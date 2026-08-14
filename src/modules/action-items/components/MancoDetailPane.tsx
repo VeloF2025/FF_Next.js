@@ -25,6 +25,19 @@ interface MancoDetailPaneProps {
  * Shows metadata, meeting context, status editor, reference link, document
  * upload, and a comment thread.
  */
+/**
+ * The message an API error actually carries.
+ *
+ * apiResponse nests it under `error.message`; reading `json.message` yields undefined and
+ * every failure renders the generic fallback instead. That matters now that these routes
+ * return a specific 403 — a viewer denied edit access would otherwise just see
+ * "Failed to update status" with no reason.
+ */
+function apiMessage(json: unknown): string | undefined {
+  const body = json as { error?: { message?: string }; message?: string } | null;
+  return body?.error?.message ?? body?.message;
+}
+
 export function MancoDetailPane({
   item,
   isOpen,
@@ -100,7 +113,7 @@ export function MancoDetailPane({
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({ message: undefined })) as { message?: string };
-        toast.error(json.message ?? 'Failed to update status');
+        toast.error(apiMessage(json) ?? 'Failed to update status');
         log.error('Failed to update status', { itemId: item.id, status: res.status });
         return;
       }
@@ -128,7 +141,7 @@ export function MancoDetailPane({
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({ message: undefined })) as { message?: string };
-        toast.error(json.message ?? 'Failed to update ongoing status');
+        toast.error(apiMessage(json) ?? 'Failed to update ongoing status');
         log.error('Failed to toggle ongoing', { itemId: item.id, status: res.status });
         return;
       }
@@ -160,7 +173,7 @@ export function MancoDetailPane({
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({ message: undefined })) as { message?: string };
-        toast.error(json.message ?? 'Failed to add comment');
+        toast.error(apiMessage(json) ?? 'Failed to add comment');
         log.error('Failed to add comment', { itemId: item.id, status: res.status });
         return;
       }
