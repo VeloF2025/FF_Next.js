@@ -540,54 +540,97 @@ else
   warn "Health check returned HTTP $HTTP_CODE — may still be starting up"
 fi
 
-# --- Step 9b: Restart the MCP connector if its code changed ---
+# --- Step 9b: Restart the MCP connector if it is older than its own code ---
 #
-# The connectors run OUT OF the deploy directory but are not the service this script
+# The connectors run OUT OF the deploy directories but are not the service this script
 # restarts:
 #
-#   ff-remote-mcp.service             PYTHONPATH=/home/velo/fibreflow-dev/apps
-#   ff-remote-mcp-production.service  PYTHONPATH=/home/velo/fibreflow-production/apps
+#   ff-remote-mcp.service             PYTHONPATH=/home/velo/fibreflow-dev/apps         :7416
+#   ff-remote-mcp-production.service  PYTHONPATH=/home/velo/fibreflow-production/apps  :7417
 #
-# So a deploy rewrites apps/ff_mcp/*.py under a live process that already imported the
-# old modules, and nothing says so: the health check and the BUILD_ID match both describe
-# the Next.js app only. On 2026-08-13 that shipped a security fix — an MCP denylist entry
-# — that was present on disk and absent from both running connectors. A grep of the
-# deployed file would have "confirmed" a fix that was not live.
+# So a deploy rewrites apps/ff_mcp/*.py under a live process that already imported the old
+# modules, and nothing says so: the health check and the BUILD_ID match both describe the
+# Next.js app only. On 2026-08-13 that shipped an MCP denylist entry that was present on
+# disk in both deploy dirs and absent from both running connectors.
 #
-# Restarted only when apps/ff_mcp actually changed, because a restart drops in-flight MCP
-# sessions and most deploys do not touch it.
+# The condition is "is the RUNNING PROCESS older than the code on disk", not "did this
+# deploy change apps/ff_mcp". The commit-range version of this check was wrong on the
+# commonest recovery path: the pull happens ~370 lines above, and a deploy that pulls new
+# Python and then dies at the build leaves it on disk. The retry then sees an unchanged
+# commit range, skips, and the connector serves stale code with no output at all.
 MCP_UNIT=""
+MCP_PORT=""
 case "$TARGET" in
-  dev)        MCP_UNIT="ff-remote-mcp.service" ;;
-  production) MCP_UNIT="ff-remote-mcp-production.service" ;;
+  dev)        MCP_UNIT="ff-remote-mcp.service"; MCP_PORT="7416" ;;
+  production) MCP_UNIT="ff-remote-mcp-production.service"; MCP_PORT="7417" ;;
 esac
 
-if [[ -n "$MCP_UNIT" && "$CURRENT_COMMIT" != "$NEW_COMMIT" ]]; then
-  MCP_CHANGED=$(sudo -u velo bash -c \
-    "cd '$DIR' && git diff --name-only '$CURRENT_COMMIT' '$NEW_COMMIT' -- apps/ff_mcp 2>/dev/null | head -1") || MCP_CHANGED=""
+# `systemctl --user` acts on the invoking user's units, so an unattended run (cron, sudo,
+# another account) cannot see them. That warns rather than failing: the app deploy
+# succeeded, and a stale connector is a smaller problem than an aborted deploy.
+if [[ -n "$MCP_UNIT" ]] && ! systemctl --user list-unit-files "$MCP_UNIT" >/dev/null 2>&1; then
+  warn "$MCP_UNIT is not visible to this user — if apps/ff_mcp changed, the connector is"
+  warn "  still running the old code. Restart it as the account that owns the unit."
+  MCP_UNIT=""
+fi
 
-  if [[ -n "$MCP_CHANGED" ]]; then
-    # `systemctl --user` targets the invoking user's units, so this only works when the
-    # deploy is run by the account that owns them. Unattended runs (cron, another user)
-    # warn rather than fail: the app deploy itself succeeded, and a stale connector is a
-    # smaller problem than an aborted deploy that leaves the environment half-updated.
-    if systemctl --user list-unit-files "$MCP_UNIT" >/dev/null 2>&1; then
-      log "apps/ff_mcp changed — restarting $MCP_UNIT"
-      if systemctl --user restart "$MCP_UNIT" 2>/dev/null; then
-        sleep 3
-        MCP_STATE=$(systemctl --user is-active "$MCP_UNIT" 2>/dev/null || echo unknown)
-        if [[ "$MCP_STATE" == "active" ]]; then
-          log "$MCP_UNIT is active on the new code"
-        else
-          warn "$MCP_UNIT is '$MCP_STATE' after restart — check: systemctl --user status $MCP_UNIT"
-        fi
-      else
-        warn "could not restart $MCP_UNIT — it is STILL RUNNING THE OLD CODE"
-        warn "  run: systemctl --user restart $MCP_UNIT"
-      fi
+if [[ -n "$MCP_UNIT" ]]; then
+  # Strip the weekday: `find -newermt` parses "2026-08-14 08:12:11 SAST", not "Fri ...".
+  MCP_STARTED=$(systemctl --user show "$MCP_UNIT" -p ActiveEnterTimestamp --value 2>/dev/null || echo "")
+  MCP_STARTED="${MCP_STARTED#* }"
+
+  MCP_STALE=""
+  if [[ -z "$MCP_STARTED" ]]; then
+    warn "could not read $MCP_UNIT start time — restarting rather than assuming it is current"
+    MCP_STALE="unknown-start-time"
+  # Tests and conftest are excluded: they are not imported by the running service, and
+  # restarting for them drops live MCP sessions for no gain.
+  elif ! MCP_STALE=$(sudo -u velo find "$DIR/apps/ff_mcp" \
+         \( -name '*.py' -o -name '*.json' \) \
+         ! -name 'test_*.py' ! -name 'conftest.py' \
+         -newermt "$MCP_STARTED" -print -quit 2>&1); then
+    # Fails SAFE. A check that could not run has not established that the connector is
+    # current, and an unnecessary restart is cheap next to silently serving old code.
+    warn "staleness check for $MCP_UNIT failed (${MCP_STALE:-no output}) — restarting to be safe"
+    MCP_STALE="check-failed"
+  fi
+
+  if [[ -n "$MCP_STALE" ]]; then
+    log "$MCP_UNIT is older than its code — restarting"
+    MCP_OLD_PID=$(systemctl --user show "$MCP_UNIT" -p MainPID --value 2>/dev/null || echo 0)
+    MCP_ERR=$(systemctl --user restart "$MCP_UNIT" 2>&1) && MCP_RESTARTED=true || MCP_RESTARTED=false
+
+    if [[ "$MCP_RESTARTED" != true ]]; then
+      warn "restart of $MCP_UNIT FAILED: ${MCP_ERR:-no output from systemctl}"
+      warn "  the connector may now be DOWN rather than merely stale."
+      warn "  systemctl --user reset-failed $MCP_UNIT && systemctl --user restart $MCP_UNIT"
     else
-      warn "apps/ff_mcp changed but $MCP_UNIT is not visible to this user"
-      warn "  the connector is still running the old code — restart it as its owner"
+      # `systemctl restart` returns as soon as exec succeeds, and these units are
+      # Type=simple with Restart=always — so a connector that imports fine and dies two
+      # seconds later still looks "active" to a sleep-then-is-active check. Wait for a NEW
+      # pid AND an actual HTTP answer, which is the only evidence it is serving the new code.
+      MCP_OK=false
+      MCP_STATE="unknown"
+      for _ in $(seq 1 20); do
+        sleep 1
+        MCP_STATE=$(systemctl --user is-active "$MCP_UNIT" 2>/dev/null || echo unknown)
+        MCP_NEW_PID=$(systemctl --user show "$MCP_UNIT" -p MainPID --value 2>/dev/null || echo 0)
+        if [[ "$MCP_STATE" == "active" && "$MCP_NEW_PID" != "0" && "$MCP_NEW_PID" != "$MCP_OLD_PID" ]]; then
+          if curl -fsS -o /dev/null --max-time 3 \
+               "http://127.0.0.1:$MCP_PORT/.well-known/oauth-authorization-server" 2>/dev/null; then
+            log "$MCP_UNIT restarted and serving (pid $MCP_OLD_PID -> $MCP_NEW_PID)"
+            MCP_OK=true
+            break
+          fi
+        fi
+      done
+
+      if [[ "$MCP_OK" != true ]]; then
+        warn "$MCP_UNIT did not come back cleanly within 20s (state=$MCP_STATE)"
+        warn "  it may be DOWN or crash-looping, NOT simply running old code."
+        warn "  systemctl --user status $MCP_UNIT"
+        warn "  if failed: systemctl --user reset-failed $MCP_UNIT && systemctl --user restart $MCP_UNIT"
+      fi
     fi
   fi
 fi
