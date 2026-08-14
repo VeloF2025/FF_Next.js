@@ -184,6 +184,26 @@ describe('useFleetMapLayers', () => {
     expect({ telemetryCalls, overlayCalls }).toEqual({ telemetryCalls: 2, overlayCalls: 1 });
   });
 
+  it('stops overlay polling after SAST midnight while live telemetry continues', async () => {
+    vi.setSystemTime(new Date('2026-08-14T21:59:45.000Z'));
+    let telemetryCalls = 0;
+    let overlayCalls = 0;
+    global.fetch = vi.fn((input) => {
+      if (String(input) === '/api/fleet/positions/live') {
+        telemetryCalls += 1; return Promise.resolve(ok(telemetry));
+      }
+      overlayCalls += 1; return Promise.resolve(ok(overlay));
+    });
+    renderHook(() => useFleetMapLayers({
+      projectId: PROJECT_A, workDate: '2026-08-14', asOf: '2026-08-14T21:59:45.000Z',
+    }));
+    await flush();
+    expect({ telemetryCalls, overlayCalls }).toEqual({ telemetryCalls: 1, overlayCalls: 1 });
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect({ telemetryCalls, overlayCalls }).toEqual({ telemetryCalls: 2, overlayCalls: 1 });
+  });
+
   it('clears project A overlay while project B is pending and keeps it clear when B fails', async () => {
     const projectB = deferredResponse();
     global.fetch = vi.fn((input) => {

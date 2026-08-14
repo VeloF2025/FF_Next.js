@@ -10,6 +10,7 @@ import {
 import { currentOperationFilters, isCurrentOperationDate } from './useOperationalOverview';
 
 const POLL_INTERVAL_MS = 30_000;
+const ALWAYS_POLL = (): boolean => true;
 
 export interface FleetMapLayerState<T> {
   data: T | null;
@@ -25,7 +26,7 @@ function emptyLayerState<T>(selectionKey: string): FleetMapLayerInternalState<T>
 }
 
 function usePollingLayer<T>(
-  load: (signal: AbortSignal) => Promise<T>, poll: boolean, selectionKey: string,
+  load: (signal: AbortSignal) => Promise<T>, shouldPoll: () => boolean, selectionKey: string,
 ): FleetMapLayerState<T> {
   const controller = useRef<AbortController | null>(null);
   const generation = useRef(0);
@@ -51,12 +52,22 @@ function usePollingLayer<T>(
 
   useEffect(() => {
     void refresh();
-    const timer = poll ? window.setInterval(() => { void refresh(); }, POLL_INTERVAL_MS) : undefined;
+    let timer: number | undefined;
+    if (shouldPoll()) {
+      timer = window.setInterval(() => {
+        if (!shouldPoll()) {
+          if (timer !== undefined) window.clearInterval(timer);
+          timer = undefined;
+          return;
+        }
+        void refresh();
+      }, POLL_INTERVAL_MS);
+    }
     return () => {
       if (timer !== undefined) window.clearInterval(timer);
       controller.current?.abort();
     };
-  }, [poll, refresh]);
+  }, [refresh, shouldPoll]);
   const visible = state.selectionKey === selectionKey ? state : emptyLayerState<T>(selectionKey);
   return { data: visible.data, lastSuccessAt: visible.lastSuccessAt, error: visible.error, refresh };
 }
@@ -68,14 +79,16 @@ export interface FleetMapLayersState {
 
 export function useFleetMapLayers(filters: OperationFilters): FleetMapLayersState {
   const filterKey = serializeOperationFilters(filters);
-  const current = isCurrentOperationDate(parseOperationFilters(filterKey).workDate);
   const loadTelemetry = useCallback((signal: AbortSignal) => operationsPresentationApi.telemetry(signal), []);
   const loadOverlay = useCallback((signal: AbortSignal) => {
     const parsed = currentOperationFilters(parseOperationFilters(filterKey));
     return operationsPresentationApi.overlay(parsed, signal);
   }, [filterKey]);
+  const shouldPollOverlay = useCallback(
+    () => isCurrentOperationDate(parseOperationFilters(filterKey).workDate), [filterKey],
+  );
   return {
-    telemetry: usePollingLayer(loadTelemetry, true, 'live-telemetry'),
-    overlay: usePollingLayer(loadOverlay, current, filterKey),
+    telemetry: usePollingLayer(loadTelemetry, ALWAYS_POLL, 'live-telemetry'),
+    overlay: usePollingLayer(loadOverlay, shouldPollOverlay, filterKey),
   };
 }
