@@ -55,6 +55,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const { date, source } = req.query;
     if (typeof date === 'string' && date) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return apiResponse.badRequest(res, 'date must be an ISO date (YYYY-MM-DD)');
+      }
       const params: unknown[] = [date];
       let where = 'snapshot_date = $1::date';
       if (typeof source === 'string' && source) {
