@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-14T02:39:24.130Z",
+  "generatedAt": "2026-08-14T14:38:37.307Z",
   "routes": [
     {
       "path": "/api/activate/:dropNumber",
@@ -4184,6 +4184,14 @@
       "group": "procurement"
     },
     {
+      "path": "/api/procurement/stock-snapshots",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/stock-snapshots"
+    },
+    {
       "path": "/api/procurement/stock-takes",
       "methods": [
         "GET"
@@ -4891,6 +4899,14 @@
       ],
       "group": "reporting",
       "description": "GET /api/reporting/action-items?state=open&assignee=…&olderThanDays=90"
+    },
+    {
+      "path": "/api/reporting/attendance",
+      "methods": [
+        "GET"
+      ],
+      "group": "reporting",
+      "description": "GET /api/reporting/attendance?mode=person|roster|exceptions&person=…&since=…&until=…"
     },
     {
       "path": "/api/reporting/export",
