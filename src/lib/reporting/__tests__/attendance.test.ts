@@ -11,9 +11,12 @@ import { describe, expect, it } from 'vitest';
 import { parseAttendanceFilter, MAX_ATTENDANCE_ROWS } from '../attendanceFilter';
 import { attendanceQuery, shapeAttendance, type AttendanceDayRow } from '../attendance';
 
+/** The caller sees everything — the note that adds no scope caveat. */
+const ORGWIDE = { kind: 'orgwide' } as const;
+
 function filter(query: Record<string, string | string[] | undefined> = {}) {
   // Every query now needs a bound; supply one unless the case sets its own.
-  if (!query.person && !query.since && !query.until) query = { ...query, person: 'someone' };
+  if (!query.person && !query.since && !query.until && query.mode !== 'exceptions') query = { ...query, person: 'someone' };
   const parsed = parseAttendanceFilter(query);
   if ('error' in parsed) throw new Error(`unexpected rejection: ${parsed.error}`);
   return parsed.filter;
@@ -49,7 +52,7 @@ describe('parseAttendanceFilter', () => {
     // attendance record for every person.
     expect('error' in parseAttendanceFilter({})).toBe(true);
     expect('error' in parseAttendanceFilter({ mode: 'person' })).toBe(true);
-    expect('error' in parseAttendanceFilter({ mode: 'exceptions' })).toBe(true);
+    // `exceptions` is exempt — it self-bounds to the outstanding queue. See below.
     // Any one bound is enough.
     expect('error' in parseAttendanceFilter({ person: 'jaun' })).toBe(false);
     expect('error' in parseAttendanceFilter({ since: '2026-08-01' })).toBe(false);
@@ -59,12 +62,31 @@ describe('parseAttendanceFilter', () => {
   it.each(['0000-00-00', '2026-02-30', '2026-13-01', '2026-00-10'])(
     'rejects %j — a shape-only regex lets it reach ::date and 500',
     (value) => {
-      expect('error' in parseAttendanceFilter({ since: value, person: 'x' })).toBe(true);
+      expect('error' in parseAttendanceFilter({ since: value, person: 'xy' })).toBe(true);
     },
   );
 
   it('accepts a real leap day', () => {
-    expect('error' in parseAttendanceFilter({ since: '2028-02-29', person: 'x' })).toBe(false);
+    expect('error' in parseAttendanceFilter({ since: '2028-02-29', person: 'xy' })).toBe(false);
+  });
+
+  it.each(['0001-01-01', '0050-06-15', '0099-12-31', '0100-01-01', '1899-12-31', '9999-12-31'])(
+    'accepts the early/late year %j that Postgres accepts',
+    (value) => {
+      // Date.UTC maps years 0-99 to 1900+y, so the first three were rejected as impossible.
+      expect('error' in parseAttendanceFilter({ since: value, person: 'xy' })).toBe(false);
+    },
+  );
+
+  it('exempts exceptions mode from the bound — "what is outstanding" is self-limiting', () => {
+    expect('error' in parseAttendanceFilter({ mode: 'exceptions' })).toBe(false);
+  });
+
+  it('does not accept a single character as a bound', () => {
+    // `person="a"` matched 2,238 days across the workforce — a statement of intent, not a
+    // narrowing.
+    expect('error' in parseAttendanceFilter({ person: 'a' })).toBe(true);
+    expect('error' in parseAttendanceFilter({ person: 'ab' })).toBe(false);
   });
 
   it('requires a date for roster mode', () => {
@@ -87,7 +109,7 @@ describe('parseAttendanceFilter', () => {
   });
 
   it('takes the first value of a repeated parameter', () => {
-    expect(filter({ person: ['a', 'b'] }).person).toBe('a');
+    expect(filter({ person: ['ab', 'cd'] }).person).toBe('ab');
   });
 });
 
@@ -95,23 +117,23 @@ describe('supervisor scope', () => {
   it('filters to the allowed staff when the caller is scoped', () => {
     // 11 of 14 staff-linked managers supervise exactly themselves. Without this the key
     // alone would hand them all 54 people with attendance.
-    const { sql, params } = attendanceQuery(filter({ person: 'x' }), ['abc', 'def']);
+    const { sql, params } = attendanceQuery(filter({ person: 'xy' }), ['abc', 'def']);
     expect(sql).toContain('staff_id = ANY(');
     expect(params).toContainEqual(['abc', 'def']);
   });
 
   it('treats an EMPTY allow-list as "nobody", not as "no filter"', () => {
-    const { sql, params } = attendanceQuery(filter({ person: 'x' }), []);
+    const { sql, params } = attendanceQuery(filter({ person: 'xy' }), []);
     expect(sql).toContain('staff_id = ANY(');
     expect(params).toContainEqual([]);
   });
 
   it('omits the filter only for an org-wide caller', () => {
-    expect(attendanceQuery(filter({ person: 'x' }), null).sql).not.toContain('staff_id = ANY(');
+    expect(attendanceQuery(filter({ person: 'xy' }), null).sql).not.toContain('staff_id = ANY(');
   });
 
   it('scopes the exceptions mode on its own spine alias', () => {
-    const { sql } = attendanceQuery(filter({ mode: 'exceptions', person: 'x' }), ['abc']);
+    const { sql } = attendanceQuery(filter({ mode: 'exceptions', person: 'xy' }), ['abc']);
     expect(sql).toContain('x.staff_id = ANY(');
   });
 });
@@ -153,8 +175,10 @@ describe('attendanceQuery', () => {
   });
 
   it('escapes LIKE metacharacters so a bare % matches nothing', () => {
-    const { params } = attendanceQuery(filter({ person: '%' }), null);
-    expect(params).toContain('%\\%%');
+    // A single `%` no longer satisfies the bound on its own, so pair it with a date —
+    // the escaping is what is under test, not the bound.
+    const { params } = attendanceQuery(filter({ person: '%%', since: '2026-01-01' }), null);
+    expect(params).toContain('%\\%\\%%');
   });
 
   it('reads exceptions from the day-level table, not the entry-level one', () => {
@@ -207,28 +231,28 @@ describe('shapeAttendance', () => {
 
   it('formats the date from local parts, not toISOString', () => {
     // A DATE arrives as a local-midnight Date; toISOString would move it a day earlier.
-    expect(shapeAttendance([row()], filter()).days[0].date).toBe('2026-08-12');
+    expect(shapeAttendance([row()], filter(), ORGWIDE).days[0].date).toBe('2026-08-12');
   });
 
   it('parses numeric hours that arrive as strings', () => {
-    const day = shapeAttendance([row()], filter()).days[0];
+    const day = shapeAttendance([row()], filter(), ORGWIDE).days[0];
     expect(day.regularHours).toBe(8);
     expect(day.overtimeHours).toBe(1.5);
   });
 
   it('keeps a missing hour value null rather than calling it zero', () => {
     // `+null` is 0, which would report a day with no computed hours as a day off.
-    const day = shapeAttendance([row({ regular_hrs: null })], filter()).days[0];
+    const day = shapeAttendance([row({ regular_hrs: null })], filter(), ORGWIDE).days[0];
     expect(day.regularHours).toBeNull();
   });
 
   it('warns that a person total is a floor', () => {
-    const caveats = shapeAttendance([row()], filter({ person: 'jaun' })).caveats.join(' ');
+    const caveats = shapeAttendance([row()], filter({ person: 'jaun' }), ORGWIDE).caveats.join(' ');
     expect(caveats).toContain('FLOOR');
   });
 
   it('warns when days are not approved, so hours are provisional', () => {
-    const caveats = shapeAttendance([row({ result_status: null })], filter()).caveats.join(' ');
+    const caveats = shapeAttendance([row({ result_status: null })], filter(), ORGWIDE).caveats.join(' ');
     expect(caveats).toContain('provisional');
   });
 
@@ -250,25 +274,42 @@ describe('shapeAttendance', () => {
   });
 
   it('says an exception is about the data, not the person', () => {
-    const caveats = shapeAttendance([row()], filter({ mode: 'exceptions' })).caveats.join(' ');
+    const caveats = shapeAttendance([row()], filter({ mode: 'exceptions' }), ORGWIDE).caveats.join(' ');
     expect(caveats).toContain('not that the person did anything wrong');
   });
 
   it('reports truncation against the real total AND flags the hours as partial', () => {
-    const report = shapeAttendance([row({ total_matched: 900 })], filter());
+    const report = shapeAttendance([row({ total_matched: 900 })], filter(), ORGWIDE);
     expect(report.caveats.join(' ')).toContain('900');
     expect(report.caveats.join(' ')).toContain('PARTIAL');
     expect(report.totals.hoursArePartial).toBe(true);
   });
 
   it('does not flag partial hours when nothing was truncated', () => {
-    expect(shapeAttendance([row()], filter()).totals.hoursArePartial).toBe(false);
+    expect(shapeAttendance([row()], filter(), ORGWIDE).totals.hoursArePartial).toBe(false);
   });
 
   it('says an empty result means "not recorded", not "did not work"', () => {
-    const caveats = shapeAttendance([], filter()).caveats.join(' ');
+    const caveats = shapeAttendance([], filter(), ORGWIDE).caveats.join(' ');
     expect(caveats).toContain('not that nobody worked');
     expect(caveats).toContain('2026-07-13');
+  });
+
+  it('does NOT blame missing data when the caller simply cannot see it', () => {
+    // The trap: an empty result for someone who supervises nobody explained as "nothing
+    // was recorded" is false — the records exist. An agent reading the first caveat would
+    // report no attendance for a period holding thousands of days of it.
+    const report = shapeAttendance([], filter(), { kind: 'no_scope', reason: 'not linked.' });
+    const joined = report.caveats.join(' ');
+    expect(joined).not.toContain('nothing was RECORDED');
+    expect(joined).toContain('about your access');
+    // And the scope explanation precedes any empty-result explanation.
+    expect(report.caveats.some((c) => c.includes('no staff in scope'))).toBe(true);
+  });
+
+  it('does not blame missing data for a scoped caller either', () => {
+    const joined = shapeAttendance([], filter(), { kind: 'scoped', staffCount: 2 }).caveats.join(' ');
+    expect(joined).not.toContain('nothing was RECORDED');
   });
 
   it('says when the caller is seeing only their own supervised staff', () => {
@@ -292,13 +333,13 @@ describe('shapeAttendance', () => {
   });
 
   it('sums hours across the returned days', () => {
-    const report = shapeAttendance([row(), row()], filter());
+    const report = shapeAttendance([row(), row()], filter(), ORGWIDE);
     expect(report.totals.regularHoursShown).toBe(16);
     expect(report.totals.overtimeHoursShown).toBe(3);
   });
 
   it('returns null totals rather than 0 when nothing has hours', () => {
-    const report = shapeAttendance([row({ regular_hrs: null, overtime_hrs: null })], filter());
+    const report = shapeAttendance([row({ regular_hrs: null, overtime_hrs: null })], filter(), ORGWIDE);
     expect(report.totals.regularHoursShown).toBeNull();
   });
 

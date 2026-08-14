@@ -86,7 +86,12 @@ describe('attendance queries (real Postgres)', () => {
     if ('error' in parsed) throw new Error(parsed.error);
     const { sql, params } = attendanceQuery(parsed.filter, allowed);
     const { rows } = await pool.query(sql, params);
-    return shapeAttendance(rows as never, parsed.filter);
+    // The note is REQUIRED alongside the ids — passing one without the other is the
+    // half-enforced pairing this helper used to demonstrate.
+    const note = allowed === null
+      ? { kind: 'orgwide' as const }
+      : { kind: 'scoped' as const, staffCount: allowed.length };
+    return shapeAttendance(rows as never, parsed.filter, note);
   }
 
   describe('person mode', () => {
@@ -209,8 +214,10 @@ describe('attendance queries (real Postgres)', () => {
   });
 
   describe('inputs that must not widen', () => {
-    it('a bare % matches nothing rather than everyone', async () => {
-      expect((await report({ person: '%' })).totals.daysShown).toBe(0);
+    it('a wildcard matches nothing rather than everyone', async () => {
+      // `%` alone is one character and no longer satisfies the bound, so use two — the
+      // escaping is what is under test.
+      expect((await report({ person: '%%' })).totals.daysShown).toBe(0);
     });
 
     it('an injection attempt returns nothing', async () => {

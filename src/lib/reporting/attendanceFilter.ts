@@ -46,7 +46,10 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 function isRealDate(value: string): boolean {
   const [y, m, d] = value.split('-').map(Number);
   if (!y || !m || !d) return false;
-  const dt = new Date(Date.UTC(y, m - 1, d));
+  // setUTCFullYear, not the Date.UTC constructor: that maps years 0-99 to 1900+y, so
+  // every year before 0100 was rejected as impossible.
+  const dt = new Date(Date.UTC(2000, m - 1, d));
+  dt.setUTCFullYear(y);
   return (
     dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
   );
@@ -90,12 +93,24 @@ export function parseAttendanceFilter(
   // differed. `get_attendance()` with no arguments did exactly that and returned every
   // summary row in the system. A question about attendance is always about somebody or
   // some period; "everyone, ever" is not a question anyone asked.
-  const bounded = Boolean(person) || Boolean(since) || Boolean(until);
+  // `exceptions` is self-bounding and exempt: it returns only days still awaiting
+  // somebody, of which there are ~1,100 in total, under the same 500 cap. "What is
+  // outstanding" is the natural phrasing of that question and requiring a date for it
+  // removed a legitimate call without closing any real exposure.
+  //
+  // A one-character `person` satisfies this rule while matching thousands of days, so it
+  // is a statement of intent rather than a volume control — the cap and the partial-total
+  // flag are what bound the volume. Two characters at least stops a bare letter.
+  const bounded =
+    mode === 'exceptions' ||
+    (person ? person.length >= 2 : false) ||
+    Boolean(since) ||
+    Boolean(until);
   if (!bounded) {
     return {
       error:
-        'Narrow the query: give `person`, or a `since`/`until` range. ' +
-        'Without either this would return every attendance record for every person.',
+        'Narrow the query: give `person` (at least two characters), or a `since`/`until` ' +
+        'range. Without either this would return every attendance record for every person.',
     };
   }
   if (mode === 'roster' && !since) {
