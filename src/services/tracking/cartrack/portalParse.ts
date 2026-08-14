@@ -65,11 +65,22 @@ export function plateOf(v: FleetwebVehicle): string | null {
  * "1" on parked vehicles. Hence 2=on / 1=off.
  *
  * That is a two-state observation of an undocumented enum, not a specification,
- * so every other value is reported unknown rather than guessed. Note no current
- * consumer reads `ignition` at all — the parking-compliance classifier decides
- * purely on distance and fix age — so a wrong mapping would not corrupt a
- * verdict today. It is kept honest for the consumer that eventually does,
- * because `false` reads as a definite state and a guess would be invisible.
+ * so every other value is reported unknown rather than guessed.
+ *
+ * THIS MAPPING IS NOW LOAD-BEARING. It used to say no consumer read `ignition`
+ * at all, which stopped being true when `statusFor` (src/modules/fleet/utils/
+ * liveMapHelpers.ts) began choosing between Parked, Idling, Moving and Lost
+ * contact from it. A wrong mapping now mislabels every Cartrack-portal vehicle
+ * on the live map, so treat 2=on/1=off as a finding to re-verify against the
+ * portal rather than a settled fact.
+ *
+ * Re-verified live 2026-08-13 against the urent account: all five vehicles
+ * reported `ignition: 1` with `speed: 0`, one of them 5 days after its last
+ * event — consistent with 1=off and not with 1=on.
+ *
+ * An unrecognised value still degrades safely: null flows through to
+ * `statusFor`'s `unknown`, which renders "No recent fix" rather than asserting
+ * a state we cannot read.
  */
 export function readIgnition(raw: string | number | null | undefined): boolean | null {
   const n = num(raw);
