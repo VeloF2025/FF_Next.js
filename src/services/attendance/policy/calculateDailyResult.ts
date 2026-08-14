@@ -8,6 +8,29 @@ import type {
 
 const MINUTE_MS = 60_000;
 
+/**
+ * Longest span a single work date can represent (#2479). A clock-in and
+ * clock-out more than 24h apart is not a long shift — it is a missed clock-out,
+ * the same class of defect as a negative span. This bounds the three columns
+ * written straight from the span: `recorded_elapsed_hrs`, `proposed_sunday_hrs`
+ * and `proposed_holiday_hrs`, all `<= 24`.
+ */
+const MAX_ELAPSED_MINUTES = 24 * 60;
+
+/**
+ * Ceiling on `proposed_overtime_hrs`, mirroring its CHECK constraint.
+ *
+ * Overtime needs its own bound — the span cap does not imply one. Overtime is
+ * `max(0, start - in) + max(0, out - end)`, which when both terms are positive
+ * is `span - scheduleWindow`, so the worst case scales with how SHORT the
+ * schedule is. A 24h span against the 9h weekday window gives exactly 15h and
+ * fits; the same span against the 5h Saturday window (08:00–13:00) gives 19h
+ * and breaches the constraint, dropping the day out of payroll exactly as
+ * #2479 did. Deriving the guard from the constraint rather than from today's
+ * schedule numbers keeps it correct if a window is ever shortened.
+ */
+const MAX_PROPOSED_OVERTIME_HOURS = 15;
+
 interface DaySchedule {
   paidHours: number;
   start: Date | null;
@@ -67,7 +90,12 @@ export function calculateDailyResult(input: CalculateDailyResultInput): Calculat
   if (!evidence.clockOutAt) return missingClockOut(base, effective, schedule);
 
   const elapsedMinutes = toMinutes(evidence.clockOutAt.getTime() - evidence.clockInAt.getTime());
-  if (elapsedMinutes <= 0) {
+  // Both directions are unreliable evidence, so both park the day without
+  // proposing hours. Projecting nothing is deliberate: the raw timestamps stay
+  // on the entry for the supervisor, and a clamped figure would put a number
+  // nobody measured in front of them. Letting the projection throw instead is
+  // what dropped these days out of payroll entirely (#2479).
+  if (elapsedMinutes <= 0 || elapsedMinutes > MAX_ELAPSED_MINUTES) {
     return finish(base, effective, {
       status: 'awaiting_supervisor',
       exceptionKinds: ['evidence_unreliable'],
@@ -126,6 +154,18 @@ function completeScheduledDay(
   const exceptions: DayExceptionKind[] = [];
   const overtimeMinutes = Math.max(0, toMinutes(schedule.start.getTime() - clockInAt.getTime())) +
     Math.max(0, toMinutes(clockOutAt.getTime() - schedule.end.getTime()));
+
+  // Overtime beyond the constraint ceiling is not a very long shift, it is
+  // evidence a clock-out was missed — the same conclusion as an over-long span,
+  // reached from the other bound. Park the day instead of proposing a figure
+  // the INSERT would reject.
+  if (toHours(overtimeMinutes) > MAX_PROPOSED_OVERTIME_HOURS) {
+    return finish(base, input, {
+      status: 'awaiting_supervisor',
+      exceptionKinds: ['evidence_unreliable'],
+    });
+  }
+
   const late = clockInAt.getTime() > schedule.start.getTime();
   const early = clockOutAt.getTime() < schedule.end.getTime();
 
