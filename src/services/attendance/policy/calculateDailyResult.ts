@@ -8,6 +8,29 @@ import type {
 
 const MINUTE_MS = 60_000;
 
+/**
+ * Longest span a single work date can represent. A clock-in and clock-out more
+ * than 24h apart is not a long shift — it is a worker who forgot to clock out
+ * and clocked out the following day, which is the same class of defect as a
+ * negative span.
+ *
+ * This bound is also what keeps every projected column inside its CHECK
+ * constraint, so it must not be raised without revisiting them:
+ *
+ *   recorded_elapsed_hrs  <= 24   — set directly from the span
+ *   proposed_sunday_hrs   <= 24   — set directly from the span
+ *   proposed_holiday_hrs  <= 24   — set directly from the span
+ *   proposed_overtime_hrs <= 15   — early + late, which is bounded by the span
+ *
+ * The overtime bound follows from the other three. With a weekday schedule of
+ * start..end, overtime is max(0, start - in) + max(0, out - end); when both
+ * terms are positive that sums to (out - in) - (end - start), so a span of at
+ * most 24h over a 9h schedule can never exceed 15h of overtime. A 25h span can
+ * (and did — see #2479), which is why the guard belongs here on the span
+ * rather than as a clamp on each column.
+ */
+const MAX_ELAPSED_MINUTES = 24 * 60;
+
 interface DaySchedule {
   paidHours: number;
   start: Date | null;
@@ -67,7 +90,13 @@ export function calculateDailyResult(input: CalculateDailyResultInput): Calculat
   if (!evidence.clockOutAt) return missingClockOut(base, effective, schedule);
 
   const elapsedMinutes = toMinutes(evidence.clockOutAt.getTime() - evidence.clockInAt.getTime());
-  if (elapsedMinutes <= 0) {
+  // Both directions are unreliable evidence, so both park the day for a
+  // supervisor without proposing hours. Projecting nothing is deliberate: the
+  // raw timestamps stay on the entry for the supervisor to read, and inventing
+  // a clamped figure here would put a number nobody measured in front of them.
+  // The alternative — letting the projection throw — is what dropped these days
+  // out of payroll entirely (#2479).
+  if (elapsedMinutes <= 0 || elapsedMinutes > MAX_ELAPSED_MINUTES) {
     return finish(base, effective, {
       status: 'awaiting_supervisor',
       exceptionKinds: ['evidence_unreliable'],

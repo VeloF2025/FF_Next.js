@@ -27,8 +27,15 @@
  *   - Fine-grained events inside reconcile.ts still go to the in-memory
  *     logger — visible via the usual /api/system/logs path in the app.
  *
- * Exits non-zero on an unrecoverable error. Day failures remain visible in the
- * persisted run and report without blocking successful worker/date projections.
+ * Exit codes:
+ *   0 — every day in the window projected cleanly
+ *   1 — unrecoverable error; nothing can be trusted from this run
+ *   2 — refused to start (missing .env.production or DATABASE_URL)
+ *   3 — partial: some days failed, the rest projected. The failed day keys and
+ *       their reasons are persisted on attendance_reconciliation_runs.
+ *
+ * Day failures do not block successful worker/date projections, but they do
+ * make the run exit non-zero so cron monitoring can see them.
  *
  * Imports ordering matters: dotenv MUST run before we import modules that
  * instantiate the pg.Pool (db-pool.ts constructs the pool at module load).
@@ -98,6 +105,11 @@ function parseArg(name: string): string | undefined {
       stderr(
         `[attendance-reconcile] failedDayKeys=${report.failedDayKeys.join(',')}`
       );
+      // Exit non-zero so a partial run is visible to cron monitoring. Two
+      // consecutive nights of partial runs went unnoticed because this used to
+      // exit 0 regardless (#2480). Code 3 distinguishes "some days failed, the
+      // rest projected" from a fatal error (1) or a config refusal (2).
+      process.exit(3);
     }
     process.exit(0);
   } catch (err) {
