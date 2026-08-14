@@ -35,6 +35,11 @@ function ok(data: unknown): Response {
 function fail(status: number, code: string, message: string): Response {
   return { ok: false, status, json: async () => ({ success: false, error: { code, message } }) } as Response;
 }
+function deferredResponse(): { promise: Promise<Response>; resolve: (response: Response) => void } {
+  let resolve: (response: Response) => void = () => undefined;
+  const promise = new Promise<Response>((done) => { resolve = done; });
+  return { promise, resolve };
+}
 async function flush(): Promise<void> {
   await act(async () => { await Promise.resolve(); });
 }
@@ -72,6 +77,42 @@ describe('useOperationalOverview', () => {
 
     await act(async () => { await hook.result.current.refresh(); });
     expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops current-date polling after the SAST work date rolls over', async () => {
+    vi.setSystemTime(new Date('2026-08-14T21:59:45.000Z'));
+    global.fetch = vi.fn().mockResolvedValue(ok(overview));
+    renderHook(() => useOperationalOverview({
+      projectId: PROJECT_A, workDate: '2026-08-14', asOf: '2026-08-14T21:59:45.000Z',
+    }));
+    await flush();
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears project A data while project B is pending and keeps it clear when B fails', async () => {
+    const projectB = deferredResponse();
+    global.fetch = vi.fn((input) => String(input).includes(PROJECT_A)
+      ? Promise.resolve(ok(overview)) : projectB.promise);
+    const hook = renderHook(({ projectId }) => useOperationalOverview({ ...historicalFilters, projectId }), {
+      initialProps: { projectId: PROJECT_A },
+    });
+    await flush();
+    expect(hook.result.current.data).toEqual(overview);
+
+    hook.rerender({ projectId: PROJECT_B });
+    await flush();
+    expect(hook.result.current.data).toBeNull();
+    expect(hook.result.current.lastSuccessAt).toBeNull();
+
+    await act(async () => {
+      projectB.resolve(fail(503, 'SERVICE_UNAVAILABLE', 'Project B unavailable'));
+      await projectB.promise;
+    });
+    expect(hook.result.current.data).toBeNull();
+    expect(hook.result.current.error).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
   });
 
   it('aborts superseded and unmounted requests', async () => {
@@ -126,6 +167,50 @@ describe('useOperationalOverview', () => {
 });
 
 describe('useFleetMapLayers', () => {
+  it('keeps live telemetry polling while a historical overlay remains static', async () => {
+    let telemetryCalls = 0;
+    let overlayCalls = 0;
+    global.fetch = vi.fn((input) => {
+      if (String(input) === '/api/fleet/positions/live') {
+        telemetryCalls += 1; return Promise.resolve(ok(telemetry));
+      }
+      overlayCalls += 1; return Promise.resolve(ok(overlay));
+    });
+    renderHook(() => useFleetMapLayers(historicalFilters));
+    await flush();
+    expect({ telemetryCalls, overlayCalls }).toEqual({ telemetryCalls: 1, overlayCalls: 1 });
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect({ telemetryCalls, overlayCalls }).toEqual({ telemetryCalls: 2, overlayCalls: 1 });
+  });
+
+  it('clears project A overlay while project B is pending and keeps it clear when B fails', async () => {
+    const projectB = deferredResponse();
+    global.fetch = vi.fn((input) => {
+      const url = String(input);
+      if (url === '/api/fleet/positions/live') return Promise.resolve(ok(telemetry));
+      return url.includes(PROJECT_A) ? Promise.resolve(ok(overlay)) : projectB.promise;
+    });
+    const hook = renderHook(({ projectId }) => useFleetMapLayers({ ...historicalFilters, projectId }), {
+      initialProps: { projectId: PROJECT_A },
+    });
+    await flush();
+    expect(hook.result.current.overlay.data).toEqual(overlay);
+
+    hook.rerender({ projectId: PROJECT_B });
+    await flush();
+    expect(hook.result.current.overlay.data).toBeNull();
+    expect(hook.result.current.overlay.lastSuccessAt).toBeNull();
+    expect(hook.result.current.telemetry.data).toEqual(telemetry);
+
+    await act(async () => {
+      projectB.resolve(fail(503, 'SERVICE_UNAVAILABLE', 'Project B unavailable'));
+      await projectB.promise;
+    });
+    expect(hook.result.current.overlay.data).toBeNull();
+    expect(hook.result.current.overlay.error).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+  });
+
   it('keeps telemetry and operational overlay successes and errors independent', async () => {
     let telemetryCalls = 0;
     let overlayCalls = 0;

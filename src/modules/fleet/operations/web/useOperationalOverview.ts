@@ -32,13 +32,17 @@ export interface OperationalOverviewState {
   refresh: () => Promise<void>;
 }
 
+type OperationalOverviewInternalState = Omit<OperationalOverviewState, 'refresh'> & { selectionKey: string };
+
+function emptyOverviewState(selectionKey: string): OperationalOverviewInternalState {
+  return { selectionKey, data: null, lastSuccessAt: null, error: null };
+}
+
 export function useOperationalOverview(filters: OperationFilters): OperationalOverviewState {
   const filterKey = serializeOperationFilters(filters);
   const controller = useRef<AbortController | null>(null);
   const generation = useRef(0);
-  const [state, setState] = useState<Omit<OperationalOverviewState, 'refresh'>>({
-    data: null, lastSuccessAt: null, error: null,
-  });
+  const [state, setState] = useState<OperationalOverviewInternalState>(() => emptyOverviewState(filterKey));
 
   const refresh = useCallback(async (): Promise<void> => {
     controller.current?.abort();
@@ -51,25 +55,36 @@ export function useOperationalOverview(filters: OperationFilters): OperationalOv
         currentOperationFilters(parsed), requestController.signal,
       );
       if (requestController.signal.aborted || generation.current !== requestGeneration) return;
-      setState((previous) => ({ ...previous, data, lastSuccessAt: new Date().toISOString(), error: null }));
+      setState({ selectionKey: filterKey, data, lastSuccessAt: new Date().toISOString(), error: null });
     } catch (error) {
       if (isOperationsRequestAbort(error) || requestController.signal.aborted
         || generation.current !== requestGeneration) return;
       const typed = error instanceof OperationsPresentationApiError ? error
         : new OperationsPresentationApiError('Operational overview request failed', 0, 'UNKNOWN_ERROR');
-      setState((previous) => ({ ...previous, error: typed }));
+      setState((previous) => previous.selectionKey === filterKey
+        ? { ...previous, error: typed } : { ...emptyOverviewState(filterKey), error: typed });
     }
   }, [filterKey]);
 
   useEffect(() => {
     void refresh();
-    const timer = isCurrentOperationDate(parseOperationFilters(filterKey).workDate)
-      ? window.setInterval(() => { void refresh(); }, POLL_INTERVAL_MS) : undefined;
+    let timer: number | undefined;
+    if (isCurrentOperationDate(parseOperationFilters(filterKey).workDate)) {
+      timer = window.setInterval(() => {
+        if (!isCurrentOperationDate(parseOperationFilters(filterKey).workDate)) {
+          if (timer !== undefined) window.clearInterval(timer);
+          timer = undefined;
+          return;
+        }
+        void refresh();
+      }, POLL_INTERVAL_MS);
+    }
     return () => {
       if (timer !== undefined) window.clearInterval(timer);
       controller.current?.abort();
     };
   }, [filterKey, refresh]);
 
-  return { ...state, refresh };
+  const visible = state.selectionKey === filterKey ? state : emptyOverviewState(filterKey);
+  return { data: visible.data, lastSuccessAt: visible.lastSuccessAt, error: visible.error, refresh };
 }

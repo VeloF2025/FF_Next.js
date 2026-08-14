@@ -18,12 +18,18 @@ export interface FleetMapLayerState<T> {
   refresh: () => Promise<void>;
 }
 
-function usePollingLayer<T>(load: (signal: AbortSignal) => Promise<T>, current: boolean): FleetMapLayerState<T> {
+type FleetMapLayerInternalState<T> = Omit<FleetMapLayerState<T>, 'refresh'> & { selectionKey: string };
+
+function emptyLayerState<T>(selectionKey: string): FleetMapLayerInternalState<T> {
+  return { selectionKey, data: null, lastSuccessAt: null, error: null };
+}
+
+function usePollingLayer<T>(
+  load: (signal: AbortSignal) => Promise<T>, poll: boolean, selectionKey: string,
+): FleetMapLayerState<T> {
   const controller = useRef<AbortController | null>(null);
   const generation = useRef(0);
-  const [state, setState] = useState<Omit<FleetMapLayerState<T>, 'refresh'>>({
-    data: null, lastSuccessAt: null, error: null,
-  });
+  const [state, setState] = useState<FleetMapLayerInternalState<T>>(() => emptyLayerState(selectionKey));
   const refresh = useCallback(async (): Promise<void> => {
     controller.current?.abort();
     const requestController = new AbortController();
@@ -32,25 +38,27 @@ function usePollingLayer<T>(load: (signal: AbortSignal) => Promise<T>, current: 
     try {
       const data = await load(requestController.signal);
       if (requestController.signal.aborted || generation.current !== requestGeneration) return;
-      setState((previous) => ({ ...previous, data, lastSuccessAt: new Date().toISOString(), error: null }));
+      setState({ selectionKey, data, lastSuccessAt: new Date().toISOString(), error: null });
     } catch (error) {
       if (isOperationsRequestAbort(error) || requestController.signal.aborted
         || generation.current !== requestGeneration) return;
       const typed = error instanceof OperationsPresentationApiError ? error
         : new OperationsPresentationApiError('Fleet map layer request failed', 0, 'UNKNOWN_ERROR');
-      setState((previous) => ({ ...previous, error: typed }));
+      setState((previous) => previous.selectionKey === selectionKey
+        ? { ...previous, error: typed } : { ...emptyLayerState<T>(selectionKey), error: typed });
     }
-  }, [load]);
+  }, [load, selectionKey]);
 
   useEffect(() => {
     void refresh();
-    const timer = current ? window.setInterval(() => { void refresh(); }, POLL_INTERVAL_MS) : undefined;
+    const timer = poll ? window.setInterval(() => { void refresh(); }, POLL_INTERVAL_MS) : undefined;
     return () => {
       if (timer !== undefined) window.clearInterval(timer);
       controller.current?.abort();
     };
-  }, [current, refresh]);
-  return { ...state, refresh };
+  }, [poll, refresh]);
+  const visible = state.selectionKey === selectionKey ? state : emptyLayerState<T>(selectionKey);
+  return { data: visible.data, lastSuccessAt: visible.lastSuccessAt, error: visible.error, refresh };
 }
 
 export interface FleetMapLayersState {
@@ -67,7 +75,7 @@ export function useFleetMapLayers(filters: OperationFilters): FleetMapLayersStat
     return operationsPresentationApi.overlay(parsed, signal);
   }, [filterKey]);
   return {
-    telemetry: usePollingLayer(loadTelemetry, current),
-    overlay: usePollingLayer(loadOverlay, current),
+    telemetry: usePollingLayer(loadTelemetry, true, 'live-telemetry'),
+    overlay: usePollingLayer(loadOverlay, current, filterKey),
   };
 }
