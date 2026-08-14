@@ -68,10 +68,10 @@ const SITE_TO_WHCODE = new Map([
   ['tembelihle', 'WH-TBL'],
   ['tonga', 'WH-TAV'],
   ['grabouw', 'WH-GR'],
+  ['phalaborwa - namakgale', 'WH-PHAN'],
+  ['mafikeng', 'WH-MAF'],
   // Sites with no FF warehouse yet -> null (still recorded, warehouse unmapped).
-  ['phalaborwa - namakgale', null],
   ['phalaborwa - ben farms', null],
-  ['mafikeng', null],
   ['cradock', null],
   ['middelburg', null],
   ['botshobelo', null],
