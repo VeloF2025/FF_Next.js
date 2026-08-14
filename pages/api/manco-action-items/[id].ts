@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { checkMancoAccess } from '@/lib/actionItems/mancoAccess';
 import { MancoActionItem } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
 import { sql, query } from '@/lib/db-pool';
@@ -50,6 +52,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (!id || typeof id !== 'string') {
     return apiResponse.badRequest(res, 'ID is required');
+  }
+
+  // Per-method permission, BEFORE any branch. PATCH and DELETE had no check at all, so
+  // any authenticated user could edit or destroy any management-committee item — and
+  // `action_item` is in PATCHABLE_COLUMNS, which made editing it the first step of the
+  // transcript-extraction chain closed in #2457.
+  const authUser = (req as AuthenticatedNextApiRequest).user;
+  const access = await checkMancoAccess(authUser.id, req.method);
+  if (!access.ok) {
+    return access.status === 403
+      ? apiResponse.forbidden(res, access.message)
+      : apiResponse.internalError(res, new Error(access.message));
   }
 
   // ------------------------------------------------------------------ GET ---
