@@ -94,6 +94,24 @@ function geometryPathOptions(lowConfidence: boolean): PathOptions {
   };
 }
 
+function stableGeometryValue(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableGeometryValue).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableGeometryValue(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? String(value);
+}
+
+function operationalGeometryKey(geometry: OperationalOverlayGeometry): string {
+  if (geometry.kind === 'aoi') {
+    return `aoi:${geometry.operationalSiteId}:${stableGeometryValue(geometry.geoJson)}`;
+  }
+  const { latitude, longitude } = geometry.center;
+  return `authorized_location:${geometry.operationalSiteId}:${latitude}:${longitude}:${geometry.radiusM}`;
+}
+
 function OperationalGeometry({ geometry }: { geometry: OperationalOverlayGeometry }) {
   if (geometry.kind === 'aoi') {
     return (
@@ -127,7 +145,12 @@ export function OperationalMapLayers({
   );
   return (
     <>
-      {operationalOverlay.geometry && <OperationalGeometry geometry={operationalOverlay.geometry} />}
+      {operationalOverlay.geometry && (
+        <OperationalGeometry
+          key={operationalGeometryKey(operationalOverlay.geometry)}
+          geometry={operationalOverlay.geometry}
+        />
+      )}
       {operationalOverlay.badges.map((badge) => {
         const vehicle = plottedByVehicle.get(badge.vehicleId);
         return vehicle ? (

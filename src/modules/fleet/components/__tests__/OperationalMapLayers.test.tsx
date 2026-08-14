@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 import type {
+  AoiOverlayGeometry,
   OperationalBadgeRow,
   OperationalMapOverlay,
 } from '../../operations/mapOverlayService';
@@ -189,6 +190,35 @@ describe('OperationalMapLayers', () => {
       center: [-26.2, 28.2], radius: 750,
       pathOptions: expect.objectContaining({ className: 'fleet-map-operational-geometry' }),
     }));
+  });
+
+  it('remounts AOI layers for changed coordinates or site while retaining equal geometry identity', () => {
+    const geometry: AoiOverlayGeometry = {
+      kind: 'aoi', operationalSiteId: 'site-1', projectId: 'project-1', operationalSiteName: 'AOI One',
+      confidence: 'medium', lowConfidence: false,
+      geoJson: { coordinates: [[[28, -26], [28.1, -26], [28, -26]]], type: 'Polygon' },
+    };
+    const firstAoi = overlay({ geometry });
+    const view = render(<OperationalMapLayers operationalOverlay={firstAoi} vehicles={[]} />);
+    const originalLayer = screen.getByTestId('aoi-geometry');
+
+    view.rerender(<OperationalMapLayers operationalOverlay={overlay({ geometry: {
+      ...geometry,
+      geoJson: { type: 'Polygon', coordinates: [[[28, -26], [28.1, -26], [28, -26]]] },
+    } })} vehicles={[]} />);
+    expect(screen.getByTestId('aoi-geometry')).toBe(originalLayer);
+
+    view.rerender(<OperationalMapLayers operationalOverlay={overlay({ geometry: {
+      ...geometry,
+      geoJson: { type: 'Polygon', coordinates: [[[28, -26], [28.2, -26], [28, -26]]] },
+    } })} vehicles={[]} />);
+    const changedCoordinatesLayer = screen.getByTestId('aoi-geometry');
+    expect(changedCoordinatesLayer).not.toBe(originalLayer);
+
+    view.rerender(<OperationalMapLayers operationalOverlay={overlay({ geometry: {
+      ...geometry, operationalSiteId: 'site-2', operationalSiteName: 'AOI Two',
+    } })} vehicles={[]} />);
+    expect(screen.getByTestId('aoi-geometry')).not.toBe(changedCoordinatesLayer);
   });
 
   it('never fabricates points for unplottable rows or badges whose live vehicle has no coordinates', () => {
