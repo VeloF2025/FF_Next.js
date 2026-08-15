@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { AssignmentOption } from '../../../assignments/rosterQueries';
@@ -44,6 +44,20 @@ function ToolbarHarness() {
 }
 
 describe('MapOperationsToolbar', () => {
+  it('offers every accepted primary operational status', () => {
+    render(<ToolbarHarness />);
+    const values = within(screen.getByLabelText('Map status')).getAllByRole('option')
+      .map((option) => (option as HTMLOptionElement).value)
+      .filter((value) => value.startsWith('status:'));
+
+    expect(values).toHaveLength(13);
+    expect(values).toEqual(expect.arrayContaining([
+      'status:off_duty', 'status:scheduled_not_due', 'status:unassigned', 'status:unverifiable',
+      'status:late', 'status:approaching', 'status:attendance_confirmed',
+      'status:vehicle_on_site_driver_unconfirmed', 'status:on_site_dual', 'status:wrong_site',
+      'status:evidence_mismatch', 'status:left_early', 'status:shift_complete',
+    ]));
+  });
   it('updates project, status, evidence, visibility, and date controls without conflicting filters', () => {
     render(<ToolbarHarness />);
 
@@ -65,11 +79,14 @@ describe('MapOperationsToolbar', () => {
   });
 
   it('labels current state and reports telemetry and overlay freshness independently', () => {
+    const currentWorkDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
     const telemetryRefresh = vi.fn().mockResolvedValue(undefined);
     const overlayRefresh = vi.fn().mockResolvedValue(undefined);
     render(
       <MapOperationsToolbar
-        filters={{ projectId: PROJECT_ID, workDate: '2026-08-14', visibility: 'all' }}
+        filters={{ projectId: PROJECT_ID, workDate: currentWorkDate, visibility: 'all' }}
         onChange={vi.fn()}
         overlay={layer<OperationalMapOverlay>({
           lastSuccessAt: '2026-08-14T08:05:00.000Z',

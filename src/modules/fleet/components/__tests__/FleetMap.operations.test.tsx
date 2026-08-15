@@ -8,6 +8,8 @@ const layers = vi.hoisted(() => ({
   mapContainers: vi.fn(),
   markers: vi.fn(),
   tileLayers: vi.fn(),
+  map: { getContainer: vi.fn(() => document.createElement('div')), getZoom: vi.fn(() => 10),
+    invalidateSize: vi.fn(), setView: vi.fn() },
 }));
 const leaflet = vi.hoisted(() => ({ divIcon: vi.fn((options: unknown) => ({ options })) }));
 
@@ -29,7 +31,7 @@ vi.mock('react-leaflet', () => ({
   GeoJSON: () => null,
   Circle: () => null,
   Popup: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  useMap: () => ({ getContainer: () => document.createElement('div'), invalidateSize: vi.fn() }),
+  useMap: () => layers.map,
 }));
 
 import FleetMap from '../FleetMap';
@@ -115,5 +117,20 @@ describe('FleetMap operational composition', () => {
 
     expect(layers.circleMarkers).not.toHaveBeenCalled();
     expect(layers.markers).toHaveBeenCalledTimes(1);
+  });
+
+  it('pans, zooms, and opens the operational popup for a focus request', () => {
+    const marker = { getLatLng: vi.fn(() => ({ lat: -26.1, lng: 28.05 })), openPopup: vi.fn() };
+    const view = render(<FleetMap operationalOverlay={operationalOverlay} vehicles={[vehicle]} />);
+    const badgeProps = layers.markers.mock.calls.at(-1)?.[0] as {
+      eventHandlers: { add: (event: { target: typeof marker }) => void };
+    };
+    badgeProps.eventHandlers.add({ target: marker });
+
+    view.rerender(<FleetMap focusRequestId={1} focusStaffId="staff-1"
+      operationalOverlay={operationalOverlay} vehicles={[vehicle]} />);
+
+    expect(layers.map.setView).toHaveBeenCalledWith({ lat: -26.1, lng: 28.05 }, 15);
+    expect(marker.openPopup).toHaveBeenCalledTimes(1);
   });
 });

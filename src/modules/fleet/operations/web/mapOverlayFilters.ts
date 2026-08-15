@@ -5,12 +5,21 @@ import type {
   OperationalUnplottableRow,
 } from '../mapOverlayService';
 import { groupForOperationalStatus } from '../overviewService';
+import type { LiveVehicleTelemetry } from './operationsPresentationApi';
 import type { OperationEvidenceFilter, OperationFilters } from './operationFilters';
+
+export type ClientUnplottableReason = OperationalUnplottableRow['reason'] | 'vehicle_telemetry_unavailable';
+export type ClientUnplottableRow = Omit<OperationalUnplottableRow, 'reason'> & {
+  reason: ClientUnplottableReason;
+};
+export type OperationalMapDisplayOverlay = Omit<OperationalMapOverlay, 'unplottable'> & {
+  unplottable: ClientUnplottableRow[];
+};
 
 export type MapAttentionItem =
   | { kind: 'badge'; row: OperationalBadgeRow }
   | { kind: 'attendance'; row: OperationalAttendancePoint }
-  | { kind: 'unplottable'; row: OperationalUnplottableRow };
+  | { kind: 'unplottable'; row: ClientUnplottableRow };
 
 export function evidenceForMapItem(item: MapAttentionItem): OperationEvidenceFilter {
   if (item.kind === 'attendance') return 'attendance_only';
@@ -30,7 +39,7 @@ export function matchesMapFilters(item: MapAttentionItem, filters: OperationFilt
     && (!filters.evidence || evidenceForMapItem(item) === filters.evidence);
 }
 
-export function mapAttentionItems(overlay: OperationalMapOverlay): MapAttentionItem[] {
+export function mapAttentionItems(overlay: OperationalMapDisplayOverlay): MapAttentionItem[] {
   return [
     ...overlay.badges.map((row): MapAttentionItem => ({ kind: 'badge', row })),
     ...overlay.attendancePoints.map((row): MapAttentionItem => ({ kind: 'attendance', row })),
@@ -39,9 +48,9 @@ export function mapAttentionItems(overlay: OperationalMapOverlay): MapAttentionI
 }
 
 export function filterOperationalOverlay(
-  overlay: OperationalMapOverlay,
+  overlay: OperationalMapDisplayOverlay,
   filters: OperationFilters,
-): OperationalMapOverlay {
+): OperationalMapDisplayOverlay {
   const included = mapAttentionItems(overlay).filter((item) => matchesMapFilters(item, filters));
   return {
     ...overlay,
@@ -50,5 +59,26 @@ export function filterOperationalOverlay(
     unplottable: included.flatMap((item) => item.kind === 'unplottable' ? [item.row] : []),
     total: included.length,
     hasMore: false,
+  };
+}
+
+export function reconcileOperationalOverlay(
+  overlay: OperationalMapOverlay,
+  vehicles: LiveVehicleTelemetry[],
+): OperationalMapDisplayOverlay {
+  const coordinateVehicleIds = new Set(vehicles.filter((vehicle) => Number.isFinite(vehicle.lat)
+    && Number.isFinite(vehicle.lon)).map((vehicle) => vehicle.vehicleId));
+  const missing = overlay.badges.filter((badge) => !coordinateVehicleIds.has(badge.vehicleId));
+  return {
+    ...overlay,
+    badges: overlay.badges.filter((badge) => coordinateVehicleIds.has(badge.vehicleId)),
+    unplottable: [
+      ...overlay.unplottable,
+      ...missing.map((badge): ClientUnplottableRow => ({
+        staffId: badge.staffId, staffName: badge.staffName, projectId: badge.projectId,
+        operationalSiteId: badge.operationalSiteId, status: badge.status,
+        reason: 'vehicle_telemetry_unavailable',
+      })),
+    ],
   };
 }

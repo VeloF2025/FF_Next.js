@@ -18,6 +18,7 @@ const layers = vi.hoisted(() => ({
 
 vi.mock('leaflet', () => ({ divIcon: leaflet.divIcon }));
 vi.mock('react-leaflet', () => ({
+  useMap: () => ({ getZoom: () => 12, setView: vi.fn() }),
   Marker: (props: {
     alt?: string;
     children?: React.ReactNode;

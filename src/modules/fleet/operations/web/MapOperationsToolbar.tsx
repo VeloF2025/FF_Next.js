@@ -1,5 +1,5 @@
-import type { AssignmentOption } from '../../assignments/rosterQueries';
 import type { OperationalMapOverlay } from '../mapOverlayService';
+import type { OperationalProjectOption } from '../projectScope';
 import type { OperationalStatusGroup } from '../presentationTypes';
 import type { OperationalStatus } from '../types';
 import type { FleetMapLayerState } from './useFleetMapLayers';
@@ -17,10 +17,12 @@ const GROUPS: Array<[OperationalStatusGroup, string]> = [
   ['unassigned', 'Unassigned'], ['unverifiable', 'Unverifiable'], ['normal', 'Normal'],
 ];
 const STATUSES: Array<[OperationalStatus, string]> = [
+  ['off_duty', 'Off duty'], ['scheduled_not_due', 'Scheduled, not due'],
   ['late', 'Late'], ['wrong_site', 'Wrong site'], ['evidence_mismatch', 'Evidence mismatch'],
   ['left_early', 'Left early'], ['unassigned', 'Unassigned'], ['unverifiable', 'Unverifiable'],
   ['vehicle_on_site_driver_unconfirmed', 'Vehicle on site — driver unconfirmed'],
   ['attendance_confirmed', 'Attendance confirmed'], ['on_site_dual', 'On site dual'],
+  ['approaching', 'Approaching'], ['shift_complete', 'Shift complete'],
 ];
 const EVIDENCE: Array<[OperationEvidenceFilter, string]> = [
   ['attendance_only', 'Attendance only'], ['vehicle_only', 'Vehicle only'], ['dual', 'Dual evidence'],
@@ -56,7 +58,7 @@ function LayerStatus({ label, layer }: {
 
 export interface MapOperationsToolbarProps {
   filters: OperationFilters;
-  projects: AssignmentOption[];
+  projects: OperationalProjectOption[];
   telemetry: FleetMapLayerState<LiveFleetTelemetry>;
   overlay: FleetMapLayerState<OperationalMapOverlay>;
   onChange: (filters: OperationFilters) => void;

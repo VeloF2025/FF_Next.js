@@ -1,6 +1,7 @@
 import type { OperationalMapOverlay } from '../mapOverlayService';
 import type { OperationalOverview } from '../presentationTypes';
 import type { OperationalEvidenceDetail } from '../statusService';
+import type { OperationalProjectOption } from '../projectScope';
 import { serializeOperationFilters, type OperationFilters } from './operationFilters';
 
 export interface OperationalOverviewResponse extends OperationalOverview {
@@ -119,6 +120,9 @@ export const operationsPresentationApi = {
   },
   telemetry(signal: AbortSignal): Promise<LiveFleetTelemetry> {
     return request('/api/fleet/positions/live', signal);
+  },
+  projectOptions(signal: AbortSignal): Promise<OperationalProjectOption[]> {
+    return request('/api/fleet/operations/project-options', signal);
   },
 };
 

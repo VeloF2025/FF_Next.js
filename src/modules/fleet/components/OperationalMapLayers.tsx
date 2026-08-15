@@ -1,39 +1,47 @@
 import type { Geometry } from 'geojson';
-import type { PathOptions } from 'leaflet';
-import { Circle, CircleMarker, GeoJSON, Marker, Popup } from 'react-leaflet';
+import { useEffect, useRef } from 'react';
+import type { LatLng, LeafletEvent, PathOptions } from 'leaflet';
+import { Circle, CircleMarker, GeoJSON, Marker, Popup, useMap } from 'react-leaflet';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 import type {
   OperationalAttendancePoint,
   OperationalBadgeRow,
-  OperationalMapOverlay,
   OperationalOverlayGeometry,
 } from '../operations/mapOverlayService';
+import type { OperationalMapDisplayOverlay } from '../operations/web/mapOverlayFilters';
 import { partitionVehicles } from '../utils/liveMapHelpers';
 import { createOperationalBadgeIcon, operationalBadgeStyle } from './operationalMapStyles';
-
 export interface OperationalMapLayersProps {
-  operationalOverlay: OperationalMapOverlay;
+  operationalOverlay: OperationalMapDisplayOverlay;
   vehicles: LiveVehicle[];
   selectedStaffId?: string | null;
   onStaffSelect?: (staffId: string) => void;
+  focusStaffId?: string | null;
+  focusRequestId?: number;
 }
-
-function clickHandler(staffId: string, onStaffSelect?: (staffId: string) => void) {
-  return onStaffSelect ? { click: () => onStaffSelect(staffId) } : undefined;
+interface FocusLayer { getLatLng: () => LatLng; openPopup: () => unknown }
+type RegisterLayer = (staffId: string, layer: FocusLayer | null) => void;
+function layerHandlers(staffId: string, onStaffSelect: ((staffId: string) => void) | undefined,
+  register: RegisterLayer) {
+  return {
+    ...(onStaffSelect ? { click: () => onStaffSelect(staffId) } : {}),
+    add: (event: LeafletEvent) => register(staffId, event.target as FocusLayer),
+    remove: () => register(staffId, null),
+  };
 }
-
-function OperationalBadgeMarker({ badge, vehicle, selected, onStaffSelect }: {
+function OperationalBadgeMarker({ badge, vehicle, selected, onStaffSelect, register }: {
   badge: OperationalBadgeRow;
   vehicle: LiveVehicle & { lat: number; lon: number };
   selected: boolean;
   onStaffSelect?: (staffId: string) => void;
+  register: RegisterLayer;
 }) {
   const style = operationalBadgeStyle(badge.status);
   const label = `${badge.staffName} — ${style.label} operational status`;
   return (
     <Marker
       alt={label}
-      eventHandlers={clickHandler(badge.staffId, onStaffSelect)}
+      eventHandlers={layerHandlers(badge.staffId, onStaffSelect, register)}
       icon={createOperationalBadgeIcon(badge.status, selected)}
       position={[vehicle.lat, vehicle.lon]}
       title={label}
@@ -48,17 +56,17 @@ function OperationalBadgeMarker({ badge, vehicle, selected, onStaffSelect }: {
     </Marker>
   );
 }
-
-function AttendanceMarker({ point, selected, onStaffSelect }: {
+function AttendanceMarker({ point, selected, onStaffSelect, register }: {
   point: OperationalAttendancePoint;
   selected: boolean;
   onStaffSelect?: (staffId: string) => void;
+  register: RegisterLayer;
 }) {
   const selectedClass = selected ? ' fleet-map-attendance-marker--selected' : '';
   return (
     <CircleMarker
       center={[point.latitude, point.longitude]}
-      eventHandlers={clickHandler(point.staffId, onStaffSelect)}
+      eventHandlers={layerHandlers(point.staffId, onStaffSelect, register)}
       pathOptions={{
         className: `fleet-map-attendance-marker${selectedClass}`,
         color: selected ? '#facc15' : '#ffffff',
@@ -80,7 +88,6 @@ function AttendanceMarker({ point, selected, onStaffSelect }: {
     </CircleMarker>
   );
 }
-
 function geometryPathOptions(lowConfidence: boolean): PathOptions {
   return {
     className: `fleet-map-operational-geometry${lowConfidence
@@ -93,7 +100,6 @@ function geometryPathOptions(lowConfidence: boolean): PathOptions {
     weight: 2,
   };
 }
-
 function stableGeometryValue(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableGeometryValue).join(',')}]`;
   if (value !== null && typeof value === 'object') {
@@ -103,7 +109,6 @@ function stableGeometryValue(value: unknown): string {
   }
   return JSON.stringify(value) ?? String(value);
 }
-
 function operationalGeometryKey(geometry: OperationalOverlayGeometry): string {
   if (geometry.kind === 'aoi') {
     return `aoi:${geometry.operationalSiteId}:${stableGeometryValue(geometry.geoJson)}`;
@@ -111,7 +116,6 @@ function operationalGeometryKey(geometry: OperationalOverlayGeometry): string {
   const { latitude, longitude } = geometry.center;
   return `authorized_location:${geometry.operationalSiteId}:${latitude}:${longitude}:${geometry.radiusM}`;
 }
-
 function OperationalGeometry({ geometry }: { geometry: OperationalOverlayGeometry }) {
   if (geometry.kind === 'aoi') {
     return (
@@ -133,13 +137,29 @@ function OperationalGeometry({ geometry }: { geometry: OperationalOverlayGeometr
     </Circle>
   );
 }
-
 export function OperationalMapLayers({
   operationalOverlay,
   vehicles,
   selectedStaffId,
   onStaffSelect,
+  focusStaffId,
+  focusRequestId = 0,
 }: OperationalMapLayersProps) {
+  const map = useMap();
+  const badgeLayers = useRef(new Map<string, FocusLayer>());
+  const attendanceLayers = useRef(new Map<string, FocusLayer>());
+  const register = (registry: Map<string, FocusLayer>): RegisterLayer => (staffId, layer) => {
+    if (layer) registry.set(staffId, layer); else registry.delete(staffId);
+  };
+  const registerBadge = register(badgeLayers.current);
+  const registerAttendance = register(attendanceLayers.current);
+  useEffect(() => {
+    if (!focusStaffId || focusRequestId === 0) return;
+    const layer = badgeLayers.current.get(focusStaffId) ?? attendanceLayers.current.get(focusStaffId);
+    if (!layer) return;
+    map.setView(layer.getLatLng(), Math.max(map.getZoom(), 15));
+    layer.openPopup();
+  }, [focusRequestId, focusStaffId, map]);
   const plottedByVehicle = new Map(
     partitionVehicles(vehicles).plotted.map((vehicle) => [vehicle.vehicleId, vehicle]),
   );
@@ -158,6 +178,7 @@ export function OperationalMapLayers({
             key={`operational-badge:${badge.vehicleId}:${badge.staffId}`}
             badge={badge}
             onStaffSelect={onStaffSelect}
+            register={registerBadge}
             selected={badge.staffId === selectedStaffId}
             vehicle={vehicle}
           />
@@ -168,6 +189,7 @@ export function OperationalMapLayers({
           key={`operational-attendance:${point.staffId}`}
           onStaffSelect={onStaffSelect}
           point={point}
+          register={registerAttendance}
           selected={point.staffId === selectedStaffId}
         />
       ))}

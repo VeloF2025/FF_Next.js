@@ -6,24 +6,25 @@
  * vehicle with an explicit trackingState, so this page must say so plainly
  * rather than silently drawing the handful it can plot.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { FleetMapLegend } from '@/modules/fleet/components/FleetMapLegend';
-import type { AssignmentOption } from '@/modules/fleet/assignments/rosterQueries';
-import { assignmentApi, AssignmentApiError } from '@/modules/fleet/assignments/web/assignmentApi';
+import type { OperationalProjectOption } from '@/modules/fleet/operations/projectScope';
 import {
   MapAttentionPanel,
 } from '@/modules/fleet/operations/web/MapAttentionPanel';
-import { filterOperationalOverlay } from '@/modules/fleet/operations/web/mapOverlayFilters';
+import {
+  filterOperationalOverlay,
+  reconcileOperationalOverlay,
+} from '@/modules/fleet/operations/web/mapOverlayFilters';
 import { MapOperationsToolbar } from '@/modules/fleet/operations/web/MapOperationsToolbar';
 import {
-  parseOperationFilters,
-  serializeOperationFilters,
-  type OperationFilters,
-} from '@/modules/fleet/operations/web/operationFilters';
+  OperationsPresentationApiError,
+  operationsPresentationApi,
+} from '@/modules/fleet/operations/web/operationsPresentationApi';
 import { useFleetMapLayers } from '@/modules/fleet/operations/web/useFleetMapLayers';
-import { isCurrentOperationDate } from '@/modules/fleet/operations/web/useOperationalOverview';
+import { useMapOperationFilters } from '@/modules/fleet/operations/web/useMapOperationFilters';
 import {
   notPlottedReason,
   partitionVehicles,
@@ -36,90 +37,51 @@ const FleetMap = dynamic(() => import('@/modules/fleet/components/FleetMap'), {
   loading: () => <div className="p-6 text-sm">Loading map…</div>,
 });
 
-const FILTER_KEYS: Array<keyof OperationFilters> = [
-  'projectId', 'staffId', 'siteId', 'workDate', 'asOf', 'status', 'group', 'evidence', 'visibility',
-];
-
-function sastDate(now = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(now);
-}
-
-function datedFilters(filters: OperationFilters, workDate: string, now = new Date()): OperationFilters {
-  const asOf = isCurrentOperationDate(workDate, now)
-    ? now.toISOString() : new Date(`${workDate}T23:59:59.999+02:00`).toISOString();
-  return { ...filters, workDate, asOf, visibility: filters.visibility ?? 'all' };
-}
-
-function locationFilters(now = new Date()): OperationFilters {
-  const source = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
-  const known = new URLSearchParams();
-  for (const key of FILTER_KEYS) for (const value of source.getAll(key)) known.append(key, value);
-  try {
-    const parsed = parseOperationFilters(known);
-    return datedFilters(parsed, parsed.workDate ?? sastDate(now), now);
-  } catch {
-    return datedFilters({}, sastDate(now), now);
-  }
-}
-
-function replaceLocation(filters: OperationFilters, replace: boolean): void {
-  const query = serializeOperationFilters(filters);
-  const next = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
-  window.history[replace ? 'replaceState' : 'pushState']({}, '', next);
-}
-
 export default function FleetMapPage() {
-  const [filters, setFilters] = useState<OperationFilters>(locationFilters);
-  const currentFilters = useRef(filters);
-  const [projects, setProjects] = useState<AssignmentOption[]>([]);
+  const { change, currentFilters, filters, initialized } = useMapOperationFilters();
+  const [projects, setProjects] = useState<OperationalProjectOption[]>([]);
   const [projectOptionsError, setProjectOptionsError] = useState(false);
+  const [focusRequest, setFocusRequest] = useState({ staffId: null as string | null, id: 0 });
   const layers = useFleetMapLayers(filters);
   const vehicles = layers.telemetry.data?.vehicles ?? [];
-  const change = useCallback((next: OperationFilters, replace = false) => {
-    currentFilters.current = next;
-    replaceLocation(next, replace);
-    setFilters(next);
-  }, []);
 
   useEffect(() => {
-    replaceLocation(currentFilters.current, true);
-    const navigate = () => {
-      const next = locationFilters();
-      currentFilters.current = next;
-      replaceLocation(next, true);
-      setFilters(next);
-    };
-    window.addEventListener('popstate', navigate);
-    return () => window.removeEventListener('popstate', navigate);
-  }, []);
-
-  useEffect(() => {
+    if (!initialized) return;
     let active = true;
+    const controller = new AbortController();
     setProjectOptionsError(false);
-    const query = new URLSearchParams({ from: filters.workDate!, to: filters.workDate! }).toString();
-    void assignmentApi.options(query).then((options) => {
+    void operationsPresentationApi.projectOptions(controller.signal).then((options) => {
       if (!active) return;
       setProjectOptionsError(false);
-      setProjects(options.projects);
+      setProjects(options);
       const current = currentFilters.current;
-      const valid = options.projects.some((project) => project.id === current.projectId);
-      const projectId = valid ? current.projectId : options.projects[0]?.id ?? current.projectId;
+      const valid = options.some((project) => project.id === current.projectId);
+      const projectId = valid ? current.projectId : options[0]?.id ?? current.projectId;
       if (projectId !== current.projectId) change({ ...current, projectId }, true);
     }).catch((error: unknown) => {
       if (!active) return;
-      const permission = error instanceof AssignmentApiError && (error.status === 401 || error.status === 403);
+      const permission = error instanceof OperationsPresentationApiError && error.kind === 'permission';
       if (permission) setProjects([]);
       setProjectOptionsError(!permission);
     });
-    return () => { active = false; };
-  }, [change, filters.workDate]);
+    return () => { active = false; controller.abort(); };
+  }, [change, currentFilters, initialized]);
+
+  useEffect(() => {
+    if (layers.overlay.error?.kind !== 'permission') return;
+    const current = currentFilters.current;
+    if (current.staffId || current.siteId) {
+      change({ ...current, staffId: undefined, siteId: undefined }, true);
+    }
+  }, [change, currentFilters, layers.overlay.error]);
 
   const visibleOverlay = layers.overlay.data
-    ? filterOperationalOverlay(layers.overlay.data, filters) : undefined;
+    ? filterOperationalOverlay(reconcileOperationalOverlay(layers.overlay.data, vehicles), filters) : undefined;
   const showOperations = (filters.visibility ?? 'all') !== 'vehicles';
-  const selectStaff = (staffId: string) => change({ ...currentFilters.current, staffId });
+  const selectStaff = useCallback((staffId: string) => {
+    change({ ...currentFilters.current, staffId });
+    setFocusRequest((request) => ({ staffId, id: request.id + 1 }));
+  }, [change, currentFilters]);
 
   const { plotted, notPlotted } = partitionVehicles(vehicles);
   // Counted from the plotted set only — the legend describes what is on the
@@ -172,6 +134,7 @@ export default function FleetMapPage() {
         </header>
         <div className="relative flex-1 min-h-0">
           <FleetMap vehicles={vehicles} operationalOverlay={showOperations ? visibleOverlay : undefined}
+            focusRequestId={focusRequest.id} focusStaffId={focusRequest.staffId}
             onStaffSelect={selectStaff} selectedStaffId={filters.staffId ?? null}
             showVehicleMarkers={(filters.visibility ?? 'all') !== 'drivers'} />
           {showOperations && visibleOverlay && <MapAttentionPanel filters={filters}

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { OperationalMapOverlay } from '../mapOverlayService';
 import type { OperationalStatus } from '../types';
 import type { OperationFilters } from './operationFilters';
 import {
@@ -7,6 +6,7 @@ import {
   mapAttentionItems,
   matchesMapFilters,
   type MapAttentionItem,
+  type OperationalMapDisplayOverlay,
 } from './mapOverlayFilters';
 
 const ACTIONABLE = new Set<OperationalStatus>([
@@ -25,7 +25,9 @@ const STATUS_LABELS: Record<OperationalStatus, string> = {
 function EvidenceText({ item }: { item: MapAttentionItem }) {
   if (item.kind === 'attendance') return <p className="text-xs">{item.row.label}</p>;
   if (item.kind === 'unplottable') {
-    return <p className="text-xs">No permissible location evidence; this person is not plotted.</p>;
+    return <p className="text-xs">{item.row.reason === 'vehicle_telemetry_unavailable'
+      ? 'Vehicle telemetry is unavailable; this person is not plotted.'
+      : 'No permissible location evidence; this person is not plotted.'}</p>;
   }
   return <p className="text-xs">{evidenceForMapItem(item).replaceAll('_', ' ')} evidence</p>;
 }
@@ -48,7 +50,7 @@ function AttentionRows({ items, selectedStaffId, onFocusStaff }: {
 }
 
 export interface MapAttentionPanelProps {
-  operationalOverlay: OperationalMapOverlay;
+  operationalOverlay: OperationalMapDisplayOverlay;
   selectedStaffId: string | null;
   onFocusStaff: (staffId: string) => void;
   filters?: OperationFilters;

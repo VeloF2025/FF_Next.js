@@ -27,6 +27,7 @@ function emptyLayerState<T>(selectionKey: string): FleetMapLayerInternalState<T>
 
 function usePollingLayer<T>(
   load: (signal: AbortSignal) => Promise<T>, shouldPoll: () => boolean, selectionKey: string,
+  clearOnPermission = false,
 ): FleetMapLayerState<T> {
   const controller = useRef<AbortController | null>(null);
   const generation = useRef(0);
@@ -45,10 +46,12 @@ function usePollingLayer<T>(
         || generation.current !== requestGeneration) return;
       const typed = error instanceof OperationsPresentationApiError ? error
         : new OperationsPresentationApiError('Fleet map layer request failed', 0, 'UNKNOWN_ERROR');
-      setState((previous) => previous.selectionKey === selectionKey
-        ? { ...previous, error: typed } : { ...emptyLayerState<T>(selectionKey), error: typed });
+      setState((previous) => clearOnPermission && typed.kind === 'permission'
+        ? { ...emptyLayerState<T>(selectionKey), error: typed }
+        : previous.selectionKey === selectionKey
+          ? { ...previous, error: typed } : { ...emptyLayerState<T>(selectionKey), error: typed });
     }
-  }, [load, selectionKey]);
+  }, [clearOnPermission, load, selectionKey]);
 
   useEffect(() => {
     void refresh();
@@ -78,7 +81,10 @@ export interface FleetMapLayersState {
 }
 
 export function useFleetMapLayers(filters: OperationFilters): FleetMapLayersState {
-  const filterKey = serializeOperationFilters(filters);
+  const filterKey = serializeOperationFilters({
+    projectId: filters.projectId, staffId: filters.staffId, siteId: filters.siteId,
+    workDate: filters.workDate, asOf: filters.asOf,
+  });
   const loadTelemetry = useCallback((signal: AbortSignal) => operationsPresentationApi.telemetry(signal), []);
   const loadOverlay = useCallback((signal: AbortSignal) => {
     const parsed = currentOperationFilters(parseOperationFilters(filterKey));
@@ -89,6 +95,6 @@ export function useFleetMapLayers(filters: OperationFilters): FleetMapLayersStat
   );
   return {
     telemetry: usePollingLayer(loadTelemetry, ALWAYS_POLL, 'live-telemetry'),
-    overlay: usePollingLayer(loadOverlay, shouldPollOverlay, filterKey),
+    overlay: usePollingLayer(loadOverlay, shouldPollOverlay, filterKey, true),
   };
 }

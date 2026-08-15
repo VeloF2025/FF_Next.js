@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  roster: vi.fn(), overview: vi.fn(), overlay: vi.fn(), project: vi.fn(), staff: vi.fn(),
+  roster: vi.fn(), overview: vi.fn(), overlay: vi.fn(), project: vi.fn(), projectOptions: vi.fn(), staff: vi.fn(),
   permissions: [] as Array<[string, string]>,
 }));
 vi.mock('@/lib/auth/middleware', () => ({
@@ -21,11 +21,15 @@ vi.mock('@/modules/fleet/operations/mapOverlayService', async () => {
   const actual = await vi.importActual<typeof import('@/modules/fleet/operations/mapOverlayService')>('@/modules/fleet/operations/mapOverlayService');
   return { ...actual, getOperationalMapOverlay: mocks.overlay };
 });
-vi.mock('@/modules/fleet/operations/projectScope', () => ({ canAccessOperationalProject: mocks.project }));
+vi.mock('@/modules/fleet/operations/projectScope', () => ({
+  canAccessOperationalProject: mocks.project,
+  listOperationalProjectOptions: mocks.projectOptions,
+}));
 vi.mock('@/modules/fleet/parking/staffLookup', () => ({ resolveStaffIdForUser: mocks.staff }));
 
 import overviewHandler from '@/pages/api/fleet/operations/overview';
 import overlayHandler from '@/pages/api/fleet/operations/map-overlay';
+import projectOptionsHandler from '@/pages/api/fleet/operations/project-options';
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
@@ -44,23 +48,36 @@ async function call(handler: (req: NextApiRequest, res: NextApiResponse) => unkn
 }
 
 beforeEach(() => {
-  vi.clearAllMocks(); mocks.permissions.length = 0; mocks.staff.mockResolvedValue(STAFF); mocks.project.mockResolvedValue(true);
+  vi.clearAllMocks(); mocks.staff.mockResolvedValue(STAFF); mocks.project.mockResolvedValue(true);
   mocks.roster.mockResolvedValue({ items: [], page: 1, limit: 100, total: 0, hasMore: false });
   mocks.overview.mockReturnValue({ selectionState: 'no_scheduled_staff', groups: [], attention: { items: [], page: 1,
     limit: 25, total: 0, hasMore: false }, roster: { page: 1, limit: 100, total: 0, hasMore: false } });
   mocks.overlay.mockResolvedValue({ badges: [], attendancePoints: [], unplottable: [], page: 1, limit: 25,
     total: 0, hasMore: false, workDate: valid.workDate, evaluatedAt: valid.asOf });
+  mocks.projectOptions.mockResolvedValue([{ id: PROJECT, label: 'Managed Project' }]);
 });
 
 describe('operational presentation APIs', () => {
   it('allows GET only and applies the operations-status view permission to both routes', async () => {
-    for (const handler of [overviewHandler, overlayHandler]) {
+    for (const handler of [overviewHandler, overlayHandler, projectOptionsHandler]) {
       const result = await call(handler, 'POST', {}); expect(result.status).toBe(405); expect(result.headers.Allow).toBe('GET');
     }
     await call(overviewHandler, 'GET', valid); await call(overlayHandler, 'GET', valid);
     expect(mocks.permissions).toEqual([
       ['fleet.operations-status', 'view'], ['fleet.operations-status', 'view'],
+      ['fleet.operations-status', 'view'],
     ]);
+  });
+
+  it('serves project-manager options from operations-status scope without assignments permission', async () => {
+    const result = await call(projectOptionsHandler, 'GET', {});
+
+    expect(result.status).toBe(200);
+    expect(mocks.staff).toHaveBeenCalledWith(USER);
+    expect(mocks.projectOptions).toHaveBeenCalledWith(USER, STAFF, 'manager');
+    expect(result.body).toMatchObject({ success: true, data: [{ id: PROJECT, label: 'Managed Project' }] });
+    expect(mocks.permissions).toContainEqual(['fleet.operations-status', 'view']);
+    expect(mocks.permissions).not.toContainEqual(['fleet.assignments', 'view']);
   });
 
   it.each([

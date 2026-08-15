@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FleetMapProps } from '../../../components/FleetMap';
 import type { OperationalMapOverlay } from '../../mapOverlayService';
@@ -11,7 +12,9 @@ const STAFF_ID = '22222222-2222-4222-8222-222222222222';
 const pageMocks = vi.hoisted(() => ({
   layers: null as FleetMapLayersState | null,
   mapProps: vi.fn<(props: FleetMapProps) => void>(),
-  options: vi.fn(),
+  assignmentOptions: vi.fn(),
+  operationsOptions: vi.fn(),
+  router: { asPath: '/fleet/map', isReady: true },
 }));
 
 vi.mock('@/components/layout/AppLayout', () => ({
@@ -23,13 +26,21 @@ vi.mock('next/dynamic', () => ({
     return <div data-testid="fleet-map">Telemetry markers: {props.vehicles.length}</div>;
   },
 }));
+vi.mock('next/router', () => ({ useRouter: () => pageMocks.router }));
 vi.mock('../useFleetMapLayers', () => ({ useFleetMapLayers: () => pageMocks.layers }));
 vi.mock('../../../assignments/web/assignmentApi', () => ({
-  assignmentApi: { options: (...args: unknown[]) => pageMocks.options(...args) },
+  assignmentApi: { options: (...args: unknown[]) => pageMocks.assignmentOptions(...args) },
   AssignmentApiError: class AssignmentApiError extends Error {
     constructor(message: string, public status: number) { super(message); }
   },
 }));
+vi.mock('../operationsPresentationApi', async () => {
+  const actual = await vi.importActual<typeof import('../operationsPresentationApi')>('../operationsPresentationApi');
+  return { ...actual, operationsPresentationApi: {
+    ...actual.operationsPresentationApi,
+    projectOptions: (...args: unknown[]) => pageMocks.operationsOptions(...args),
+  } };
+});
 
 import FleetMapPage from '../../../../../../pages/fleet/map';
 
@@ -90,8 +101,11 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true, shouldClearNativeTimers: true });
   vi.setSystemTime(new Date('2026-08-14T08:00:00.000Z'));
   window.history.replaceState({}, '', `/fleet/map?projectId=${PROJECT_ID}&workDate=2026-08-14&visibility=all`);
+  pageMocks.router.asPath = `/fleet/map?projectId=${PROJECT_ID}&workDate=2026-08-14&visibility=all`;
+  pageMocks.router.isReady = true;
   pageMocks.layers = layerState();
-  pageMocks.options.mockReturnValue(new Promise(() => undefined));
+  pageMocks.assignmentOptions.mockReturnValue(new Promise(() => undefined));
+  pageMocks.operationsOptions.mockResolvedValue([{ id: PROJECT_ID, label: 'Lawley' }]);
 });
 
 describe('Fleet map page operational composition', () => {
@@ -101,7 +115,7 @@ describe('Fleet map page operational composition', () => {
       overlayError: new OperationsPresentationApiError('Private scope', 403, 'FORBIDDEN'),
     });
     const { container } = render(<FleetMapPage />);
-    await waitFor(() => expect(pageMocks.options).toHaveBeenCalled());
+    await waitFor(() => expect(pageMocks.operationsOptions).toHaveBeenCalled());
 
     expect(screen.getByRole('heading', { name: 'Fleet map' })).toBeInTheDocument();
     expect(screen.getByText(/Showing 1 of 2 active vehicles\. 1 not on the map\./)).toBeInTheDocument();
@@ -119,7 +133,7 @@ describe('Fleet map page operational composition', () => {
 
   it('keeps URL filters and staff focus synchronized across visibility modes', async () => {
     render(<FleetMapPage />);
-    await waitFor(() => expect(pageMocks.options).toHaveBeenCalled());
+    await waitFor(() => expect(pageMocks.operationsOptions).toHaveBeenCalled());
     expect(new URLSearchParams(window.location.search).get('projectId')).toBe(PROJECT_ID);
 
     fireEvent.change(screen.getByLabelText('Map visibility'), { target: { value: 'drivers' } });
@@ -146,7 +160,61 @@ describe('Fleet map page operational composition', () => {
     act(() => lastMapProps().onStaffSelect?.(STAFF_ID));
     expect(new URLSearchParams(window.location.search).get('staffId')).toBe(STAFF_ID);
     const panel = screen.getByTestId('map-attention-desktop');
-    expect(within(panel).getByRole('button', { name: 'Focus Late Driver on map' }))
-      .toHaveAttribute('aria-pressed', 'true');
+    const focus = within(panel).getByRole('button', { name: 'Focus Late Driver on map' });
+    expect(focus).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(focus);
+    expect(lastMapProps()).toMatchObject({ focusStaffId: STAFF_ID, focusRequestId: 2 });
+  });
+
+  it('clears selected protected staff state after a successful overlay becomes forbidden', async () => {
+    pageMocks.router.asPath = `/fleet/map?projectId=${PROJECT_ID}&staffId=${STAFF_ID}&workDate=2026-08-14`;
+    window.history.replaceState({}, '', pageMocks.router.asPath);
+    const view = render(<FleetMapPage />);
+    await waitFor(() => expect(lastMapProps().selectedStaffId).toBe(STAFF_ID));
+    expect(lastMapProps().operationalOverlay).toBeDefined();
+
+    pageMocks.layers = layerState({ overlayData: null,
+      overlayError: new OperationsPresentationApiError('Private scope', 403, 'FORBIDDEN') });
+    view.rerender(<FleetMapPage />);
+
+    await waitFor(() => expect(lastMapProps().selectedStaffId).toBeNull());
+    expect(lastMapProps().operationalOverlay).toBeUndefined();
+    expect(new URLSearchParams(window.location.search).has('staffId')).toBe(false);
+    expect(lastMapProps().vehicles).toEqual(telemetry.vehicles);
+  });
+
+  it('initializes query-backed filters after mount so server markup is URL-independent', async () => {
+    pageMocks.router.asPath = `/fleet/map?projectId=${PROJECT_ID}&workDate=2026-08-14&status=late&visibility=drivers`;
+    window.history.replaceState({}, '', pageMocks.router.asPath);
+
+    const serverHtml = renderToString(<FleetMapPage />);
+    expect(serverHtml).not.toContain('value="status:late" selected=""');
+
+    render(<FleetMapPage />);
+    await waitFor(() => expect(screen.getByLabelText('Map status')).toHaveValue('status:late'));
+    expect(screen.getByLabelText('Map visibility')).toHaveValue('drivers');
+  });
+
+  it('uses operations-status project options rather than assignment options', async () => {
+    render(<FleetMapPage />);
+
+    await waitFor(() => expect(pageMocks.operationsOptions).toHaveBeenCalled());
+    expect(pageMocks.assignmentOptions).not.toHaveBeenCalled();
+    expect(await screen.findByRole('option', { name: 'Lawley' })).toBeInTheDocument();
+  });
+
+  it('explains an operational badge whose vehicle has no telemetry coordinate join', async () => {
+    pageMocks.layers = layerState({ overlayData: {
+      ...overlay,
+      badges: [{ ...overlay.badges[0]!, vehicleId: 'missing-vehicle' }],
+      unplottable: [],
+      total: 1,
+    } });
+    render(<FleetMapPage />);
+
+    await waitFor(() => expect(screen.getByText(
+      'Vehicle telemetry is unavailable; this person is not plotted.',
+    )).toBeInTheDocument());
+    expect(lastMapProps().operationalOverlay?.badges).toEqual([]);
   });
 });

@@ -21,7 +21,7 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
-import type { OperationalMapOverlay } from '../operations/mapOverlayService';
+import type { OperationalMapDisplayOverlay } from '../operations/web/mapOverlayFilters';
 import {
   STATUS_STYLE,
   ageLabel,
@@ -178,10 +178,12 @@ function VehicleMarkers({ plotted }: { plotted: PlottedVehicle[] }) {
 
 export interface FleetMapProps {
   vehicles: LiveVehicle[];
-  operationalOverlay?: OperationalMapOverlay;
+  operationalOverlay?: OperationalMapDisplayOverlay;
   selectedStaffId?: string | null;
   onStaffSelect?: (staffId: string) => void;
   showVehicleMarkers?: boolean;
+  focusStaffId?: string | null;
+  focusRequestId?: number;
 }
 
 export default function FleetMap({
@@ -190,6 +192,8 @@ export default function FleetMap({
   selectedStaffId,
   onStaffSelect,
   showVehicleMarkers = true,
+  focusStaffId,
+  focusRequestId = 0,
 }: FleetMapProps) {
   const { plotted } = partitionVehicles(vehicles);
   return (
@@ -207,6 +211,8 @@ export default function FleetMap({
           onStaffSelect={onStaffSelect}
           operationalOverlay={operationalOverlay}
           selectedStaffId={selectedStaffId}
+          focusRequestId={focusRequestId}
+          focusStaffId={focusStaffId}
           vehicles={vehicles}
         />
       )}
