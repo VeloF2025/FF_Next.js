@@ -270,3 +270,73 @@ async def get_report_export(report: str, state: str = "open") -> str:
     """
     query = build_query(report=report, state=state)
     return await anyio.to_thread.run_sync(partial(_export_link_sync, query))
+
+
+def _attendance_sync(query: str) -> str:
+    return _fibreflow_get_sync("/api/reporting/attendance", query)
+
+
+@mcp.tool()
+async def get_attendance(
+    mode: str = "person",
+    person: str = "",
+    since: str = "",
+    until: str = "",
+    include_resolved: bool = False,
+    limit: int = 500,
+) -> str:
+    """Attendance for staff and field workers: who worked when, for how long, and which
+    days are flagged for review.
+
+    - `mode`:
+        "person"     (default) one person or a few over a date range, oldest day first.
+                     Use with `person` to answer "how did X do last month".
+        "roster"     who worked on a given day or span, most recent first. Requires
+                     `since`; a single date is fine.
+        "exceptions" only days flagged for review, newest first.
+    - `person`: free-text match on the name held on the staff record.
+    - `since` / `until`: `YYYY-MM-DD`, both inclusive.
+    - `include_resolved`: exceptions mode only — also return ones already resolved or
+      cancelled. Off by default, so you see the outstanding ones.
+
+    Hours only. This carries NO pay, NO GPS and NO photographs, deliberately — those are
+    a different and larger disclosure than "who worked when", and they are not available
+    through any tool here. Do not tell anyone what someone earns from this.
+
+    Four ways to state something false from the result, so read the caveats it returns:
+
+    - `person` matches free text, and one human can hold more than one spelling on their
+      record. Every per-person total is a FLOOR, never a headcount or a payroll figure.
+    - Most days are NOT approved or locked. Their hours are provisional and can still
+      change, so never present them as final, and never as what someone will be paid.
+    - The result includes people who have LEFT. Check `employmentStatus` before describing
+      anyone as current staff.
+    - An exception means a day needs review — overwhelmingly a missing clock-in. It says
+      the DATA is incomplete, not that the person did something wrong. The large
+      awaiting_supervisor backlog is an unworked queue, not a set of findings. Never
+      characterise a named person's conduct from it.
+
+    Coverage differs by mode: daily hours start 2026-04-25, day exceptions start
+    2026-07-13. An empty result before those dates means "not recorded here", NOT "did not
+    work" and NOT "no problems" — asked about exceptions in May, the honest answer is that
+    exception tracking had not begun.
+
+    You must narrow the query: give `person`, or a `since`/`until` range. A call with
+    neither is refused rather than returning every record for every person.
+
+    Read `totals` carefully: `daysMatched` is how many days matched, but
+    `regularHoursShown` and `overtimeHoursShown` sum only the days RETURNED. When
+    `hoursArePartial` is true they are a partial sum — never quote them as a period total.
+
+    Most callers see only the staff they supervise, not the organisation. The response
+    says so when that applies; do not generalise a supervisor's slice to the company.
+    """
+    query = build_query(
+        mode=mode,
+        person=person,
+        since=since,
+        until=until,
+        includeResolved="true" if include_resolved else "",
+        limit=limit,
+    )
+    return await anyio.to_thread.run_sync(partial(_attendance_sync, query))

@@ -206,3 +206,27 @@ async def test_report_export_description_sets_expectations(svc):
     assert "`rows`" in desc or "rows is how many" in desc
     assert "truncated" in desc
     assert "x-export-truncated" not in desc
+
+
+@pytest.mark.asyncio
+async def test_attendance_description_matches_what_the_route_does(svc):
+    """Every promise here has to be true of the code, or it licenses a false answer."""
+    import re
+
+    server, _ = svc
+    tools = {
+        t.name: re.sub(r"\s+", " ", t.description.lower())
+        for t in await server.mcp.list_tools()
+    }
+    desc = tools["get_attendance"]
+
+    # Coverage differs per mode — claiming one start date licensed "May was clean".
+    assert "2026-04-25" in desc and "2026-07-13" in desc
+    # The unbounded call is refused, so the description must not imply otherwise.
+    assert "you must narrow the query" in desc
+    # Totals are a partial sum over the page.
+    assert "hoursarepartial" in desc
+    # Scope: most callers see only their supervised staff.
+    assert "supervise" in desc
+    # And the exclusions it still guarantees.
+    assert "no pay" in desc and "no gps" in desc
