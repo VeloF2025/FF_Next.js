@@ -54,7 +54,9 @@ const SOURCE_TABLES = `
     resolution_status TEXT,
     activated_at TIMESTAMPTZ,
     first_resolved_at TIMESTAMPTZ,
-    resolved_at TIMESTAMPTZ
+    resolved_at TIMESTAMPTZ,
+    decommissioned_at TIMESTAMPTZ,
+    decommissioned_reason TEXT
   );
   CREATE TABLE olt_mismatch_records (
     id SERIAL PRIMARY KEY,
@@ -164,6 +166,25 @@ describe('listCandidateRows against a real schema', () => {
       `INSERT INTO oes_pp_data (resolved_drop_number, resolution_status, activated_at)
        VALUES ($1, 'pending', $2)`,
       ['DR3000001', `${TARGET}T08:00:00Z`],
+    );
+
+    await expect(listCandidateRows(TARGET)).resolves.toEqual([]);
+  });
+
+  it('excludes pp rows retired by the ONT lifecycle', async () => {
+    // A superseded serial keeps resolution_status = 'activated'; decommissioned_at
+    // is the terminal signal, and it must not raise a second review candidate on
+    // the day the old serial first activated.
+    await db.query(
+      `INSERT INTO oes_pp_data
+         (resolved_drop_number, resolution_status, activated_at, decommissioned_at, decommissioned_reason)
+       VALUES ($1, 'activated', $2, $3, $4)`,
+      [
+        'DR3000002',
+        `${TARGET}T08:00:00Z`,
+        `${TARGET}T18:00:00Z`,
+        'superseded_by_serial:ALCLF0000001',
+      ],
     );
 
     await expect(listCandidateRows(TARGET)).resolves.toEqual([]);
