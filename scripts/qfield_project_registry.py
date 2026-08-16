@@ -169,12 +169,61 @@ PROJECTS = {
         "table_name": "civil_audit__civil_audit",
         "label_col": "Name",
     },
-    # NOTE: "Phalaborwa - Ben Farm" (qf ef0b7147…, ff 67df5c8d…) is NOT registered
-    # yet. Its civil audit is split across three team GPKGs — "Civil Audit (BF|LLK|
-    # MT).gpkg" — with inconsistent QField relation-table names, and only ~7 photos
-    # captured so far. It will be onboarded (with the correct per-GPKG table names)
-    # once field QA ramps; until then the coverage-check (worksqa-qfield-ingest.sh)
-    # flags it if its upstream photo count crosses the alert threshold.
+    # QF project HT_Phalaborwa_Benfarm_V1 carries THREE Phalaborwa areas, not three
+    # crews of one: BF_* (18 design files), MK_* (16) and LK_* (14). An earlier note
+    # here called them "team GPKGs" and framed onboarding as a table-name problem;
+    # that is wrong and is what this entry replaces. Only BF maps to a FibreFlow
+    # project. LK and MK have NO project row at all (the only Phalaborwa projects are
+    # Ben Farm and Namakgale, and Namakgale is its own QF project b32184d6), so they
+    # cannot be registered here: without an ff_project_id of their own they would file
+    # another area's poles against Ben Farm. That is a business decision, not config.
+    #
+    # Consequence to know before LK/MK crews start shooting: EXTRACT-GAP fires on
+    # `upstream >= threshold AND ingested == 0`, and `upstream` is the whole QF
+    # project's DCIM count. Registering BF makes ingested non-zero, so LK/MK photos
+    # landing in the shared DCIM will NOT raise an alert — they will simply never
+    # arrive. Tracked in #2497. A ratio-based partial-ingest check was measured and
+    # rejected: live ingested/upstream spans 0.46 (Mahikeng) to 1.88 (Etwatwa), so any
+    # threshold catching LK/MK also fires permanently on projects that are fine.
+    #
+    # SIX civil audits exist, not three: the paren set "Civil Audit (BF|LLK|MT).gpkg"
+    # (live — BF last written 2026-08-14) and an unparenthesised "Civil Audit BF|LK|
+    # MT.gpkg" set left at 2026-07-02/07-27. The old files are not empty — "Civil Audit
+    # BF.gpkg" (table bf_poles__bf_poles) and "Civil Audit MT.gpkg" each still hold one
+    # photo reference — so BF holds all but one of the captured Ben Farm photos, not
+    # literally all of them. Table naming is chaotic across all six: (BF) contains
+    # civil_audit_mt__civil_audit_bf, (LLK) and (MT) both contain civil_audit_bf, and
+    # "Civil Audit LK.gpkg" contains civil_audit_mt. Never infer a table from a filename
+    # here.
+    #
+    # That this crew uses BOTH conventions is the risk worth knowing. is_family_member
+    # was checked over all 60 GPKG names in the folder and BF's family is the singleton
+    # ["Civil Audit (BF).gpkg"], so no sibling can be adopted INTO this entry — but the
+    # reverse is unguarded. If the crew renames AWAY from the paren name, pick_latest_gpkg
+    # returns (None, None), the extractor keeps reading the still-present dead file and
+    # logs "SKIP: Already processed this version" forever; select_stale_gpkgs uses the
+    # same prefix rule so it cannot report it, and EXTRACT-GAP is already quiet once the
+    # first rows land. That is the Mahikeng freeze shape. Pre-existing for every entry
+    # here, not introduced by this one — but this project is the likeliest to hit it.
+    #
+    # table_name and label_col were read off the live file (v20260814174604), not
+    # inferred. label_col is "Label" (capital L); this layer's "Name" column exists but
+    # is NULL in all 3248 rows. The two plausible wrong spellings fail DIFFERENTLY, and
+    # the difference is the whole point of the module docstring above:
+    #   "Name"  → SILENT. 0 photos found, no error, and a non-dry run stamps
+    #             last_version as though it had succeeded. This is the dangerous one.
+    #   "label" → LOUD. "no label column 'label' — refusing to record a sync."
+    # Poles are HT_PABA1_Z1_*; LK is PABA3_Z3 and MK is PABA2_Z2. As for Cradock and
+    # Middelburg, pon_col/zone_col are deliberately omitted — the layer carries no
+    # PON/zone column, so resolve_hierarchy yields (None, None) for every row and poles
+    # ingest unzoned rather than wrong.
+    "Phalaborwa - Ben Farm": {
+        "qf_project_id": "ef0b7147-e56f-43a1-9074-6807e0bedf50",
+        "ff_project_id": "67df5c8d-0b3d-4784-9d63-70e3cdd1e2b8",
+        "gpkg_path": "Civil Audit (BF).gpkg",
+        "table_name": "civil_audit_mt__civil_audit_bf",
+        "label_col": "Label",
+    },
 }
 
 # Also check these alternate GPKGs per project (civil audit vs poles audit)
