@@ -169,12 +169,38 @@ PROJECTS = {
         "table_name": "civil_audit__civil_audit",
         "label_col": "Name",
     },
-    # NOTE: "Phalaborwa - Ben Farm" (qf ef0b7147…, ff 67df5c8d…) is NOT registered
-    # yet. Its civil audit is split across three team GPKGs — "Civil Audit (BF|LLK|
-    # MT).gpkg" — with inconsistent QField relation-table names, and only ~7 photos
-    # captured so far. It will be onboarded (with the correct per-GPKG table names)
-    # once field QA ramps; until then the coverage-check (worksqa-qfield-ingest.sh)
-    # flags it if its upstream photo count crosses the alert threshold.
+    # QF project HT_Phalaborwa_Benfarm_V1 carries THREE Phalaborwa areas, not three
+    # crews of one: BF_* (10 design files), MK_* (8) and LK_* (7), each with its own
+    # civil audit — "Civil Audit (BF|LLK|MT).gpkg". An earlier note here called them
+    # "team GPKGs" and framed onboarding as a table-name problem; that is wrong and is
+    # what this entry replaces. Only BF maps to a FibreFlow project. LK and MK have NO
+    # project row at all (the only Phalaborwa projects are Ben Farm and Namakgale, and
+    # Namakgale is its own QF project b32184d6), so they cannot be registered here:
+    # without an ff_project_id of their own they would file another area's poles
+    # against Ben Farm. Creating those projects is a business decision, not config.
+    #
+    # Consequence to know before LK/MK crews start shooting: EXTRACT-GAP fires on
+    # `upstream >= threshold AND ingested == 0`, and `upstream` is the whole QF
+    # project's DCIM count. Registering BF makes ingested non-zero, so LK/MK photos
+    # landing in the shared DCIM will NOT raise an alert — they will simply never
+    # arrive. Tracked in #2497. A ratio-based partial-ingest check was measured and
+    # rejected: live ingested/upstream spans 0.46 (Mahikeng) to 1.88 (Etwatwa), so any
+    # threshold catching LK/MK also fires permanently on projects that are fine.
+    #
+    # table_name and label_col below are NOT guessable and were read off the live file
+    # (v20260814174604): the table inside "Civil Audit (BF).gpkg" is named
+    # civil_audit_mt__civil_audit_bf, while BOTH sibling audits contain a table called
+    # civil_audit_bf — the names are cross-wired against the filenames. label_col is
+    # "Label" (capital L) and this layer's "Name" column is 100% NULL across all 3248
+    # rows, so the neighbouring "Name"/"label" spellings would ingest nothing, silently.
+    # Poles are HT_PABA1_Z1_*; LK is PABA3_Z3 and MK is PABA2_Z2.
+    "Phalaborwa - Ben Farm": {
+        "qf_project_id": "ef0b7147-e56f-43a1-9074-6807e0bedf50",
+        "ff_project_id": "67df5c8d-0b3d-4784-9d63-70e3cdd1e2b8",
+        "gpkg_path": "Civil Audit (BF).gpkg",
+        "table_name": "civil_audit_mt__civil_audit_bf",
+        "label_col": "Label",
+    },
 }
 
 # Also check these alternate GPKGs per project (civil audit vs poles audit)
