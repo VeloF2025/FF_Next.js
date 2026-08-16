@@ -29,6 +29,11 @@ source_rows AS (
   FROM oes_pp_data pp, params p
   WHERE pp.resolved_drop_number IS NOT NULL
     AND pp.resolution_status = 'activated'
+    -- A superseded serial (ONT swap) keeps resolution_status = 'activated' as a
+    -- record of fact; decommissioned_at is what marks it as no longer the live
+    -- ONT for this drop. Without this filter a swapped home raises a second
+    -- review candidate on the day the old serial first activated.
+    AND pp.decommissioned_at IS NULL
     AND (COALESCE(pp.activated_at, pp.first_resolved_at, pp.resolved_at)
          AT TIME ZONE 'Africa/Johannesburg')::date = p.target_date
   UNION ALL

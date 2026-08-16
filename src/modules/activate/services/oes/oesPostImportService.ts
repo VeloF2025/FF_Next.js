@@ -8,6 +8,7 @@
  * - Serial verification recomputation
  * - VLM learning from OES ground truth
  * - PP activation status check
+ * - Superseded PP serial retirement (ONT_LIFECYCLE_V2 terminal transition)
  * - ONT swap confirmation
  *
  * Each function is independent and non-blocking. Errors are logged but
@@ -19,6 +20,7 @@ import pool from '@/lib/db';
 import { computeAndPersistVerification } from '@/modules/activate/services/serialVerificationService';
 import { recordVlmCorrectionsFromOes } from './oesVlmLearningService';
 import { promoteOesActivatedSerials, reconcileInStockOesActivated } from './oesSerialLifecycle';
+import { isOntLifecycleV2Enabled } from '@/lib/featureFlags';
 
 const logger = createLogger('oes/oesPostImportService');
 
@@ -417,10 +419,160 @@ export function triggerPpActivationCheck(): void {
           error: reconErr instanceof Error ? reconErr.message : String(reconErr),
         });
       }
+
+      // ── Terminal transition for the one-way lifecycle (ONT_LIFECYCLE_V2) ────
+      // Runs on EVERY import for the same reason the reconciliation above does:
+      // a drop can gain a second activated serial on a night when no PP row was
+      // promoted here (Path A/B may have flipped it on an earlier run).
+      try {
+        const retired = await retireSupersededPpSerials();
+        if (retired.retired > 0) {
+          logger.info('Superseded PP serials retired', {
+            retired: retired.retired,
+            blockedNoActivatedAt: retired.blockedNoActivatedAt,
+          });
+        } else {
+          logger.debug('Superseded PP serial sweep: 0 candidates');
+        }
+      } catch (retireErr) {
+        logger.warn('Superseded PP serial sweep skipped (non-blocking)', {
+          error: retireErr instanceof Error ? retireErr.message : String(retireErr),
+        });
+      }
     } catch (err) {
       logger.error('PP activation check failed', { error: err instanceof Error ? err.message : String(err) });
     }
   })();
+}
+
+// ============================================================================
+// SUPERSEDED SERIAL RETIREMENT (ONT_LIFECYCLE_V2 terminal transition)
+// ============================================================================
+
+export interface RetireSupersededResult {
+  /** Rows moved to the decommissioned terminal state. */
+  retired: number;
+  /** Duplicate live rows the lifecycle constraint refuses to retire (activated_at IS NULL). */
+  blockedNoActivatedAt: number;
+}
+
+/**
+ * Retire PP rows whose serial has been superseded on the same drop.
+ *
+ * Why this exists
+ * ---------------
+ * Under ONT_LIFECYCLE_V2 the PP upsert never demotes an `activated` row — the
+ * activation is a record of fact and an FT re-list is not a deactivation. That
+ * is correct, but it left the lifecycle with no terminal transition: migration
+ * 377 added `decommissioned_at` / `decommissioned_reason` and NOTHING in the
+ * codebase ever wrote them. So when a home's ONT is swapped, the old serial and
+ * the new serial both sit at `resolution_status = 'activated'` forever and the
+ * drop is counted twice by every consumer that filters on status alone.
+ *
+ * The rule is derived from data, not policy: within one `resolved_drop_number`,
+ * a home has exactly one live ONT. The newest activation wins; older live rows
+ * on the same drop are superseded and move to the terminal state.
+ *
+ * `decommissioned_reason` records provenance:
+ *   - `ont_swap:<new serial>`            — a confirmed `ont_swap_records` entry
+ *                                          links this exact old → new pair.
+ *   - `superseded_by_serial:<new serial>` — inferred from the activation order.
+ *
+ * Guard rails:
+ *   - No-op unless ONT_LIFECYCLE_V2 is on. With the flag off the legacy upsert
+ *     still demotes on re-list, so duplicates are transient and retiring rows
+ *     would fight that path.
+ *   - `resolution_status` is left untouched. The 377 check constraint has no
+ *     'decommissioned' member, and every existing read either ignores the
+ *     column or already filters `decommissioned_at IS NULL`.
+ *   - Rows with `activated_at IS NULL` are never retired: the 377 lifecycle
+ *     constraint requires `decommissioned_at >= activated_at`. They are counted
+ *     and reported instead of silently skipped.
+ */
+export async function retireSupersededPpSerials(): Promise<RetireSupersededResult> {
+  if (!isOntLifecycleV2Enabled()) {
+    return { retired: 0, blockedNoActivatedAt: 0 };
+  }
+
+  // Selection is a plain SELECT and the write is a per-row UPDATE rather than one
+  // CTE-driven UPDATE: the candidate set is a handful of rows per night (26 drops
+  // in production at the time of writing), and keeping the two apart means the
+  // selection SQL is exercisable in the pg-mem harness the rest of this lifecycle
+  // work is tested with. pg-mem supports neither window functions nor a CTE
+  // attached to an UPDATE.
+  const candidates = await pool.query<{
+    id: number;
+    serial_number: string;
+    drop_number: string;
+    keeper_serial: string;
+    activated_at: string | null;
+    swap_confirmed: boolean;
+  }>(`
+    WITH live AS (
+      SELECT id, serial_number, resolved_drop_number, activated_at, updated_at
+        FROM oes_pp_data
+       WHERE resolution_status = 'activated'
+         AND decommissioned_at IS NULL
+         AND resolved_drop_number IS NOT NULL
+    ),
+    keeper AS (
+      SELECT DISTINCT ON (resolved_drop_number)
+             resolved_drop_number, id AS keeper_id, serial_number AS keeper_serial
+        FROM live
+       ORDER BY resolved_drop_number, activated_at DESC NULLS LAST, updated_at DESC, id DESC
+    )
+    SELECT l.id,
+           l.serial_number,
+           l.resolved_drop_number AS drop_number,
+           k.keeper_serial,
+           l.activated_at,
+           (s.new_serial IS NOT NULL) AS swap_confirmed
+      FROM live l
+      JOIN keeper k ON k.resolved_drop_number = l.resolved_drop_number
+      LEFT JOIN ont_swap_records s
+        ON s.status LIKE 'confirmed%'
+       AND UPPER(TRIM(s.old_serial)) = UPPER(TRIM(l.serial_number))
+       AND UPPER(TRIM(s.new_serial)) = UPPER(TRIM(k.keeper_serial))
+     WHERE l.id <> k.keeper_id
+  `);
+
+  // The 377 lifecycle constraint requires decommissioned_at >= activated_at, so a
+  // duplicate with no activation timestamp cannot be retired. Counted and warned
+  // about rather than silently dropped — a growing number here means activated_at
+  // is not being stamped upstream.
+  const retirable = candidates.rows.filter((r) => r.activated_at !== null);
+  const blockedNoActivatedAt = candidates.rows.length - retirable.length;
+  if (blockedNoActivatedAt > 0) {
+    logger.warn('Duplicate activated PP rows cannot be retired — activated_at is NULL', {
+      count: blockedNoActivatedAt,
+    });
+  }
+
+  let retired = 0;
+  for (const row of retirable) {
+    const reason = row.swap_confirmed
+      ? `ont_swap:${row.keeper_serial}`
+      : `superseded_by_serial:${row.keeper_serial}`;
+    const res = await pool.query(
+      `UPDATE oes_pp_data
+          SET decommissioned_at = NOW(),
+              decommissioned_reason = $2,
+              updated_at = NOW()
+        WHERE id = $1
+          AND decommissioned_at IS NULL`,
+      [row.id, reason],
+    );
+    if ((res.rowCount ?? 0) > 0) {
+      retired += 1;
+      logger.info('PP serial superseded', {
+        drop_number: row.drop_number,
+        serial_number: row.serial_number,
+        reason,
+      });
+    }
+  }
+
+  return { retired, blockedNoActivatedAt };
 }
 
 /**
