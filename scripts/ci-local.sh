@@ -450,6 +450,21 @@ else
   echo "$SECRET_OUT" | sed 's/^/    /'
 fi
 
+# ─── Gate 8: Migration version collisions ────────────────────────────────────
+echo -e "\n${CYAN}── Gate 8: Migration Versions ──${NC}\n"
+
+# A rollback is resolved by version prefix, so two migrations numbered 493 leave
+# `rollback 493` unable to say which one was meant. 15 such pairs already exist
+# and cannot be renamed — schema_migrations is keyed by filename, so renaming an
+# applied migration re-applies it to the shared production database. Those are
+# grandfathered by name inside the checker; this stops the next one.
+if MIGRATION_OUT=$(node scripts/check-migration-versions.mjs 2>&1); then
+  pass "Migration versions: no new collisions"
+else
+  fail "Migration versions: a new migration reuses an existing version number"
+  echo "$MIGRATION_OUT" | sed 's/^/    /'
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
