@@ -10,7 +10,6 @@ import { apiResponse } from '@/lib/apiResponse';
 import { getSql } from '@/lib/neon-sql';
 import type { LocationType } from '@/modules/fleet/types';
 import {
-  isLocationType,
   validateLocationInput,
   type LocationInput,
 } from '@/modules/fleet/locations/locationRules';
@@ -44,8 +43,12 @@ function vehicleIdValue(value: unknown, fallback: string | null): string | null 
   return fallback;
 }
 
-function locationTypeValue(value: unknown): LocationType {
-  return isLocationType(value) ? value : value as LocationType;
+// A rejected `isActive` must fail loudly rather than be coerced: `=== true`
+// silently turned a malformed truthy value into `false`, deactivating the
+// location while returning 200.
+function isActiveValue(value: unknown): boolean | null | 'invalid' {
+  if (value === undefined) return null;
+  return typeof value === 'boolean' ? value : 'invalid';
 }
 
 function normalizeLocationInput(
@@ -64,8 +67,11 @@ function normalizeLocationInput(
     lat: body.lat === undefined ? fallback.lat : numberValue(body.lat),
     lon: body.lon === undefined ? fallback.lon : numberValue(body.lon),
     radiusKm: body.radiusKm === undefined ? fallback.radiusKm : numberValue(body.radiusKm),
+    // Deliberately NOT narrowed here: an invalid value must reach
+    // validateLocationInput so it returns 422 instead of being coerced to a
+    // silent default.
     locationType: hasLocationType
-      ? locationTypeValue(rawLocationType)
+      ? rawLocationType as LocationType
       : fallback.locationType,
     isGlobal: vehicleId ? false : body.isGlobal === undefined ? fallback.isGlobal : body.isGlobal !== false,
     vehicleId,
@@ -209,7 +215,11 @@ async function routeHandler(req: NextApiRequest, res: NextApiResponse) {
       const input = normalizeLocationInput(body, UPDATE_DEFAULTS);
       const relationshipUpdated = body.isGlobal !== undefined
         || Object.prototype.hasOwnProperty.call(body, 'vehicleId');
-      const errors = validateLocationInput(input);
+      const isActive = isActiveValue(body.isActive);
+      const errors: Record<string, string> = {
+        ...validateLocationInput(input),
+        ...(isActive === 'invalid' ? { isActive: 'isActive must be a boolean' } : {}),
+      };
       if (Object.keys(errors).length > 0) {
         return apiResponse.validationError(res, errors);
       }
@@ -231,7 +241,7 @@ async function routeHandler(req: NextApiRequest, res: NextApiResponse) {
             WHEN ${Object.prototype.hasOwnProperty.call(body, 'vehicleId')} THEN ${input.vehicleId}
             ELSE vehicle_id
           END,
-          is_active = COALESCE(${body.isActive === undefined ? null : body.isActive === true}, is_active)
+          is_active = COALESCE(${isActive}, is_active)
         WHERE id = ${id as string}
         RETURNING *, radius_km as "radiusKm", location_type as "locationType", is_global as "isGlobal",
           vehicle_id as "vehicleId", is_active as "isActive", created_at as "createdAt"

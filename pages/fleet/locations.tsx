@@ -8,6 +8,11 @@ import { fleetConfig } from '@/modules/navigation';
 import type { AuthorizedLocation } from '@/modules/fleet/types';
 import { LocationFormModal } from '@/modules/fleet/locations/LocationFormModal';
 import { deactivateLocation, listLocations, reactivateLocation } from '@/modules/fleet/locations/locationApi';
+import { LOCATION_TYPES } from '@/modules/fleet/locations/locationRules';
+
+// Derived from LOCATION_TYPES so the badge can never drift from the form's
+// picker options the way a hand-maintained copy did (it omitted 'office').
+const TYPE_LABELS = new Map(LOCATION_TYPES.map((type) => [type.value, type.label]));
 
 type ModalState = { mode: 'create'; location: null } | { mode: 'edit'; location: AuthorizedLocation } | null;
 
@@ -19,7 +24,18 @@ function LocationSection({ title, icon: Icon, locations, canEdit, canDelete, onE
     <header className="flex items-center gap-2 border-b border-[var(--ff-border-light)] px-6 py-4"><Icon className="h-5 w-5 text-[var(--ff-primary)]" /><h2 className="font-semibold">{title}</h2><span>({locations.length})</span></header>
     {locations.length === 0 ? <p className="p-8 text-center text-[var(--ff-text-secondary)]">No locations</p> : locations.map((location) =>
       <div key={location.id} className="flex items-center justify-between border-b border-[var(--ff-border-light)] px-6 py-4 last:border-0">
-        <div><p className="font-medium">{location.name}</p><p className="text-sm text-[var(--ff-text-secondary)]">{location.lat.toFixed(4)}, {location.lon.toFixed(4)} · {location.radiusKm}km radius</p></div>
+        <div>
+          <p className="flex items-center gap-2 font-medium">
+            {location.name}
+            <span className="rounded-full bg-[var(--ff-bg-tertiary)] px-2 py-0.5 text-xs font-normal text-[var(--ff-text-secondary)]">
+              {TYPE_LABELS.get(location.locationType) ?? location.locationType}
+            </span>
+          </p>
+          <p className="text-sm text-[var(--ff-text-secondary)]">
+            {location.vehicleRegistration ? `${location.vehicleRegistration} · ` : ''}
+            {location.lat.toFixed(4)}, {location.lon.toFixed(4)} · {location.radiusKm}km radius
+          </p>
+        </div>
         <div className="flex items-center gap-2">{!location.isActive && <span className="text-xs">Inactive</span>}
           {location.isActive && canEdit && <button aria-label={`Edit ${location.name}`} onClick={() => onEdit(location)} className="p-2"><Pencil className="h-4 w-4" /></button>}
           {location.isActive && canDelete && <button aria-label={`Deactivate ${location.name}`} onClick={() => onDeactivate(location)} className="p-2 text-red-600"><Trash2 className="h-4 w-4" /></button>}
