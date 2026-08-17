@@ -1,0 +1,8 @@
+import type { AssignmentRosterItem } from '../rosterQueries';
+
+export function AssignmentRoster({ rows, selected, onSelect, loading }: { rows: AssignmentRosterItem[]; selected: string[]; onSelect: (ids: string[]) => void; loading?: boolean }) {
+  if (loading) return <p>Loading roster…</p>;
+  if (!rows.length) return <p>No assignments match these filters.</p>;
+  const keys = rows.flatMap((row) => row.assignmentId ? [row.assignmentId] : []);
+  return <div className="overflow-x-auto"><label><input type="checkbox" aria-label="Select all" checked={keys.length > 0 && keys.every((key) => selected.includes(key))} onChange={(event) => onSelect(event.target.checked ? keys : [])} /> Select all explicit assignments</label><table><thead><tr><th>Select</th><th>Staff</th><th>Project / site</th><th>Source</th><th>Work date / schedule</th><th>Vehicle</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.staffId}:${row.workDate ?? row.assignmentId}`}><td>{row.assignmentId ? <input aria-label={`Select ${row.staffName}`} type="checkbox" checked={selected.includes(row.assignmentId)} onChange={(event) => onSelect(event.target.checked ? [...selected, row.assignmentId!] : selected.filter((id) => id !== row.assignmentId))} /> : 'Derived'}</td><td>{row.staffName}</td><td>{row.projectName ?? 'No project'} / {row.operationalSiteName ?? 'No site'}</td><td>{row.assignmentKind.replace('_', ' ')}</td><td>{row.workDate ?? `${row.startDate} – ${row.endDate}`} · {row.scheduled ? `${row.expectedStartTime ?? ''}–${row.expectedEndTime ?? ''}` : 'Unscheduled'}</td><td>{row.vehicleRegistration ?? 'No vehicle'}</td></tr>)}</tbody></table></div>;
+}

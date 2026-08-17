@@ -70,6 +70,7 @@ export const fleetConfig: ModuleNavigationConfig = {
     // Operations
     { id: 'parking', label: 'Parking Compliance', shortLabel: 'Parking', icon: ClipboardList, path: '/fleet/parking', rbacKey: 'fleet.parking' },
     { id: 'parking-requests', label: 'Parking Requests', shortLabel: 'Requests', icon: ClipboardList, path: '/fleet/parking/requests', rbacKey: 'fleet.parking-requests' },
+    { id: 'assignments', label: 'Assignments', icon: ClipboardList, path: '/fleet/assignments', rbacKey: 'fleet.assignments' },
     {
       id: 'fuel',
       label: 'Fuel',

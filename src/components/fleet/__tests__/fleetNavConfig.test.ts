@@ -36,6 +36,7 @@ describe('getActiveTabId', () => {
     ['/fleet/vehicles', 'vehicles'],
     ['/fleet/portal', 'vehicles'],
     ['/fleet/drivers', 'operations'],
+    ['/fleet/assignments', 'operations'],
     ['/fleet/fuel', 'operations'],
     ['/fleet/maintenance', 'operations'],
     ['/fleet/check-in', 'check-ins'],
@@ -90,6 +91,12 @@ describe('TABS', () => {
   it('exposes the map, parking, requests, and locations routes', () => {
     const hrefs = allHrefs(TABS);
     expect(hrefs).toEqual(expect.arrayContaining(['/fleet/map', '/fleet/parking', '/fleet/parking/requests', '/fleet/locations']));
+  });
+
+  it('exposes Assignments under Operations', () => {
+    const operations = TABS.find((tab) => tab.id === 'operations');
+    const hrefs = operations ? allHrefs([operations]) : [];
+    expect(hrefs).toContain('/fleet/assignments');
   });
 
   it('resolves every advertised href to the tab that advertises it', () => {

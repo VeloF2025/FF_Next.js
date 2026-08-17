@@ -60,6 +60,7 @@ export const TABS: Tab[] = [
         section: 'People',
         items: [
           { label: 'Drivers', href: '/fleet/drivers' },
+          { label: 'Assignments', href: '/fleet/assignments' },
         ],
       },
       {
@@ -145,8 +146,9 @@ export function getActiveTabId(
     return 'vehicles';
   }
 
-  // Operations — drivers, fuel, mileage, maintenance, overnight parking
+  // Operations — drivers, assignments, fuel, mileage, maintenance, overnight parking
   if (pathname.startsWith('/fleet/drivers') ||
+      pathname.startsWith('/fleet/assignments') ||
       pathname.startsWith('/fleet/fuel') ||
       pathname.startsWith('/fleet/mileage') ||
       pathname.startsWith('/fleet/maintenance') ||
