@@ -6,7 +6,7 @@ if (!process.env.TEST_DATABASE_URL) {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 
-const SCHEMA = 'mig489_fleet_operational_evidence_scratch';
+const SCHEMA = 'mig498_fleet_operational_evidence_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
 const SCOPED_URL = `${BASE_URL}${BASE_URL.includes('?') ? '&' : '?'}options=${encodeURIComponent(
   `-c search_path=${SCHEMA},public`,

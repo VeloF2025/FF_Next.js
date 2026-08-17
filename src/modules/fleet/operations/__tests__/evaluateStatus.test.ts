@@ -88,6 +88,34 @@ describe('evaluateOperationalStatus', () => {
     expect(status(evidence({ attendance: attendanceInside, vehicle: jitterVehicle }))).toBe('on_site_dual');
   });
 
+  // Both sources confirmed a wrong site but named DIFFERENT known ids while
+  // sitting within the mismatch tolerance of each other (overlapping geometry).
+  // That fell through every site-conflict branch — ids differ, a vehicle exists,
+  // a clock-in exists — and both confirmations were silently discarded, letting
+  // the evaluation continue to arrival/departure as if nothing were wrong.
+  it('confirms wrong_site when both sources confirm different co-located wrong sites', () => {
+    const wrongPoint = { latitude: -26.2, longitude: 28.2, recordedAt: '2026-08-14T06:00:00Z' };
+    const attendance = {
+      ...attendanceInside,
+      clockInPoint: wrongPoint,
+      matchedSiteId: 'site-2',
+      requiredSite: { valid: true, inside: false, distanceM: 2000, knownSiteId: 'site-2' },
+    };
+    // Same coordinates as the clock-in, so within mismatch tolerance, but a
+    // different known-site id.
+    const positions = ['06:00:00', '06:05:00'].map((time) => ({
+      ...wrongPoint, recordedAt: `2026-08-14T${time}Z`,
+      valid: true, inside: false, distanceM: 2000, speedKmh: 0, knownSiteId: 'site-3',
+    }));
+
+    const result = evaluateOperationalStatus(evidence({ attendance, vehicle: { ...vehicleInside, positions } }));
+
+    expect(result.status).toBe('wrong_site');
+    // Positive pin on WHY: it is the agreed-wrong-site path, not an incidental
+    // wrong_site from one source, and not a fallthrough to arrival/departure.
+    expect(result.reasonCodes).toContain('sources_agree_wrong_site');
+  });
+
   it('handles early and normal Attendance clock-out plus confirmed vehicle departure', () => {
     expect(status(evidence({ attendance: { ...attendanceInside, clockOutAt: '2026-08-14T12:00:00Z' } }))).toBe('left_early');
     expect(status(evidence({ attendance: { ...attendanceInside, clockOutAt: '2026-08-14T15:00:00Z' } }))).toBe('shift_complete');

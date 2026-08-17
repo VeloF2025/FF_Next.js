@@ -116,7 +116,15 @@ function evaluateSiteConflict(context: EvaluationContext): Decision | null {
   }
   const attendanceWrong = attendanceWrongConfirmed(context); const outside = vehicleWrong(context);
   const vehicleWrongConfirmed = Boolean(outside?.confirmed && outside.knownSiteId);
-  if (attendanceWrong && vehicleWrongConfirmed && attendanceSite === outside?.knownSiteId) return decision('wrong_site', 'sources_agree_wrong_site');
+  // Reaching this line already means the two sources are not in tolerance-
+  // exceeding disagreement: differing known sites beyond the mismatch tolerance
+  // returned evidence_mismatch above. So either the ids match, or the points are
+  // close enough to be the same physical place under overlapping geometry —
+  // both sources agree the worker is at a wrong site either way. Requiring id
+  // equality here dropped the co-located case through every branch below
+  // (vehicle exists, so not attendance-only; clock-in is set, so not
+  // vehicle-only) and silently discarded both confirmations.
+  if (attendanceWrong && vehicleWrongConfirmed) return decision('wrong_site', 'sources_agree_wrong_site');
   if (attendanceWrong && !vehicle) return decision('wrong_site', 'attendance_confirmed_wrong_site');
   if (vehicleWrongConfirmed && !attendance.clockInAt) return decision('wrong_site', 'vehicle_confirmed_wrong_site');
   if ((attendance.requiredSite?.valid && !attendance.requiredSite.inside && !attendanceWrong)

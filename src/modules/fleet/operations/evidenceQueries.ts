@@ -1,4 +1,5 @@
 import { query } from '@/lib/db-pool';
+import { log } from '@/lib/logger';
 import { staleAfterSecondsFor } from '@/services/tracking/staleness';
 import { buildAssignmentRosterQuery } from '../assignments/rosterQueries';
 import { loadEffectiveRule } from './ruleQueries';
@@ -94,14 +95,35 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
     const row = roster.find((candidate) => candidate.staff_id === vehicle.staff_id);
     if (!row) return [];
     try { return [{ vehicle, row, monitoringEnd: operationalWindow(toSchedule(row, request.workDate), rule).monitoringEnd }]; }
-    catch { return []; }
+    catch (error) {
+      // An unusable schedule drops this staff member from the GPS window only.
+      // evaluateOperationalStatus recomputes the same window per person and
+      // resolves it to unverifiable/evidence_source_error, so the status stays
+      // correct — but the swallow was previously unlogged, which made the
+      // downstream recomputation look like the sole safeguard.
+      log.warn('Skipping vehicle GPS window for an unusable schedule', {
+        staffId: String(vehicle.staff_id), workDate: request.workDate, error,
+      }, 'fleet');
+      return [];
+    }
   });
   const vehicleIds = vehicleMappings.map(({ vehicle }) => String(vehicle.vehicle_id));
   const vehicleSiteIds = vehicleMappings.map(({ row }) => row.operational_site_id);
   const vehicleProjectIds = vehicleMappings.map(({ row }) => row.project_id);
   const monitoringEnds = vehicleMappings.map(({ monitoringEnd }) => monitoringEnd);
   const lookbackMinutes = Math.max(rule.arrivalDwellMinutes, rule.wrongSiteConfirmationMinutes, rule.earlyDepartureConfirmationMinutes);
-  const starts = roster.flatMap((row) => { try { return [Date.parse(operationalWindow(toSchedule(row, request.workDate), rule).monitoringStart)]; } catch { return []; } });
+  const starts = roster.flatMap((row) => {
+    try { return [Date.parse(operationalWindow(toSchedule(row, request.workDate), rule).monitoringStart)]; }
+    catch (error) {
+      // Same contract as the vehicle window above: this row only loses its
+      // contribution to the earliest-lookback bound, and falls back to the
+      // workDate-derived start below. Per-person status is unaffected.
+      log.warn('Excluding an unusable schedule from the GPS lookback bound', {
+        staffId: String(row.staff_id), workDate: request.workDate, error,
+      }, 'fleet');
+      return [];
+    }
+  });
   const fallbackStart = Date.parse(`${request.workDate}T00:00:00+02:00`) - rule.monitoringBeforeMinutes * 60_000;
   const earliest = new Date((starts.length ? Math.min(...starts) : fallbackStart) - lookbackMinutes * 60_000).toISOString();
   const positions = await query<Row>(`WITH mapping AS (SELECT * FROM unnest($1::uuid[],$2::uuid[],$5::uuid[],$6::timestamptz[]) m(vehicle_id,site_id,project_id,monitoring_end))

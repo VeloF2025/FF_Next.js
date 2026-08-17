@@ -44,7 +44,7 @@ src/modules/fleet/
 | `fleet_gps_jobs` | GPS investigation jobs |
 | `fleet_gps_trips` | Analyzed GPS trips |
 
-## Operational Status Engine (migration 489, PR 4)
+## Operational Status Engine (migration 498, PR 4)
 
 Operational status is an explainable, read-time classification of a roster member's assignment,
 Attendance evidence, assigned-vehicle GPS, schedule, and required-site geometry. It is not stored
@@ -52,7 +52,7 @@ as a snapshot and does not create incidents, notifications, payroll outcomes, di
 or driver scores. The implementation lives in `src/modules/fleet/operations/`; protected APIs are
 under `/api/fleet/operations`, and the compact rule editor remains inside the Assignments workspace.
 
-Migration `489_fleet_operational_status_rules.sql` adds `fleet_operational_status_rules` plus
+Migration `498_fleet_operational_status_rules.sql` adds `fleet_operational_status_rules` plus
 `fleet.operations-status` and `fleet.operations-rules` permissions. Rule intervals are half-open
 `[effective_from, effective_to)`, cannot overlap, and have exactly one open version. A change locks
 and closes the current interval before inserting the next version in the same transaction; threshold

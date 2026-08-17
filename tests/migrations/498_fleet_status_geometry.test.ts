@@ -3,7 +3,7 @@ if (!process.env.TEST_DATABASE_URL) throw new Error('Integration test needs TEST
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 
-const schema = 'mig489_fleet_status_geometry_scratch';
+const schema = 'mig498_fleet_status_geometry_scratch';
 const baseUrl = process.env.TEST_DATABASE_URL;
 const scopedUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}options=${encodeURIComponent(`-c search_path=${schema},public`)}`;
 const admin = new Pool({ connectionString: baseUrl, ssl: false, max: 1 });
