@@ -72,14 +72,24 @@ case "$MODE" in
     # origin/master always exists) but is not survivable as a CI gate: a runner
     # that failed to fetch the base branch would report a clean scan over an
     # empty diff, and the gate would be exactly the paper guarantee this replaced.
-    if ! git rev-parse --verify --quiet origin/master >/dev/null 2>&1; then
-      echo -e "${RED}secret-scan: origin/master is not available — nothing was scanned.${NC}"
-      echo    "Fetch it first (git fetch origin master). Refusing to report a clean scan."
+    # The base is overridable because master is not every PR's base. A stacked PR
+    # bases on its parent feature branch, and diffing such a branch against
+    # master rescans the whole unmerged parent. That over-scans rather than
+    # under-scans, so it stayed fail-safe, but it can block a PR on content its
+    # parent already cleared. SECRET_SCAN_BASE_REF lets CI pass github.base_ref,
+    # matching what zero-tolerance-changed.sh and test-ratchet.sh already do.
+    # Defaults to master, so local use and `--tree` audits are unchanged.
+    #
+    # Still fails CLOSED on an unresolvable base — see the note above.
+    BASE_BRANCH="origin/${SECRET_SCAN_BASE_REF:-master}"
+    if ! git rev-parse --verify --quiet "$BASE_BRANCH" >/dev/null 2>&1; then
+      echo -e "${RED}secret-scan: $BASE_BRANCH is not available — nothing was scanned.${NC}"
+      echo    "Fetch it first (git fetch origin ${SECRET_SCAN_BASE_REF:-master}). Refusing to report a clean scan."
       exit 2
     fi
-    BASE=$(git merge-base origin/master HEAD 2>/dev/null || true)
+    BASE=$(git merge-base "$BASE_BRANCH" HEAD 2>/dev/null || true)
     if [ -z "$BASE" ]; then
-      echo -e "${RED}secret-scan: no merge-base with origin/master — nothing was scanned.${NC}"
+      echo -e "${RED}secret-scan: no merge-base with $BASE_BRANCH — nothing was scanned.${NC}"
       echo    "Refusing to report a clean scan over an empty diff."
       exit 2
     fi

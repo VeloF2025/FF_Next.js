@@ -82,8 +82,18 @@ jobs:
       # --branch scans lines ADDED between the merge-base and HEAD, so it cannot
       # trip on the repo's pre-existing hits (there are known ones; `--tree` is
       # the audit mode and is deliberately not gated).
+      # Scoped to the PR's ACTUAL base, now that a PR can be based on a feature
+      # branch. Diffing a stacked PR against master rescans its whole unmerged
+      # parent — fail-safe, since it over-scans rather than under-scans, but it
+      # can block a PR on content the parent already cleared. This matches how
+      # the Zero Tolerance and unit-test steps already scope themselves.
+      #
+      # BASE_REF goes through env and is never inlined into `run:` — a branch
+      # name is attacker-controlled on a fork PR.
       - name: Secret scan (gate)
         if: github.event_name == 'pull_request'
+        env:
+          SECRET_SCAN_BASE_REF: ${{ github.base_ref }}
         run: bash scripts/secret-scan.sh --branch
 
       # On a push to master the merge-base IS HEAD, so --branch would diff a
