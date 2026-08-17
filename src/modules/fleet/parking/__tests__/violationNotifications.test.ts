@@ -19,7 +19,7 @@ const report: ParkingCheckReport = {
 };
 
 describe('Fleet violation notifications', () => {
-  beforeEach(() => { vi.clearAllMocks(); process.env.FLEET_ALERT_USER_IDS = USER; notify.mockResolvedValue({ accepted_recipients: 1, suppressed_recipients: 0, failed_recipients: 0 }); });
+  beforeEach(() => { vi.clearAllMocks(); process.env.FLEET_ALERT_USER_IDS = USER; notify.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 }); });
 
   it('normalizes valid unique recipient UUIDs', () => {
     expect(fleetAlertUserIds(undefined)).toEqual([]);
@@ -45,7 +45,7 @@ describe('Fleet violation notifications', () => {
   });
 
   it('counts bus failures but not duplicate suppression as warnings', async () => {
-    notify.mockResolvedValue({ accepted_recipients: 0, suppressed_recipients: 1, failed_recipients: 2 });
+    notify.mockResolvedValue({ delivered: 0, suppressed: 1, failed: 2 });
     expect(await notifyNewParkingViolations(report)).toEqual({ warnings: 2, notifiedViolations: 0 });
   });
 });

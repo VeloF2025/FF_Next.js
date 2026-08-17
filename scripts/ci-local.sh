@@ -424,11 +424,45 @@ else
   echo "$SCANNER_TEST_OUT" | grep -E '^not ok|error:' | head -10 | sed 's/^/    /'
 fi
 
+# The pre-push hook drives that scanner as one of its three guards, and its own
+# failure modes are the same shape: a guard that silently never fires, or one
+# that blocks a routine push for the wrong reason.
+if HOOK_TEST_OUT=$(node --test scripts/pre-push.test.mjs 2>&1); then
+  pass "Pre-push hook: guard tests pass"
+else
+  fail "Pre-push hook: guard tests FAILED — a push guard is not trustworthy"
+  echo "$HOOK_TEST_OUT" | grep -E '^not ok|error:' | head -10 | sed 's/^/    /'
+fi
+
+# The setup that points git at those hooks. It must not report success when the
+# hooks would not actually run.
+if SETUP_TEST_OUT=$(node --test scripts/install-hooks.test.mjs 2>&1); then
+  pass "Hook setup: core.hooksPath tests pass"
+else
+  fail "Hook setup: tests FAILED — the hooks may not actually be wired"
+  echo "$SETUP_TEST_OUT" | grep -E '^not ok|error:' | head -10 | sed 's/^/    /'
+fi
+
 if SECRET_OUT=$(bash scripts/secret-scan.sh --branch 2>&1); then
   pass "Secret scan: no new credential-like content"
 else
   fail "Secret scan: credential-like content detected"
   echo "$SECRET_OUT" | sed 's/^/    /'
+fi
+
+# ─── Gate 8: Migration version collisions ────────────────────────────────────
+echo -e "\n${CYAN}── Gate 8: Migration Versions ──${NC}\n"
+
+# A rollback is resolved by version prefix, so two migrations numbered 493 leave
+# `rollback 493` unable to say which one was meant. 15 such pairs already exist
+# and cannot be renamed — schema_migrations is keyed by filename, so renaming an
+# applied migration re-applies it to the shared production database. Those are
+# grandfathered by name inside the checker; this stops the next one.
+if MIGRATION_OUT=$(node scripts/check-migration-versions.mjs 2>&1); then
+  pass "Migration versions: no new collisions"
+else
+  fail "Migration versions: a new migration reuses an existing version number"
+  echo "$MIGRATION_OUT" | sed 's/^/    /'
 fi
 
 # ─── Summary ─────────────────────────────────────────────────────────────────

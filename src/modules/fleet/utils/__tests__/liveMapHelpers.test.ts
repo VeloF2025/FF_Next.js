@@ -297,3 +297,30 @@ describe('lostContact — the case that used to hide inside grey', () => {
     expect(STATUS_STYLE.lostContact.fillOpacity).toBeGreaterThan(STATUS_STYLE.unknown.fillOpacity);
   });
 });
+
+describe('idling — the HW50KNGP bug: ignition on at 0 km/h used to render "Moving"', () => {
+  it('reports idling for a fresh fix with the engine on and no speed', () => {
+    const v = vehicle({ ignition: true, speedKph: 0, isStale: false });
+    expect(statusFor(v)).toBe('idling');
+  });
+
+  it('still reports moving when there is speed', () => {
+    const v = vehicle({ ignition: true, speedKph: 42, isStale: false });
+    expect(statusFor(v)).toBe('moving');
+  });
+
+  it('reports moving when speed is UNKNOWN — absence of data is not evidence of stillness', () => {
+    const v = vehicle({ ignition: true, speedKph: null, isStale: false });
+    expect(statusFor(v)).toBe('moving');
+  });
+
+  it('still reports lostContact when the fix is stale, whatever the speed', () => {
+    const v = vehicle({ ignition: true, speedKph: 0, isStale: true });
+    expect(statusFor(v)).toBe('lostContact');
+  });
+
+  it('has a style entry, so the legend cannot drift', () => {
+    expect(STATUS_STYLE.idling).toBeDefined();
+    expect(STATUS_STYLE.idling.label).toBe('Idling');
+  });
+});

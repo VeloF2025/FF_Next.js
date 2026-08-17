@@ -8,7 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { StockTakeLineCountData } from '@/types/procurement/stockTake.types';
-import { withAuth } from '@/lib/auth';
+import { withAuth, AuthenticatedRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -42,6 +42,11 @@ async function handler(
       return apiResponse.badRequest(res, 'Stock take must be in progress to record counts');
     }
 
+    // Attribution comes from the authenticated session, not the request body.
+    const authUser = (req as unknown as AuthenticatedRequest).user;
+    const countedBy = authUser?.id || null;
+    const countedByName = authUser?.name || null;
+
     const data: CountRequest = req.body;
 
     if (!data.line_id) {
@@ -73,7 +78,8 @@ async function handler(
         SET
           recount_quantity = ${data.counted_quantity},
           recounted_at = NOW(),
-          recounted_by_name = ${data.counted_by_name || null},
+          recounted_by = ${countedBy},
+          recounted_by_name = ${countedByName},
           status = 'recounted',
           updated_at = NOW()
         WHERE id = ${data.line_id}
@@ -86,7 +92,8 @@ async function handler(
         SET
           counted_quantity = ${data.counted_quantity},
           counted_at = NOW(),
-          counted_by_name = ${data.counted_by_name || null},
+          counted_by = ${countedBy},
+          counted_by_name = ${countedByName},
           serial_numbers = ${data.serial_numbers || null},
           lot_numbers = ${data.lot_numbers || null},
           status = 'counted',

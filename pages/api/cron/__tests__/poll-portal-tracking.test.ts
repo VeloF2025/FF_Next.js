@@ -47,6 +47,7 @@ vi.mock('@/services/tracking/alerts', () => ({
 }));
 
 import { PartialFetchError } from '@/services/tracking/netstar/client';
+import { SILENCE_WINDOW_MS } from '@/services/tracking/silence';
 import handler from '../poll-portal-tracking';
 
 const SECRET = 'test-cron-secret';
@@ -139,7 +140,7 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     netstarProviderMock.mockReturnValue(makeFakeProvider());
     reconcileTrackersMock.mockResolvedValue(recon({ upserted: 1 }));
     ingestPositionsMock.mockResolvedValue({ inserted: 0, skippedUnmapped: 0, maxIngestedAt: null });
-    raiseTrackingAlertMock.mockResolvedValue(undefined);
+    raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
   });
 
   it('rejects non-GET/POST methods with 405', async () => {
@@ -263,6 +264,75 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     }
   });
 
+  describe('cadence gate: an account not yet due for a poll is skipped without writing the watermark', () => {
+    it('skips when the configured interval has not elapsed, without calling listVehicles or writing the watermark', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-08-12T10:00:00.000Z'));
+        const listVehicles = vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]);
+        sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+          const text = strings.join('');
+          if (text.includes('SELECT last_event_ts')) {
+            return [{
+              last_event_ts: '2026-08-12T08:00:00.000Z',
+              consecutive_failures: 0,
+              last_error: null,
+              last_run_at: '2026-08-12T09:00:00.000Z', // 60 min ago, interval is 120
+              last_gap_alert_at: null,
+              evicted_since: null,
+              poll_interval_minutes: 120,
+            }];
+          }
+          if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+          return [];
+        });
+        netstarClientMock.mockReturnValue({ listVehicles, feedFreshness: vi.fn().mockResolvedValue(new Date()) });
+        const res = await run(AUTH);
+        expect(res._getJSONData().data.results).toEqual([
+          { provider: 'netstar', accountRef: 'europcar', skipped: 'not-due' },
+        ]);
+        expect(listVehicles).not.toHaveBeenCalled();
+        expect(reconcileTrackersMock).not.toHaveBeenCalled();
+        expect(sqlMock.mock.calls.some((c) =>
+          (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracking_watermarks')
+          || (c[0] as TemplateStringsArray).join('').includes('UPDATE fleet_tracking_watermarks')
+        )).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('polls when a tighter per-account interval has elapsed, even though 120 minutes has not', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-08-12T10:00:00.000Z'));
+        sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+          const text = strings.join('');
+          if (text.includes('SELECT last_event_ts')) {
+            return [{
+              last_event_ts: '2026-08-12T08:00:00.000Z',
+              consecutive_failures: 0,
+              last_error: null,
+              last_run_at: '2026-08-12T09:45:00.000Z', // 15 min ago
+              last_gap_alert_at: null,
+              evicted_since: null,
+              poll_interval_minutes: 10, // ramped down from the 120-minute default
+            }];
+          }
+          if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 0 }];
+          if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+          return [];
+        });
+        const listVehicles = vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]);
+        netstarClientMock.mockReturnValue({ listVehicles, feedFreshness: vi.fn().mockResolvedValue(new Date()) });
+        await run(AUTH);
+        expect(listVehicles).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   it('threads provider.key AND provider.accountRef through to ingestPositions', async () => {
     const fakePositions = [{ externalId: '1' }];
     netstarProviderMock.mockReturnValue(
@@ -308,6 +378,59 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'gap', provider: 'netstar', accountRef: 'europcar' })
     );
+  });
+
+  /**
+   * The stamp must track DELIVERY, not just policy.
+   *
+   * decideAlert saying an alert is due only means the POLICY wants one sent —
+   * raiseTrackingAlert can still fail to reach anyone (no recipients
+   * configured, or notify() itself throwing). Stamping last_gap_alert_at
+   * regardless would suppress the next 24h of gap alerts for an outage
+   * nobody was actually told about.
+   */
+  describe('gap alert: last_gap_alert_at is stamped only when raiseTrackingAlert reports delivery', () => {
+    function stampQuery() {
+      return sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('SET last_gap_alert_at'));
+    }
+
+    function triggerGapTick() {
+      stubSql({ activeTrackers: 3 });
+      reconcileTrackersMock.mockResolvedValue(recon({ upserted: 3 }));
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]),
+        feedFreshness: vi.fn().mockResolvedValue(new Date(Date.now() - 8 * 60 * 60 * 1000)),
+      });
+      netstarProviderMock.mockReturnValue(makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([]) }));
+    }
+
+    it('stamps when the decision was due AND delivery succeeded', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+        delivered: true,
+      });
+      triggerGapTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeDefined();
+    });
+
+    it('does NOT stamp when the decision was due but delivery failed (e.g. no recipients configured)', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+        delivered: false,
+      });
+      triggerGapTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+
+    it('does NOT stamp when the policy says the gap is not due yet', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      triggerGapTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
   });
 
   it('does not raise a gap alert when nothing is mapped (empty portal already handled by reconcileTrackers)', async () => {
@@ -399,13 +522,245 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     expect(raiseTrackingAlertMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'auth' }));
   });
 
-  it('treats "still logged out after re-auth" as an auth failure', async () => {
+  it('treats "still logged out after re-auth" as eviction, not an auth failure', async () => {
+    // Was asserted `authFailure: true` here. Task 3: Netstar's single-session
+    // eviction (a human opened the same portal) used to share isAuthFailure's
+    // immediate-WhatsApp channel. It now raises kind: 'evicted', which
+    // decideAlert (alerts.ts) keeps silent until sustained past 30 minutes.
     netstarClientMock.mockReturnValue({
       listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
       feedFreshness: vi.fn().mockResolvedValue(new Date()),
     });
     const res = await run(AUTH);
-    expect(res._getJSONData().data.results[0]).toMatchObject({ authFailure: true });
+    expect(res._getJSONData().data.results[0]).toMatchObject({ authFailure: false });
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'evicted', evictedSinceMs: 0 })
+    );
+  });
+
+  describe('eviction: evicted_since is sourced from the watermark, not derived from tick count', () => {
+    it('starts the eviction clock at 0 on the first eviction (no prior evicted_since)', async () => {
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'evicted', evictedSinceMs: 0 })
+      );
+    });
+
+    it('continues the clock from the watermark evicted_since while the streak persists', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-08-12T10:00:00.000Z'));
+        const evictedSince = '2026-08-12T09:15:00.000Z'; // 45 minutes before "now"
+        sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+          const text = strings.join('');
+          if (text.includes('SELECT last_event_ts')) {
+            return [{
+              last_event_ts: null,
+              consecutive_failures: 3,
+              last_error: '[portal-session] still logged out after re-auth: /prev',
+              // Outside the default 120-minute interval — this test is about
+              // the eviction clock, not cadence, so the tick must not be
+              // skipped as not-due before it ever reaches listVehicles().
+              last_run_at: '2026-08-12T07:00:00.000Z',
+              last_gap_alert_at: null,
+              evicted_since: evictedSince,
+            }];
+          }
+          if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 4 }];
+          if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+          return [];
+        });
+        netstarClientMock.mockReturnValue({
+          listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
+          feedFreshness: vi.fn().mockResolvedValue(new Date()),
+        });
+        await run(AUTH);
+        expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'evicted', evictedSinceMs: 45 * 60_000 })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('clears evicted_since in the watermark write on a healthy tick', async () => {
+      netstarProviderMock.mockReturnValue(
+        makeFakeProvider({ fetchPositions: vi.fn().mockResolvedValue([{ externalId: '1' }]) })
+      );
+      await run(AUTH);
+      const healthy = sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracking_watermarks') &&
+        (c[0] as TemplateStringsArray).join('').includes('consecutive_failures = 0'));
+      expect(healthy).toBeDefined();
+      expect((healthy![0] as TemplateStringsArray).join('')).toContain('evicted_since = NULL');
+    });
+
+    it('does not carry a prior eviction clock into an unrelated auth failure', async () => {
+      // The bug isSameFailureKind's docstring warns about, seen from
+      // pollProvider's side: a prior eviction streak must not leak its clock
+      // (or its consecutive_failures count) into a genuinely different auth
+      // failure that follows it.
+      sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+        const text = strings.join('');
+        if (text.includes('SELECT last_event_ts')) {
+          return [{
+            last_event_ts: null,
+            consecutive_failures: 2,
+            last_error: '[portal-session] still logged out after re-auth: /prev',
+            // Outside the default 120-minute interval — this test is about the
+            // eviction clock not leaking into an unrelated auth failure, not
+            // about cadence, so the tick must not be skipped as not-due.
+            last_run_at: new Date(Date.now() - 3 * 60 * 60_000).toISOString(),
+            last_gap_alert_at: null,
+            evicted_since: new Date().toISOString(),
+          }];
+        }
+        if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+        if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+        return [];
+      });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] login failed: HTTP 403')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+        // consecutiveFailures resets to 1 (not merged into the eviction streak's
+        // 2) and evictedSinceMs is null — the clock did not carry over.
+        expect.objectContaining({ kind: 'auth', consecutiveFailures: 1, evictedSinceMs: null })
+      );
+    });
+  });
+
+  describe('cadence demotion: back off the poll interval when a portal pushes back', () => {
+    function demoteQuery() {
+      return sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('SET poll_interval_minutes'));
+    }
+
+    function watermarkRow(overrides: Record<string, unknown> = {}) {
+      return {
+        last_event_ts: null,
+        consecutive_failures: 0,
+        last_error: null,
+        last_run_at: null, // never run: always due, and under the breaker threshold
+        last_gap_alert_at: null,
+        evicted_since: null,
+        poll_interval_minutes: 30,
+        ...overrides,
+      };
+    }
+
+    function stubWatermark(row: Record<string, unknown>) {
+      sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+        const text = strings.join('');
+        if (text.includes('SELECT last_event_ts')) return [row];
+        if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+        if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+        return [];
+      });
+    }
+
+    it('demotes immediately on an auth failure, with no threshold to wait for', async () => {
+      stubWatermark(watermarkRow({ poll_interval_minutes: 30 }));
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] login failed: HTTP 403')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      const q = demoteQuery();
+      expect(q).toBeDefined();
+      expect(q![1]).toBe(120); // demote(30) === 120
+    });
+
+    it('demotes on a sustained eviction (decideAlert reports non-null)', async () => {
+      stubWatermark(watermarkRow({ poll_interval_minutes: 10 }));
+      // Mocked module: raiseTrackingAlert's real decideAlert only returns
+      // non-null for 'evicted' once the streak has passed
+      // EVICTION_ESCALATE_AFTER_MS (see alerts.ts). This mock stands in for
+      // that "sustained" outcome without re-deriving the 30-minute clock here.
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_failed' },
+        delivered: true,
+      });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      const q = demoteQuery();
+      expect(q).toBeDefined();
+      expect(q![1]).toBe(30); // demote(10) === 30
+    });
+
+    it('does NOT demote on an eviction that is not sustained yet', async () => {
+      stubWatermark(watermarkRow({ poll_interval_minutes: 10 }));
+      // decideAlert stays silent below EVICTION_ESCALATE_AFTER_MS.
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[portal-session] still logged out after re-auth: /x')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(demoteQuery()).toBeUndefined();
+    });
+
+    it('does NOT demote on a transient failure, even once raiseTrackingAlert reports a non-null decision', async () => {
+      // Proves demotion is not keyed off `decision !== null` alone — only
+      // auth, or evicted-and-sustained. TRANSIENT_THRESHOLD already governs
+      // alerting for transient failures; folding it into demotion too would
+      // ratchet every account to 120 within a day of ordinary internet
+      // weather.
+      stubWatermark(watermarkRow({ poll_interval_minutes: 10, consecutive_failures: 2 }));
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded' },
+        delivered: true,
+      });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] Export: HTTP 500')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(demoteQuery()).toBeUndefined();
+    });
+
+    it('does not write a no-op UPDATE when already at the slowest step', async () => {
+      stubWatermark(watermarkRow({ poll_interval_minutes: 120 }));
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] login failed: HTTP 403')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(demoteQuery()).toBeUndefined();
+    });
+
+    it('never demotes from the breaker\'s throttled path — that path writes no watermark at all', async () => {
+      // 3 consecutive prior auth failures + a recent last_run_at => 'open':
+      // the tick never reaches listVehicles or the catch, so demote() is
+      // never even reachable, let alone able to write.
+      stubWatermark(watermarkRow({
+        consecutive_failures: 3,
+        last_error: '[netstar] login failed: HTTP 403',
+        last_run_at: new Date(Date.now() - 60_000).toISOString(), // 1 min ago, well inside the 24h cooldown
+        poll_interval_minutes: 10,
+      }));
+      const listVehicles = vi.fn().mockResolvedValue([{ externalId: '1', registration: 'ND01ABGP' }]);
+      netstarClientMock.mockReturnValue({ listVehicles, feedFreshness: vi.fn().mockResolvedValue(new Date()) });
+      const res = await run(AUTH);
+      expect(res._getJSONData().data.results[0]).toMatchObject({ skipped: 'auth-circuit-open' });
+      expect(listVehicles).not.toHaveBeenCalled();
+      expect(demoteQuery()).toBeUndefined();
+      expect(sqlMock.mock.calls.some((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracking_watermarks')
+        || (c[0] as TemplateStringsArray).join('').includes('UPDATE fleet_tracking_watermarks')
+      )).toBe(false);
+    });
   });
 
   it('does not mark a generic failure as an auth failure', async () => {
@@ -416,6 +771,98 @@ describe('GET/POST /api/cron/poll-portal-tracking', () => {
     const res = await run(AUTH);
     expect(res._getJSONData().data.results[0]).toMatchObject({ authFailure: false });
     expect(raiseTrackingAlertMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'transient' }));
+  });
+
+  it('reads last_transient_alert_at from the watermark and threads it into the transient alert (catch path)', async () => {
+    const priorAlertAt = '2026-08-11T09:00:00.000Z';
+    sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join('');
+      if (text.includes('SELECT last_event_ts')) {
+        return [{
+          last_event_ts: null,
+          consecutive_failures: 0,
+          last_error: null,
+          last_run_at: null,
+          last_gap_alert_at: null,
+          evicted_since: null,
+          poll_interval_minutes: 120,
+          last_transient_alert_at: priorAlertAt,
+        }];
+      }
+      if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+      if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+      return [];
+    });
+    netstarClientMock.mockReturnValue({
+      listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] Export: HTTP 500')),
+      feedFreshness: vi.fn().mockResolvedValue(new Date()),
+    });
+    await run(AUTH);
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'transient', lastTransientAlertAt: new Date(priorAlertAt) })
+    );
+  });
+
+  /**
+   * Same delivered-gate as the gap stamp: decideAlert saying an alert is due
+   * only means the POLICY wants one sent. Stamping last_transient_alert_at
+   * regardless would suppress the next 24h of transient alerts for an outage
+   * nobody was actually told about. Exercises the catch-path alert — the one
+   * a real portal outage (connection errors, not partial fetches) actually
+   * takes.
+   */
+  describe('transient alert (catch path): last_transient_alert_at is stamped only when delivered', () => {
+    function stampQuery() {
+      return sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('SET last_transient_alert_at'));
+    }
+
+    function triggerTransientFailureTick() {
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] Export: HTTP 500')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+    }
+
+    it('stamps when the decision was due AND delivery succeeded', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded', stampTransientAlert: true },
+        delivered: true,
+      });
+      triggerTransientFailureTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeDefined();
+    });
+
+    it('does NOT stamp when the decision was due but delivery failed (e.g. no recipients configured)', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded', stampTransientAlert: true },
+        delivered: false,
+      });
+      triggerTransientFailureTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+
+    it('does NOT stamp when the policy says the repeat is not due yet', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      triggerTransientFailureTick();
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+
+    it('does NOT stamp an auth decision, which never sets stampTransientAlert', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_failed' },
+        delivered: true,
+      });
+      netstarClientMock.mockReturnValue({
+        listVehicles: vi.fn().mockRejectedValue(new Error('[netstar] login failed: HTTP 403')),
+        feedFreshness: vi.fn().mockResolvedValue(new Date()),
+      });
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
   });
 
   it('returns an empty results array when no provider is configured', async () => {
@@ -704,6 +1151,67 @@ describe('partial fetch', () => {
     const res = await run(AUTH);
     expect(res._getJSONData().data.results[0]).not.toHaveProperty('error');
   });
+
+  it('reads last_transient_alert_at from the watermark and threads it into the transient alert', async () => {
+    const priorAlertAt = '2026-08-11T09:00:00.000Z';
+    sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join('');
+      if (text.includes('SELECT last_event_ts')) {
+        return [{
+          last_event_ts: null,
+          consecutive_failures: 0,
+          last_error: null,
+          last_run_at: null,
+          last_gap_alert_at: null,
+          evicted_since: null,
+          poll_interval_minutes: 120,
+          last_transient_alert_at: priorAlertAt,
+        }];
+      }
+      if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+      if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+      return [];
+    });
+    netstarProviderMock.mockReturnValue(partialProvider());
+    await run(AUTH);
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'transient', lastTransientAlertAt: new Date(priorAlertAt) })
+    );
+  });
+
+  describe('transient alert (partial-fetch path): last_transient_alert_at is stamped only when delivered', () => {
+    function stampQuery() {
+      return sqlMock.mock.calls.find((c) =>
+        (c[0] as TemplateStringsArray).join('').includes('SET last_transient_alert_at'));
+    }
+
+    it('stamps when the decision was due AND delivery succeeded', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded', stampTransientAlert: true },
+        delivered: true,
+      });
+      netstarProviderMock.mockReturnValue(partialProvider());
+      await run(AUTH);
+      expect(stampQuery()).toBeDefined();
+    });
+
+    it('does NOT stamp when the decision was due but delivery failed', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({
+        decision: { event: 'fleet.tracking_pull_degraded', stampTransientAlert: true },
+        delivered: false,
+      });
+      netstarProviderMock.mockReturnValue(partialProvider());
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+
+    it('does NOT stamp when the policy says the repeat is not due yet', async () => {
+      raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+      netstarProviderMock.mockReturnValue(partialProvider());
+      await run(AUTH);
+      expect(stampQuery()).toBeUndefined();
+    });
+  });
 });
 
 describe('alert recipients are visible in the response', () => {
@@ -711,6 +1219,221 @@ describe('alert recipients are visible in the response', () => {
     alertRecipientCountMock.mockReturnValue(0);
     const res = await run(AUTH);
     expect(res._getJSONData().data.alertRecipients).toBe(0);
+  });
+});
+
+/**
+ * Per-vehicle silence detection (Task 8).
+ *
+ * findSilentTrackers itself is pure and covered by silence.test.ts. What
+ * belongs here is the WIRING: the detector runs once per tick against the
+ * whole fleet, independent of which providers are configured this run —
+ * proven by disabling every provider below and still seeing the alert fire.
+ */
+describe('per-vehicle silence detection', () => {
+  function stubSilenceRows(rows: Array<Record<string, unknown>>) {
+    sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join('');
+      if (text.includes('FROM fleet_check_records')) return rows;
+      if (text.includes('SELECT last_event_ts')) return [];
+      if (text.includes('RETURNING consecutive_failures')) return [{ consecutive_failures: 1 }];
+      if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+      return [];
+    });
+  }
+
+  const silentRow = (overrides: Record<string, unknown> = {}) => ({
+    vehicle_id: 'v1', registration: 'HW50KNGP',
+    created_at: new Date('2026-08-12T08:00:00.000Z'),
+    nearest_fix_ms: 40 * 60 * 60 * 1000, // 40h — well past the 12h window
+    provider: 'netstar', account_ref: 'europcar',
+    last_alert_at: null,
+    ...overrides,
+  });
+
+  /**
+   * The real-time race (fix round 2, production 2026-08-13): evaluating a
+   * check-in immediately races a healthy tracker that has not had a chance
+   * to report yet. LL92LYGP checked in at 07:05:35; the detector ran at
+   * 07:10 and saw only the previous evening's fix, 13.1h away — past the
+   * 12h window — and flagged it. The tracker actually reported 24 minutes
+   * after check-in; the vehicle was never silent. This would fire most
+   * mornings for most of the fleet.
+   *
+   * `sqlMock` returns whatever rows it is handed regardless of the WHERE
+   * clause text — it does not run real SQL — so the row-exclusion behaviour
+   * itself cannot be exercised here. What CAN be proven at this layer is
+   * that the query sent to Postgres carries the upper bound at all, and
+   * that its value is tied to SILENCE_WINDOW_MS rather than a second,
+   * driftable literal. The exclusion behaviour itself is Postgres's to
+   * enforce; production is what surfaced its absence in the first place.
+   */
+  it('bounds the check-in query above by SILENCE_WINDOW_MS, not just below by the 3-day floor', async () => {
+    stubSilenceRows([silentRow()]);
+    await run(AUTH);
+    const call = sqlMock.mock.calls.find((c) =>
+      (c[0] as TemplateStringsArray).join('').includes('FROM fleet_check_records'));
+    expect(call).toBeDefined();
+    const text = (call![0] as TemplateStringsArray).join('');
+    expect(text).toMatch(/c\.created_at\s*<\s*now\(\)/);
+    // Tied to the constant, not a hardcoded second literal — the two must
+    // never be able to drift apart.
+    expect(call!.slice(1)).toContain(SILENCE_WINDOW_MS);
+  });
+
+  it('raises a gap alert for a vehicle whose tracker went dark, even with no providers configured this tick', async () => {
+    // No providers ticked at all this run — proves the check does not live
+    // inside pollProvider, which never even runs here.
+    delete process.env.NETSTAR_PORTAL_URL;
+    stubSilenceRows([silentRow()]);
+    const res = await run(AUTH);
+    expect(res._getStatusCode()).toBe(200);
+    expect(res._getJSONData().data.results).toEqual([]);
+    expect(raiseTrackingAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'gap', provider: 'netstar', accountRef: 'europcar',
+        detail: expect.stringContaining('HW50KNGP'),
+      })
+    );
+  });
+
+  it('does not alert when the checked-in vehicle has a nearby fix', async () => {
+    stubSilenceRows([silentRow({ nearest_fix_ms: 1 * 60 * 60 * 1000 })]);
+    await run(AUTH);
+    expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('does not assess a vehicle with a check-in but no fix anywhere (nearest_fix_ms null)', async () => {
+    stubSilenceRows([silentRow({ nearest_fix_ms: null })]);
+    await run(AUTH);
+    expect(raiseTrackingAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('reports the silent count in the response body', async () => {
+    stubSilenceRows([silentRow()]);
+    const res = await run(AUTH);
+    expect(res._getJSONData().data.silentTrackers).toBe(1);
+  });
+
+  it('groups multiple silent vehicles on the same account into a single alert call', async () => {
+    stubSilenceRows([
+      silentRow({ vehicle_id: 'v1', registration: 'HW50KNGP' }),
+      silentRow({ vehicle_id: 'v2', registration: 'LG88LJGP', nearest_fix_ms: 50 * 60 * 60 * 1000 }),
+    ]);
+    await run(AUTH);
+    const gapCalls = raiseTrackingAlertMock.mock.calls.filter(
+      (c) => (c[0] as { kind: string }).kind === 'gap'
+    );
+    expect(gapCalls).toHaveLength(1);
+    expect(gapCalls[0][0]).toMatchObject({
+      detail: expect.stringContaining('HW50KNGP'),
+    });
+    expect((gapCalls[0][0] as { detail: string }).detail).toContain('LG88LJGP');
+  });
+
+  function silenceStampCalls() {
+    return sqlMock.mock.calls.filter((c) =>
+      (c[0] as TemplateStringsArray).join('').includes('INSERT INTO fleet_tracker_silence_alerts'));
+  }
+
+  it('stamps this vehicle\'s own cooldown row once delivery succeeds', async () => {
+    raiseTrackingAlertMock.mockResolvedValue({
+      decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+      delivered: true,
+    });
+    stubSilenceRows([silentRow()]);
+    await run(AUTH);
+    expect(silenceStampCalls()).toHaveLength(1);
+    expect(silenceStampCalls()[0]?.[1]).toBe('v1');
+  });
+
+  it('does not stamp when raiseTrackingAlert reports no delivery', async () => {
+    raiseTrackingAlertMock.mockResolvedValue({ decision: null, delivered: false });
+    stubSilenceRows([silentRow()]);
+    await run(AUTH);
+    expect(silenceStampCalls()).toHaveLength(0);
+  });
+
+  it('stamps EVERY vehicle named in a delivered alert, not just the one whose cooldown expired', async () => {
+    raiseTrackingAlertMock.mockResolvedValue({
+      decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+      delivered: true,
+    });
+    stubSilenceRows([
+      // v1's own cooldown is fresh (2h ago) — would not be due alone.
+      silentRow({ vehicle_id: 'v1', registration: 'HW50KNGP', last_alert_at: new Date(Date.now() - 2 * 60 * 60 * 1000) }),
+      // v2 has never alerted — this is what makes the GROUP due.
+      silentRow({ vehicle_id: 'v2', registration: 'LG88LJGP', nearest_fix_ms: 50 * 60 * 60 * 1000, last_alert_at: null }),
+    ]);
+    await run(AUTH);
+    const stampedVehicleIds = silenceStampCalls().map((c) => c[1]);
+    expect(stampedVehicleIds).toEqual(expect.arrayContaining(['v1', 'v2']));
+    expect(stampedVehicleIds).toHaveLength(2);
+  });
+
+  /**
+   * The exact case fix round 1 exists for: vehicle A on an account already
+   * alerted and is still mid-cooldown. A DIFFERENT vehicle (B) on the SAME
+   * account goes silent for the first time. B must still produce an alert —
+   * the account-level cooldown from round 1 would have suppressed it for up
+   * to 24h, reported by review as a real defect (3-7 vehicles/account makes
+   * this plausible, not an edge case).
+   */
+  it('alerts for a vehicle that goes silent while an account-mate is still mid-cooldown', async () => {
+    raiseTrackingAlertMock.mockResolvedValue({
+      decision: { event: 'fleet.tracking_data_gap', stampGapAlert: true },
+      delivered: true,
+    });
+    stubSilenceRows([
+      // Vehicle A: already alerted 4h ago — well inside the 24h cooldown, not
+      // due on its own.
+      silentRow({
+        vehicle_id: 'v1', registration: 'HW50KNGP',
+        last_alert_at: new Date(Date.now() - 4 * 60 * 60 * 1000),
+      }),
+      // Vehicle B: same account, silent for the first time — never alerted.
+      silentRow({
+        vehicle_id: 'v2', registration: 'LG88LJGP',
+        nearest_fix_ms: 50 * 60 * 60 * 1000, last_alert_at: null,
+      }),
+    ]);
+    const res = await run(AUTH);
+    expect(res._getStatusCode()).toBe(200);
+    const gapCalls = raiseTrackingAlertMock.mock.calls.filter(
+      (c) => (c[0] as { kind: string }).kind === 'gap'
+    );
+    expect(gapCalls).toHaveLength(1);
+    // Both are still currently silent, so both are named.
+    expect((gapCalls[0]?.[0] as { detail: string }).detail).toContain('HW50KNGP');
+    expect((gapCalls[0]?.[0] as { detail: string }).detail).toContain('LG88LJGP');
+    // The real assertion: B's null cooldown must win the group's anchor, not
+    // A's recent one. An account-level clock (round 1) would have passed A's
+    // 4h-ago timestamp here — recent enough that the real decideAlert would
+    // have stayed silent, exactly the defect review caught.
+    expect(gapCalls[0]?.[0]).toMatchObject({ lastGapAlertAt: null });
+  });
+
+  it('never sends a WhatsApp-graded alert kind for silence — always gap, never auth/transient/evicted', async () => {
+    stubSilenceRows([silentRow()]);
+    await run(AUTH);
+    const kinds = raiseTrackingAlertMock.mock.calls.map((c) => (c[0] as { kind: string }).kind);
+    expect(kinds.every((k) => k === 'gap')).toBe(true);
+  });
+
+  it('does not let a silence-check failure take the whole tick down', async () => {
+    sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const text = strings.join('');
+      if (text.includes('FROM fleet_check_records')) throw new Error('db exploded');
+      if (text.includes('SELECT last_event_ts')) return [];
+      if (text.includes('FROM fleet_vehicle_trackers') && text.includes('count(*)')) return [{ n: 1 }];
+      return [];
+    });
+    const res = await run(AUTH);
+    expect(res._getStatusCode()).toBe(200);
+    expect(logMock.error).toHaveBeenCalledWith(
+      expect.stringContaining('silence check failed'),
+      expect.objectContaining({ error: expect.stringContaining('db exploded') })
+    );
   });
 });
 

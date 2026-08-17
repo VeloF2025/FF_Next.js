@@ -87,7 +87,9 @@ interface GRNListItem {
   purchaseOrderNumber?: string;
   supplierName?: string;
   receivedDate?: string;
-  itemCount: number;
+  // The GRN list API returns `totalItems` (unlike the PO/requisition APIs which
+  // return `itemCount`); reading `itemCount` here rendered a blank count.
+  totalItems: number;
 }
 
 const reqStatusConfig: Record<RequisitionStatus, { label: string; color: string; icon: typeof Clock }> = {
@@ -521,7 +523,7 @@ function GRNTabContent() {
                     <StatusIcon className="h-3 w-3" />
                     {status.label}
                   </span>
-                  <span className="text-sm text-[var(--ff-text-secondary)]">{grn.itemCount} items</span>
+                  <span className="text-sm text-[var(--ff-text-secondary)]">{grn.totalItems} items</span>
                   <ChevronRight className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
                 </div>
               </div>

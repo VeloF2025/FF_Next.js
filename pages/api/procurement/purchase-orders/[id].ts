@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, AuthenticatedRequest } from '@/lib/auth';
-import { poApprovalService } from '@/services/procurement/approval';
+import { poApprovalService, UnauthorizedApprovalError } from '@/services/procurement/approval';
 import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -65,7 +65,14 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         po.updated_at,
         po.version,
         po.current_approval_request_id,
-        po.approved_by,
+        -- approved_by stores a user id for new approvals; resolve to a display
+        -- name via users, falling back to the raw value for legacy rows that
+        -- stored the name directly.
+        COALESCE(
+          NULLIF(TRIM(CONCAT_WS(' ', approver.first_name, approver.last_name)), ''),
+          approver.email,
+          po.approved_by
+        ) as approved_by,
         po.approved_at,
         po.odoo_po_id,
         po.sage_po_number,
@@ -77,6 +84,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN projects p ON po.project_id = p.id
+      LEFT JOIN users approver ON approver.id::text = po.approved_by
       WHERE po.id = ${id}
     `;
 
@@ -341,6 +349,15 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           return apiResponse.badRequest(res, 'Only pending POs can be approved');
         }
 
+        // Authorize the approver against the threshold-based approval chain.
+        // super_admin/admin always pass; otherwise the user must match the
+        // approval level (specific user or role) for this PO's amount.
+        const canApprove = await poApprovalService.canUserApprove(id, userId);
+        if (!canApprove) {
+          log.warn('PO approval denied', { id, userId, userName });
+          return apiResponse.forbidden(res, 'You are not authorized to approve this purchase order');
+        }
+
         await poApprovalService.approvePO(id, userId, userName, notes);
 
         log.info('PO approved', { id, approver: userName });
@@ -594,6 +611,12 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
         return apiResponse.badRequest(res, `Invalid action: ${action}`);
     }
   } catch (error) {
+    // A race between the route's canUserApprove check and approvePO's own
+    // re-check surfaces as an authorization failure, not a server error.
+    if (error instanceof UnauthorizedApprovalError) {
+      log.warn('PO approval denied (service guard)', { id, error: error.message });
+      return apiResponse.forbidden(res, 'You are not authorized to approve this purchase order');
+    }
     log.error('Failed to update purchase order status', { error });
     return apiResponse.internalError(res, error);
   }

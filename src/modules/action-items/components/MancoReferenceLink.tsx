@@ -42,6 +42,23 @@ function parseMeetingId(url: string): number | null {
  * Reference links + meeting links for a manco action item.
  * Supports multiple meeting links (follow-up meetings) and a general reference link.
  */
+/**
+ * Parse a JSON body, tolerating one that is not JSON.
+ *
+ * A proxy error page, a 204, or a truncated response all produce a body that will not
+ * parse, and none of them are worth surfacing on their own — the status code is what the
+ * caller acts on. Written as a named helper with a real body rather than an inline
+ * promise catch returning an empty object literal: the zero-tolerance gate reads that
+ * form as an empty catch, and it leaves no place to say why swallowing is correct here.
+ */
+async function readJsonBody<T>(response: Response): Promise<Partial<T>> {
+  try {
+    return (await response.json()) as Partial<T>;
+  } catch {
+    return {};
+  }
+}
+
 export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps) {
   const [linkInput, setLinkInput] = useState('');
   const [saving, setSaving] = useState(false);
@@ -84,7 +101,7 @@ export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps)
         });
 
         if (!res.ok) {
-          const json = await res.json().catch(() => ({})) as { message?: string };
+          const json = await readJsonBody<{ message?: string }>(res);
           toast.error(json.message ?? 'Failed to link meeting');
           return;
         }
@@ -98,9 +115,26 @@ export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps)
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ manco_action_item_id: item.id, meeting_id: meetingId }),
         })
-          .then(r => r.json())
-          .then(json => {
-            const count = (json as { data?: { comments_inserted?: number } }).data?.comments_inserted ?? 0;
+          .then(async r => {
+            // Without the r.ok check a refusal parsed to `data: undefined` -> count 0 ->
+            // no toast, so a caller who was not in the meeting saw "extracting
+            // discussion..." and then silence, indistinguishable from "nothing relevant
+            // found". The link itself still succeeded, so this is not a failure of the
+            // whole action — say what did and did not happen.
+            const json = await readJsonBody<{
+              data?: { comments_inserted?: number };
+              message?: string;
+            }>(r);
+            if (!r.ok) {
+              toast.error(
+                r.status === 403
+                  ? 'Meeting linked, but its discussion is only available to people who were in it'
+                  : json.message ?? 'Meeting linked, but the discussion could not be extracted',
+              );
+              onUpdated();
+              return;
+            }
+            const count = json.data?.comments_inserted ?? 0;
             if (count > 0) {
               toast.success(`${count} discussion excerpt${count > 1 ? 's' : ''} added as comments`);
             }

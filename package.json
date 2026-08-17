@@ -72,7 +72,8 @@
     "test:logger": "tsx scripts/test-logger.ts",
     "db:migrate:realtime": "node scripts/run-realtime-migration.js",
     "embed-manual": "node scripts/embed-manual-content.js",
-    "test:migrations": "vitest --config vitest.migrations.config.ts run"
+    "test:migrations": "vitest --config vitest.migrations.config.ts run",
+    "test:db:action-items": "vitest --config vitest.db.config.ts run tests/db/action-items"
   },
   "keywords": [
     "react",

@@ -39,32 +39,32 @@ describe('notification bus idempotency', () => {
   });
 
   it('claims once per recipient when idempotency_key is present', async () => {
-    expect(await notify(payload)).toEqual({ accepted_recipients: 2, suppressed_recipients: 0, failed_recipients: 0 });
+    expect(await notify(payload)).toEqual({ delivered: 2, suppressed: 0, failed: 0 });
     expect(state.claim).toHaveBeenCalledTimes(2);
   });
 
   it('skips every channel when the recipient claim already exists', async () => {
     state.claim.mockResolvedValue(false);
-    expect(await notify({ ...payload, recipient_user_ids: ['user-1'] })).toEqual({ accepted_recipients: 0, suppressed_recipients: 1, failed_recipients: 0 });
+    expect(await notify({ ...payload, recipient_user_ids: ['user-1'] })).toEqual({ delivered: 0, suppressed: 1, failed: 0 });
     expect(state.email).not.toHaveBeenCalled();
     expect(state.whatsapp).not.toHaveBeenCalled();
     expect(state.sql).not.toHaveBeenCalled();
   });
 
   it('dispatches normally without an idempotency_key', async () => {
-    expect(await notify({ ...payload, idempotency_key: undefined })).toEqual({ accepted_recipients: 2, suppressed_recipients: 0, failed_recipients: 0 });
+    expect(await notify({ ...payload, idempotency_key: undefined })).toEqual({ delivered: 2, suppressed: 0, failed: 0 });
     expect(state.claim).not.toHaveBeenCalled();
   });
 
   it('does not dispatch when the claim query throws', async () => {
     state.claim.mockRejectedValue(new Error('db unavailable'));
-    expect(await notify({ ...payload, recipient_user_ids: ['user-1'] })).toEqual({ accepted_recipients: 0, suppressed_recipients: 0, failed_recipients: 1 });
+    expect(await notify({ ...payload, recipient_user_ids: ['user-1'] })).toEqual({ delivered: 0, suppressed: 0, failed: 1 });
     expect(state.sql).not.toHaveBeenCalled();
   });
 
   it('allows one recipient while suppressing another', async () => {
     state.claim.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
-    expect(await notify(payload)).toEqual({ accepted_recipients: 1, suppressed_recipients: 1, failed_recipients: 0 });
+    expect(await notify(payload)).toEqual({ delivered: 1, suppressed: 1, failed: 0 });
   });
 
   it('releases a successful claim when durable in-app insertion fails', async () => {
@@ -74,10 +74,36 @@ describe('notification bus idempotency', () => {
     });
 
     expect(await notify({ ...payload, recipient_user_ids: ['user-1'] })).toEqual({
-      accepted_recipients: 0,
-      suppressed_recipients: 0,
-      failed_recipients: 1,
+      delivered: 0,
+      suppressed: 0,
+      failed: 1,
     });
     expect(state.release).toHaveBeenCalledWith('user-1', 'test', 'stable-key');
+  });
+
+  // The interaction between the two things merged here, which neither side
+  // covered on its own: a claim IS taken, then every channel turns out to be
+  // muted. The previous idempotency work counted this recipient as `accepted`,
+  // so it reported the notification as reached; master's rule counts only what
+  // was dispatched, so it is now reported as nothing at all.
+  it('reports a claimed but fully muted recipient as neither delivered nor failed', async () => {
+    state.sql.mockImplementation(async (strings: TemplateStringsArray) =>
+      strings.join('').includes('notification_preferences')
+        ? [{ channel_in_app: false, channel_email: false, channel_whatsapp: false }]
+        : [{ id: 'notification-1' }]);
+
+    expect(await notify({ ...payload, recipient_user_ids: ['user-1'] })).toEqual({
+      delivered: 0,
+      suppressed: 0,
+      failed: 0,
+    });
+    // Positive pins on WHY it is all zeroes: the claim was taken (so this is the
+    // muted path, not the suppressed path), nothing was dispatched on either
+    // async channel, and the claim is deliberately NOT released — a retry would
+    // send nothing either, so consuming the key is correct.
+    expect(state.claim).toHaveBeenCalledWith('user-1', 'test', 'stable-key');
+    expect(state.email).not.toHaveBeenCalled();
+    expect(state.whatsapp).not.toHaveBeenCalled();
+    expect(state.release).not.toHaveBeenCalled();
   });
 });

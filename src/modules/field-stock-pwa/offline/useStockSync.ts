@@ -142,7 +142,10 @@ export function useStockSync(): UseStockSyncResult {
         if (items.length > 0) {
           for (const item of items) {
             try {
-              await submitIssue(item.draft);
+              // The queued item's id IS the idempotency key (mirrors returns):
+              // a retry after a mid-submit network drop dedupes to the same
+              // picking server-side instead of issuing the stock twice.
+              await submitIssue(item.draft, item.id);
               // 2xx — remove from queue.
               await dropQueued(item.id);
             } catch (err) {
