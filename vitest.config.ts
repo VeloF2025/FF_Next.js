@@ -69,6 +69,7 @@ export default defineConfig({
       'tests/migrations/489_hs_ppe_acknowledgements.test.ts',
       'tests/migrations/490_wiekus_health_safety_edit.test.ts',
       'tests/migrations/496_fleet_parking_operational_foundations.test.ts',
+      'tests/migrations/497_fleet_operational_assignments.test.ts',
       'tests/migrations/metric-registry-execution.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.
