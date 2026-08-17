@@ -138,16 +138,19 @@ function OperationalGeometry({ geometry }: { geometry: OperationalOverlayGeometr
   );
 }
 export function OperationalMapLayers({
-  operationalOverlay,
-  vehicles,
-  selectedStaffId,
-  onStaffSelect,
-  focusStaffId,
-  focusRequestId = 0,
+  operationalOverlay, vehicles, selectedStaffId, onStaffSelect, focusStaffId, focusRequestId = 0,
 }: OperationalMapLayersProps) {
   const map = useMap();
+  const plottedByVehicle = new Map(
+    partitionVehicles(vehicles).plotted.map((vehicle) => [vehicle.vehicleId, vehicle]),
+  );
   const badgeLayers = useRef(new Map<string, FocusLayer>());
   const attendanceLayers = useRef(new Map<string, FocusLayer>());
+  const badgeIds = new Set(operationalOverlay.badges
+    .filter((badge) => plottedByVehicle.has(badge.vehicleId)).map((badge) => badge.staffId));
+  const attendanceIds = new Set(operationalOverlay.attendancePoints.map((point) => point.staffId));
+  for (const staffId of badgeLayers.current.keys()) if (!badgeIds.has(staffId)) badgeLayers.current.delete(staffId);
+  for (const staffId of attendanceLayers.current.keys()) if (!attendanceIds.has(staffId)) attendanceLayers.current.delete(staffId);
   const register = (registry: Map<string, FocusLayer>): RegisterLayer => (staffId, layer) => {
     if (layer) registry.set(staffId, layer); else registry.delete(staffId);
   };
@@ -160,9 +163,6 @@ export function OperationalMapLayers({
     map.setView(layer.getLatLng(), Math.max(map.getZoom(), 15));
     layer.openPopup();
   }, [focusRequestId, focusStaffId, map]);
-  const plottedByVehicle = new Map(
-    partitionVehicles(vehicles).plotted.map((vehicle) => [vehicle.vehicleId, vehicle]),
-  );
   return (
     <>
       {operationalOverlay.geometry && (

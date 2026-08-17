@@ -133,4 +133,23 @@ describe('FleetMap operational composition', () => {
     expect(layers.map.setView).toHaveBeenCalledWith({ lat: -26.1, lng: 28.05 }, 15);
     expect(marker.openPopup).toHaveBeenCalledTimes(1);
   });
+
+  it('does not focus a removed badge at its stale coordinate', () => {
+    const marker = { getLatLng: vi.fn(() => ({ lat: -26.1, lng: 28.05 })), openPopup: vi.fn() };
+    const view = render(<FleetMap operationalOverlay={operationalOverlay} vehicles={[vehicle]} />);
+    const badgeProps = layers.markers.mock.calls.at(-1)?.[0] as {
+      eventHandlers: { add: (event: { target: typeof marker }) => void };
+    };
+    badgeProps.eventHandlers.add({ target: marker });
+    view.rerender(<FleetMap focusRequestId={1} focusStaffId="staff-1"
+      operationalOverlay={operationalOverlay} vehicles={[vehicle]} />);
+    expect(marker.openPopup).toHaveBeenCalledTimes(1);
+    layers.map.setView.mockClear();
+
+    view.rerender(<FleetMap focusRequestId={2} focusStaffId="staff-1"
+      operationalOverlay={{ ...operationalOverlay, badges: [] }} vehicles={[vehicle]} />);
+
+    expect(layers.map.setView).not.toHaveBeenCalled();
+    expect(marker.openPopup).toHaveBeenCalledTimes(1);
+  });
 });
