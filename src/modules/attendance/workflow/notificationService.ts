@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { notify } from '@/modules/notifications/services/notificationBus';
-import type { NotifyPayload } from '@/modules/notifications/types';
+import type { NotifyPayload, NotifyResult } from '@/modules/notifications/types';
 import { getPeriodReadiness } from './periodQueries';
 import {
   claimDispatch, finishDispatch, loadAdminRecipients, loadClockoutCandidates,
@@ -227,7 +227,10 @@ async function dispatch(candidate: Candidate, phase: AttendanceNotificationPhase
   } catch {
     addFailure(report, candidate.sourceKey, 'dispatch_claim_failed'); return;
   }
-  let invocation: Promise<void>;
+  // notify() reports per-recipient delivery counts; this site only cares that
+  // the bus accepted the call, so the result is deliberately not read — but the
+  // annotation must match, not be widened away.
+  let invocation: Promise<NotifyResult>;
   try { invocation = notify(candidate.payload); }
   catch {
     await markFailed(candidate.deliveryKey, 'notification_bus_invocation_failed');
