@@ -180,28 +180,28 @@ describe('query construction', () => {
 
   it('dedupes on the object version, not the key', () => {
     // The same physical photo carries a QField key AND a local key that
-    // copyQFieldPhotoToStorage wrote, so keying on storage_key returned 29,287 photos
+    // copyQFieldPhotoToStorage wrote, so keying on storage_key returned 34,313 photos
     // twice. Only the trailing version id is shared.
     const { sql } = pageQuery(filter({ project: 'Etwatwa' }));
-    expect(sql).toContain("split_part(storage_key, '/', -1)");
+    expect(sql).toContain("substring(storage_key from '/(v[0-9]{14}-[^/]+)$')");
     expect(sql).not.toContain('DISTINCT ON (storage_key)');
     expect(sql).toContain('UNION ALL');
   });
 
   it('falls back to the whole key when there is no version id', () => {
-    // 4,629 works-QA keys carry no version segment. Without the fallback they would all
-    // reduce to the same trailing segment and collapse into a single row.
+    // One expression, so the guard and the extractor cannot disagree: a CASE that asks
+    // "is there a version anywhere" plus a split_part that takes "the LAST segment" would
+    // dedupe `.../v20260319102739-abc/thumb.jpg` to `thumb.jpg`.
     const { sql } = pageQuery(filter());
-    expect(sql).toMatch(/CASE WHEN storage_key ~ '\/v\[0-9\]\{14\}-'/);
-    expect(sql).toContain('ELSE storage_key END');
+    expect(sql).toContain("COALESCE(substring(storage_key from '/(v[0-9]{14}-[^/]+)$'), storage_key)");
   });
 
   it('applies the same dedupe to the page, the summary and the manifest', () => {
     // A manifest that deduped differently from the page would download photos the user
     // was never shown a count for.
     for (const { sql } of [pageQuery(filter()), summaryQuery(filter()), allKeysQuery(filter())]) {
-      expect(sql).toContain("split_part(storage_key, '/', -1)");
-      expect(sql).not.toContain('DISTINCT ON (storage_key)');
+      expect(sql).toContain("DISTINCT ON (COALESCE(substring(storage_key from '/(v[0-9]{14}-[^/]+)$'), storage_key))");
+      expect(sql).toContain('first_value(captured_at) OVER dategroup');
     }
   });
 
@@ -209,7 +209,7 @@ describe('query construction', () => {
     // DISTINCT ON dictates its own leading sort key. Without the outer ORDER BY,
     // "the 20 most recent photos" quietly returns the 20 alphabetically-first ones.
     const { sql } = pageQuery(filter());
-    const inner = sql.indexOf('ORDER BY CASE WHEN storage_key');
+    const inner = sql.indexOf('ORDER BY COALESCE(substring(storage_key');
     const outer = sql.indexOf('ORDER BY captured_at DESC NULLS LAST, storage_key');
     expect(inner).toBeGreaterThan(-1);
     expect(outer).toBeGreaterThan(inner);
@@ -242,11 +242,11 @@ describe('query construction', () => {
   });
 
   it('resolves a cross-corpus duplicate to the QA row, not by timestamp', () => {
-    // 29,287 photos exist in both corpora. A time-ordered tiebreak hands every one to
+    // 34,313 photos exist in both corpora. A time-ordered tiebreak hands every one to
     // the QField row (validation always postdates capture), losing file_size_bytes,
     // vlm_valid, zone_no, pon_no and filename. corpus_rank must precede captured_at.
     const { sql } = pageQuery(filter());
-    expect(sql).toContain('END, corpus_rank, captured_at DESC NULLS LAST');
+    expect(sql).toContain('storage_key), corpus_rank, captured_at DESC NULLS LAST');
     expect(sql).toMatch(/0\s+AS corpus_rank/);
   });
 

@@ -221,7 +221,7 @@ function union(filter: PhotoFilter): Clause {
   const wq = worksQaQuery(filter, params);
   // UNION ALL, then DISTINCT ON the version id below. The overlap between the
   // construction-QA and QField corpora is not the ~102 rows whose storage_key happens to
-  // start with `projects/` — it is 29,287, because copyQFieldPhotoToStorage gives the
+  // start with `projects/` — it is 34,313, because copyQFieldPhotoToStorage gives the
   // same object a second, local key. See DEDUPE_KEY.
   return { sql: `${qa.sql} UNION ALL ${qf.sql} UNION ALL ${wq.sql}`, params };
 }
@@ -242,26 +242,70 @@ function union(filter: PhotoFilter): Clause {
  * `copyQFieldPhotoToStorage` rewrites a QField key into a local one, so one physical
  * photo lives in two corpora under two different keys and `DISTINCT ON (storage_key)`
  * kept both. The comment above once claimed only ~102 rows overlapped; measured on live
- * data it is 29,287 — every one of the 29,290 versioned construction-QA photos shares a
- * version id with a QField row. A `source=both` search and the download manifest were
- * returning each of them twice.
+ * data 34,313 of the 58,879 version ids resolve to two paths. A `source=both` search and
+ * the download manifest were returning every one of those photos twice — the default
+ * three-corpus search drops from 152,508 deduped rows to 118,195.
  *
  *   cqa : mamelodi/MAM.P.A383/v20260319102739-e5aee617
  *   qpv : projects/2ce80264-…/DCIM/civil-audit_20260319121813445.jpg/v20260319102739-e5aee617
  *
  * The trailing `v<14-digit timestamp>-<hash>` is MinIO's version id and is what the two
- * keys genuinely share. It is unambiguous: across all three corpora no version id maps
- * to two distinct photos (checked live — construction-QA 34,322 version ids, QField
- * 58,875, works-QA 7,797, zero ambiguous). The single works-QA version id that did map
- * to two keys is this very bug — the same photo under a QField path and a local one.
+ * keys genuinely share — `qfieldIngestionService` sets the local filename to exactly
+ * that segment, so the match is by construction, not coincidence. It is unambiguous:
+ * of the 58,879 version ids across the three corpora, 34,313 map to more than one path
+ * and EVERY one of those is exactly one `projects/…` path plus one local path. None
+ * maps to three, none is qfield↔qfield or local↔local. The single works-QA id that
+ * mapped to two keys is this very bug — the same photo under a QField and a local path.
  *
- * Keys with no version id (4,629 works-QA rows) fall back to the whole key, so they
- * dedupe exactly as before rather than all collapsing onto one empty segment.
+ * Matched with an anchored substring rather than a CASE + split_part pair: a guard that
+ * asks "is there a version segment anywhere" while the extractor takes "the LAST
+ * segment" agree only while the version is terminal. One key shaped
+ * `…/v20260319102739-e5aee617/thumb.jpg` would otherwise dedupe to `thumb.jpg` and
+ * collapse every such photo across every project into one row. QField keys already nest
+ * the version UNDER a filename, so that layout is not far-fetched. One expression
+ * cannot desync from itself.
+ *
+ * Keys with no version id (16,576 works-QA rows) fall back to the whole key. Without
+ * that fallback they reduce to their basenames — 59,316 distinct keys collapse to
+ * 52,656, silently losing ~6,660 photos.
  */
-const DEDUPE_KEY =
-  "CASE WHEN storage_key ~ '/v[0-9]{14}-' THEN split_part(storage_key, '/', -1) ELSE storage_key END";
+const DEDUPE_KEY = "COALESCE(substring(storage_key from '/(v[0-9]{14}-[^/]+)$'), storage_key)";
 const DEDUPE = `DISTINCT ON (${DEDUPE_KEY})`;
 const DEDUPE_ORDER = `ORDER BY ${DEDUPE_KEY}, corpus_rank, captured_at DESC NULLS LAST`;
+
+/**
+ * Carry the best-known timestamp onto whichever row survives the dedupe.
+ *
+ * Collapsing duplicates makes the surviving row's date the ONLY date, and the richest
+ * corpus is not always the dated one: works-QA (rank 1) records no photo timestamp at
+ * all, and 21,636 version ids have a works-QA row and a QField row but no
+ * construction-QA row. Ranking alone would hand those to works-QA and drop the
+ * `validated_at` the QField row carried — sending 21,636 photos to the NULL tail of
+ * `captured_at DESC NULLS LAST`, i.e. off the first pages of an unfiltered search that
+ * previously showed them. It is not only a works-QA problem: 12,551 construction-QA
+ * rows also have a NULL captured_at, so "prefer the dated row" is not a rule that can
+ * be expressed by rank either.
+ *
+ * So rank still decides WHICH row wins — the step label and VLM verdict are why that
+ * policy exists — and the date is taken from the best-dated row in the same group.
+ * `date_basis` travels with it from the same window, so a borrowed date is never
+ * reported under the borrower's own basis.
+ */
+const CARRY_WINDOW =
+  `WINDOW dategroup AS (PARTITION BY ${DEDUPE_KEY} ORDER BY captured_at DESC NULLS LAST)`;
+const CARRIED_COLUMNS = `
+             COALESCE(captured_at, first_value(captured_at) OVER dategroup) AS captured_at,
+             CASE WHEN captured_at IS NOT NULL THEN date_basis
+                  ELSE first_value(date_basis) OVER dategroup END          AS date_basis`;
+
+/** The union with `captured_at`/`date_basis` replaced by their carried equivalents. */
+function carried(baseSql: string): string {
+  return `SELECT photo_id, corpus, corpus_rank, storage_key, filename, step_label,
+                 vlm_valid, needs_retake, file_size_bytes, pole_number, zone_no, pon_no,
+                 project_name,${CARRIED_COLUMNS}
+          FROM (${baseSql}) carried_src
+          ${CARRY_WINDOW}`;
+}
 
 /**
  * Rows for one page, newest first.
@@ -277,7 +321,7 @@ export function pageQuery(filter: PhotoFilter): Clause {
     sql: `
       SELECT * FROM (
         SELECT ${DEDUPE} *
-        FROM (${base.sql}) matched
+        FROM (${carried(base.sql)}) matched
         ${DEDUPE_ORDER}
       ) deduped
       ORDER BY captured_at DESC NULLS LAST, storage_key
@@ -302,7 +346,7 @@ export function summaryQuery(filter: PhotoFilter): Clause {
              count(file_size_bytes)::int AS sized,
              COALESCE(sum(file_size_bytes), 0)::bigint AS total_bytes
       FROM (SELECT ${DEDUPE} storage_key, file_size_bytes, captured_at, corpus_rank
-            FROM (${base.sql}) m
+            FROM (${carried(base.sql)}) m
             ${DEDUPE_ORDER}) deduped`,
     params: base.params,
   };
@@ -314,7 +358,7 @@ export function allKeysQuery(filter: PhotoFilter): Clause {
   return {
     sql: `
       SELECT ${DEDUPE} storage_key, filename, step_label, file_size_bytes, captured_at, corpus_rank
-      FROM (${base.sql}) matched
+      FROM (${carried(base.sql)}) matched
       ${DEDUPE_ORDER}`,
     params: base.params,
   };
