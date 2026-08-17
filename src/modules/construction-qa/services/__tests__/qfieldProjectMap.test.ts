@@ -15,9 +15,13 @@ import { describe, expect, it } from 'vitest';
  *
  * The authoritative mapping is really `qfield_projects` ⋈ `qfield_project_links` in the
  * database, but CI has no access to it. Comparing the two in-repo copies catches the
- * drift that actually occurred and needs nothing but the filesystem. The DB remains the
- * tie-breaker for anything this cannot see (Grabouw reached this map from the DB, not
- * from the registry, so it is legitimately absent below).
+ * drift that actually occurred and needs nothing but the filesystem.
+ *
+ * Coverage is PARTIAL and the gap matters: the registry knows 13 of the map's 21
+ * entries, so the other 8 (the four original *Pole Audit* projects, MAM offline,
+ * ETWpoc1 and anything else map-only) are checked here for duplicate keys and nothing
+ * else. A wrong-but-well-formed UUID on one of those passes. Only a query against
+ * `qfield_projects` ⋈ `qfield_project_links` catches those, and CI has no DB.
  */
 const REPO_ROOT = join(__dirname, '../../../../..');
 const SERVICE = join(REPO_ROOT, 'src/modules/construction-qa/services/qfieldIngestionService.ts');
@@ -25,13 +29,29 @@ const REGISTRY = join(REPO_ROOT, 'scripts/qfield_project_registry.py');
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
+/** Registry blocks in `scripts/qfield_project_registry.py`. Bump deliberately. */
+const REGISTRY_ENTRY_COUNT = 13;
+
+/**
+ * Text between two markers, throwing if either is missing.
+ *
+ * `indexOf` returns -1 for an absent marker, and `slice(start, -1)` then silently means
+ * "the rest of the file bar one char" — so renaming the end marker would quietly widen
+ * the region instead of failing, and any later `'uuid': 'uuid'` pair would be absorbed
+ * into the map under test.
+ */
+function sliceBetween(src: string, startMarker: string, endMarker: string): string {
+  const start = src.indexOf(startMarker);
+  const end = src.indexOf(endMarker);
+  if (start < 0) throw new Error(`marker not found: ${startMarker}`);
+  if (end < start) throw new Error(`marker not found after ${startMarker}: ${endMarker}`);
+  return src.slice(start, end);
+}
+
 /** {qf_uuid: ff_uuid} parsed from the TS literal. */
 function tsMap(): Map<string, string> {
-  const src = readFileSync(SERVICE, 'utf8');
-  const body = src.slice(
-    src.indexOf('const QFIELD_TO_FIBREFLOW'),
-    src.indexOf('const FIBREFLOW_TO_QFIELD'),
-  );
+  const body = sliceBetween(readFileSync(SERVICE, 'utf8'),
+    'const QFIELD_TO_FIBREFLOW', 'const FIBREFLOW_TO_QFIELD');
   const out = new Map<string, string>();
   for (const m of body.matchAll(new RegExp(`'(${UUID})':\\s*'(${UUID})'`, 'g'))) {
     out.set(m[1], m[2]);
@@ -41,8 +61,7 @@ function tsMap(): Map<string, string> {
 
 /** {name: {qf, ff}} parsed from the Python PROJECTS literal. */
 function registry(): Array<{ name: string; qf: string; ff: string }> {
-  const src = readFileSync(REGISTRY, 'utf8');
-  const body = src.slice(src.indexOf('PROJECTS = {'), src.indexOf('ALTERNATE_GPKGS'));
+  const body = sliceBetween(readFileSync(REGISTRY, 'utf8'), 'PROJECTS = {', 'ALTERNATE_GPKGS');
   const blocks = body.matchAll(
     new RegExp(
       `"([^"]+)":\\s*\\{[^}]*?"qf_project_id":\\s*"(${UUID})"[^}]*?"ff_project_id":\\s*"(${UUID})"`,
@@ -54,8 +73,11 @@ function registry(): Array<{ name: string; qf: string; ff: string }> {
 
 describe('QFIELD_TO_FIBREFLOW vs the extraction registry', () => {
   it('parses both sides — a silent parse failure would make every assertion vacuous', () => {
+    // EXACT, not a floor. A regex that silently drops one block (a nested dict inside an
+    // entry, reversed key order, single-quoted keys) leaves that project unchecked while
+    // a `> 10` guard still passes with three slots to spare.
+    expect(registry().length).toBe(REGISTRY_ENTRY_COUNT);
     expect(tsMap().size).toBeGreaterThan(15);
-    expect(registry().length).toBeGreaterThan(10);
   });
 
   it('ingests every project that is extracted', () => {

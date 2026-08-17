@@ -44,8 +44,11 @@ const FEATURE_TYPE_DISCIPLINE: Record<string, { discipline: Discipline; featureT
  * This literal is a THIRD copy of a mapping that already lives in the DB
  * (`qfield_projects` ⋈ `qfield_project_links`), after
  * `scripts/qfield_project_registry.py`. Nothing compared the copies, so a project could
- * be registered for extraction and silently absent here — which is how seven entries
- * went missing. `test_qfield_map_matches_db` now fails when they diverge.
+ * be registered for extraction and silently absent here — which is how the five entries
+ * above went missing. `__tests__/qfieldProjectMap.test.ts` now cross-checks this map
+ * against the Python registry and fails when they diverge. It covers the 13 entries the
+ * registry knows about; the other 8 here have no registry counterpart and are checked
+ * only for duplicate keys, so the DB audit below is still the wider net.
  *
  * Two reasons the DB cannot simply replace this map today:
  *   - It is not a superset. `380147aa…` (ETWpoc1) is here but has no row in
@@ -54,6 +57,13 @@ const FEATURE_TYPE_DISCIPLINE: Record<string, { discipline: Discipline; featureT
  *   - `Record<string, string>` cannot express what the table holds. `Master_2026` and
  *     `FT_Master_Progress` each link to SIX FibreFlow projects. Both carry zero photos
  *     today, so they are omitted here rather than modelled wrongly.
+ *   - Being linked in the DB is not sufficient on its own. Grabouw QA and Grabouw Drill
+ *     Survey are linked and carry 122 photos, but were never onboarded for EXTRACTION,
+ *     so no `label_col` was configured and their `feature_id`s are raw GPKG row ids
+ *     (`poles_20251113101137422`) rather than pole labels. None of the 121 matches
+ *     Grabouw's existing reviews (`GRA.P.A282`, …) or any of its 3,793 poles, so adding
+ *     them here would create 121 untraceable reviews beside the 122 correct ones. The
+ *     fix is a registry entry with the right label_col, not a line in this map.
  */
 const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   // Original Pole Audit projects
@@ -74,7 +84,7 @@ const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   '7fe59cdc-b1d5-475d-8448-5cf2e9f7175b': 'ce3bf310-d6ba-4ede-ab36-a8c902a5efc6', // Tonga Site Audit 2026 → Tonga
   '9af1fc72-f637-4ecb-b371-f7c08a4d4e68': '7bb7e022-dd75-4299-8575-cfc08abdfabb', // FT_Thembelihle → Themb'elihle
   // Registered for extraction but absent here until 2026-08-17, so their photos reached
-  // qfield_photo_validations and stopped: 6,364 rows eligible under this service's own
+  // qfield_photo_validations and stopped: 6,242 rows eligible under this service's own
   // predicate and zero construction_qa_reviews between them.
   //
   // What this does NOT do: unblock zone delivery. That gate joins
@@ -89,8 +99,6 @@ const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   'f076fad4-b2a5-40b8-bafe-35c20ce09827': 'de408530-76f0-4d10-bf08-cfcd3202f69e', // HT_Middelburg → Middelburg
   'b32184d6-1776-4b89-8afd-2907dfca86d4': '183fe626-7bf7-4793-bdb9-1a1dc2e21aa6', // HT_Namakgale_P3_A1 → Phalaborwa - Namakgale
   'ef0b7147-e56f-43a1-9074-6807e0bedf50': '67df5c8d-0b3d-4784-9d63-70e3cdd1e2b8', // HT_Phalaborwa_Benfarm_V1 → Phalaborwa - Ben Farm
-  'aa6aba62-e57e-4701-8b55-30d2cce996c8': '574a7856-3582-46aa-9094-1c434855d176', // Grabouw QA → Grabouw
-  '0fc570b5-99e6-4d8a-b906-10c6257d6a9d': '574a7856-3582-46aa-9094-1c434855d176', // Grabouw Drill Survey → Grabouw
 };
 
 /** Reverse map: FibreFlow project UUID → QFieldCloud project UUIDs */
