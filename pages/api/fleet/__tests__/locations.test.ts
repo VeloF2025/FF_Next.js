@@ -200,4 +200,69 @@ describe('/api/fleet/locations', () => {
     expect(sqlValues[1]).toContain(false);
     expect(sqlValues[1]).toContain('vehicle-2');
   });
+
+  // A non-boolean isActive used to coerce through `=== true` to false, so
+  // asking to activate with a stringly-typed body silently DEACTIVATED the
+  // location and still returned 200.
+  it.each([
+    ['string', 'true'],
+    ['number', 1],
+    ['object', {}],
+  ])('rejects a %s isActive instead of coercing it to a deactivation', async (_label, value) => {
+    const response = await callRoute({
+      method: 'PUT',
+      query: { id: 'location-1' },
+      body: { isActive: value },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.body).toMatchObject({
+      error: { details: { isActive: 'isActive must be a boolean' } },
+    });
+    // Positive pin on WHY nothing changed: no UPDATE was issued at all, and the
+    // row is still active rather than having been flipped off.
+    expect(sqlCalls.filter((query) => query.includes('UPDATE fleet_authorized_locations'))).toHaveLength(0);
+    expect(locationState.isActive).toBe(true);
+  });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])('applies a boolean isActive of %s', async (value, expected) => {
+    const response = await callRoute({
+      method: 'PUT',
+      query: { id: 'location-1' },
+      body: { isActive: value },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(locationState.isActive).toBe(expected);
+  });
+
+  it('leaves is_active untouched when isActive is omitted', async () => {
+    locationState.isActive = false;
+
+    const response = await callRoute({
+      method: 'PUT',
+      query: { id: 'location-1' },
+      body: { name: 'Renamed depot' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(locationState.isActive).toBe(false);
+  });
+
+  it('rejects an unknown locationType rather than coercing it to a default', async () => {
+    const response = await callRoute({
+      method: 'PUT',
+      query: { id: 'location-1' },
+      body: { locationType: 'not_a_real_type' },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.body).toMatchObject({
+      error: { details: { locationType: 'Select a valid location type' } },
+    });
+    expect(sqlCalls.filter((query) => query.includes('UPDATE fleet_authorized_locations'))).toHaveLength(0);
+  });
 });
