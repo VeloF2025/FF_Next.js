@@ -89,6 +89,7 @@ describe('manco route enforcement (real Postgres)', () => {
   let indexHandler: (r: NextApiRequest, s: NextApiResponse) => Promise<unknown>;
   let idHandler: (r: NextApiRequest, s: NextApiResponse) => Promise<unknown>;
   let linkHandler: (r: NextApiRequest, s: NextApiResponse) => Promise<unknown>;
+  let linkedHandler: (r: NextApiRequest, s: NextApiResponse) => Promise<unknown>;
   let itemId: string;
 
   beforeAll(async () => {
@@ -125,8 +126,8 @@ describe('manco route enforcement (real Postgres)', () => {
         linked_at TIMESTAMPTZ DEFAULT now(),
         UNIQUE (manco_action_item_id, meeting_id)
       );
-      CREATE TABLE manco_rt.meetings (id INTEGER PRIMARY KEY, title TEXT);
-      INSERT INTO manco_rt.meetings (id, title) VALUES (1, 'A meeting');
+      CREATE TABLE manco_rt.meetings (id INTEGER PRIMARY KEY, title TEXT, meeting_date DATE);
+      INSERT INTO manco_rt.meetings (id, title, meeting_date) VALUES (1, 'Board meeting', '2026-08-10');
     `);
 
     const inserted = await pool.query(
@@ -140,6 +141,7 @@ describe('manco route enforcement (real Postgres)', () => {
     indexHandler = (await import('@/pages/api/manco-action-items/index')).default as typeof indexHandler;
     idHandler = (await import('@/pages/api/manco-action-items/[id]')).default as typeof idHandler;
     linkHandler = (await import('@/pages/api/manco-action-items/link-meeting')).default as typeof linkHandler;
+    linkedHandler = (await import('@/pages/api/manco-action-items/linked-meetings')).default as typeof linkedHandler;
   });
 
   afterAll(async () => {
@@ -212,6 +214,16 @@ describe('manco route enforcement (real Postgres)', () => {
       expect(rows[0].n).toBe(0);
     });
 
+    it('cannot READ the linked meetings — 403, and no meeting title comes back', async () => {
+      // The read side of the same pair. link-meeting was gated and this was not, so a
+      // denied caller could still ask "what meetings does item X touch?" and be told the
+      // title and date of each — enough to confirm a meeting exists and when it ran.
+      const { res, captured } = mockRes();
+      await linkedHandler(req('GET', { query: { item_id: itemId }, user: DENIED }), res);
+      expect(captured.status).toBe(403);
+      expect(JSON.stringify(captured.body ?? '')).not.toContain('Board meeting');
+    });
+
     it('cannot UNLINK a meeting', async () => {
       const { res, captured } = mockRes();
       await linkHandler(
@@ -250,6 +262,21 @@ describe('manco route enforcement (real Postgres)', () => {
       expect(captured.status).not.toBe(403);
       const { rows } = await pool.query('SELECT count(*)::int n FROM manco_action_item_meetings');
       expect(rows[0].n).toBe(1);
+    });
+
+    it('CAN read the linked meetings, and actually gets the title', async () => {
+      // The mirror of the denial test: without it, a route that 403'd everyone would
+      // satisfy that one. The link is made here rather than relying on the test above —
+      // afterEach clears the link table, so leaning on execution order would assert
+      // against an empty result and pass for the wrong reason.
+      await pool.query(
+        'INSERT INTO manco_action_item_meetings (manco_action_item_id, meeting_id) VALUES ($1::uuid, 1)',
+        [itemId],
+      );
+      const { res, captured } = mockRes();
+      await linkedHandler(req('GET', { query: { item_id: itemId }, user: ALLOWED }), res);
+      expect(captured.status).not.toBe(403);
+      expect(JSON.stringify(captured.body ?? '')).toContain('Board meeting');
     });
   });
 

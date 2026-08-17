@@ -1,12 +1,24 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { checkMancoAccess } from '@/lib/actionItems/mancoAccess';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Same gate as the rest of the group. This returns meeting titles and dates for any
+  // item id, so an ungated caller could confirm which meetings exist and when — the
+  // property meeting-context deliberately withholds by answering with an empty shape.
+  const access = await checkMancoAccess((req as AuthenticatedNextApiRequest).user.id, req.method);
+  if (!access.ok) {
+    return access.status === 403
+      ? apiResponse.forbidden(res, access.message)
+      : apiResponse.internalError(res, new Error(access.message));
   }
 
   try {
