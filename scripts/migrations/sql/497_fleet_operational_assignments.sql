@@ -1,4 +1,4 @@
--- 488_fleet_operational_assignments.sql
+-- 497_fleet_operational_assignments.sql
 -- Explicit project/site expectations for operational roster assignments.
 -- This migration intentionally does not copy geometry, vehicle/project fallback,
 -- or attendance evidence into durable assignment rows.
