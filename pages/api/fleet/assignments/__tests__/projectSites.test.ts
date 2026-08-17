@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   createProjectSite: vi.fn(),
   updateProjectSite: vi.fn(),
   canEditAssignmentProject: vi.fn(),
+  canViewAssignmentProject: vi.fn(),
   resolveStaffIdForUser: vi.fn(),
 }));
 
@@ -37,6 +38,7 @@ vi.mock('@/modules/fleet/assignments/projectSiteQueries', () => ({
 }));
 vi.mock('@/modules/fleet/assignments/projectScope', () => ({
   canEditAssignmentProject: mocks.canEditAssignmentProject,
+  canViewAssignmentProject: mocks.canViewAssignmentProject,
 }));
 vi.mock('@/modules/fleet/parking/staffLookup', () => ({
   resolveStaffIdForUser: mocks.resolveStaffIdForUser,
@@ -93,6 +95,7 @@ beforeEach(() => {
   mocks.permissionCalls.length = 0;
   mocks.permissionAllowed = true;
   mocks.canEditAssignmentProject.mockResolvedValue(true);
+  mocks.canViewAssignmentProject.mockResolvedValue(true);
   mocks.resolveStaffIdForUser.mockResolvedValue(STAFF_ID);
   mocks.listProjectSites.mockResolvedValue([]);
   mocks.createProjectSite.mockResolvedValue({ id: SITE_ID, projectId: PROJECT_ID });
@@ -134,6 +137,38 @@ describe('project-sites collection API', () => {
       query: { projectId: 'not-a-uuid' },
     });
     expect(invalid.statusCode).toBe(400);
+  });
+
+  // The module-level view grant is broad (manager and viewer both hold it), so
+  // without a per-project check any grant holder could enumerate any active
+  // project's site configuration. Every other read here already re-checks scope.
+  it('refuses to list sites for a project outside the caller scope', async () => {
+    mocks.canViewAssignmentProject.mockResolvedValue(false);
+
+    const response = await callRoute(indexHandler, {
+      method: 'GET',
+      query: { projectId: PROJECT_ID },
+    });
+
+    expect(response.statusCode).toBe(403);
+    // Positive pin on WHY nothing leaked: the scope check ran with this
+    // caller and this project, and the listing was never reached.
+    expect(mocks.canViewAssignmentProject).toHaveBeenCalledWith(
+      USER_ID, STAFF_ID, 'manager', PROJECT_ID,
+    );
+    expect(mocks.listProjectSites).not.toHaveBeenCalled();
+  });
+
+  it('scopes the GET listing to the requested project for an in-scope caller', async () => {
+    await callRoute(indexHandler, {
+      method: 'GET',
+      query: { projectId: PROJECT_ID },
+    });
+
+    expect(mocks.canViewAssignmentProject).toHaveBeenCalledWith(
+      USER_ID, STAFF_ID, 'manager', PROJECT_ID,
+    );
+    expect(mocks.listProjectSites).toHaveBeenCalledWith(PROJECT_ID, false);
   });
 
   it('returns 400 for an invalid source combination before checking project scope', async () => {

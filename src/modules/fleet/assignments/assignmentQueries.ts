@@ -1,6 +1,6 @@
 import { query, transaction, type TxnClient } from '@/lib/db-pool';
 import { assignmentSourceVersion, type AssignmentSourceVersions } from './fingerprint';
-import type { AssignmentProposalRow } from './types';
+import type { AssignmentKind, AssignmentProposalRow } from './types';
 import type { ProposalValidationContext } from './validation';
 
 export interface ActorScope { allProjects?: boolean; authorizedProjectIds?: string[] }
@@ -50,7 +50,7 @@ export async function loadPreviewState(rows: AssignmentProposalRow[], db: Db = p
     db.query<{ id: string; active: boolean }>(`SELECT id, (LOWER(status) = 'active' AND COALESCE(is_active, true)) AS active FROM staff WHERE id = ANY($1::uuid[])`, [staffIds]),
     db.query<{ id: string; active: boolean; project_name: string; project_code: string | null }>(`SELECT id, LOWER(status) IN ('active','in_progress') AS active, project_name, project_code FROM projects WHERE id = ANY($1::uuid[])`, [projectIds]),
     db.query<{ id: string; project_id: string; is_active: boolean; display_name: string; confidence: string | null }>(`SELECT ops.id, ops.project_id, ops.is_active, ops.display_name, aoi.confidence FROM fleet_project_operational_sites ops LEFT JOIN fno_atlas_project_aois aoi ON aoi.id = ops.project_aoi_id WHERE ops.id = ANY($1::uuid[])`, [siteIds]),
-    db.query<{ staff_id: string; start_date: string; end_date: string }>(`SELECT staff_id, ${dates} FROM fleet_operational_assignments WHERE staff_id = ANY($1::uuid[]) AND status = 'active' AND daterange(start_date,end_date,'[]') && daterange($2::date,$3::date,'[]')`, [staffIds, bounds.from, bounds.to]),
+    db.query<{ staff_id: string; assignment_kind: AssignmentKind; start_date: string; end_date: string }>(`SELECT staff_id, assignment_kind, ${dates} FROM fleet_operational_assignments WHERE staff_id = ANY($1::uuid[]) AND status = 'active' AND daterange(start_date,end_date,'[]') && daterange($2::date,$3::date,'[]')`, [staffIds, bounds.from, bounds.to]),
     db.query<{ id: string; staff_id: string; vehicle_id: string; start_date: string; end_date: string }>(`SELECT id, staff_id, fleet_vehicle_id AS vehicle_id, TO_CHAR(assignment_start,'YYYY-MM-DD') AS start_date, TO_CHAR(COALESCE(assignment_end,'9999-12-31'::date),'YYYY-MM-DD') AS end_date FROM vehicle_assignments WHERE staff_id = ANY($1::uuid[]) AND assignment_start <= $3::date AND COALESCE(assignment_end,'9999-12-31'::date) >= $2::date`, [staffIds, bounds.from, bounds.to]),
     db.query<{ vehicle_id: string; project_id: string; operational_site_id: string | null; start_date: string; end_date: string }>(`SELECT vehicle_id, project_id, NULL::uuid AS operational_site_id, TO_CHAR(assigned_date,'YYYY-MM-DD') AS start_date, TO_CHAR(COALESCE(returned_date,'9999-12-31'::date),'YYYY-MM-DD') AS end_date FROM fleet_vehicle_project_assignments WHERE assigned_date <= $2::date AND COALESCE(returned_date,'9999-12-31'::date) >= $1::date`, [bounds.from, bounds.to]),
     db.queryOne<AssignmentSourceVersions & Record<string, unknown>>(`SELECT COALESCE((SELECT MAX(updated_at)::text FROM fleet_operational_assignments),'') assignments, COALESCE((SELECT MAX(updated_at)::text FROM fleet_vehicles),'') vehicles, COALESCE((SELECT MAX(updated_at)::text FROM vehicle_assignments),'') "vehicleAssignments", COALESCE((SELECT MAX(updated_at)::text FROM staff),'') staff, COALESCE((SELECT MAX(updated_at)::text FROM fleet_project_operational_sites),'') "projectSites", COALESCE((SELECT MAX(updated_at)::text FROM team_members),'') "teamMembers", COALESCE((SELECT MAX(updated_at)::text FROM attendance_policy_assignments),'') "attendancePolicies"`),
@@ -62,7 +62,7 @@ export async function loadPreviewState(rows: AssignmentProposalRow[], db: Db = p
     staffById: Object.fromEntries(staff.map((item) => [item.id, { isActive: item.active }])),
     projectsById: Object.fromEntries(projects.map((item) => [item.id, { isActive: item.active }])),
     operationalSitesById: Object.fromEntries(sites.map((item) => [item.id, { isActive: item.is_active, projectId: item.project_id, aoiConfidence: item.confidence }])),
-    existingAssignments: existing.map((item) => ({ staffId: item.staff_id, startDate: item.start_date, endDate: item.end_date })),
+    existingAssignments: existing.map((item) => ({ staffId: item.staff_id, assignmentKind: item.assignment_kind, startDate: item.start_date, endDate: item.end_date })),
     vehicleAssignments: vehicles.map((item) => ({ id: item.id, staffId: item.staff_id, vehicleId: item.vehicle_id, startDate: item.start_date, endDate: item.end_date })),
     vehicleProjectAssignments: vehicleProjects.map((item) => ({ vehicleId: item.vehicle_id, projectId: item.project_id, operationalSiteId: item.operational_site_id, startDate: item.start_date, endDate: item.end_date })), unscheduledDatesByStaffId: {},
   }, sourceVersion: assignmentSourceVersion(versions!), snapshots };

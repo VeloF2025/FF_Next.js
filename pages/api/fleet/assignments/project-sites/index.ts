@@ -9,7 +9,10 @@ import {
   listProjectSites,
   type CreateProjectSiteInput,
 } from '@/modules/fleet/assignments/projectSiteQueries';
-import { canEditAssignmentProject } from '@/modules/fleet/assignments/projectScope';
+import {
+  canEditAssignmentProject,
+  canViewAssignmentProject,
+} from '@/modules/fleet/assignments/projectScope';
 import { resolveStaffIdForUser } from '@/modules/fleet/parking/staffLookup';
 import { isValidUUID } from '@/modules/fleet/services/mileageUtils';
 
@@ -69,6 +72,9 @@ function databaseCode(error: unknown): string | null {
 }
 
 async function routeHandler(req: AssignmentRequest, res: NextApiResponse) {
+  const user = req.user;
+  if (!user) return apiResponse.unauthorized(res);
+
   if (req.method === 'GET') {
     const projectId = req.query.projectId;
     if (typeof projectId !== 'string' || !isValidUUID(projectId)) {
@@ -79,6 +85,15 @@ async function routeHandler(req: AssignmentRequest, res: NextApiResponse) {
       return apiResponse.badRequest(res, 'includeInactive must be true or false');
     }
 
+    // The module-level `fleet.assignments:view` grant is broad (migration 497
+    // gives it to manager and viewer), so without this any grant holder could
+    // enumerate any active project's site configuration. Every other read in
+    // this module re-checks per-project scope; this one did not.
+    const staffId = await resolveStaffIdForUser(user.id);
+    if (!await canViewAssignmentProject(user.id, staffId, user.role, projectId)) {
+      return apiResponse.forbidden(res, 'You cannot view sites for this project');
+    }
+
     try {
       return apiResponse.success(res, await listProjectSites(projectId, inactiveFlag === 'true'));
     } catch (error) {
@@ -87,8 +102,6 @@ async function routeHandler(req: AssignmentRequest, res: NextApiResponse) {
     }
   }
 
-  const user = req.user;
-  if (!user) return apiResponse.unauthorized(res);
   const input = parseCreateBody(req.body);
   if (typeof input === 'string') return apiResponse.badRequest(res, input);
 

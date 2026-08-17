@@ -1,5 +1,5 @@
 /**
- * Real-Postgres contract for migration 488. The migration stores only explicit
+ * Real-Postgres contract for migration 497. The migration stores only explicit
  * expectations; source geometry and vehicle relationships stay in their own
  * tables. Every object below lives in a disposable schema.
  */
@@ -13,15 +13,15 @@ import { join } from 'node:path';
 import { Pool } from 'pg';
 import { buildAssignmentRosterQuery } from '@/modules/fleet/assignments/rosterQueries';
 
-const SCHEMA = 'mig488_fleet_operational_assignments_scratch';
+const SCHEMA = 'mig497_fleet_operational_assignments_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
 const SCOPED_URL = `${BASE_URL}${BASE_URL.includes('?') ? '&' : '?'}options=${encodeURIComponent(
   `-c search_path=${SCHEMA}`
 )}`;
 const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
-const FORWARD = readFileSync(join(SQL_DIR, '488_fleet_operational_assignments.sql'), 'utf8');
+const FORWARD = readFileSync(join(SQL_DIR, '497_fleet_operational_assignments.sql'), 'utf8');
 const ROLLBACK = readFileSync(
-  join(SQL_DIR, 'rollback_488_fleet_operational_assignments.sql'),
+  join(SQL_DIR, 'rollback_497_fleet_operational_assignments.sql'),
   'utf8'
 );
 
@@ -81,12 +81,12 @@ const PREREQUISITES = `
     permission_key VARCHAR(100) NOT NULL, override_type VARCHAR(10) NOT NULL, actions JSONB NOT NULL,
     UNIQUE (user_id, permission_key)
   );
-  INSERT INTO users (id, email) VALUES ('${USER}', 'migration-488@example.test'),
-    ('${UNASSIGNED_USER}', 'migration-488-unassigned@example.test');
+  INSERT INTO users (id, email) VALUES ('${USER}', 'migration-497@example.test'),
+    ('${UNASSIGNED_USER}', 'migration-497-unassigned@example.test');
   INSERT INTO staff (id, user_id, full_name, first_name, last_name) VALUES
     ('${STAFF}', '${USER}', 'Migration Test Staff', 'Explicit', 'Driver'),
     ('${UNASSIGNED_STAFF}', '${UNASSIGNED_USER}', 'Unassigned Test Staff', 'Scheduled', 'Unassigned');
-  INSERT INTO projects (id, project_name, project_code) VALUES ('${PROJECT}', 'Migration Test Project', 'M488');
+  INSERT INTO projects (id, project_name, project_code) VALUES ('${PROJECT}', 'Migration Test Project', 'M497');
   INSERT INTO fno_atlas_project_aois (id) VALUES ('${AOI}');
   INSERT INTO fleet_authorized_locations (id, name) VALUES ('${LOCATION}', 'Migration Test Location');
   INSERT INTO vehicle_assignments (id, staff_id) VALUES ('${VEHICLE_ASSIGNMENT}', '${STAFF}');
@@ -139,7 +139,7 @@ async function insertAssignment({
        (staff_id, project_id, operational_site_id, start_date, end_date, assignment_kind,
         vehicle_assignment_id, status, reason, project_name_snapshot, project_code_snapshot,
         operational_site_display_name_snapshot, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Migration Test Project', 'M488',
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Migration Test Project', 'M497',
              'Operational Site', $10)
      RETURNING id`,
     [
@@ -204,7 +204,7 @@ beforeEach(async () => {
     fleet_operational_assignments, fleet_project_operational_sites`);
 });
 
-describe('migration 488 operational-assignment invariants', () => {
+describe('migration 497 operational-assignment invariants', () => {
   it('requires exactly one source for an operational site', async () => {
     await expect(insertSite({ aoiId: null, locationId: null })).rejects.toMatchObject({ code: '23514' });
     await expect(insertSite({ aoiId: AOI, locationId: LOCATION })).rejects.toMatchObject({ code: '23514' });
@@ -221,6 +221,50 @@ describe('migration 488 operational-assignment invariants', () => {
 
   it('rejects overlapping active assignments for the same staff member', async () => {
     await expect(insertOverlappingAssignment()).rejects.toMatchObject({ code: '23P01' });
+  });
+
+  // The exclusion constraints are scoped per assignment_kind so the documented
+  // precedence is reachable: a one-day override must be insertable on a day the
+  // roster already covers, or the resolver's daily_override branch is dead code.
+  it('allows a daily override to overlap an active roster assignment', async () => {
+    const siteId = await insertSite({ aoiId: AOI, locationId: null });
+    const rosterId = await insertAssignment({ siteId, startDate: '2026-08-10', endDate: '2026-08-14' });
+    const overrideId = await insertAssignment({
+      siteId,
+      startDate: '2026-08-12',
+      endDate: '2026-08-12',
+      assignmentKind: 'daily_override',
+      reason: 'Covering a callout',
+    });
+
+    // Positive pin: BOTH rows are simultaneously active, which is the state the
+    // resolver's precedence ordering requires in order to prefer the override.
+    const { rows } = await db.query<{ id: string; assignment_kind: string }>(
+      `SELECT id, assignment_kind FROM fleet_operational_assignments
+       WHERE status = 'active' AND staff_id = $1 ORDER BY assignment_kind`,
+      [STAFF]
+    );
+    expect(rows.map((row) => row.assignment_kind)).toEqual(['daily_override', 'roster']);
+    expect(rows.map((row) => row.id).sort()).toEqual([rosterId, overrideId].sort());
+  });
+
+  it('still rejects two active daily overrides on the same day', async () => {
+    const siteId = await insertSite({ aoiId: AOI, locationId: null });
+    await insertAssignment({
+      siteId,
+      startDate: '2026-08-12',
+      endDate: '2026-08-12',
+      assignmentKind: 'daily_override',
+      reason: 'First override',
+    });
+
+    await expect(insertAssignment({
+      siteId,
+      startDate: '2026-08-12',
+      endDate: '2026-08-12',
+      assignmentKind: 'daily_override',
+      reason: 'Second override',
+    })).rejects.toMatchObject({ code: '23P01' });
   });
 
   it('allows non-overlapping and superseded assignment history', async () => {
@@ -253,7 +297,7 @@ describe('migration 488 operational-assignment invariants', () => {
       db.query(
         `INSERT INTO fleet_operational_assignment_audit
            (assignment_id, action, actor_user_id, request_correlation_id, after_snapshot)
-         VALUES ($1, 'created', $2, 'migration-488-contract', '{"assignment_kind":"roster"}')`,
+         VALUES ($1, 'created', $2, 'migration-497-contract', '{"assignment_kind":"roster"}')`,
         [assignmentId, USER]
       )
     ).resolves.toBeDefined();
@@ -299,9 +343,9 @@ describe('effective roster production SQL', () => {
   });
 });
 
-describe('migration 488 rollback', () => {
+describe('migration 497 rollback', () => {
   it('removes only its tables and permission rows', async () => {
-    await db.query(`INSERT INTO schema_migrations (filename) VALUES ('488_fleet_operational_assignments.sql')`);
+    await db.query(`INSERT INTO schema_migrations (filename) VALUES ('497_fleet_operational_assignments.sql')`);
     await db.query(
       `INSERT INTO user_permission_overrides (user_id, permission_key, override_type, actions)
        VALUES ($1, 'fleet.assignments', 'grant', '{"view":true,"edit":true}')`,

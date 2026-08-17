@@ -117,10 +117,68 @@ describe('validateProposal', () => {
       proposal({ startDate: '2026-08-12', endDate: '2026-08-15' }),
     ]);
     const conflicts = validateProposal(rows, context({
-      existingAssignments: [{ staffId: STAFF_ID, startDate: '2026-08-11', endDate: '2026-08-13' }],
+      existingAssignments: [{
+        staffId: STAFF_ID,
+        assignmentKind: 'roster',
+        startDate: '2026-08-11',
+        endDate: '2026-08-13',
+      }],
     }));
 
     expect(conflicts.filter(({ code }) => code === 'driver_overlap')).toHaveLength(4);
+  });
+
+  // The precedence model needs a one-day daily_override to coexist with the
+  // roster row it overrides. An unscoped overlap check made that impossible, so
+  // the resolver's daily_override branch could never be reached in production.
+  it('allows a daily override to overlap an existing roster assignment', () => {
+    const rows = normalizeProposal([
+      proposal({ assignmentKind: 'daily_override', startDate: '2026-08-11', endDate: '2026-08-11', reason: 'Covering a callout' }),
+    ]);
+    const conflicts = validateProposal(rows, context({
+      existingAssignments: [{
+        staffId: STAFF_ID,
+        assignmentKind: 'roster',
+        startDate: '2026-08-10',
+        endDate: '2026-08-14',
+      }],
+    }));
+
+    expect(conflicts.filter(({ code }) => code === 'driver_overlap')).toHaveLength(0);
+    // Positive pin on WHY it is empty: the row was validated and produced no
+    // blocking conflict of any kind, rather than being skipped entirely.
+    expect(conflicts.filter(({ level }) => level === 'blocking')).toHaveLength(0);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('still blocks two daily overrides on the same day', () => {
+    const rows = normalizeProposal([
+      proposal({ assignmentKind: 'daily_override', startDate: '2026-08-11', endDate: '2026-08-11', reason: 'First' }),
+    ]);
+    const conflicts = validateProposal(rows, context({
+      existingAssignments: [{
+        staffId: STAFF_ID,
+        assignmentKind: 'daily_override',
+        startDate: '2026-08-11',
+        endDate: '2026-08-11',
+      }],
+    }));
+
+    expect(conflicts).toContainEqual(expect.objectContaining({ code: 'driver_overlap', level: 'blocking' }));
+  });
+
+  it('still blocks two overlapping roster assignments', () => {
+    const rows = normalizeProposal([proposal()]);
+    const conflicts = validateProposal(rows, context({
+      existingAssignments: [{
+        staffId: STAFF_ID,
+        assignmentKind: 'roster',
+        startDate: '2026-08-11',
+        endDate: '2026-08-13',
+      }],
+    }));
+
+    expect(conflicts).toContainEqual(expect.objectContaining({ code: 'driver_overlap', level: 'blocking' }));
   });
 
   it('blocks vehicles assigned to another driver or only part of the range', () => {
