@@ -1,8 +1,18 @@
 name: CI
 
+# `pull_request` is deliberately unfiltered. It used to be `branches: [master]`,
+# which meant a PR based on another feature branch — every stacked PR — got no
+# CI at all, only the unfiltered agent-docs workflow. One four-PR fleet stack
+# accumulated ~7,500 lines that way and hid four separate defects: three
+# migration version collisions against already-applied migrations, a `next
+# build` broken by a test file under pages/, five migration tests missing from
+# vitest.config.ts's exclude list, and — worst — a btree_gist extension dropped
+# between test files, so EXCLUDE constraints silently stopped being created and
+# the overlap tests passed without testing anything.
+#
+# `push` stays master-only: feature branches are covered by their PR.
 on:
   pull_request:
-    branches: [master]
   push:
     branches: [master]
 
@@ -72,8 +82,18 @@ jobs:
       # --branch scans lines ADDED between the merge-base and HEAD, so it cannot
       # trip on the repo's pre-existing hits (there are known ones; `--tree` is
       # the audit mode and is deliberately not gated).
+      # Scoped to the PR's ACTUAL base, now that a PR can be based on a feature
+      # branch. Diffing a stacked PR against master rescans its whole unmerged
+      # parent — fail-safe, since it over-scans rather than under-scans, but it
+      # can block a PR on content the parent already cleared. This matches how
+      # the Zero Tolerance and unit-test steps already scope themselves.
+      #
+      # BASE_REF goes through env and is never inlined into `run:` — a branch
+      # name is attacker-controlled on a fork PR.
       - name: Secret scan (gate)
         if: github.event_name == 'pull_request'
+        env:
+          SECRET_SCAN_BASE_REF: ${{ github.base_ref }}
         run: bash scripts/secret-scan.sh --branch
 
       # On a push to master the merge-base IS HEAD, so --branch would diff a
@@ -288,6 +308,30 @@ jobs:
       - name: Type check (non-blocking — pre-existing errors)
         run: npm run type-check
         continue-on-error: true
+
+      # `next build` ran nowhere in CI, so a broken build reached
+      # scripts/deploy-local.sh and surfaced as a failed deploy. A test file
+      # committed under pages/ is enough to do it: pageExtensions is not
+      # configured, so Next treats the file as a route and dies collecting its
+      # page data. Two such files shipped on one stack; lint, type-check and the
+      # unit tests were all green on both.
+      #
+      # DATABASE_URL is a placeholder, not a secret, and no database is
+      # contacted. Several API routes construct a pool at module scope, so
+      # page-data collection needs the variable to be PRESENT — without it the
+      # build fails at /api/assets/dashboard. It never connects, because
+      # collection does not execute a query. Keeping it fake also means this
+      # gate cannot touch the shared dev+prod database.
+      #
+      # Blocking on purpose, and deliberately not continue-on-error: this repo
+      # has already been burned by a gate that let every outcome through and
+      # reported green (see the unit-test note below).
+      - name: Build (gate)
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build
+        timeout-minutes: 30
 
       # Ratcheted, NOT continue-on-error. The old step let any outcome through,
       # so a failing test — or a run killed at the 5-minute cap — reported
