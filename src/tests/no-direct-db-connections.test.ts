@@ -50,6 +50,14 @@ describe('No Direct Database Connections', () => {
     //   `import('...').ReceiptStatus` expression. Nothing is pulled into the
     //   bundle; confirmed absent from every client chunk.
     'modules/receipts/queries.ts',
+    //   reached only from pages/api/fleet/parking/health.ts and
+    //   pages/api/cron/fleet-parking-check.ts. No .tsx imports it, and it is
+    //   absent from every client chunk: `npm run ci:bundle-db` reports no new
+    //   database code across 639 chunks, and `fleet_parking_check_runs` — the
+    //   only table it writes — appears nowhere under .next/static. Verified
+    //   against a real build rather than inferred from the import graph, since
+    //   webpack bundles what is imported regardless of runtime guards.
+    'modules/fleet/parking/runQueries.ts',
   ];
 
   function isExcluded(filePath: string): boolean {
