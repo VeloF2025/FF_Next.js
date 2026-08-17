@@ -21,7 +21,10 @@ vi.mock('../LocationFormModal', () => ({
 
 import FleetLocationsPage from '../../../../../pages/fleet/locations';
 
-const active = { id: 'loc-1', name: 'Depot', lat: -26.1, lon: 28.1, radiusKm: 1, locationType: 'depot', isGlobal: true, vehicleId: null, isActive: true };
+// locationType is deliberately NOT 'depot': the row now renders a type label,
+// and a 'depot' type would render "Depot" alongside the name "Depot", making
+// every getByText('Depot') ambiguous.
+const active = { id: 'loc-1', name: 'Depot', lat: -26.1, lon: 28.1, radiusKm: 1, locationType: 'work_site', isGlobal: true, vehicleId: null, isActive: true };
 const inactive = { ...active, id: 'loc-2', name: 'Old depot', isActive: false };
 
 describe('FleetLocationsPage', () => {
@@ -111,5 +114,42 @@ describe('FleetLocationsPage', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reactivate Old depot' })); });
     await waitFor(() => expect(api.reactivateLocation).toHaveBeenCalledWith('loc-2'));
     await waitFor(() => expect(api.listLocations).toHaveBeenCalledTimes(2));
+  });
+
+  // The rewritten page dropped both of these, so a location's type and owning
+  // vehicle became invisible even though the form lets you set the type.
+  it.each([
+    ['work_site', 'Work site'],
+    ['office', 'Office'],
+    ['depot', 'Depot'],
+    ['accommodation', 'Accommodation'],
+  ])('renders the %s type as the label %s', async (locationType, label) => {
+    api.listLocations.mockResolvedValue([{ ...active, name: 'Site A', locationType }]);
+    render(<FleetLocationsPage />);
+    await screen.findByText('Site A');
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  it('shows the vehicle registration for a vehicle-specific location', async () => {
+    api.listLocations.mockResolvedValue([{
+      ...active,
+      name: 'Yard',
+      isGlobal: false,
+      vehicleId: 'veh-1',
+      vehicleRegistration: 'ND 123-456',
+    }]);
+    render(<FleetLocationsPage />);
+    await screen.findByText('Yard');
+    expect(screen.getByText(/ND 123-456/)).toBeInTheDocument();
+  });
+
+  it('omits the registration separator for a global location', async () => {
+    render(<FleetLocationsPage />);
+    const name = await screen.findByText('Depot');
+    // JSX splits this line into several text nodes, so assert on the assembled
+    // textContent rather than a getByText regex. Positive pin on WHY there is no
+    // registration: the line begins with the latitude, with no leading separator.
+    const detail = name.parentElement?.querySelector('p + p');
+    expect(detail?.textContent).toBe('-26.1000, 28.1000 · 1km radius');
   });
 });
