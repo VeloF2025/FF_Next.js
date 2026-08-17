@@ -128,6 +128,59 @@ driver-facing confirmation/input, while PR 8 owns analytics and retention. Do no
 maps, alerts, persisted status snapshots, payroll/discipline effects, driver input, or analytics
 backward into this engine.
 
+## Operational Dashboard and Map (PR 5)
+
+PR 5 presents the PR 4 read-time decisions without recalculating, persisting, or escalating them.
+The existing `/fleet` Dashboard keeps its vehicle cards, investigations, and quick actions, and adds
+**Today’s Operations** after the stat cards. Its coordinate-free
+`GET /api/fleet/operations/overview` accepts scoped `projectId`, ISO `workDate`/`asOf`, optional
+status group/status, and bounded pagination; it returns grouped counts, attention rows, evaluation
+and rule metadata, pagination, and stale/source warnings. URL filters are the source of truth so
+Dashboard count controls, Map content, refresh, and browser back/forward remain synchronized.
+
+Only `on_site_dual` and `attendance_confirmed` count as **On site**. In particular,
+`vehicle_on_site_driver_unconfirmed` is **Unverifiable** and labelled
+`Vehicle on site — driver unconfirmed`: vehicle GPS is never presented as confirmed driver presence.
+Default Needs Attention contains `late`, `wrong_site`, `evidence_mismatch`, `left_early`,
+`unassigned`, `unverifiable`, and `vehicle_on_site_driver_unconfirmed`; normal states are available
+through explicit filters. Operational loading/error state is independent: a failure preserves the
+existing Dashboard/Map and last successful operational data with an explicit stale/error warning;
+it is never rendered as all clear.
+
+`GET /api/fleet/operations/map-overlay` adds optional `staffId`, `siteId`, and scoped
+`includeGeometry`. It returns authorized operational badge rows, minimum authorized Attendance-only
+points, selected required-site geometry, evidence/status timestamps, unplottable rows, and
+evaluation metadata; it never returns raw provider payloads, unrelated geometry, contact details,
+or out-of-scope evidence. PMs remain limited to owned projects, while authorized
+oversight/admin access can span its permitted projects. `/api/fleet/positions/live` remains the
+separate existing telemetry source.
+
+The live Map’s marker grammar remains authoritative: marker fill is movement state and the white
+ring is GPS freshness/contact. PR 5 adds a small attached operational badge only: green check
+(on site), blue arrow (approaching), amber clock (late), red displaced pin (wrong site), purple
+split/evidence mark (mismatch), grey question (unverifiable), hollow person/check (vehicle on
+site, driver unconfirmed), orange exit (left early), or grey broken assignment (unassigned). A
+badge never replaces fill or ring, and existing popup provider/speed/ignition/last-fix evidence
+remains.
+
+Attendance-only markers use only a minimum authorized captured Attendance coordinate and must say
+`Attendance check-in evidence — not live tracking`; they are not animated or described as current
+location. Staff without permissible/usable coordinates remain separately labelled in the attention
+panel and are never fabricated at a project site, AOI centroid, home site, or vehicle position.
+AOI polygons and Authorized Location circles load only for a selected project/site/staff or an
+inspected attention row; all-project unfiltered mode never draws every geometry. Low-confidence
+AOIs retain a warning style without being declared invalid.
+
+Dashboard and Map current-date operational data may refresh no faster than every 30 seconds and
+both support manual refresh. Telemetry and the operational overlay refresh independently, retain
+their own last successful state on failure, and cancel updates on unmount/filter change. A selected
+historical date disables automatic refresh and shows `Historical view` with its evaluation `asOf`.
+Desktop attention is collapsible; mobile uses an accessible bottom sheet. Status needs icon/label
+accessibility rather than color alone.
+
+PR 5 has no migration. Roll back presentation with a normal PR revert: PR 4 APIs/rules remain
+valid and no database/data rollback is required.
+
 ## Tracking (Live GPS)
 
 Vehicle position history lands in `fleet_vehicle_positions` via two provider-blind ingestion
