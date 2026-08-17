@@ -150,5 +150,12 @@ describe('migration 498 operational status rules', () => {
     expect(rows[0]).toEqual({ rules: null });
     await expect(db.query(`SELECT 1 FROM access_permissions WHERE key = 'fleet'`)).resolves.toBeDefined();
     await expect(db.query(`SELECT 1 FROM access_permissions WHERE key IN ('fleet.operations-status', 'fleet.operations-rules')`)).resolves.toMatchObject({ rows: [] });
+    // Matched by suffix, not an exact number: the rollback's DELETE still named
+    // the pre-rename 489 filename after the renumber, so it removed nothing and
+    // left the runner believing this migration was applied with its table gone.
+    // This test asserted only on the table and permissions, so it passed anyway.
+    await expect(db.query(
+      `SELECT filename FROM schema_migrations WHERE filename LIKE '%_fleet_operational_status_rules.sql'`
+    )).resolves.toMatchObject({ rows: [] });
   });
 });

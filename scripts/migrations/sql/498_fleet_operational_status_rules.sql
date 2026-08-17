@@ -1,4 +1,4 @@
--- 489_fleet_operational_status_rules.sql
+-- 498_fleet_operational_status_rules.sql
 -- Effective-dated, auditable thresholds used by Fleet operational status classification.
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
