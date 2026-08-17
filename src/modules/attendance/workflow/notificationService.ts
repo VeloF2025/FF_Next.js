@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { notify } from '@/modules/notifications/services/notificationBus';
-import type { NotifyPayload, NotifyResult } from '@/modules/notifications/types';
+import type { NotifyResult } from '@/modules/notifications/types';
+import type { NotifyPayload } from '@/modules/notifications/types';
 import { getPeriodReadiness } from './periodQueries';
 import {
   claimDispatch, finishDispatch, loadAdminRecipients, loadClockoutCandidates,
@@ -14,7 +15,8 @@ export type AttendanceNotificationPhase = typeof ATTENDANCE_NOTIFICATION_PHASES[
 export type AttendanceNotificationFailureReason =
   | 'recipient_missing' | 'recipient_ambiguous' | 'recipient_inactive'
   | 'recipient_resolution_failed' | 'candidate_query_failed'
-  | 'notification_bus_invocation_failed' | 'dispatch_claim_failed'
+  | 'notification_bus_invocation_failed' | 'notification_bus_delivery_failed' | 'dispatch_multi_recipient'
+  | 'dispatch_claim_failed'
   | 'dispatch_status_update_failed';
 
 export interface AttendanceNotificationFailure {
@@ -218,6 +220,18 @@ function activeLink(row: StaffUserRow): boolean {
 
 async function dispatch(candidate: Candidate, phase: AttendanceNotificationPhase,
   report: AttendanceNotificationReport): Promise<void> {
+  // One recipient per delivery key is an invariant the retry logic depends on,
+  // not a coincidence of the current callers. `failed > 0` fails the whole
+  // dispatch, and the next run re-sends the whole payload — with several
+  // recipients under one key, a partial failure would re-notify the ones that
+  // already succeeded, and user_notifications has no uniqueness guard to
+  // deduplicate them. Every call site passes a single-element array today, so
+  // this branch is unreachable and therefore untested — it exists to fail
+  // loudly rather than silently duplicate if that ever changes.
+  if (candidate.payload.recipient_user_ids.length !== 1) {
+    addFailure(report, candidate.sourceKey, 'dispatch_multi_recipient');
+    return;
+  }
   try {
     if (!await claimDispatch({ deliveryKey: candidate.deliveryKey, phase,
       sourceKey: candidate.sourceKey, recipientUserId: candidate.recipientUserId })) {
@@ -227,17 +241,30 @@ async function dispatch(candidate: Candidate, phase: AttendanceNotificationPhase
   } catch {
     addFailure(report, candidate.sourceKey, 'dispatch_claim_failed'); return;
   }
-  // notify() reports per-recipient delivery counts; this site only cares that
-  // the bus accepted the call, so the result is deliberately not read — but the
-  // annotation must match, not be widened away.
-  let invocation: Promise<NotifyResult>;
-  try { invocation = notify(candidate.payload); }
+  // Await the bus and inspect the result. This used to fire-and-forget and then
+  // swallow the rejection (`void invocation.catch(() => undefined)`) before
+  // marking the dispatch `accepted`. Combined with notify() never throwing, no
+  // delivery failure could ever be delivered: a run against an unreachable
+  // database reported accepted=16 with zero notifications sent, and those
+  // idempotency keys would have stopped a later, working run from retrying
+  // them (#2506).
+  let result: NotifyResult;
+  try { result = await notify(candidate.payload); }
   catch {
     await markFailed(candidate.deliveryKey, 'notification_bus_invocation_failed');
     addFailure(report, candidate.sourceKey, 'notification_bus_invocation_failed');
     return;
   }
-  void invocation.catch(() => undefined);
+  if (result.failed > 0) {
+    // Branch on `failed`, not on a delivered count. A recipient with in-app
+    // disabled but WhatsApp enabled records nothing yet may well be reached, so
+    // treating "nothing delivered" as failure would retry a working send forever.
+    // `failed` means the bus could not act at all — the database-outage case.
+    // claimDispatch can re-claim a 'failed' row, so this genuinely retries.
+    await markFailed(candidate.deliveryKey, 'notification_bus_delivery_failed');
+    addFailure(report, candidate.sourceKey, 'notification_bus_delivery_failed');
+    return;
+  }
   try {
     await finishDispatch(candidate.deliveryKey, 'accepted', null);
     report.accepted += 1;

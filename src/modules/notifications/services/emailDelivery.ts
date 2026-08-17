@@ -7,11 +7,10 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { neon } from '@/lib/db-neon';
+import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import type { NotifyPayload } from '../types';
 
-const sql = neon(process.env.DATABASE_URL!);
 
 const FROM_ADDRESS = 'FibreFlow <notifications@fibreflow.app>';
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
@@ -39,7 +38,7 @@ export async function deliverEmail(
 
   try {
     // Look up user email
-    const userRows = await sql`
+    const userRows = await sql<{ email: string | null; first_name: string | null }>`
       SELECT email, first_name FROM users
       WHERE id = ${userId}::uuid AND is_active = TRUE
       LIMIT 1
@@ -100,7 +99,13 @@ export async function deliverEmail(
       userId, to: recipientEmail, error: errorMsg,
     }, 'EmailDelivery');
 
-    await logDelivery(notificationId, userId, 'email', 'failed', recipientEmail, errorMsg).catch(() => {});
+    // The delivery failure is already logged above; this second failure means
+    // we could not even record it, which is worth its own line rather than a
+    // swallow — it is how a delivery outage becomes invisible.
+    await logDelivery(notificationId, userId, 'email', 'failed', recipientEmail, errorMsg)
+      .catch((logErr) => log.error('Email delivery: failed to record delivery failure', {
+        userId, error: logErr instanceof Error ? logErr.message : String(logErr),
+      }, 'EmailDelivery'));
   }
 }
 

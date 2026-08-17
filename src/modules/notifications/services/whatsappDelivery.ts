@@ -5,13 +5,12 @@
  * @module notifications/services/whatsappDelivery
  */
 
-import { neon } from '@/lib/db-neon';
+import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { sendWhatsAppText } from '@/modules/communications/whatsapp/send/waSendClient';
 import { sendWahaDm } from '@/modules/communications/whatsapp/send/wahaDmClient';
 import type { NotifyPayload } from '../types';
 
-const sql = neon(process.env.DATABASE_URL!);
 
 // WA Bridge on VPS (direct — legacy 8092 proxy is deprecated)
 const WA_FEEDBACK_URL = process.env.WA_BRIDGE_URL || process.env.WA_FEEDBACK_URL || 'http://72.61.197.178:8083';

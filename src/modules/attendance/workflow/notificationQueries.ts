@@ -231,7 +231,15 @@ export async function claimDispatch(args: {
     INSERT INTO attendance_notification_dispatches (
       delivery_key, phase, source_key, recipient_user_id, status
     ) VALUES ($1, $2, $3, $4::uuid, 'claimed')
-    ON CONFLICT (delivery_key) DO NOTHING
+    -- A 'failed' dispatch is reclaimable; 'accepted' and 'claimed' are not.
+    -- delivery_key is the primary key, so a bare DO NOTHING made 'failed' just
+    -- as terminal as 'accepted' — a delivery that failed could never be
+    -- retried, only re-labelled (#2506). The WHERE scopes the update to failed
+    -- rows, so a genuinely delivered notification is still never re-sent and a
+    -- run in flight is not stolen.
+    ON CONFLICT (delivery_key) DO UPDATE
+      SET status = 'claimed', failure_message = NULL, updated_at = NOW()
+      WHERE attendance_notification_dispatches.status = 'failed'
     RETURNING delivery_key`, [args.deliveryKey, args.phase, args.sourceKey, args.recipientUserId]);
   return rows.length === 1;
 }

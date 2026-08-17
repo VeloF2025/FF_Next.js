@@ -6,7 +6,7 @@
  * @module notifications/services/notificationBus
  */
 
-import { neon } from '@/lib/db-neon';
+import { sql, type SqlRow } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import {
   DEFAULT_CHANNEL_PREFERENCES,
@@ -23,7 +23,16 @@ import { deliverEmail } from './emailDelivery';
 import { deliverWhatsApp } from './whatsappDelivery';
 import { claimNotification, releaseNotificationClaim } from './notificationIdempotency';
 
-const sql = neon(process.env.DATABASE_URL!);
+/**
+ * Row shape of the notification_preferences lookup. The Neon client returned
+ * `any`, so these were implicitly untyped until the driver swap.
+ */
+interface ChannelPrefRow extends Record<string, unknown> {
+  channel_in_app: boolean;
+  channel_email: boolean;
+  channel_whatsapp: boolean;
+}
+
 
 // =============================================================================
 // Core notify() function
@@ -91,7 +100,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
       let notificationId: string | null = null;
       if (channels.in_app) {
         const sourceIdValue = source_id || null;
-        const result = await sql`
+        const result = await sql<{ id: string }>`
           INSERT INTO user_notifications (
             user_id, event_type, title, body, icon, severity,
             action_url, source_module, source_id, metadata
@@ -172,7 +181,7 @@ export async function getEffectiveChannels(
   eventType: string
 ): Promise<ChannelPreferences> {
   try {
-    const rows = await sql`
+    const rows = await sql<ChannelPrefRow>`
       SELECT channel_in_app, channel_email, channel_whatsapp
       FROM notification_preferences
       WHERE user_id = ${userId}::uuid AND event_type = ${eventType}
@@ -203,7 +212,7 @@ export async function getEffectiveChannels(
 
 /** Get unread notification count for a user */
 export async function getUnreadCount(userId: string): Promise<number> {
-  const result = await sql`
+  const result = await sql<{ count: number }>`
     SELECT COUNT(*)::int as count
     FROM user_notifications
     WHERE user_id = ${userId}::uuid AND is_read = FALSE
@@ -219,22 +228,22 @@ export async function getNotifications(
   unreadOnly = false
 ): Promise<UserNotification[]> {
   if (unreadOnly) {
-    const rows = await sql`
+    const rows = await sql<SqlRow>`
       SELECT * FROM user_notifications
       WHERE user_id = ${userId}::uuid AND is_read = FALSE
       ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
-    return rows as UserNotification[];
+    return rows as unknown as UserNotification[];
   }
 
-  const rows = await sql`
+  const rows = await sql<SqlRow>`
     SELECT * FROM user_notifications
     WHERE user_id = ${userId}::uuid
     ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
-  return rows as UserNotification[];
+  return rows as unknown as UserNotification[];
 }
 
 /** Mark specific notifications as read */

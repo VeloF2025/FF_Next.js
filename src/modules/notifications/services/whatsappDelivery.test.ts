@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { mockSql } = vi.hoisted(() => ({ mockSql: vi.fn() }));
-vi.mock('@/lib/db-neon', () => ({ neon: vi.fn(() => mockSql) }));
+vi.mock('@/lib/db-pool', () => ({ sql: mockSql }));
 
 const { loggerMock } = vi.hoisted(() => ({
   loggerMock: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },

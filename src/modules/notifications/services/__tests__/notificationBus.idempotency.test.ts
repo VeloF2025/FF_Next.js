@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
   whatsapp: vi.fn(),
 }));
 
-vi.mock('@/lib/db-neon', () => ({ neon: () => state.sql }));
+vi.mock('@/lib/db-pool', () => ({ sql: state.sql }));
 vi.mock('../notificationIdempotency', () => ({
   claimNotification: state.claim,
   releaseNotificationClaim: state.release,
