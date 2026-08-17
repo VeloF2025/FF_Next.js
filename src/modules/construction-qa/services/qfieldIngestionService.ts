@@ -40,6 +40,19 @@ const FEATURE_TYPE_DISCIPLINE: Record<string, { discipline: Discipline; featureT
 /**
  * QFieldCloud project UUID → FibreFlow project UUID mapping.
  * QFieldCloud uses its own project UUIDs which differ from FibreFlow's.
+ *
+ * This literal is a THIRD copy of a mapping that already lives in
+ * `qfield_project_links` — where the extractor and the coverage check read it from —
+ * after `scripts/qfield_project_registry.py`. Replacing it with a query against that
+ * table is tracked separately.
+ *
+ * Copies are what let five entries go missing here for months: a project can be
+ * registered for extraction and silently absent from this map, and nothing compares the
+ * two. Checked all 19 pairs against the table on 2026-08-17 — 18 agree, and the drift
+ * runs BOTH ways: `380147aa…` (ETWpoc1) is in this map but has no row in
+ * `qfield_projects` at all, no link and no photos. The table is therefore NOT a superset
+ * of this map, so a DB-backed replacement cannot be swapped in blind — ETWpoc1 has to be
+ * deleted or explained first.
  */
 const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   // Original Pole Audit projects
@@ -59,6 +72,17 @@ const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   '380147aa-0c25-4b09-a745-2480addd8cca': 'c7255076-1d2f-41ce-97bb-858b8c87ee27', // ETWpoc1 → Etwatwa
   '7fe59cdc-b1d5-475d-8448-5cf2e9f7175b': 'ce3bf310-d6ba-4ede-ab36-a8c902a5efc6', // Tonga Site Audit 2026 → Tonga
   '9af1fc72-f637-4ecb-b371-f7c08a4d4e68': '7bb7e022-dd75-4299-8575-cfc08abdfabb', // FT_Thembelihle → Themb'elihle
+  // Registered for extraction but absent here until 2026-08-17, so their photos reached
+  // qfield_photo_validations and stopped: 6,242 rows eligible under this service's own
+  // predicate and zero construction_qa_reviews between them. Mahikeng was the visible
+  // casualty — it has zone_delivery_state rows whose civil-QA gate reads
+  // construction_qa_reviews, so the gate could never pass while Lawley (3,775 reviews)
+  // and Etwatwa (1,895) progressed normally.
+  'e801cd43-7efe-4f7a-bed5-ee0410f3dfd6': '7794d0ba-95c9-491b-8cb5-7f300c61aa23', // HT_Mahikeng → Mahikeng
+  'a7464d75-88e7-4e1a-ba3d-7978844b9ab7': 'd14b5632-8803-4be6-b567-fb091e9e8a7e', // HT_Cradock → Cradock
+  'f076fad4-b2a5-40b8-bafe-35c20ce09827': 'de408530-76f0-4d10-bf08-cfcd3202f69e', // HT_Middelburg → Middelburg
+  'b32184d6-1776-4b89-8afd-2907dfca86d4': '183fe626-7bf7-4793-bdb9-1a1dc2e21aa6', // HT_Namakgale_P3_A1 → Phalaborwa - Namakgale
+  'ef0b7147-e56f-43a1-9074-6807e0bedf50': '67df5c8d-0b3d-4784-9d63-70e3cdd1e2b8', // HT_Phalaborwa_Benfarm_V1 → Phalaborwa - Ben Farm
 };
 
 /** Reverse map: FibreFlow project UUID → QFieldCloud project UUIDs */
