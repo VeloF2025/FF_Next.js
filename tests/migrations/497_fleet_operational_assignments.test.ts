@@ -373,6 +373,14 @@ describe('migration 497 rollback', () => {
     await expect(db.query(`SELECT 1 FROM access_permissions WHERE key = 'fleet.assignments'`)).resolves.toMatchObject({ rows: [] });
     await expect(db.query(`SELECT 1 FROM role_permissions WHERE permission_key = 'fleet.assignments'`)).resolves.toMatchObject({ rows: [] });
     await expect(db.query(`SELECT 1 FROM user_permission_overrides WHERE permission_key = 'fleet.assignments'`)).resolves.toMatchObject({ rows: [] });
+    // The tracking row must go too, or the runner still believes this migration
+    // is applied while its schema is gone. The rollback's DELETE targeted the
+    // pre-rename filename after the 488 -> 497 renumber, so it matched nothing —
+    // and this test asserted only on tables and permissions, so it passed either
+    // way. Pinning the filename here is what makes the rename honest.
+    await expect(db.query(
+      `SELECT filename FROM schema_migrations WHERE filename LIKE '%_fleet_operational_assignments.sql'`
+    )).resolves.toMatchObject({ rows: [] });
     const extension = await db.query<{ present: boolean }>(
       `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'btree_gist') AS present`
     );

@@ -17,4 +17,4 @@ DELETE FROM access_permissions
  WHERE key = 'fleet.assignments';
 
 DELETE FROM schema_migrations
- WHERE filename = '488_fleet_operational_assignments.sql';
+ WHERE filename = '497_fleet_operational_assignments.sql';
