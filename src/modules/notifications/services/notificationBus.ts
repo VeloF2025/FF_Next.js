@@ -21,6 +21,7 @@ import type {
 } from '../types';
 import { deliverEmail } from './emailDelivery';
 import { deliverWhatsApp } from './whatsappDelivery';
+import { claimNotification, releaseNotificationClaim } from './notificationIdempotency';
 
 /**
  * Row shape of the notification_preferences lookup. The Neon client returned
@@ -60,16 +61,34 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
 
   if (!recipient_user_ids || recipient_user_ids.length === 0) {
     log.warn('notify() called with no recipients', { event_type }, 'NotificationBus');
-    return { delivered: 0, failed: 0 };
+    return { delivered: 0, suppressed: 0, failed: 0 };
   }
+
+  const result: NotifyResult = { delivered: 0, suppressed: 0, failed: 0 };
 
   const icon = payload.icon || EVENT_ICONS[event_type] || 'bell';
   const severity = payload.severity || EVENT_SEVERITY[event_type] || 'info';
-  let delivered = 0;
-  let failed = 0;
 
   for (const userId of recipient_user_ids) {
+    let claimedIdempotencyKey: string | null = null;
     try {
+      if (payload.idempotency_key) {
+        let claimed: boolean;
+        try {
+          claimed = await claimNotification(userId, event_type, payload.idempotency_key);
+        } catch (err) {
+          result.failed += 1;
+          log.error('Notification idempotency claim failed', {
+            userId, event_type, error: err instanceof Error ? err.message : String(err),
+          }, 'NotificationBus');
+          continue;
+        }
+        if (!claimed) {
+          result.suppressed += 1;
+          continue;
+        }
+        claimedIdempotencyKey = payload.idempotency_key;
+      }
       const channels = await getEffectiveChannels(userId, event_type);
       // Whether any channel was actually acted on for this recipient. A user
       // who has muted all three gets nothing written and nothing dispatched, so
@@ -117,19 +136,36 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
         dispatched = true;
       }
 
-      if (dispatched) delivered += 1;
+      // Counted as delivered only if a channel was actually acted on, which is
+      // master's rule and the stricter of the two: the previous idempotency work
+      // incremented an `accepted` counter here unconditionally, so a recipient
+      // who had muted every channel was reported as reached. The claim taken
+      // above is deliberately NOT released in that case — nothing was sent, but
+      // a retry would send nothing either, so consuming the key is correct.
+      if (dispatched) result.delivered += 1;
       else log.warn('notify() reached a user with every channel muted', {
         userId, event_type,
       }, 'NotificationBus');
     } catch (err) {
-      failed += 1;
+      if (claimedIdempotencyKey) {
+        try {
+          await releaseNotificationClaim(userId, event_type, claimedIdempotencyKey);
+        } catch (releaseError) {
+          log.error('Notification idempotency claim release failed', {
+            userId,
+            event_type,
+            error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+          }, 'NotificationBus');
+        }
+      }
+      result.failed += 1;
       log.error('notify() failed for user', {
         userId, event_type, error: err instanceof Error ? err.message : String(err),
       }, 'NotificationBus');
     }
   }
 
-  return { delivered, failed };
+  return result;
 }
 
 // =============================================================================

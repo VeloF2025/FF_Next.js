@@ -57,6 +57,8 @@ export interface NotifyPayload {
   metadata?: Record<string, unknown>;
   /** User IDs to notify — caller resolves recipients */
   recipient_user_ids: string[];
+  /** Stable producer key used for per-recipient at-most-once acceptance. */
+  idempotency_key?: string;
   /** Custom HTML for email (optional, else default template used) */
   email_html?: string;
   /** Custom email subject (defaults to title) */
@@ -85,13 +87,24 @@ export interface NotifyPayload {
  * died at the in-app INSERT for nine days that way while reporting delivery, and
  * the reported success stamped a 24h cooldown that suppressed the retries.
  *
- * `delivered + failed` can be less than `recipient_user_ids.length`: a recipient
- * who has muted every channel had nothing written and nothing dispatched, so it
- * is not a delivery, and nothing broke, so it is not a failure either.
+ * `delivered + suppressed + failed` can be less than
+ * `recipient_user_ids.length`: a recipient who has muted every channel had
+ * nothing written and nothing dispatched, so it is not a delivery, and nothing
+ * broke, so it is not a failure either.
  */
 export interface NotifyResult {
   /** Recipients whose synchronous delivery work completed without throwing. */
   delivered: number;
+  /**
+   * Recipients skipped because an idempotency claim for this
+   * (user, event_type, idempotency_key) was already held.
+   *
+   * Distinct from both other counters on purpose: nothing was dispatched, so it
+   * is not `delivered`, and nothing broke, so it is not `failed`. A caller
+   * retrying a run should read a non-zero `suppressed` as "already sent
+   * earlier", not as a failure to react to.
+   */
+  suppressed: number;
   /** Recipients whose delivery threw (already logged per-user). */
   failed: number;
 }
