@@ -22,17 +22,23 @@ async function handler(
     return apiResponse.forbidden(res, 'User email required for meeting access');
   }
 
-  // A display name only counts when it identifies exactly ONE active user, and never when
-  // it is empty. Resolved once here and threaded into every match below as a value:
-  // `LOWER(p->>'name') = NULL` is NULL and never true, so an unusable name simply stops
-  // matching. Previously `userName` fell back to '' — and 1,649 meetings carry a
-  // participant whose name is the empty string — while a shared display name handed a
-  // technician-role login 443 meetings it had no other claim to.
-  // See src/lib/meetings/participantScope.ts for the measurements.
-  const { nameForMatch: userName } = await resolveParticipantIdentity(pool, authReq.user);
-
   if (req.method === 'GET') {
     try {
+      // A display name only counts when it identifies exactly ONE active user, and never
+      // when it is empty. Resolved once here and threaded into every match below as a
+      // value: `LOWER(p->>'name') = NULL` is NULL and never true, so an unusable name
+      // simply stops matching. Previously `userName` fell back to '' — and 1,649 meetings
+      // carry a participant whose name is the empty string — while a shared display name
+      // handed a technician-role login 443 meetings it had no other claim to.
+      // See src/lib/meetings/participantScope.ts for the measurements.
+      //
+      // INSIDE the try, and inside GET: this is a database call. withAuth returns the
+      // handler's promise without awaiting it, so a rejection above this block would not
+      // be caught there either, and would surface as an unhandled rejection with nothing
+      // logged. Only GET matches participants, so POST ?action=sync no longer pays for a
+      // query it never reads.
+      const { nameForMatch: userName } = await resolveParticipantIdentity(pool, authReq.user);
+
       // Check if requesting a specific meeting by ID
       const { id, source } = req.query;
 
