@@ -2,7 +2,7 @@
  * PO Approval Services
  */
 
-export { poApprovalService, default } from './poApprovalService';
+export { poApprovalService, default, UnauthorizedApprovalError } from './poApprovalService';
 export type {
   ApprovalLevel,
   ApprovalRequest,

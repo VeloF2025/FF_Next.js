@@ -1,10 +1,27 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { checkMancoAccess } from '@/lib/actionItems/mancoAccess';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // This route WRITES: it inserts into manco_action_item_meetings and updates
+  // manco_action_items.source_meeting_id. Gating index.ts and [id].ts while leaving this
+  // one on bare withAuth would have left "any authenticated user can edit any
+  // management-committee item" true through a different URL — the hole moved rather than
+  // closed. Both methods here are edits of an existing item, so both ask for `edit`
+  // rather than letting DELETE fall through to the stricter `delete` grant: removing a
+  // meeting LINK is not deleting the action item.
+  const authUser = (req as AuthenticatedNextApiRequest).user;
+  const access = await checkMancoAccess(authUser.id, 'PATCH');
+  if (!access.ok) {
+    return access.status === 403
+      ? apiResponse.forbidden(res, access.message)
+      : apiResponse.internalError(res, new Error(access.message));
+  }
+
   if (req.method === 'POST') {
     try {
       const { manco_action_item_id, meeting_id } = req.body;

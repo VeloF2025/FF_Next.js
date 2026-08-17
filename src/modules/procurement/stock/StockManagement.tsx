@@ -174,13 +174,19 @@ export default function StockManagement({ projectId, projectName }: StockManagem
       setItems(stockItems);
       setMovements(data.movements || []);
 
-      // Calculate metrics
-      const lowStock = stockItems.filter(item => item.status === 'low_stock').length;
-      const outOfStock = stockItems.filter(item => item.status === 'out_of_stock').length;
-      const totalValue = stockItems.reduce((sum, item) => sum + (item.totalValue || 0), 0);
+      // Prefer the server's catalog-wide summary (computed over the full table);
+      // fall back to deriving from the returned page for older API responses.
+      // Deriving from the page undercounts once the catalog exceeds the API's
+      // display limit.
+      const summary = data.summary as
+        | { totalItems: number; totalValue: number; lowStock: number; outOfStock: number }
+        | undefined;
+      const lowStock = summary?.lowStock ?? stockItems.filter(item => item.status === 'low_stock').length;
+      const outOfStock = summary?.outOfStock ?? stockItems.filter(item => item.status === 'out_of_stock').length;
+      const totalValue = summary?.totalValue ?? stockItems.reduce((sum, item) => sum + (item.totalValue || 0), 0);
 
       setMetrics({
-        totalItems: stockItems.length,
+        totalItems: summary?.totalItems ?? stockItems.length,
         totalValue,
         lowStockItems: lowStock,
         outOfStockItems: outOfStock,

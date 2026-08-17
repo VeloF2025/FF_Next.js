@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# 2-hourly Ituran tracking poll (Avis account).
+# Ituran tracking poll (Avis account).
+# The CRON fires every 10 minutes (offset :05 so it never collides with the
+# portal poll); the per-account cadence lives in
+# fleet_tracking_watermarks.poll_interval_minutes.
 #
 # Unlike cron-portal-tracking.sh this does NOT call an API route: the Ituran
 # portal is behind a bot challenge that needs a real browser to clear, and

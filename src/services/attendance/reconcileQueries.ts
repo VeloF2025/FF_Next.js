@@ -1,7 +1,7 @@
 import { query } from '@/lib/db-pool';
 import type { OvertimeRuleInput } from './overtimeCalculator';
 import type { AttendanceSchedulePolicy } from './policy/types';
-import { employmentEffectivePredicate, expectedAttendanceDayPredicate } from './employmentUniverse';
+import { employmentWindowPredicate, expectedAttendanceDayPredicate } from './employmentUniverse';
 
 export interface OpenEntryRow extends Record<string, unknown> {
   id: string;
@@ -156,7 +156,7 @@ export async function loadOpenEntriesForReconciliation(
           AND approved_out.status = 'approved'
           AND approved_out.adjusted_clock_out_at IS NOT NULL
       )
-      AND ${employmentEffectivePredicate('s', 'attendance_entries.work_date')}
+      AND ${employmentWindowPredicate('s', 'attendance_entries.work_date')}
       AND EXISTS (
         SELECT 1 FROM attendance_schedule_policies
         WHERE active_from <= attendance_entries.work_date
@@ -205,7 +205,7 @@ export async function loadReconciliationEntries(
       AND e.work_date >= $1::date
       AND e.work_date <= $2::date
       AND e.work_date < (NOW() AT TIME ZONE 'Africa/Johannesburg')::date
-      AND ${employmentEffectivePredicate('s', 'e.work_date')}
+      AND ${employmentWindowPredicate('s', 'e.work_date')}
       AND EXISTS (
         SELECT 1 FROM attendance_schedule_policies policy
         WHERE policy.active_from <= e.work_date
@@ -219,7 +219,7 @@ export async function loadReconciliationEntries(
  * The set of (staff, day) pairs a worker was EXPECTED to clock in on.
  *
  * Uses the shared `expectedAttendanceDayPredicate`, as every expectation CTE
- * must; the entry-driven readers above keep `employmentEffectivePredicate`
+ * must; the entry-driven readers above use `employmentWindowPredicate`
  * alone. See that helper for why the two must not be merged.
  */
 export async function loadExpectedAttendanceDays(

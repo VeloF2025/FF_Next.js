@@ -1,7 +1,23 @@
 #!/bin/bash
 # =============================================================================
-# Pre-Push Hook: Auth Isolation Guard
+# Pre-Push Hook: Master Protection + Secret Scan + Auth Isolation Guard
 # =============================================================================
+# GUARD 1: block non-interactive pushes straight to master/main.
+# GUARD 2: secret scan over the pushed range (per-ref, below).
+# GUARD 3: scan outgoing commits for hardcoded userId patterns that bypass auth.
+#
+# WHY GUARD 1 IS IN THIS FILE: it existed only in the *installed* hook at
+# .git/hooks/pre-push on one workstation, never in this tracked script. The two
+# had diverged, so `bash scripts/install-hooks.sh` would install the secret scan
+# and simultaneously DELETE the master protection — one guard silently traded for
+# another. Both live here now, so installing loses nothing.
+#
+# Measured 2026-08-11: the installed pre-push had zero references to
+# secret-scan, and so did the installed pre-commit. CLAUDE.md rule 11 claims the
+# scan runs at three points; CI became real in #2425, and this closes the two
+# local ones.
+#
+# GUARD 3 details:
 # Scans outgoing commits for hardcoded userId patterns that bypass auth.
 #
 # BLOCKS:
@@ -31,6 +47,52 @@ YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
+# Stdin is the ref list and can be read only ONCE, so capture it up front and
+# feed both guards from the variable. Every loop below uses a here-string rather
+# than a pipe: a piped `while` runs in a subshell, and VIOLATIONS_FOUND is
+# incremented inside the loop and read after it, so a pipe would silently discard
+# every violation and pass the push.
+PUSH_REFS=$(cat)
+
+# ─── GUARD 1: master/main protection ─────────────────────────────────────────
+# Lifted from the installed hook with its behaviour preserved exactly, including
+# the `[ -t 0 ]` branch. That branch is DEAD and was dead there too: git hands a
+# pre-push hook its ref list on stdin, so stdin is never a terminal. It is kept
+# rather than "fixed" because changing what this guard ALLOWS is a separate
+# decision from making it survive install-hooks.sh. CLAUDECODE=1 is what
+# actually lets an interactive Claude Code session through.
+BLOCK_MASTER=0
+while read -r _lref _lsha remote_ref _rsha; do
+  [ -z "${remote_ref:-}" ] && continue
+  case "$remote_ref" in
+    refs/heads/master | refs/heads/main) ;;
+    *) continue ;;
+  esac
+  [ "${ALLOW_MASTER_PUSH:-}" = "1" ] && continue
+  [ -t 0 ] 2>/dev/null && continue
+  [ "${CLAUDECODE:-}" = "1" ] && continue
+  BLOCK_MASTER=1
+done <<< "$PUSH_REFS"
+
+if [ "$BLOCK_MASTER" = "1" ]; then
+  AGENT_INFO=""
+  [ -n "${OPENCLAW_AGENT:-}" ] && AGENT_INFO=" (OpenClaw: $OPENCLAW_AGENT)"
+  [ -z "$AGENT_INFO" ] && AGENT_INFO=" ($(git config user.name 2>/dev/null || echo 'unknown'))"
+  echo ""
+  echo "🚫 BLOCKED: Direct push to master by non-interactive session${AGENT_INFO}"
+  echo ""
+  echo "   Options:"
+  echo "     1. Use a feature branch + PR:"
+  echo "        git checkout -b <name>/<description>"
+  echo "        git push origin <name>/<description>"
+  echo "        gh pr create --title '...' --body '...'"
+  echo ""
+  echo "     2. Override (humans only):"
+  echo "        ALLOW_MASTER_PUSH=1 git push"
+  echo ""
+  exit 1
+fi
+
 echo "🔍 Auth isolation guard running..."
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
@@ -38,28 +100,35 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 VIOLATIONS_FOUND=0
 VIOLATION_FILES=()
 
-# Read push info from stdin (format: <local ref> <local sha> <remote ref> <remote sha>)
+ZERO_SHA=0000000000000000000000000000000000000000
+
+# Ref format: <local ref> <local sha> <remote ref> <remote sha>
 while read -r local_ref local_sha remote_ref remote_sha; do
-  # Determine range of commits to check
-  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-    # New branch — scope to commits unique to this branch only
-    MERGE_BASE=$(git merge-base origin/master HEAD 2>/dev/null)
-    if [ -n "$MERGE_BASE" ]; then
-      RANGE="$MERGE_BASE..$local_sha"
-    else
-      RANGE="$local_sha"
-    fi
-    DIFF_CMD="git diff --name-only $RANGE"
-  else
-    # Existing branch — check only new commits
-    RANGE="$remote_sha..$local_sha"
-    DIFF_CMD="git diff --name-only $RANGE"
-  fi
+  # An empty local_sha means an empty ref line: a here-string always yields one
+  # iteration even for empty input, so this is the no-input case.
+  [ -z "${local_sha:-}" ] && continue
+  # A local_sha of all zeros is a DELETION (`git push --delete <ref>`, or
+  # `git push origin :branch`). There is nothing to scan, and it must not be
+  # treated as a range: the zero SHA does not resolve, secret-scan.sh correctly
+  # refuses it with exit 2, and this loop counted that as a violation — so every
+  # branch or tag deletion was blocked, reporting "auth isolation violation",
+  # which is neither true nor actionable. Deletions push no content.
+  [ "$local_sha" = "$ZERO_SHA" ] && continue
+
+  # NOTE: a RANGE/DIFF_CMD pair used to be computed here for a "new branch" vs
+  # "existing branch" case. It was dead — DIFF_CMD was never executed, and the
+  # scans below derive their own ranges. It is deleted rather than left, because
+  # its `MERGE_BASE=$(git merge-base …)` had no `|| true`: under this script's
+  # `set -euo pipefail`, a failing command substitution in an assignment aborts
+  # the whole script, so on any checkout without origin/master fetched (shallow
+  # clone, fresh clone) the entire hook died before reaching the `if [ -n … ]`
+  # fallback written to handle exactly that. Measured: exit 128, no further
+  # output. The SCAN_BASE assignment below is the same shape done correctly.
 
   # ---------------------------------------------------------
   # Secret scan over the pushed range (new credentials only)
   # ---------------------------------------------------------
-  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+  if [ "$remote_sha" = "$ZERO_SHA" ]; then
     SCAN_BASE=$(git merge-base origin/master "$local_sha" 2>/dev/null || git rev-list --max-parents=0 "$local_sha" | tail -1)
   else
     SCAN_BASE="$remote_sha"
@@ -159,7 +228,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     VIOLATIONS_FOUND=$((VIOLATIONS_FOUND + 1))
   fi
 
-done
+# Here-string, not a pipe: this loop increments VIOLATIONS_FOUND and the check
+# below reads it, so running it in a subshell would discard every violation.
+done <<< "$PUSH_REFS"
 
 # =============================================================================
 # RESULT

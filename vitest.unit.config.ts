@@ -23,6 +23,11 @@ export default defineConfig({
       // Specific src/lib overrides MUST come before the generic @/lib catch-all
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
       { find: '@/lib/neon',    replacement: path.resolve(__dirname, './src/lib/neon') },
+      { find: '@/lib/rateLimiter', replacement: path.resolve(__dirname, './src/lib/rateLimiter') },
+      { find: '@/lib/photos', replacement: path.resolve(__dirname, './src/lib/photos') },
+      { find: '@/lib/meetings', replacement: path.resolve(__dirname, './src/lib/meetings') },
+      { find: '@/lib/reporting', replacement: path.resolve(__dirname, './src/lib/reporting') },
+      { find: '@/lib/actionItems', replacement: path.resolve(__dirname, './src/lib/actionItems') },
       { find: '@/lib/utils',   replacement: path.resolve(__dirname, './src/lib/utils') },
       { find: '@/lib',         replacement: path.resolve(__dirname, './lib') },
       // Other module aliases

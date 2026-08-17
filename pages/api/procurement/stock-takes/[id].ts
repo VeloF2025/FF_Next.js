@@ -73,8 +73,21 @@ async function handlePut(id: string, data: StockTakeFormData & { status?: string
     return apiResponse.notFound(res, 'Stock take', id);
   }
 
-  // Prevent editing approved stock takes
-  if (existing[0]!.status === 'approved' && !data.status) {
+  // Status transitions belong to the actions endpoint (start/complete/approve/
+  // cancel), which enforces the state machine and applies stock adjustments.
+  // Allowing an arbitrary `status` write here would let a caller skip the
+  // count-completeness + adjustment logic (e.g. PUT {status:'approved'}) or
+  // reopen an already-approved take (PUT {status:'draft'}), double-applying
+  // adjustments on the next approval.
+  if (data.status !== undefined && data.status !== existing[0]!.status) {
+    return apiResponse.badRequest(
+      res,
+      'Status cannot be changed here; use the stock-take actions endpoint (start/complete/approve/cancel).'
+    );
+  }
+
+  // Prevent editing approved stock takes.
+  if (existing[0]!.status === 'approved') {
     return apiResponse.badRequest(res, 'Cannot edit approved stock take');
   }
 
@@ -90,7 +103,6 @@ async function handlePut(id: string, data: StockTakeFormData & { status?: string
       stock_take_type = COALESCE(${data.stock_take_type}, stock_take_type),
       count_method = COALESCE(${data.count_method}, count_method),
       scheduled_date = COALESCE(${data.scheduled_date}, scheduled_date),
-      status = COALESCE(${data.status}, status),
       notes = COALESCE(${data.notes}, notes),
       tags = COALESCE(${data.tags}, tags),
       updated_at = NOW()

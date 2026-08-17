@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, AuthenticatedRequest } from '@/lib/auth';
 import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -159,7 +159,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const quoteAttachmentName = body.quoteAttachmentName;
     const sagePoNumber = body.sagePoNumber;
     const items = body.items;
-    const createdBy = body.createdBy || 'system';
+    // Attribution comes from the authenticated session, never the request body —
+    // a client-supplied createdBy would forge the audit trail.
+    const authUser = (req as unknown as AuthenticatedRequest).user;
+    const createdBy = authUser?.id || 'system';
+    const createdByName = authUser?.name || 'System';
 
     // Validation
     if (!supplierId) {
@@ -309,7 +313,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       entityId: poId,
       action: 'create',
       performedBy: createdBy,
-      performedByName: createdBy,
+      performedByName: createdByName,
       newValues: { poNumber, totalAmount, supplierId },
     });
 

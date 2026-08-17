@@ -11,10 +11,35 @@ export function employmentEffectivePredicate(
   workDateRef: string,
 ): string {
   return [
+    employmentWindowPredicate(staffAlias, workDateRef),
+    approvedAccountPredicate(staffAlias),
+  ].join(' AND ');
+}
+
+/**
+ * Employment window ONLY — no Rule P. Whether the person was employed on that
+ * date, and nothing about whether their account has been approved yet.
+ *
+ * Use this for the entry-driven reconciliation readers, and only those. Rule P
+ * is a visibility rule: it decides who HR sees, not who gets processed. Applying
+ * it to processing meant a `account_status='pending'` worker who clocked in was
+ * never reconciled at all — no summary, no hours, no record — and the hours were
+ * lost rather than merely hidden. A pending worker who clocks in is doing real
+ * work; the approval step gates who appears in Pulse, not whether the clock ran.
+ *
+ * Everything downstream keeps `employmentEffectivePredicate`, so a pending
+ * worker's projected day stays out of reports, the week view, payroll readiness
+ * and the lock gate until their account is approved — at which point the summary
+ * already exists rather than having to be reconstructed.
+ */
+export function employmentWindowPredicate(
+  staffAlias: string,
+  workDateRef: string,
+): string {
+  return [
     `(${staffAlias}.is_active = true OR ${staffAlias}.is_active IS NULL OR ${staffAlias}.end_date IS NOT NULL)`,
     `(${staffAlias}.join_date IS NULL OR ${staffAlias}.join_date::date <= ${workDateRef})`,
     `(${staffAlias}.end_date IS NULL OR ${staffAlias}.end_date::date >= ${workDateRef})`,
-    approvedAccountPredicate(staffAlias),
   ].join(' AND ');
 }
 

@@ -69,10 +69,44 @@ export interface NotifyPayload {
   wa_message?: string;
 }
 
+/**
+ * What notify() reports back about a dispatch.
+ *
+ * Read `delivered` narrowly. It counts recipients for whom notify() got as far
+ * as handing the notification to at least one channel without throwing: the
+ * in-app INSERT is synchronous, so its success is genuinely known, but email
+ * and WhatsApp are dispatched fire-and-forget with `.catch()` handlers, so for
+ * a recipient reached only on those channels this means "dispatched", never
+ * "a human received it".
+ *
+ * What it does mean, reliably, is that `delivered === 0` proves nobody was
+ * reached — which is the question that matters. `notify()` catches per-recipient
+ * failures and resolves regardless (deliberately: a broken mail server must not
+ * take a caller's run down), so before these counters existed callers could only
+ * observe "the promise resolved" and read it as success. Fleet tracking alerts
+ * died at the in-app INSERT for nine days that way while reporting delivery, and
+ * the reported success stamped a 24h cooldown that suppressed the retries.
+ *
+ * `delivered + suppressed + failed` can be less than
+ * `recipient_user_ids.length`: a recipient who has muted every channel had
+ * nothing written and nothing dispatched, so it is not a delivery, and nothing
+ * broke, so it is not a failure either.
+ */
 export interface NotifyResult {
-  accepted_recipients: number;
-  suppressed_recipients: number;
-  failed_recipients: number;
+  /** Recipients whose synchronous delivery work completed without throwing. */
+  delivered: number;
+  /**
+   * Recipients skipped because an idempotency claim for this
+   * (user, event_type, idempotency_key) was already held.
+   *
+   * Distinct from both other counters on purpose: nothing was dispatched, so it
+   * is not `delivered`, and nothing broke, so it is not `failed`. A caller
+   * retrying a run should read a non-zero `suppressed` as "already sent
+   * earlier", not as a failure to react to.
+   */
+  suppressed: number;
+  /** Recipients whose delivery threw (already logged per-user). */
+  failed: number;
 }
 
 /** Notification preference row from DB */

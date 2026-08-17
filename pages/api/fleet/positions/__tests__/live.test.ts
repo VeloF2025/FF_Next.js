@@ -38,6 +38,9 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     is_speeding: false,
     recorded_at: null as Date | null,
     has_tracker: true,
+    // The account's configured cadence from fleet_tracking_watermarks, joined
+    // in by staleness. 2 min mirrors the fast Cartrack REST feed.
+    poll_interval_minutes: 2 as number | null | undefined,
     ...overrides,
   };
 }
@@ -153,9 +156,10 @@ describe('GET /api/fleet/positions/live', () => {
     ]);
   });
 
-  it('judges the fast REST feed at 15 minutes', async () => {
-    const stale = new Date(NOW.getTime() - 16 * 60 * 1000); // 16 min ago
-    const fresh = new Date(NOW.getTime() - 5 * 60 * 1000); // 5 min ago
+  it('judges a feed against twice its own configured poll interval', async () => {
+    // poll_interval_minutes: 2 (from makeRow's default) → stale after 4 min.
+    const stale = new Date(NOW.getTime() - 5 * 60 * 1000); // 5 min ago
+    const fresh = new Date(NOW.getTime() - 2 * 60 * 1000); // 2 min ago
     sqlMock.mockResolvedValue([
       makeRow({ vehicle_id: 'stale-1', recorded_at: stale }),
       makeRow({ vehicle_id: 'fresh-1', recorded_at: fresh }),
@@ -171,35 +175,41 @@ describe('GET /api/fleet/positions/live', () => {
     expect(vehicles.find((v) => v.vehicleId === 'fresh-1')?.isStale).toBe(false);
   });
 
-  it('does NOT call the same age stale on a 2-hourly portal feed', async () => {
+  it('does NOT call the same age stale on a feed configured with a slower cadence', async () => {
     // The bug being fixed: one flat 15-minute rule judged every feed, so the
     // 2-hourly portals were stale by construction and never rendered as
-    // anything but "no recent fix" however healthy they were.
+    // anything but "no recent fix" however healthy they were. Now each
+    // account's own poll_interval_minutes decides, not a hardcoded constant.
     const age = new Date(NOW.getTime() - 100 * 60 * 1000); // 100 min — fine for a 2h poll
     sqlMock.mockResolvedValue([
       makeRow({
         vehicle_id: 'netstar-1',
         provider: 'netstar',
         account_ref: 'europcar',
+        poll_interval_minutes: 120,
         recorded_at: age,
       }),
       makeRow({
         vehicle_id: 'ituran-1',
         provider: 'ituran',
         account_ref: 'avis',
+        poll_interval_minutes: 120,
         recorded_at: age,
       }),
-      // Same provider as the fast feed, different account, different cron.
+      // Same provider as the fast feed, different account and configured
+      // interval — the account's own row decides, not the provider name.
       makeRow({
         vehicle_id: 'urent-1',
         provider: 'cartrack',
         account_ref: 'urent',
+        poll_interval_minutes: 120,
         recorded_at: age,
       }),
       makeRow({
         vehicle_id: 'velocity-1',
         provider: 'cartrack',
         account_ref: 'velocity',
+        poll_interval_minutes: 2,
         recorded_at: age,
       }),
     ]);
@@ -217,11 +227,12 @@ describe('GET /api/fleet/positions/live', () => {
 
   it('reports the threshold each vehicle was judged against', async () => {
     sqlMock.mockResolvedValue([
-      makeRow({ vehicle_id: 'fast', recorded_at: NOW }),
+      makeRow({ vehicle_id: 'fast', poll_interval_minutes: 2, recorded_at: NOW }),
       makeRow({
         vehicle_id: 'slow',
         provider: 'netstar',
         account_ref: 'europcar',
+        poll_interval_minutes: 120,
         recorded_at: NOW,
       }),
     ]);
@@ -232,8 +243,29 @@ describe('GET /api/fleet/positions/live', () => {
       staleAfterSeconds: number;
     }>;
 
-    expect(v.find((x) => x.vehicleId === 'fast')?.staleAfterSeconds).toBe(15 * 60);
-    expect(v.find((x) => x.vehicleId === 'slow')?.staleAfterSeconds).toBe(3 * 3600);
+    expect(v.find((x) => x.vehicleId === 'fast')?.staleAfterSeconds).toBe(2 * 2 * 60);
+    expect(v.find((x) => x.vehicleId === 'slow')?.staleAfterSeconds).toBe(2 * 120 * 60);
+  });
+
+  it('a row with no matching watermark (poll_interval_minutes undefined) takes the lenient fallback, not NaN', async () => {
+    // A vehicle whose last position has no matching fleet_tracking_watermarks
+    // row — e.g. a feed we have never polled — must not silently stop being
+    // checked for staleness. `undefined` is what a fixture (and an absent SQL
+    // join column) carries when the field was never set; a strict `=== null`
+    // guard would let it through to `undefined * 2 * 60` = NaN, and every
+    // `ageSeconds > NaN` comparison is false, i.e. nothing is ever stale.
+    const recordedAt = new Date(NOW.getTime() - 60 * 60 * 1000); // 60 min ago
+    sqlMock.mockResolvedValue([
+      makeRow({ vehicle_id: 'no-watermark', poll_interval_minutes: undefined, recorded_at: recordedAt }),
+    ]);
+
+    const res = await run();
+    const vehicle = res._getJSONData().data.vehicles[0];
+
+    expect(Number.isNaN(vehicle.staleAfterSeconds)).toBe(false);
+    expect(vehicle.staleAfterSeconds).toBe(3 * 3600); // DEFAULT_STALE_AFTER_SECONDS
+    // 60 min old is well within the 3h lenient fallback.
+    expect(vehicle.isStale).toBe(false);
   });
 
   it('computes ageSeconds from recorded_at relative to now', async () => {

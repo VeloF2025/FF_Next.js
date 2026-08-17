@@ -28,6 +28,9 @@ def svc(tmp_path, monkeypatch):
         "ff_mcp.catalogue",
         "ff_mcp.tools",
         "ff_mcp.qfield_tools",
+        "ff_mcp.photo_tools",
+        "ff_mcp.photo_search_tools",
+        "ff_mcp.reporting_tools",
         "ff_mcp.oauth",
         "ff_mcp.config",
     ):

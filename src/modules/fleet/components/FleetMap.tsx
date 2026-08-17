@@ -91,8 +91,15 @@ export default function FleetMap({ vehicles }: { vehicles: LiveVehicle[] }) {
               {v.speedKph !== null ? ` · ${Math.round(v.speedKph)} km/h` : ''}
               {v.isSpeeding ? ' · SPEEDING' : ''}
               <br />
+              {/*
+                No "(stale)" suffix: `style.label` above already conveys
+                freshness, and on a parked vehicle the suffix contradicted it.
+                The reasoning lives in statusFor's docblock (liveMapHelpers) and
+                is deliberately NOT restated here, so the two cannot drift.
+                `isStale` is still load-bearing there — it gates `speeding` and
+                drives `lostContact`; only this echo of it is gone.
+              */}
               Last fix: {ageLabel(v.ageSeconds)}
-              {v.isStale ? ' (stale)' : ''}
               <br />
               <small>via {v.provider ?? 'unknown'}</small>
             </Popup>

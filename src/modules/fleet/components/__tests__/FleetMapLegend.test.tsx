@@ -68,4 +68,14 @@ describe('FleetMapLegend', () => {
     const { container: without } = render(<FleetMapLegend />);
     expect(without.textContent).not.toMatch(/\(\d+\)/);
   });
+
+  it('lists every status the map can draw — nothing else catches a missed one', () => {
+    // VehicleStatus gaining a member forces a STATUS_STYLE entry (it's an
+    // exhaustive Record, so tsc catches that), but ORDER is a plain array —
+    // TypeScript does not require it to be exhaustive, and this test file
+    // iterating ORDER.forEach(...) would keep passing even with a status
+    // missing from it. STATUS_STYLE's keys ARE exhaustive, so compare against
+    // those rather than restating the status list here.
+    expect([...ORDER].sort()).toEqual(Object.keys(STATUS_STYLE).sort());
+  });
 });

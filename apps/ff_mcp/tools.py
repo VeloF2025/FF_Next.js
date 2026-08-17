@@ -34,7 +34,18 @@ from .server import mcp
 # Mirrors DENIED_GROUPS in scripts/build-mcp-endpoint-catalogue.ts. Omitting a group
 # from the catalogue is not enough on its own — Claude can construct a path it never saw
 # listed — so fibreflow_get refuses them too.
-DENIED_GROUPS = ("accounting", "staff", "my", "cortex-remote-mcp", "ff-remote-mcp")
+# `action-items` is denied because those rows are meeting content and /api/action-items
+# applies no attendance filter — see the note in build-mcp-endpoint-catalogue.ts. The
+# attendance-scoped report at /api/reporting/action-items is in the `reporting` group and
+# stays reachable.
+DENIED_GROUPS = (
+    "accounting",
+    "staff",
+    "my",
+    "cortex-remote-mcp",
+    "ff-remote-mcp",
+    "action-items",
+)
 
 MAX_RESPONSE_CHARS = 15_000
 
@@ -141,8 +152,64 @@ def _rate_limit(token: str) -> None:
         _call_times[key] = recent
 
 
+def build_query(**params: object) -> str:
+    """Urlencode the parameters that were actually given, dropping the rest.
+
+    Shared by every tool module. Sending `type=None` would filter on the literal string
+    "None" and match nothing, which reads back to the model as "this project has no depth
+    photos" rather than as an error.
+    """
+    present = {k: v for k, v in params.items() if v is not None and v != ""}
+    return urllib.parse.urlencode(present)
+
+
 def _reject(message: str, **extra) -> str:
     return json.dumps({"error": message, **extra}, indent=2)
+
+
+def _guard_path(target: str) -> dict[str, object] | None:
+    """Refuse a path that must never reach FibreFlow.
+
+    Returns the `_reject` payload for a refusal (its "message" plus the context fields
+    that refusal carries), or None when the path may proceed.
+
+    Extracted so every tool that reaches FibreFlow shares ONE guard. A second tool with
+    its own copy is a guard that drifts: the copy would keep passing the tests written
+    against this one while quietly diverging from it.
+    """
+    # Every guard below runs on the canonical form, never on the raw string.
+    canonical = _canonical(target)
+    if not canonical.startswith("/api/"):
+        return {
+            "message": (
+                "path must be a FibreFlow API path beginning with /api/ — not a full URL "
+                "and not an app page."
+            ),
+            "received": target,
+        }
+    if ".." in canonical or "//" in canonical[1:]:
+        return {"message": "path must not contain '..' or '//'.", "received": target}
+
+    group = _group_of(canonical)
+    denied = _denied_group(group)
+    if denied:
+        # Stated plainly so the model stops rather than probing sibling paths.
+        return {
+            "message": (
+                f"The '{denied}' area is not available through this connector. This is a "
+                "deliberate restriction, not a missing endpoint — do not try other paths "
+                "in this area."
+            ),
+            "group": group,
+        }
+    return None
+
+
+def _build_url(target: str, query: str) -> str:
+    url = FF_APP_BASE + target
+    if query.strip():
+        url += ("&" if "?" in url else "?") + query.strip().lstrip("?&")
+    return url
 
 
 def _fibreflow_get_sync(path: str, query: str = "") -> str:
@@ -152,27 +219,9 @@ def _fibreflow_get_sync(path: str, query: str = "") -> str:
     the event loop — see the note on fibreflow_get.
     """
     target = path.strip()
-    # Every guard below runs on the canonical form, never on the raw string.
-    canonical = _canonical(target)
-    if not canonical.startswith("/api/"):
-        return _reject(
-            "path must be a FibreFlow API path beginning with /api/ — not a full URL "
-            "and not an app page.",
-            received=target,
-        )
-    if ".." in canonical or "//" in canonical[1:]:
-        return _reject("path must not contain '..' or '//'.", received=target)
-
-    group = _group_of(canonical)
-    denied = _denied_group(group)
-    if denied:
-        # Stated plainly so the model stops rather than probing sibling paths.
-        return _reject(
-            f"The '{denied}' area is not available through this connector. This is a "
-            "deliberate restriction, not a missing endpoint — do not try other paths "
-            "in this area.",
-            group=group,
-        )
+    refusal = _guard_path(target)
+    if refusal is not None:
+        return _reject(str(refusal.pop("message")), **refusal)
 
     try:
         token = _access_token()
@@ -180,9 +229,7 @@ def _fibreflow_get_sync(path: str, query: str = "") -> str:
     except RuntimeError as exc:
         return _reject(str(exc))
 
-    url = FF_APP_BASE + target
-    if query.strip():
-        url += ("&" if "?" in url else "?") + query.strip().lstrip("?&")
+    url = _build_url(target, query)
 
     req = urllib.request.Request(
         url,

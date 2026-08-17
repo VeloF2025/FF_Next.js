@@ -98,7 +98,10 @@ describe('attendance policy reconcile readers', () => {
     expect(text).toContain('active_to >= attendance_entries.work_date');
     expect(text).toContain('s.join_date::date <= attendance_entries.work_date');
     expect(text).toContain('s.end_date::date >= attendance_entries.work_date');
-    expect(text).toContain("LOWER(s.account_status) <> 'pending'");
+    // Rule P must NOT be here. It is a visibility rule; applying it to the
+    // reconciliation readers meant a pending worker who clocked in was never
+    // reconciled and their hours were lost rather than hidden.
+    expect(text).not.toContain("LOWER(s.account_status) <> 'pending'");
     expect(text).toMatch(/attendance_adjustments approved_out[\s\S]*adjusted_clock_out_at IS NOT NULL/i);
     expect(params).toEqual(['2026-08-03', '2026-08-04']);
   });
@@ -114,7 +117,8 @@ describe('attendance policy reconcile readers', () => {
     expect(text).toMatch(/ORDER BY e\.staff_id ASC, e\.work_date ASC,[\s\S]*COALESCE\(approved_adjustment\.adjusted_clock_in_at, e\.clock_in_at\) ASC/i);
     expect(text).toContain('s.join_date::date <= e.work_date');
     expect(text).toContain('s.end_date::date >= e.work_date');
-    expect(text).toContain("LOWER(s.account_status) <> 'pending'");
+    // See above — the entry reader deliberately omits Rule P.
+    expect(text).not.toContain("LOWER(s.account_status) <> 'pending'");
     expect(params).toEqual(['2026-08-03', '2026-08-04']);
   });
 

@@ -15,9 +15,13 @@ import { ingestPositions } from '@/services/tracking/ingest';
 import { raiseTrackingAlert } from '@/services/tracking/alerts';
 import { decideGapReason } from '@/services/tracking/gapReason';
 import type { PortalVehicle } from '@/services/tracking/portal/registration';
-import { isAuthFailure, isSameFailureKind } from '@/services/tracking/authFailure';
+import { isAuthFailure, isEviction, isSameFailureKind } from '@/services/tracking/authFailure';
 import { authBreakerDecision, logProbe, reportThrottled } from '@/services/tracking/authBreaker';
+import { demote, isTickDue } from '@/services/tracking/cadence';
 import type { TrackingProvider } from '@/services/tracking/types';
+
+/** No row yet, or an account never migrated onto explicit cadence. */
+const DEFAULT_POLL_INTERVAL_MINUTES = 120;
 
 /** No watermark yet: how far back the first tick reaches. */
 const COLD_START_MS = 24 * 60 * 60 * 1000;
@@ -68,6 +72,21 @@ export async function pollProvider(
   { provider, listVehicles, feedFreshness }: ConfiguredProvider
 ): Promise<Record<string, unknown>> {
   let priorError = '';   // hoisted: the catch compares failure kinds
+  // Hoisted: the catch either continues this eviction streak's clock or
+  // starts a fresh one, and it needs the streak's prior start time to do that.
+  let priorEvictedSince: Date | null = null;
+  // Hoisted: demotion happens in the catch, which needs to know the interval
+  // that was in effect for this tick to tell whether demoting would actually
+  // change anything. `wm` (the watermark read) is scoped to the try and is not
+  // reachable from the catch, so this is set from it below rather than
+  // re-queried — a second read there could disagree with the first and would
+  // double DB round-trips on the failure path.
+  let currentIntervalMinutes = DEFAULT_POLL_INTERVAL_MINUTES;
+  // Hoisted for the same reason as priorEvictedSince: a transient alert can
+  // fire from EITHER the partial-fetch path (try) or a thrown error (catch),
+  // unlike a gap alert which only ever fires from the try. Read once from the
+  // watermark below and reused by both sites.
+  let priorTransientAlertAt: Date | null = null;
   try {
     // Read the watermark FIRST — before anything that authenticates, so a
     // known-bad credential never spends another login attempt. See
@@ -77,13 +96,21 @@ export async function pollProvider(
       consecutive_failures: number;
       last_error: string | null;
       last_run_at: Date | null;
+      last_gap_alert_at: Date | null;
+      evicted_since: Date | null;
+      poll_interval_minutes: number | null;
+      last_transient_alert_at: Date | null;
     }>`
-      SELECT last_event_ts, consecutive_failures, last_error, last_run_at
+      SELECT last_event_ts, consecutive_failures, last_error, last_run_at, last_gap_alert_at, evicted_since, poll_interval_minutes, last_transient_alert_at
       FROM fleet_tracking_watermarks
       WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
     `;
     const failures = wm[0]?.consecutive_failures ?? 0;
     priorError = wm[0]?.last_error ?? '';
+    priorEvictedSince = wm[0]?.evicted_since ? new Date(wm[0].evicted_since) : null;
+    priorTransientAlertAt = wm[0]?.last_transient_alert_at ? new Date(wm[0].last_transient_alert_at) : null;
+    currentIntervalMinutes = wm[0]?.poll_interval_minutes ?? DEFAULT_POLL_INTERVAL_MINUTES;
+    const lastGapAlertAt = wm[0]?.last_gap_alert_at ? new Date(wm[0].last_gap_alert_at) : null;
     // Half-open on a cooldown, NOT a latch: while throttled the tick is skipped
     // without writing the watermark, so a permanently-skipping breaker would
     // freeze consecutive_failures and block the only path that could ever clear
@@ -95,6 +122,19 @@ export async function pollProvider(
       return reportThrottled(provider.key, provider.accountRef, decision, priorError);
     }
     if (decision.state === 'half-open') logProbe(provider.key, provider.accountRef, decision.failures);
+
+    // Not due yet: the cron fires at the fastest supported rate and each account
+    // decides for itself, so one portal can be ramped without touching others.
+    // Like the breaker's throttled path, this writes NOTHING — last_run_at must
+    // keep meaning "when we last actually polled".
+    if (!isTickDue(
+      wm[0]?.last_run_at ? new Date(wm[0].last_run_at) : null,
+      currentIntervalMinutes,
+      new Date()
+    )) {
+      return { provider: provider.key, accountRef: provider.accountRef, skipped: 'not-due' };
+    }
+
     const portalVehicles = await listVehicles();
     const recon = await reconcileTrackers(provider.key, provider.accountRef, portalVehicles);
 
@@ -167,25 +207,30 @@ export async function pollProvider(
     // data", and a genuinely healthy tick below resets it to 0.
     let gapTicks = 0;
     if (gap) {
+      // evicted_since cleared: a gap is a different failure kind from
+      // eviction (see isSameFailureKind), so any eviction clock stops here.
       const bumped = await sql<{ consecutive_failures: number }>`
         INSERT INTO fleet_tracking_watermarks
-          (provider, account_ref, last_event_ts, last_run_at, last_error, consecutive_failures)
-        VALUES (${provider.key}, ${provider.accountRef}, ${advanceTo}, now(), ${gapDetail}, 1)
+          (provider, account_ref, last_event_ts, last_run_at, last_error, consecutive_failures, evicted_since)
+        VALUES (${provider.key}, ${provider.accountRef}, ${advanceTo}, now(), ${gapDetail}, 1, NULL)
         ON CONFLICT (provider, account_ref) DO UPDATE
           SET last_event_ts = COALESCE(EXCLUDED.last_event_ts, fleet_tracking_watermarks.last_event_ts),
               last_run_at = now(), last_error = ${gapDetail},
-              consecutive_failures = fleet_tracking_watermarks.consecutive_failures + 1
+              consecutive_failures = fleet_tracking_watermarks.consecutive_failures + 1,
+              evicted_since = NULL
         RETURNING consecutive_failures
       `;
       gapTicks = bumped[0]?.consecutive_failures ?? 1;
     } else {
+      // evicted_since cleared: a healthy tick ends any eviction streak outright.
       await sql`
         INSERT INTO fleet_tracking_watermarks
-          (provider, account_ref, last_event_ts, last_run_at, last_error, consecutive_failures)
-        VALUES (${provider.key}, ${provider.accountRef}, ${advanceTo}, now(), NULL, 0)
+          (provider, account_ref, last_event_ts, last_run_at, last_error, consecutive_failures, evicted_since)
+        VALUES (${provider.key}, ${provider.accountRef}, ${advanceTo}, now(), NULL, 0, NULL)
         ON CONFLICT (provider, account_ref) DO UPDATE
           SET last_event_ts = COALESCE(EXCLUDED.last_event_ts, fleet_tracking_watermarks.last_event_ts),
-              last_run_at = now(), last_error = NULL, consecutive_failures = 0
+              last_run_at = now(), last_error = NULL, consecutive_failures = 0,
+              evicted_since = NULL
       `;
     }
 
@@ -194,27 +239,55 @@ export async function pollProvider(
         provider: provider.key, accountRef: provider.accountRef,
         activeTrackers, portalVehicleCount: portalVehicles.length,
         positionCount: positions.length, reason: gapDetail, gapTicks });
-      await raiseTrackingAlert({
+      const { decision, delivered } = await raiseTrackingAlert({
         kind: 'gap',
         consecutiveFailures: gapTicks,
         nowSast: now,
+        lastGapAlertAt,
         provider: provider.key,
         accountRef: provider.accountRef,
         detail: gapDetail,
       });
+      // Separate statement, not folded into the INSERT above: this repo's SQL
+      // tag cannot carry a conditional fragment like `${cond ? sql`..` : sql``}`.
+      //
+      // Gated on `delivered`, not just `decision.stampGapAlert`: the decision
+      // is the POLICY saying an alert is due, but if nobody actually heard it
+      // (no recipients configured, or notify() itself failed) stamping the
+      // clock anyway would suppress the next 24h of gap alerts for an outage
+      // nobody was told about.
+      if (delivered && decision?.stampGapAlert) {
+        await sql`
+          UPDATE fleet_tracking_watermarks SET last_gap_alert_at = now()
+          WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+        `;
+      }
     }
 
     // A partial fetch is degraded even when it produced data: reported as
     // transient so a portal dropping one vehicle eventually says so.
     if (!fetched.complete) {
-      await raiseTrackingAlert({
+      const { decision: transientDecision, delivered: transientDelivered } = await raiseTrackingAlert({
         kind: 'transient',
         consecutiveFailures: (wm[0]?.consecutive_failures ?? 0) + 1,
         nowSast: now,
+        lastGapAlertAt,
+        lastTransientAlertAt: priorTransientAlertAt,
         provider: provider.key,
         accountRef: provider.accountRef,
         detail: fetched.detail ?? 'partial fetch',
       });
+      // Separate statement, not folded into the watermark write above: this
+      // repo's SQL tag cannot carry a conditional fragment. Gated on
+      // `delivered`, not just `stampTransientAlert` — same reasoning as the
+      // gap stamp above: an undelivered alert must not start a 24h silence
+      // for an outage nobody was actually told about.
+      if (transientDelivered && transientDecision?.stampTransientAlert) {
+        await sql`
+          UPDATE fleet_tracking_watermarks SET last_transient_alert_at = now()
+          WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+        `;
+      }
     }
 
     log.info('[poll-portal-tracking] polled', {
@@ -244,34 +317,98 @@ export async function pollProvider(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const now = new Date();
     // Restarts the streak at 1 when the failure kind changes — see
-    // isSameFailureKind for why the gap branch makes that necessary.
+    // isSameFailureKind for why the gap branch makes that necessary. THREE-WAY:
+    // auth (dead credential), evicted (Netstar's single-session limit — a
+    // human in the portal, not an incident) and transient all keep separate
+    // streaks now that eviction has left isAuthFailure.
     const sameKind = isSameFailureKind(message, priorError);
     const auth = isAuthFailure(message);
+    const evicted = isEviction(message);
+    // Set on the tick an eviction streak STARTS (first eviction, or the prior
+    // tick was a different kind); held across ticks while it continues;
+    // cleared to null the moment this failure is not an eviction. Deriving it
+    // from consecutive_failures * poll interval was considered and rejected —
+    // that re-couples it to cadence, exactly what last_gap_alert_at (Task 2)
+    // was added to remove one layer up.
+    const evictedSince = evicted ? (sameKind && priorEvictedSince ? priorEvictedSince : now) : null;
     // Watermark deliberately untouched — the next tick retries the same window,
     // so a transient outage loses no data. This INSERT omits last_event_ts
     // entirely, so ON CONFLICT never overwrites it.
     const updated = await sql<{ consecutive_failures: number }>`
       INSERT INTO fleet_tracking_watermarks
-        (provider, account_ref, last_run_at, last_error, consecutive_failures)
-      VALUES (${provider.key}, ${provider.accountRef}, now(), ${message}, 1)
+        (provider, account_ref, last_run_at, last_error, consecutive_failures, evicted_since)
+      VALUES (${provider.key}, ${provider.accountRef}, now(), ${message}, 1, ${evictedSince})
       ON CONFLICT (provider, account_ref) DO UPDATE
         SET last_run_at = now(), last_error = ${message},
             consecutive_failures = CASE WHEN ${sameKind}::boolean
-              THEN fleet_tracking_watermarks.consecutive_failures + 1 ELSE 1 END
+              THEN fleet_tracking_watermarks.consecutive_failures + 1 ELSE 1 END,
+            evicted_since = ${evictedSince}
       RETURNING consecutive_failures
     `;
     log.error('[poll-portal-tracking] provider failed', {
       provider: provider.key, accountRef: provider.accountRef,
-      error: message, authFailure: auth });
-    await raiseTrackingAlert({
-      kind: auth ? 'auth' : 'transient',
+      error: message, authFailure: auth, evicted });
+    // Named apart from the breaker's `decision` above (a different concept,
+    // in a different scope) so the two are never misread as the same thing.
+    const { decision: alertDecision, delivered: alertDelivered } = await raiseTrackingAlert({
+      kind: auth ? 'auth' : evicted ? 'evicted' : 'transient',
       consecutiveFailures: updated[0]?.consecutive_failures ?? 1,
-      nowSast: new Date(),
+      nowSast: now,
+      // auth/transient/evicted decisions never read lastGapAlertAt (see
+      // decideAlert), and the try-scoped watermark read is out of scope in
+      // this catch anyway.
+      lastGapAlertAt: null,
+      // priorTransientAlertAt is hoisted above the try specifically so it
+      // survives into this catch — see its declaration for why.
+      lastTransientAlertAt: priorTransientAlertAt,
+      evictedSinceMs: evictedSince ? now.getTime() - evictedSince.getTime() : null,
       provider: provider.key,
       accountRef: provider.accountRef,
       detail: message,
     });
+    // Separate statement — same delivered-gate as the partial-fetch transient
+    // stamp above. Only the transient branch of decideAlert ever sets
+    // stampTransientAlert, so this is a no-op for auth/evicted decisions.
+    if (alertDelivered && alertDecision?.stampTransientAlert) {
+      await sql`
+        UPDATE fleet_tracking_watermarks SET last_transient_alert_at = now()
+        WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+      `;
+    }
+
+    // Slow down rather than keep hammering a portal that is pushing back.
+    // Deliberately NOT inside the breaker's throttled path above: that path
+    // returns early via reportThrottled and writes no watermark on purpose, so
+    // that a probe can still clear consecutive_failures — a write here would
+    // freeze the counter the breaker depends on.
+    //
+    // - Auth failures demote unconditionally: decideAlert's own reasoning is
+    //   that an auth failure will never self-heal, so there is no threshold
+    //   to wait for.
+    // - Eviction only demotes once `alertDecision` is non-null, which for
+    //   kind 'evicted' only happens once decideAlert calls it sustained (past
+    //   EVICTION_ESCALATE_AFTER_MS) — a human in the portal for a minute must
+    //   not ratchet cadence down.
+    // - Transient never demotes here, no matter how many consecutive ones
+    //   there are. TRANSIENT_THRESHOLD already governs alerting for those;
+    //   folding it into demotion too would ratchet every account to 120
+    //   within a day of ordinary internet weather.
+    if (auth || (evicted && alertDecision !== null)) {
+      const slower = demote(currentIntervalMinutes);
+      if (slower !== currentIntervalMinutes) {
+        await sql`
+          UPDATE fleet_tracking_watermarks SET poll_interval_minutes = ${slower}
+          WHERE provider = ${provider.key} AND account_ref = ${provider.accountRef}
+        `;
+        log.warn('[poll-portal-tracking] cadence demoted after portal pushback', {
+          provider: provider.key, accountRef: provider.accountRef,
+          from: currentIntervalMinutes, to: slower,
+        });
+      }
+    }
+
     return {
       provider: provider.key, accountRef: provider.accountRef,
       error: message, authFailure: auth };

@@ -84,4 +84,34 @@ describe('createPicking proof-photo enforcement', () => {
     expect(res.statusCode).toBe(400);
     expect(JSON.stringify(res.body)).toContain('INVALID_PROOF_PHOTO_URL');
   });
+
+  it('rejects a negative-quantity TRANSFER line (not just issue)', async () => {
+    // A negative planned_quantity flips the source decrement into an increment
+    // at process time, fabricating stock. This must be blocked for every type,
+    // not only 'issue'.
+    const res = mockRes();
+    await createPicking(
+      { body: {
+        pickingType: 'transfer', sourceLocationId: 'src', destinationLocationId: 'dst',
+        lines: [{ stockItemId: 'i1', plannedQuantity: -5 }] } } as NextApiRequest,
+      res, 'staff1');
+    expect(res.statusCode).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('greater than zero');
+  });
+
+  it('rejects duplicate stock-item lines within one picking', async () => {
+    // Two lines for the same item each pass the per-line availability check,
+    // then both decrement → stock can go negative.
+    const res = mockRes();
+    await createPicking(
+      { body: {
+        pickingType: 'transfer', sourceLocationId: 'src', destinationLocationId: 'dst',
+        lines: [
+          { stockItemId: 'i1', plannedQuantity: 5 },
+          { stockItemId: 'i1', plannedQuantity: 5 },
+        ] } } as NextApiRequest,
+      res, 'staff1');
+    expect(res.statusCode).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('DUPLICATE_PICKING_LINE');
+  });
 });

@@ -22,6 +22,7 @@ import {
   upsertSummary,
 } from './reconcileWriters';
 import { countsFrom, emptyReport, runStatus, type ReconcileReport } from './reconcileReport';
+import { buildFailureDiagnosis } from './reconcileFailureDiagnosis';
 import { loadObservedHolidays } from './saPublicHolidays';
 import { computeWageCents, hourlyRateCentsFromDbValue } from './wageCalculator';
 import { isoWeekMonday } from './isoWeek';
@@ -56,7 +57,9 @@ export async function reconcile(options: ReconcileOptions = {}): Promise<Reconci
   const report = emptyReport(fromDate, toDate, startedAt.toISOString());
   await startReconciliationRun({ runId, scannedFrom: fromDate, scannedTo: toDate, startedAt: report.startedAt });
   const policyIds = new Set<string>();
-  const failed = new Set<string>();
+  // key -> why it failed. A bare Set loses the reason, which is how two
+  // consecutive partial runs recorded which days failed but not why (#2480).
+  const failed = new Map<string, string>();
   const skippedLocked = new Set<string>();
   const pendingClosed = new Set<string>();
   try {
@@ -111,13 +114,13 @@ export async function reconcile(options: ReconcileOptions = {}): Promise<Reconci
         }
       } catch (error) {
         if (isPeriodLockedError(error)) recordLockedSkip(skippedLocked, key, 'system closure');
-        else { failed.add(key); logDayFailure(key, 'system closure', error); }
+        else { failed.set(key, logDayFailure(key, 'system closure', error)); }
       }
     }
     const entries = await loadReconciliationEntries(fromDate, toDate);
     const { candidates, duplicateKeys } = buildCandidates(expectedDays, entries, publicHolidays);
     for (const key of duplicateKeys) {
-      failed.add(key);
+      failed.set(key, 'multiple entries cannot be projected as one policy day');
       log.error('[attendance-reconcile] multiple entries cannot be projected as one policy day', { dayKey: key });
     }
     const legacy: LegacyContext = { rule, publicHolidays, weeklyOvertime: new Map() };
@@ -135,17 +138,16 @@ export async function reconcile(options: ReconcileOptions = {}): Promise<Reconci
           recordLockedSkip(skippedLocked, key, 'day projection');
           pendingClosed.delete(key);
         } else {
-          failed.add(key);
-          logDayFailure(key, 'day projection', error);
+          failed.set(key, logDayFailure(key, 'day projection', error));
         }
         legacy.weeklyOvertime.delete(`${candidate.staffId}:${isoWeekMonday(candidate.workDate)}`);
       }
     }
     report.skippedLockedDays = skippedLocked.size;
-    report.failedDayKeys = [...new Set([...failed, ...pendingClosed])].sort();
+    report.failedDayKeys = [...new Set([...failed.keys(), ...pendingClosed])].sort();
   } catch (error) {
     report.skippedLockedDays = skippedLocked.size;
-    report.failedDayKeys = [...new Set([...failed, ...pendingClosed])].sort();
+    report.failedDayKeys = [...new Set([...failed.keys(), ...pendingClosed])].sort();
     report.finishedAt = new Date().toISOString();
     await finishReconciliationRun({
       runId,
@@ -165,6 +167,10 @@ export async function reconcile(options: ReconcileOptions = {}): Promise<Reconci
     status: runStatus(report),
     counts: countsFrom(report),
     failedDayKeys: report.failedDayKeys,
+    // A partial run is the only status that used to reach the database with no
+    // diagnosis attached, so the row said which days failed but not why and the
+    // reason survived only in the cron log file (#2480).
+    errorMessage: buildFailureDiagnosis(report.failedDayKeys, failed, pendingClosed),
     finishedAt: report.finishedAt,
   });
   return report;
@@ -266,8 +272,11 @@ function onePolicyId(ids: Set<string>): string | null {
 function errorMessage(error: unknown): string {
   return (error instanceof Error ? error.message : String(error)).slice(0, 2_000);
 }
-function logDayFailure(key: string, operation: string, error: unknown): void {
+/** Logs the failure and returns the message, so callers can persist it too. */
+function logDayFailure(key: string, operation: string, error: unknown): string {
+  const message = `${operation} failed: ${errorMessage(error)}`;
   log.error(`[attendance-reconcile] ${operation} failed`, { dayKey: key, error: errorMessage(error) });
+  return message;
 }
 function isPeriodLockedError(error: unknown): boolean {
   return !!error && typeof error === 'object' && 'code' in error && error.code === 'period_locked';

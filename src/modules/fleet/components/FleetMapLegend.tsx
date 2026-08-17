@@ -24,6 +24,7 @@ export const ORDER: VehicleStatus[] = [
   'speeding',
   'lostContact',
   'moving',
+  'idling',
   'parked',
   'parkedSilent',
   'unknown',

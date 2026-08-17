@@ -31,8 +31,14 @@ export async function notifyNewParkingViolations(
         recipient_user_ids: recipients,
         metadata: { registration: violation.registration, distanceM: violation.distanceM === null ? null : Math.round(violation.distanceM) },
       });
-      warnings += result.failed_recipients;
-      if (result.accepted_recipients > 0) notifiedViolations += 1;
+      warnings += result.failed;
+      // `delivered`, not the old `accepted`: a recipient who has muted every
+      // channel is no longer counted, so a violation only counts as notified
+      // when something was actually dispatched. `suppressed` is deliberately
+      // neither counted nor warned about — it means an earlier run already
+      // notified this vehicle for this date, which is the idempotency key doing
+      // its job rather than a problem to report.
+      if (result.delivered > 0) notifiedViolations += 1;
     } catch (error) {
       warnings += 1;
       log.error('Parking violation notification failed', {

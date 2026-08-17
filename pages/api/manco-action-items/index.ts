@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { checkMancoAccess } from '@/lib/actionItems/mancoAccess';
 import {
   MancoActionItem,
   MancoActionItemFilters,
@@ -12,6 +14,17 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // Per-method permission. Both routes were withAuth and nothing else, so any
+  // authenticated user could edit or delete any management-committee item; the grants
+  // that say otherwise already exist on `dashboard.action-items` and were not consulted.
+  const authUser = (req as AuthenticatedNextApiRequest).user;
+  const access = await checkMancoAccess(authUser.id, req.method);
+  if (!access.ok) {
+    return access.status === 403
+      ? apiResponse.forbidden(res, access.message)
+      : apiResponse.internalError(res, new Error(access.message));
+  }
+
   if (req.method === 'GET') {
     try {
       const {

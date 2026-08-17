@@ -99,7 +99,8 @@ interface StockBundle {
 interface StockTake {
   id: string;
   reference_number: string;
-  status: 'draft' | 'in_progress' | 'pending_review' | 'approved' | 'completed' | 'cancelled';
+  name?: string;
+  status: 'draft' | 'in_progress' | 'pending_review' | 'approved' | 'completed' | 'cancelled' | 'historical';
   stock_take_type: string;
   started_at?: string;
   completed_at?: string;
@@ -115,6 +116,8 @@ const statusColors: Record<string, string> = {
   approved: 'bg-green-500/20 text-green-400',
   completed: 'bg-green-500/20 text-green-400',
   cancelled: 'bg-red-500/20 text-red-300',
+  // Backfilled historical physical counts (reference only — never adjust stock).
+  historical: 'bg-purple-500/20 text-purple-300',
 };
 
 // Categories Tab Content
@@ -759,10 +762,30 @@ function StockTakesTabContent() {
     name: '',
     stock_take_type: 'full',
     notes: '',
+    location_id: '',
   });
+  const [warehouses, setWarehouses] = useState<Array<{ id: string; code?: string; name: string }>>([]);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
 
   useEffect(() => {
     fetchStockTakes();
+  }, []);
+
+  // Warehouses for the location selector. A stock take is scoped to one
+  // location: expected quantities come from stock_quants at that location, and
+  // the create API + initialize_stock_take_lines require it.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/procurement/field-stock/locations?locationType=warehouse&isActive=true')
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : (data?.data ?? []);
+        setWarehouses(list);
+      })
+      .catch((err) => log.error('Failed to load warehouses', { error: err }));
+    return () => { cancelled = true; };
   }, []);
 
   const fetchStockTakes = async () => {
@@ -782,7 +805,7 @@ function StockTakesTabContent() {
 
   const openNewModal = () => {
     const today = new Date().toISOString().slice(0, 10);
-    setFormData({ name: `Stock Take ${today}`, stock_take_type: 'full', notes: '' });
+    setFormData({ name: `Stock Take ${today}`, stock_take_type: 'full', notes: '', location_id: '' });
     setShowModal(true);
   };
 
@@ -793,6 +816,10 @@ function StockTakesTabContent() {
   const handleCreate = async () => {
     if (!formData.name.trim()) {
       notificationService.error('Name is required');
+      return;
+    }
+    if (!formData.location_id) {
+      notificationService.error('Select a location');
       return;
     }
     setIsSaving(true);
@@ -847,9 +874,20 @@ function StockTakesTabContent() {
     }
   };
 
-  const filtered = stockTakes.filter(
-    (st) => st.reference_number.toLowerCase().includes(search.toLowerCase())
-  );
+  const q = search.trim().toLowerCase();
+  const filtered = stockTakes.filter((st) => {
+    const matchesSearch =
+      !q ||
+      st.reference_number.toLowerCase().includes(q) ||
+      (st.name?.toLowerCase().includes(q) ?? false);
+    const matchesStatus = !statusFilter || st.status === statusFilter;
+    const matchesType = !typeFilter || st.stock_take_type === typeFilter;
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  // Dropdown options derived from what's actually present.
+  const statusOptions = Array.from(new Set(stockTakes.map((st) => st.status))).sort();
+  const typeOptions = Array.from(new Set(stockTakes.map((st) => st.stock_take_type).filter(Boolean))).sort();
 
   const totalTakes = stockTakes.length;
   const inProgress = stockTakes.filter(st => st.status === 'in_progress').length;
@@ -880,20 +918,48 @@ function StockTakesTabContent() {
         />
       </StatCardGrid>
 
-      <div className="flex items-center justify-between">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[16rem] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
           <input
             type="text"
-            placeholder="Search stock takes..."
+            placeholder="Search by reference or name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
           />
         </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+        >
+          <option value="">All statuses</option>
+          {statusOptions.map((s) => (
+            <option key={s} value={s}>{s.replace('_', ' ')}</option>
+          ))}
+        </select>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+        >
+          <option value="">All types</option>
+          {typeOptions.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        {(statusFilter || typeFilter || search) && (
+          <button
+            onClick={() => { setSearch(''); setStatusFilter(''); setTypeFilter(''); }}
+            className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] transition-colors"
+          >
+            Clear
+          </button>
+        )}
         <button
           onClick={openNewModal}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+          className="ml-auto flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
         >
           <Plus className="h-4 w-4" />
           New Stock Take
@@ -911,8 +977,12 @@ function StockTakesTabContent() {
               <div className="flex items-center gap-3">
                 <ClipboardCheck className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
                 <div>
-                  <p className="font-medium text-[var(--ff-text-primary)]">{take.reference_number}</p>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">{take.stock_take_type}</p>
+                  <p className="font-medium text-[var(--ff-text-primary)]">
+                    {take.name || take.reference_number}
+                  </p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
+                    {take.reference_number} · {take.stock_take_type}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -964,6 +1034,23 @@ function StockTakesTabContent() {
                   className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                   autoFocus
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Location *</label>
+                <select
+                  value={formData.location_id}
+                  onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+                >
+                  <option value="">Select a warehouse…</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}{w.code ? ` (${w.code})` : ''}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-[var(--ff-text-tertiary)]">
+                  Expected quantities are counted against this location&apos;s stock.
+                </p>
               </div>
 
               <div>
