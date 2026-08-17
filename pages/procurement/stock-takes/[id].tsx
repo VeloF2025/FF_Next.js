@@ -52,7 +52,7 @@ export default function StockTakeDetailPage() {
         setStockTake(data.data);
         setLines(data.data.lines || []);
       } else {
-        notificationService.error(data.error || 'Failed to load stock take');
+        notificationService.error(data.error?.message ||'Failed to load stock take');
         router.push('/procurement/stock-takes');
       }
     } catch (error) {
@@ -83,7 +83,7 @@ export default function StockTakeDetailPage() {
         notificationService.success(data.message || `Stock take ${action}ed`);
         fetchStockTake();
       } else {
-        notificationService.error(data.error || `Failed to ${action} stock take`);
+        notificationService.error(data.error?.message ||`Failed to ${action} stock take`);
       }
     } catch (error) {
       console.error(`Error ${action}ing stock take:`, error);
@@ -107,7 +107,7 @@ export default function StockTakeDetailPage() {
         notificationService.success(data.message || 'Items initialized');
         fetchStockTake();
       } else {
-        notificationService.error(data.error || 'Failed to initialize items');
+        notificationService.error(data.error?.message ||'Failed to initialize items');
       }
     } catch (error) {
       console.error('Error initializing items:', error);
@@ -137,7 +137,7 @@ export default function StockTakeDetailPage() {
         setCountValue('');
         fetchStockTake();
       } else {
-        notificationService.error(data.error || 'Failed to record count');
+        notificationService.error(data.error?.message ||'Failed to record count');
       }
     } catch (error) {
       console.error('Error recording count:', error);
