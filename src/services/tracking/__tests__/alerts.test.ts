@@ -179,7 +179,10 @@ describe('raiseTrackingAlert', () => {
     // rather than rethrowing, so raiseTrackingAlert still reported delivered.
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const payloads: Record<string, unknown>[] = [];
-    const notify = vi.fn(async (p: Record<string, unknown>) => { payloads.push(p); });
+    const notify = vi.fn(async (p: Record<string, unknown>) => {
+      payloads.push(p);
+      return { delivered: 1, failed: 0 };
+    });
 
     for (const kind of ['auth', 'gap', 'transient'] as const) {
       await raiseTrackingAlert(
@@ -207,7 +210,7 @@ describe('raiseTrackingAlert', () => {
   });
 
   it('notifies the configured recipients on an auth failure, and reports delivered: true', async () => {
-    const notify = vi.fn();
+    const notify = vi.fn(async () => ({ delivered: 2, failed: 0 }));
     const result = await raiseTrackingAlert(
       { ...base, kind: 'auth', consecutiveFailures: 1 },
       { notify, recipients: async () => ['u1', 'u2'] }
@@ -241,6 +244,34 @@ describe('raiseTrackingAlert', () => {
       { notify, recipients: async () => ['u1'] }
     );
     expect(result).toEqual({ decision: { event: 'fleet.tracking_pull_failed' }, delivered: false });
+  });
+
+  it('reports delivered: false when notify() resolves but reached nobody', async () => {
+    // The nine-day outage in one line. notify() catches per-recipient failures
+    // and resolves regardless, so "the promise resolved" never meant "somebody
+    // was told" — and this call site read it as exactly that. With the counters
+    // it can tell the difference, and pollProvider's `if (delivered && ...)`
+    // gate then leaves last_gap_alert_at unstamped, so the next tick alerts
+    // again instead of serving a 24h silence for an outage nobody heard about.
+    const notify = vi.fn(async () => ({ delivered: 0, failed: 1 }));
+    const result = await raiseTrackingAlert(
+      { ...base, kind: 'gap', consecutiveFailures: 1 },
+      { notify, recipients: async () => ['u1'] }
+    );
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(result.decision).toEqual({ event: 'fleet.tracking_data_gap', stampGapAlert: true });
+    expect(result.delivered).toBe(false);
+  });
+
+  it('reports delivered: true when at least one recipient of several got through', async () => {
+    // Partial delivery is still delivery: somebody was told, so the cooldown
+    // is legitimate. Only "nobody at all" must keep the alert live.
+    const notify = vi.fn(async () => ({ delivered: 1, failed: 3 }));
+    const result = await raiseTrackingAlert(
+      { ...base, kind: 'gap', consecutiveFailures: 1 },
+      { notify, recipients: async () => ['u1', 'u2', 'u3', 'u4'] }
+    );
+    expect(result.delivered).toBe(true);
   });
 });
 

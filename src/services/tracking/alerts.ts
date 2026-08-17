@@ -12,6 +12,7 @@
  */
 
 import { notify as busNotify } from '@/modules/notifications/services/notificationBus';
+import type { NotifyResult } from '@/modules/notifications/types';
 import { log } from '@/lib/logger';
 import type { ProviderKey } from './types';
 
@@ -202,7 +203,7 @@ export interface RaiseAlertDeps {
     source_id?: string;
     recipient_user_ids: string[];
     metadata?: Record<string, unknown>;
-  }) => Promise<void>;
+  }) => Promise<NotifyResult>;
   recipients: () => Promise<string[]>;
 }
 
@@ -249,12 +250,18 @@ export interface RaiseAlertOutcome {
   /** What `decideAlert` computed for this input, or null if it said stay silent. */
   decision: AlertDecision | null;
   /**
-   * Whether the notification actually reached `deps.notify` and it resolved —
-   * false whenever the policy said silent, no recipients were configured, or
-   * `notify` itself threw. Callers that gate side effects on "the alert went
-   * out" (e.g. stamping last_gap_alert_at) must check this, not just
-   * `decision`: a truthy decision only means the POLICY said to alert, not
+   * Whether `notify` reported reaching at least one recipient — false whenever
+   * the policy said silent, no recipients were configured, `notify` threw, or
+   * `notify` resolved having reached nobody. Callers that gate side effects on
+   * "the alert went out" (e.g. stamping last_gap_alert_at) must check this, not
+   * just `decision`: a truthy decision only means the POLICY said to alert, not
    * that anyone was actually told.
+   *
+   * This used to mean only "notify() resolved", which is not the same claim:
+   * the bus catches per-recipient failures and resolves regardless, so it stayed
+   * true through nine days of alerts that reached nobody. It is now read from
+   * NotifyResult.delivered — see that docblock for how narrow the underlying
+   * evidence is on the async channels.
    */
   delivered: boolean;
 }
@@ -281,7 +288,7 @@ export async function raiseTrackingAlert(
       : `Tracking pull failed: ${input.provider}`;
 
   try {
-    await deps.notify({
+    const result = await deps.notify({
       event_type: decision.event,
       title,
       body: `${input.provider}/${input.accountRef}: ${input.detail}`,
@@ -305,7 +312,13 @@ export async function raiseTrackingAlert(
         consecutiveFailures: input.consecutiveFailures,
       },
     });
-    return { decision, delivered: true };
+    if (result.delivered === 0) {
+      log.error('[tracking-alerts] alert dispatched but reached nobody', {
+        event: decision.event, provider: input.provider,
+        recipients: recipients.length, failed: result.failed,
+      });
+    }
+    return { decision, delivered: result.delivered > 0 };
   } catch (err) {
     // A broken mail server must never take the ingestion run down with it —
     // the positions are the point, the alert is the courtesy.
