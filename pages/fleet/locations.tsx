@@ -1,50 +1,49 @@
-/**
- * Fleet Authorized Locations Page
- * Manage geofencing zones for trip classification
- */
-
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertTriangle, Car, Globe, MapPin, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { usePermission } from '@/hooks/usePermission';
 import { fleetConfig } from '@/modules/navigation';
-import {
-  MapPin,
-  Plus,
-  Search,
-  Globe,
-  Car,
-  Building2,
-  Home,
-  Truck,
-  AlertTriangle,
-  Pencil,
-  Trash2,
-} from 'lucide-react';
+import type { AuthorizedLocation } from '@/modules/fleet/types';
+import { LocationFormModal } from '@/modules/fleet/locations/LocationFormModal';
+import { deactivateLocation, listLocations, reactivateLocation } from '@/modules/fleet/locations/locationApi';
+import { LOCATION_TYPES } from '@/modules/fleet/locations/locationRules';
 
-interface AuthorizedLocation {
-  id: string;
-  name: string;
-  lat: number;
-  lon: number;
-  radiusKm: number;
-  locationType: string;
-  isGlobal: boolean;
-  vehicleId: string | null;
-  vehicleRegistration: string | null;
-  isActive: boolean;
-  createdAt: string;
+// Derived from LOCATION_TYPES so the badge can never drift from the form's
+// picker options the way a hand-maintained copy did (it omitted 'office').
+const TYPE_LABELS = new Map(LOCATION_TYPES.map((type) => [type.value, type.label]));
+
+type ModalState = { mode: 'create'; location: null } | { mode: 'edit'; location: AuthorizedLocation } | null;
+
+function LocationSection({ title, icon: Icon, locations, canEdit, canDelete, onEdit, onDeactivate, onReactivate }: {
+  title: string; icon: typeof Globe; locations: AuthorizedLocation[]; canEdit: boolean; canDelete: boolean;
+  onEdit: (location: AuthorizedLocation) => void; onDeactivate: (location: AuthorizedLocation) => void; onReactivate: (location: AuthorizedLocation) => void;
+}) {
+  return <section className="rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+    <header className="flex items-center gap-2 border-b border-[var(--ff-border-light)] px-6 py-4"><Icon className="h-5 w-5 text-[var(--ff-primary)]" /><h2 className="font-semibold">{title}</h2><span>({locations.length})</span></header>
+    {locations.length === 0 ? <p className="p-8 text-center text-[var(--ff-text-secondary)]">No locations</p> : locations.map((location) =>
+      <div key={location.id} className="flex items-center justify-between border-b border-[var(--ff-border-light)] px-6 py-4 last:border-0">
+        <div>
+          <p className="flex items-center gap-2 font-medium">
+            {location.name}
+            <span className="rounded-full bg-[var(--ff-bg-tertiary)] px-2 py-0.5 text-xs font-normal text-[var(--ff-text-secondary)]">
+              {TYPE_LABELS.get(location.locationType) ?? location.locationType}
+            </span>
+          </p>
+          <p className="text-sm text-[var(--ff-text-secondary)]">
+            {location.vehicleRegistration ? `${location.vehicleRegistration} · ` : ''}
+            {location.lat.toFixed(4)}, {location.lon.toFixed(4)} · {location.radiusKm}km radius
+          </p>
+        </div>
+        <div className="flex items-center gap-2">{!location.isActive && <span className="text-xs">Inactive</span>}
+          {location.isActive && canEdit && <button aria-label={`Edit ${location.name}`} onClick={() => onEdit(location)} className="p-2"><Pencil className="h-4 w-4" /></button>}
+          {location.isActive && canDelete && <button aria-label={`Deactivate ${location.name}`} onClick={() => onDeactivate(location)} className="p-2 text-red-600"><Trash2 className="h-4 w-4" /></button>}
+          {!location.isActive && canEdit && <button aria-label={`Reactivate ${location.name}`} onClick={() => onReactivate(location)} className="p-2"><RotateCcw className="h-4 w-4" /></button>}
+        </div>
+      </div>)}
+  </section>;
 }
-
-const defaultTypeConfig = { label: 'Other', icon: MapPin, color: 'bg-gray-100 text-gray-800' };
-
-const locationTypeConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  work_site: { label: 'Work Site', icon: Building2, color: 'bg-blue-100 text-blue-800' },
-  accommodation: { label: 'Accommodation', icon: Home, color: 'bg-purple-100 text-purple-800' },
-  supplier: { label: 'Supplier', icon: Truck, color: 'bg-green-100 text-green-800' },
-  client: { label: 'Client', icon: Building2, color: 'bg-orange-100 text-orange-800' },
-  depot: { label: 'Depot', icon: MapPin, color: 'bg-gray-100 text-gray-800' },
-  other: defaultTypeConfig,
-};
 
 export default function FleetLocationsPage() {
   const [locations, setLocations] = useState<AuthorizedLocation[]>([]);
@@ -52,203 +51,60 @@ export default function FleetLocationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
+  const [modal, setModal] = useState<ModalState>(null);
+  const [pendingDeactivation, setPendingDeactivation] = useState<AuthorizedLocation | null>(null);
+  const listRequestId = useRef(0);
+  const { can, isLoading: permissionsLoading } = usePermission();
+  const canCreate = !permissionsLoading && can('fleet.locations', 'create');
+  const canEdit = !permissionsLoading && can('fleet.locations', 'edit');
+  const canDelete = !permissionsLoading && can('fleet.locations', 'delete');
 
-  useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        const params = new URLSearchParams();
-        if (showInactive) params.append('active', 'false');
-
-        const res = await fetch(`/api/fleet/locations?${params.toString()}`);
-        const data = await res.json();
-        setLocations(data.data || []);
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to load locations');
-        setLoading(false);
-      }
-    };
-
-    fetchLocations();
+  const loadLocations = useCallback(async () => {
+    const requestId = ++listRequestId.current;
+    setLoading(true); setError(null);
+    try {
+      const nextLocations = await listLocations(showInactive);
+      if (listRequestId.current === requestId) setLocations(nextLocations);
+    }
+    catch (caught) {
+      if (listRequestId.current === requestId) setError(caught instanceof Error ? caught.message : 'Failed to load locations');
+    }
+    finally { if (listRequestId.current === requestId) setLoading(false); }
   }, [showInactive]);
 
-  const filteredLocations = locations.filter((loc) =>
-    loc.name.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => { void loadLocations(); }, [loadLocations]);
 
-  const globalLocations = filteredLocations.filter((l) => l.isGlobal);
-  const vehicleLocations = filteredLocations.filter((l) => !l.isGlobal);
+  const mutate = async (operation: () => Promise<unknown>) => {
+    setError(null);
+    try { await operation(); await loadLocations(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : 'Location request failed'); }
+  };
 
-  return (
-    <AppLayout>
-        <ModulePage config={fleetConfig} hideTabs>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Authorized Locations</h1>
-            <p className="text-[var(--ff-text-secondary)]">
-              Configure geofencing zones for trip classification
-            </p>
-          </div>
-          <button className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] transition-colors flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Add Location
-          </button>
-        </div>
+  const confirmDeactivation = () => {
+    if (!pendingDeactivation) return;
+    const location = pendingDeactivation;
+    setPendingDeactivation(null);
+    void mutate(() => deactivateLocation(location.id));
+  };
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
-              <input
-                type="text"
-                placeholder="Search locations..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
-              />
-            </div>
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-              className="rounded border-[var(--ff-border-light)]"
-            />
-            <span className="text-[var(--ff-text-secondary)]">Show inactive</span>
-          </label>
-        </div>
+  const filtered = locations.filter((location) => location.name.toLowerCase().includes(search.toLowerCase()));
+  const sectionProps = { canEdit, canDelete, onEdit: (location: AuthorizedLocation) => setModal({ mode: 'edit', location }), onDeactivate: setPendingDeactivation, onReactivate: (location: AuthorizedLocation) => void mutate(() => reactivateLocation(location.id)) };
 
-        {loading ? (
-          <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-8">
-            <div className="animate-pulse space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-16 bg-[var(--ff-bg-tertiary)] rounded"></div>
-              ))}
-            </div>
-          </div>
-        ) : error ? (
-          <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-8 text-center">
-            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-[var(--ff-text-primary)]">{error}</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Global Locations */}
-            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)]">
-              <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-5 h-5 text-[var(--ff-primary)]" />
-                  <h2 className="font-semibold text-[var(--ff-text-primary)]">Global Locations</h2>
-                  <span className="text-sm text-[var(--ff-text-secondary)]">
-                    ({globalLocations.length})
-                  </span>
-                </div>
-                <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
-                  Apply to all vehicles
-                </p>
-              </div>
-              <div className="divide-y divide-[var(--ff-border-light)]">
-                {globalLocations.length === 0 ? (
-                  <div className="px-6 py-8 text-center">
-                    <MapPin className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
-                    <p className="text-[var(--ff-text-secondary)]">No global locations</p>
-                  </div>
-                ) : (
-                  globalLocations.map((location) => {
-                    const typeConfig = locationTypeConfig[location.locationType] ?? defaultTypeConfig;
-                    const TypeIcon = typeConfig.icon;
-                    return (
-                      <div key={location.id} className="px-6 py-4 flex items-center justify-between hover:bg-[var(--ff-bg-tertiary)]">
-                        <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded-lg ${typeConfig.color}`}>
-                            <TypeIcon className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-[var(--ff-text-primary)]">{location.name}</p>
-                            <p className="text-sm text-[var(--ff-text-secondary)]">
-                              {location.lat.toFixed(4)}, {location.lon.toFixed(4)} • {location.radiusKm}km radius
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {!location.isActive && (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                              Inactive
-                            </span>
-                          )}
-                          <button className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg">
-                            <Pencil className="w-4 h-4 text-[var(--ff-text-secondary)]" />
-                          </button>
-                          <button className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg">
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* Vehicle-Specific Locations */}
-            {vehicleLocations.length > 0 && (
-              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)]">
-                <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
-                  <div className="flex items-center gap-2">
-                    <Car className="w-5 h-5 text-[var(--ff-primary)]" />
-                    <h2 className="font-semibold text-[var(--ff-text-primary)]">Vehicle-Specific Locations</h2>
-                    <span className="text-sm text-[var(--ff-text-secondary)]">
-                      ({vehicleLocations.length})
-                    </span>
-                  </div>
-                  <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
-                    Override for specific vehicles
-                  </p>
-                </div>
-                <div className="divide-y divide-[var(--ff-border-light)]">
-                  {vehicleLocations.map((location) => {
-                    const typeConfig = locationTypeConfig[location.locationType] ?? defaultTypeConfig;
-                    const TypeIcon = typeConfig.icon;
-                    return (
-                      <div key={location.id} className="px-6 py-4 flex items-center justify-between hover:bg-[var(--ff-bg-tertiary)]">
-                        <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded-lg ${typeConfig.color}`}>
-                            <TypeIcon className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-[var(--ff-text-primary)]">{location.name}</p>
-                            <p className="text-sm text-[var(--ff-text-secondary)]">
-                              {location.vehicleRegistration} • {location.radiusKm}km radius
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {!location.isActive && (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                              Inactive
-                            </span>
-                          )}
-                          <button className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg">
-                            <Pencil className="w-4 h-4 text-[var(--ff-text-secondary)]" />
-                          </button>
-                          <button className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg">
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </ModulePage>
-      </AppLayout>
-  );
+  return <AppLayout><ModulePage config={fleetConfig} hideTabs><div className="space-y-6 p-6">
+    <div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Authorized Locations</h1><p className="text-[var(--ff-text-secondary)]">Configure geofencing zones for trip classification</p></div>{canCreate && <button aria-label="Add location" onClick={() => setModal({ mode: 'create', location: null })} className="flex items-center gap-2 rounded-lg bg-[var(--ff-primary)] px-4 py-2 text-white"><Plus className="h-4 w-4" />Add Location</button>}</div>
+    <div className="flex gap-4"><label className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4" /><input aria-label="Search locations" value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg border py-2 pl-10" /></label><label className="flex items-center gap-2"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />Show inactive</label></div>
+    {error && <p role="alert" className="flex gap-2 text-red-600"><AlertTriangle className="h-5 w-5" />{error}</p>}
+    {loading ? <p>Loading locations…</p> : <div className="space-y-6"><LocationSection title="Global Locations" icon={Globe} locations={filtered.filter((location) => location.isGlobal)} {...sectionProps} /><LocationSection title="Vehicle-Specific Locations" icon={Car} locations={filtered.filter((location) => !location.isGlobal)} {...sectionProps} /></div>}
+    {filtered.length === 0 && !loading && !error && <div className="text-center"><MapPin className="mx-auto h-8 w-8" />No matching locations</div>}
+    {modal && <LocationFormModal mode={modal.mode} location={modal.location} onClose={() => setModal(null)} onSaved={() => { setModal(null); void loadLocations(); }} />}
+    <ConfirmDialog
+      open={pendingDeactivation !== null}
+      onConfirm={confirmDeactivation}
+      onCancel={() => setPendingDeactivation(null)}
+      title="Deactivate location"
+      message={`Deactivate ${pendingDeactivation?.name ?? 'this location'}?`}
+      confirmLabel="Confirm deactivation"
+      variant="danger"
+    />
+  </div></ModulePage></AppLayout>;
 }

@@ -160,6 +160,8 @@ export interface AuthorizedLocation {
   locationType: LocationType;
   isGlobal: boolean;
   vehicleId: string | null;
+  /** Joined from fleet_vehicles by the locations API; null for global locations. */
+  vehicleRegistration?: string | null;
   isActive: boolean;
 }
 
