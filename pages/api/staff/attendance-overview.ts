@@ -34,6 +34,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
+import { approvedAccountPredicate } from '@/lib/staff/hrVisibilityFilters';
 import {
   withAuth,
   withPermission,
@@ -183,7 +184,11 @@ async function loadWeeklyTotals(
               (DATE_TRUNC('week', work_date::timestamp)::date) AS week_start,
               regular_hrs, overtime_hrs, sunday_hrs, holiday_hrs, night_hrs,
               wage_amount_cents, staff_id, work_date
-            FROM attendance_daily_summaries
+            FROM attendance_daily_summaries ds_all
+            -- Rule P. Pending workers are reconciled (their hours are captured,
+            -- not lost) but must not reach an HR-facing surface until approved.
+            JOIN staff s_rp ON s_rp.id = ds_all.staff_id
+              ${sql.unsafe('AND ' + approvedAccountPredicate('s_rp'))}
             WHERE work_date >= ${fromDate}::date
               AND work_date <= ${toDate}::date
           ),
@@ -229,7 +234,10 @@ async function loadWeeklyTotals(
               (DATE_TRUNC('week', work_date::timestamp)::date) AS week_start,
               regular_hrs, overtime_hrs, sunday_hrs, holiday_hrs, night_hrs,
               wage_amount_cents, staff_id, work_date
-            FROM attendance_daily_summaries
+            FROM attendance_daily_summaries ds_all
+            -- Rule P — see the org-wide branch above.
+            JOIN staff s_rp ON s_rp.id = ds_all.staff_id
+              ${sql.unsafe('AND ' + approvedAccountPredicate('s_rp'))}
             WHERE work_date >= ${fromDate}::date
               AND work_date <= ${toDate}::date
               AND staff_id = ANY(${scope}::uuid[])
@@ -352,6 +360,7 @@ async function loadTopOvertimeThisWeek(
                  SUM(ds.overtime_hrs)::text AS overtime_hrs
           FROM attendance_daily_summaries ds
           JOIN staff s ON s.id = ds.staff_id
+            ${sql.unsafe('AND ' + approvedAccountPredicate('s'))}
           WHERE ds.work_date >= ${weekMonday}::date
           GROUP BY ds.staff_id, s.first_name, s.last_name
           HAVING SUM(ds.overtime_hrs) > 0
@@ -364,6 +373,7 @@ async function loadTopOvertimeThisWeek(
                  SUM(ds.overtime_hrs)::text AS overtime_hrs
           FROM attendance_daily_summaries ds
           JOIN staff s ON s.id = ds.staff_id
+            ${sql.unsafe('AND ' + approvedAccountPredicate('s'))}
           WHERE ds.work_date >= ${weekMonday}::date
             AND ds.staff_id = ANY(${scope}::uuid[])
           GROUP BY ds.staff_id, s.first_name, s.last_name

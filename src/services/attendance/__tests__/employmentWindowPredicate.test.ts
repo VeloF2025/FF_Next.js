@@ -22,7 +22,17 @@ import {
   employmentWindowPredicate,
 } from '../employmentUniverse';
 
-const ROOTS = ['src/services/attendance', 'src/modules/attendance', 'pages/api/staff'];
+// Every directory that consumes the employment/Rule-P predicates. A new call
+// site added in an unwalked directory would escape the allow-list below, so
+// this list must stay wider than the set of current consumers.
+const ROOTS = [
+  'src/services/attendance',
+  'src/modules/attendance',
+  'src/modules/field-workers',
+  'pages/api/staff',
+  'pages/api/my',
+  'pages/api/field',
+];
 
 /** The only files permitted to use the Rule-P-free predicate. */
 const ALLOWED = new Set(['src/services/attendance/reconcileQueries.ts']);
