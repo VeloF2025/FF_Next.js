@@ -1,10 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ permission: true, calls: [] as Array<[string, string]>, roster: vi.fn(), options: vi.fn(), scope: vi.fn(), staff: vi.fn(), query: vi.fn() }));
+const mocks = vi.hoisted(() => ({ permission: true, calls: [] as Array<[string, string]>, roster: vi.fn(), options: vi.fn(), scope: vi.fn(), authorizedIds: vi.fn(), staff: vi.fn(), query: vi.fn() }));
 vi.mock('@/lib/auth/middleware', () => ({ withAuth: (handler: unknown) => handler, withPermission: (key: string, action: string) => (handler: (req: NextApiRequest, res: NextApiResponse) => unknown) => async (req: NextApiRequest, res: NextApiResponse) => { mocks.calls.push([key, action]); return mocks.permission ? handler(req, res) : res.status(403).json({ success: false }); } }));
 vi.mock('@/modules/fleet/assignments/rosterQueries', () => ({ listAssignmentRoster: mocks.roster, listAssignmentOptions: mocks.options }));
-vi.mock('@/modules/fleet/assignments/projectScope', () => ({ canViewAssignmentProject: mocks.scope }));
+vi.mock('@/modules/fleet/assignments/projectScope', () => ({ canViewAssignmentProject: mocks.scope, authorizedAssignmentProjectIds: mocks.authorizedIds }));
 vi.mock('@/modules/fleet/parking/staffLookup', () => ({ resolveStaffIdForUser: mocks.staff }));
 vi.mock('@/lib/db-pool', () => ({ query: mocks.query }));
 import assignmentsHandler from '../index';
@@ -21,7 +21,7 @@ async function call(handler: (req: NextApiRequest, res: NextApiResponse) => unkn
   await handler({ method, query, user: { id: USER, role: 'manager' } } as unknown as NextApiRequest, res);
   return state;
 }
-beforeEach(() => { vi.clearAllMocks(); mocks.permission = true; mocks.calls.length = 0; mocks.staff.mockResolvedValue(STAFF); mocks.scope.mockResolvedValue(true); mocks.roster.mockResolvedValue({ items: [], total: 0 }); mocks.options.mockResolvedValue({ staff: [], projects: [], sites: [], vehicles: [] }); mocks.query.mockResolvedValue([{ id: PROJECT }]); });
+beforeEach(() => { vi.clearAllMocks(); mocks.permission = true; mocks.calls.length = 0; mocks.staff.mockResolvedValue(STAFF); mocks.scope.mockResolvedValue(true); mocks.authorizedIds.mockResolvedValue([PROJECT]); mocks.roster.mockResolvedValue({ items: [], total: 0 }); mocks.options.mockResolvedValue({ staff: [], projects: [], sites: [], vehicles: [] }); mocks.query.mockResolvedValue([{ id: PROJECT }]); });
 
 describe('assignment read APIs', () => {
   it('allows GET only and requires fleet assignment view permission', async () => {
@@ -53,11 +53,22 @@ describe('assignment read APIs', () => {
     expect(mocks.roster).toHaveBeenCalledWith({ projectId: PROJECT, staffId: STAFF, siteId: SITE, startDate: '2026-08-01', endDate: '2026-08-31', source: 'roster', unassignedScheduled: false, limit: 10, offset: 10 });
   });
 
+  // Scoping is now resolved in one batched call instead of a per-project loop.
+  // The allow/deny rules themselves are covered in projectScope.test.ts; what
+  // matters here is that the route asks for 'view' and forwards exactly the set
+  // it is given, without widening it.
   it('only exposes options for active projects in the user view scope', async () => {
-    mocks.query.mockResolvedValue([{ id: PROJECT }, { id: OTHER }]);
-    mocks.scope.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    mocks.authorizedIds.mockResolvedValue([PROJECT]);
     await call(optionsHandler, 'GET');
+    expect(mocks.authorizedIds).toHaveBeenCalledWith(USER, STAFF, 'manager', 'view');
     expect(mocks.options).toHaveBeenCalledWith({}, [PROJECT]);
+    expect(mocks.options.mock.calls[0]![1]).not.toContain(OTHER);
+  });
+
+  it('forwards an empty scope rather than falling back to every project', async () => {
+    mocks.authorizedIds.mockResolvedValue([]);
+    await call(optionsHandler, 'GET');
+    expect(mocks.options).toHaveBeenCalledWith({}, []);
   });
 
   it('validates and passes the requested option date range', async () => {
