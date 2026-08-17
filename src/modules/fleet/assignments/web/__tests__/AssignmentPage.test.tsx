@@ -25,7 +25,7 @@ vi.mock('@/modules/fleet/assignments/web/AssignmentRoster', () => ({
     <>{rows.map((row) => <button key={row.assignmentId} onClick={() => onSelect([row.assignmentId!])}>Select {row.staffName}</button>)}</>,
 }));
 
-import AssignmentPage from '../index';
+import AssignmentPage from '../../../../../../pages/fleet/assignments/index';
 
 const assignment = {
   assignmentId: 'assignment-1', staffId: 'staff-1', staffName: 'Driver One', projectId: 'project-1', projectName: 'Project One',
