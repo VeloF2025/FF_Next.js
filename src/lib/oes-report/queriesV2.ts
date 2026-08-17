@@ -162,6 +162,11 @@ export async function loadPpActivatedOnListRows(): Promise<LinkedAwaitingRow[]> 
     JOIN latest_batch_per_project lb
       ON p.project = lb.project AND p.import_batch_id = lb.bid
     WHERE p.resolution_status = 'activated'
+      -- Sibling reader of the same status condition the retirement sweep
+      -- supersedes. resolution_status is never moved off 'activated' (migration
+      -- 377's CHECK has no terminal member), so without this a superseded serial
+      -- keeps appearing on the PP — Linked sheet as though it were still live.
+      AND p.decommissioned_at IS NULL
     ORDER BY p.project NULLS LAST, p.date_registered NULLS LAST, p.serial_number
   `);
   return result.rows;
