@@ -201,8 +201,20 @@ describe('query construction', () => {
     // was never shown a count for.
     for (const { sql } of [pageQuery(filter()), summaryQuery(filter()), allKeysQuery(filter())]) {
       expect(sql).toContain("DISTINCT ON (COALESCE(substring(storage_key from '/(v[0-9]{14}-[^/]+)$'), storage_key))");
-      expect(sql).toContain('first_value(captured_at) OVER dategroup');
+      expect(sql).toContain('max(captured_at) OVER dategroup');
     }
+  });
+
+  it('carries the date with a partition-only window, never an ordered first_value', () => {
+    // first_value over `ORDER BY captured_at DESC NULLS LAST` is nondeterministic in a
+    // group where every row is undated: the ordering cannot break the tie, so the same
+    // photo reported 'captured' on one refresh and 'unknown' on the next. max() has no
+    // such freedom, and the basis is only borrowed when a date actually was.
+    const { sql } = pageQuery(filter());
+    expect(sql).toContain('WINDOW dategroup AS (PARTITION BY');
+    expect(sql).not.toContain('first_value');
+    expect(sql).not.toMatch(/dategroup AS \([^)]*ORDER BY/);
+    expect(sql).toContain('WHEN max(captured_at) OVER dategroup IS NULL THEN date_basis');
   });
 
   it('sorts the page by recency outside the DISTINCT ON, not by key', () => {

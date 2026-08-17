@@ -288,15 +288,40 @@ const DEDUPE_ORDER = `ORDER BY ${DEDUPE_KEY}, corpus_rank, captured_at DESC NULL
  *
  * So rank still decides WHICH row wins — the step label and VLM verdict are why that
  * policy exists — and the date is taken from the best-dated row in the same group.
- * `date_basis` travels with it from the same window, so a borrowed date is never
- * reported under the borrower's own basis.
+ *
+ * The window is PARTITION-only, deliberately, on both correctness and cost grounds:
+ *
+ *   - `first_value(...) OVER (... ORDER BY captured_at DESC NULLS LAST)` is
+ *     NONDETERMINISTIC in a group where every row is undated: the ordering cannot break
+ *     the tie, so an arbitrary row's `date_basis` wins and the choice changes between
+ *     executions of the identical query. 5,276 all-NULL groups hold conflicting bases,
+ *     and they flipped run to run — the same photo reporting 'captured' on one refresh
+ *     and 'unknown' on the next. `max()` has no such freedom.
+ *   - It is also the cheaper form, though not as cheap as one might hope. Measured on
+ *     the uncapped manifest: ~330 ms with no carry at all, ~1,260 ms partition-only,
+ *     ~1,180 ms on pre-PR master. The window still forces its own sort of the union —
+ *     PG does not fold it into the DISTINCT ON sort even though the partition key is a
+ *     prefix — so the carry gives back the dedupe speedup and lands roughly level with
+ *     what is deployed today, while returning 34k fewer rows. Adding an ORDER BY to the
+ *     window to align the two sorts was tried and buys ~200 ms; not worth the frame
+ *     semantics it drags in. Correctness of the date is worth the wash.
+ *
+ * `date_basis` is only borrowed when a date was actually borrowed, and names the corpus
+ * the borrowed date came from rather than the borrower's own basis. A group whose rows
+ * are all undated keeps its own basis — there is nothing to borrow, and inventing one
+ * is what made it unstable.
  */
-const CARRY_WINDOW =
-  `WINDOW dategroup AS (PARTITION BY ${DEDUPE_KEY} ORDER BY captured_at DESC NULLS LAST)`;
+const CARRY_WINDOW = `WINDOW dategroup AS (PARTITION BY ${DEDUPE_KEY})`;
 const CARRIED_COLUMNS = `
-             COALESCE(captured_at, first_value(captured_at) OVER dategroup) AS captured_at,
-             CASE WHEN captured_at IS NOT NULL THEN date_basis
-                  ELSE first_value(date_basis) OVER dategroup END          AS date_basis`;
+             COALESCE(captured_at, max(captured_at) OVER dategroup) AS captured_at,
+             CASE
+               WHEN captured_at IS NOT NULL THEN date_basis
+               WHEN max(captured_at) OVER dategroup IS NULL THEN date_basis
+               WHEN max(captured_at) OVER dategroup IS NOT DISTINCT FROM
+                    max(captured_at) FILTER (WHERE date_basis = 'captured') OVER dategroup
+                 THEN 'captured'
+               ELSE 'validated'
+             END                                                    AS date_basis`;
 
 /** The union with `captured_at`/`date_basis` replaced by their carried equivalents. */
 function carried(baseSql: string): string {
