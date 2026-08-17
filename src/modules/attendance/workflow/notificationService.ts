@@ -15,7 +15,7 @@ export type AttendanceNotificationPhase = typeof ATTENDANCE_NOTIFICATION_PHASES[
 export type AttendanceNotificationFailureReason =
   | 'recipient_missing' | 'recipient_ambiguous' | 'recipient_inactive'
   | 'recipient_resolution_failed' | 'candidate_query_failed'
-  | 'notification_bus_invocation_failed' | 'notification_bus_delivery_failed'
+  | 'notification_bus_invocation_failed' | 'notification_bus_delivery_failed' | 'dispatch_multi_recipient'
   | 'dispatch_claim_failed'
   | 'dispatch_status_update_failed';
 
@@ -220,6 +220,18 @@ function activeLink(row: StaffUserRow): boolean {
 
 async function dispatch(candidate: Candidate, phase: AttendanceNotificationPhase,
   report: AttendanceNotificationReport): Promise<void> {
+  // One recipient per delivery key is an invariant the retry logic depends on,
+  // not a coincidence of the current callers. `failed > 0` fails the whole
+  // dispatch, and the next run re-sends the whole payload — with several
+  // recipients under one key, a partial failure would re-notify the ones that
+  // already succeeded, and user_notifications has no uniqueness guard to
+  // deduplicate them. Every call site passes a single-element array today, so
+  // this branch is unreachable and therefore untested — it exists to fail
+  // loudly rather than silently duplicate if that ever changes.
+  if (candidate.payload.recipient_user_ids.length !== 1) {
+    addFailure(report, candidate.sourceKey, 'dispatch_multi_recipient');
+    return;
+  }
   try {
     if (!await claimDispatch({ deliveryKey: candidate.deliveryKey, phase,
       sourceKey: candidate.sourceKey, recipientUserId: candidate.recipientUserId })) {
