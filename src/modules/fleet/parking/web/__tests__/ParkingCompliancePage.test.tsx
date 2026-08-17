@@ -10,7 +10,7 @@ vi.mock('@/components/layout/AppLayout', () => ({ AppLayout: ({ children }: { ch
 vi.mock('@/components/module-page', () => ({ ModulePage: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock('@/modules/fleet/parking/web/ComplianceTable', () => ({ ComplianceTable: () => null }));
 
-import ParkingCompliancePage from '../index';
+import ParkingCompliancePage from '../../../../../../pages/fleet/parking/index';
 
 describe('ParkingCompliancePage URL filters', () => {
   beforeEach(() => {
