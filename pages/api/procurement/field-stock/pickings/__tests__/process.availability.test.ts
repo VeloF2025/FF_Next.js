@@ -99,4 +99,27 @@ describe('validateStockAvailability', () => {
       expect(result.errors[ITEM_ID]).toContain('FT-ONT Router');
     }
   });
+
+  it('scopes the availability check to the line lot_number', async () => {
+    const { txn } = fakeTxn({ quants: [{ quantity: 10 }] });
+    const lotLine = { ...LINE, lot_number: 'LOT-9' };
+
+    await validateStockAvailability(txn, [lotLine], SOURCE_ID);
+
+    const quantCall = (txn.query as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .find((c) => typeof c[0] === 'string' && /FROM stock_quants/.test(c[0] as string));
+    expect(quantCall).toBeDefined();
+    expect(quantCall![0]).toMatch(/COALESCE\(lot_number, ''\) = COALESCE\(\$3, ''\)/);
+    expect(quantCall![1]).toEqual([ITEM_ID, SOURCE_ID, 'LOT-9']);
+  });
+
+  it('treats a line with no lot_number as the bulk/null-lot row (param null)', async () => {
+    const { txn } = fakeTxn({ quants: [{ quantity: 10 }] });
+
+    await validateStockAvailability(txn, [LINE], SOURCE_ID);
+
+    const quantCall = (txn.query as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .find((c) => typeof c[0] === 'string' && /FROM stock_quants/.test(c[0] as string));
+    expect(quantCall![1]).toEqual([ITEM_ID, SOURCE_ID, null]);
+  });
 });

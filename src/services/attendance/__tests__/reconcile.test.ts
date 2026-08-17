@@ -307,6 +307,63 @@ describe('schedule-aware attendance reconciliation', () => {
     expect(mocks.startRun).not.toHaveBeenCalled();
   });
 
+  // #2480 — a partial run used to persist which days failed but not why, so the
+  // reason survived only in the cron log file and two consecutive partial nights
+  // went unnoticed.
+  describe('partial-run diagnosis (#2480)', () => {
+    it('persists the per-day reason alongside the failed day key', async () => {
+      mocks.loadEntries.mockResolvedValue([
+        entry(),
+        entry({ work_date: '2026-08-04', clock_in_at: '2026-08-04T06:00:00.000Z' }),
+      ]);
+      mocks.loadExpectedDays.mockResolvedValue([expectedDay(), expectedDay('2026-08-04')]);
+      mocks.persistDay.mockReset();
+      mocks.persistDay
+        .mockRejectedValueOnce(new Error('violates check constraint "…proposed_overtime_hrs_check"'))
+        .mockResolvedValue({ resultVersion: 1, exceptionIds: ['exception-1'] });
+
+      await reconcile({ fromDate: '2026-08-03', toDate: '2026-08-04' });
+
+      const args = mocks.finishRun.mock.calls.at(-1)?.[0];
+      expect(args.status).toBe('partial');
+      expect(args.failedDayKeys).toEqual([`${STAFF_ID}:2026-08-03`]);
+      // The point of the fix: the constraint name reaches the database row, so
+      // the run can be diagnosed without reading the cron log.
+      expect(args.errorMessage).toContain(`${STAFF_ID}:2026-08-03`);
+      expect(args.errorMessage).toContain('proposed_overtime_hrs_check');
+    });
+
+    it('leaves errorMessage null on a clean run', async () => {
+      // A full 08:00-17:00 SAST day: approved, no exceptions, so the readback
+      // assertion is satisfied by the default empty exceptionIds mock.
+      mocks.loadEntries.mockResolvedValue([
+        entry({ status: 'closed', clock_out_at: '2026-08-03T15:00:00.000Z' }),
+      ]);
+      mocks.loadExpectedDays.mockResolvedValue([expectedDay()]);
+
+      await reconcile({ fromDate: '2026-08-03', toDate: '2026-08-03' });
+
+      const args = mocks.finishRun.mock.calls.at(-1)?.[0];
+      expect(args.status).toBe('succeeded');
+      expect(args.errorMessage).toBeNull();
+    });
+
+    it('labels a system-closed day that never projected rather than omitting it', async () => {
+      // pendingClosed days land in failedDayKeys with no thrown error to quote.
+      // A key with no matching line would be worse than the bug being fixed.
+      mocks.loadOpenEntries.mockResolvedValue([entry({ status: 'open' })]);
+      mocks.loadEntries.mockResolvedValue([]);
+      mocks.loadExpectedDays.mockResolvedValue([]);
+
+      await reconcile({ fromDate: '2026-08-03', toDate: '2026-08-03' });
+
+      const args = mocks.finishRun.mock.calls.at(-1)?.[0];
+      expect(args.failedDayKeys).toEqual([`${STAFF_ID}:2026-08-03`]);
+      expect(args.errorMessage).toContain('system-closed but not projected');
+      expect(args.errorMessage).not.toContain('unknown failure');
+    });
+  });
+
   it('retains a successfully closed day if the projection reload aborts', async () => {
     mocks.loadOpenEntries.mockResolvedValue([entry({ status: 'open' })]);
     mocks.loadEntries.mockRejectedValueOnce(new Error('entry reload failed'));

@@ -1,7 +1,10 @@
 /**
  * Polls the partner tracking portals and stores new positions.
  *
- * Runs every 2 hours. Registration is scripts/cron-portal-tracking.sh, which
+ * The cron fires every 10 minutes; each provider/account decides whether its
+ * own tick is due from fleet_tracking_watermarks.poll_interval_minutes, so the
+ * real cadence is data and not this file. Registration is
+ * scripts/cron-portal-tracking.sh, which
  * resolves the secret and port from the deploy dir's env file — Vercel crons do
  * not fire for this systemd-hosted app:
  *
@@ -22,6 +25,7 @@ import { log } from '@/lib/logger';
 import { pool } from '@/lib/db-pool';
 import { configuredProviders, pollProvider } from '@/services/tracking/pollProvider';
 import { alertRecipientCount } from '@/services/tracking/alerts';
+import { runSilenceCheck } from '@/services/tracking/silence';
 
 /** Distinct from poll-tracking's 4417301 so the two never block each other. */
 const LOCK_KEY = 4417302;
@@ -64,6 +68,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       results.push(await pollProvider(entry));
     }
 
+    // Once per tick, not inside the loop above: pollProvider runs once PER
+    // PROVIDER, but this assesses the whole fleet against check-ins, so a
+    // per-provider call would evaluate every vehicle twice on a two-provider
+    // tick. A broken silence check must not take the ingestion run down with
+    // it — same reasoning as the alert dispatch it feeds.
+    let silentTrackers = 0;
+    try {
+      silentTrackers = (await runSilenceCheck(new Date())).silent;
+    } catch (err) {
+      log.error('[poll-portal-tracking] silence check failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     // providersConfigured makes "nothing to do" distinguishable from "nothing
     // happened": a 0 here is the visible half of the log.warn in
     // configuredProviders(). alertRecipients does the same for the alerting
@@ -76,7 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
     return apiResponse.success(res, {
-      providersConfigured: providers.length, alertRecipients, results,
+      providersConfigured: providers.length, alertRecipients, results, silentTrackers,
     });
   } finally {
     let unlockFailed = false;

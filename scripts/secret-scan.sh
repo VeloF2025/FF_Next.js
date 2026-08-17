@@ -106,6 +106,45 @@ esac
 # (Deliberately described rather than shown: an assignment-shaped example here
 # is itself caught by the rule below, as this file's own gate demonstrated.)
 #
+# The five documentation words -- example, sample, dummy, fake, placeholder --
+# carry a LEADING `\b` only, deliberately asymmetric, and for the opposite reason
+# to `test[-_]` above. `TEST_PASSWORD` names a fixture in the KEY, so that term
+# is anchored to an assignment. These five are normally the placeholder VALUE
+# itself (`API_TOKEN="sample-token"`), so anchoring them to a key position would
+# discard every real documentation placeholder -- 858 tracked files mention
+# "example" alone (`git grep -lIi example`, case-insensitive, whole repo).
+# A leading boundary keeps those and drops the case that mattered: a
+# generated secret that merely CONTAINS one of the words mid-token, e.g. a
+# password of the form Kx9mQ2<word>Tn7Lp, which exempted itself.
+#
+# No TRAILING `\b`, and that is load-bearing rather than an oversight: a real
+# placeholder often continues into a word character (`exampleValue123`,
+# `sample-token`), and secret-scan.test.mjs asserts those stay exempt. Adding a
+# trailing boundary breaks that test.
+#
+# All five were fixed together. Doing `example` alone left four identical
+# bypasses behind a test name that read as if the class were closed.
+#
+# ACCEPTED COST, recorded here rather than pinned as a test: a credential-named
+# key whose quoted value glues an ordinary word onto one of these five -- so the
+# word is preceded by a word character rather than a boundary -- flips from
+# exempt to FLAGGED. Measured as dormant: a `--tree` audit is
+# byte-identical before and after, and no tracked line has a credential-shaped
+# assignment with one of these words preceded by a word character. If that shape
+# ever does appear and the right answer is to exempt it, loosen the anchor
+# knowingly -- and re-read the CONTAINS tests first, because the obvious loosening
+# reopens the bug this fixed. It is documented instead of tested on purpose: a
+# test asserting `mysamplevalue` MUST flag would fossilise a judgement call, and
+# the detection behaviour is already pinned from the other direction.
+#
+# STILL OPEN, deliberately: a word at the START of a value, or after punctuation,
+# still exempts -- `API_TOKEN="example1234..."`, and inside a URI's userinfo
+# (`postgresql://user:example9f8e@host`). The URI case is the more realistic of
+# the two, because prefixing a real secret with a descriptive word is an
+# authoring habit rather than a coincidence, and a Postgres URI is issue #1830's
+# own shape. It wants the URI rule's per-rule $4 exact-match exclusion rather
+# than a change to this global list -- see the note on that rule below.
+#
 # NOT here: an exclusion for a placeholder connection URI. Adding userinfo
 # placeholder terms to this list was a REGRESSION, because PLACEHOLDER is
 # applied to the matched span of EVERY rule — so a value that merely CONTAINED
@@ -117,7 +156,7 @@ esac
 #
 # (Described rather than shown, again: a concrete example here is itself matched
 # by the URI rule below. This file cannot safely quote the things it detects.)
-PLACEHOLDER='\byour\b|your_|example|placeholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|dummy|fake|sample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|(^|[+[:space:]"'"'"'{(,])test[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub'
+PLACEHOLDER='\byour\b|your_|\bexample|\bplaceholder|change[ _-]?me|x{4,}|<[^>]*>|REDACTED|\bhere\b|\bdummy|\bfake|\bsample|\.\.\.|\\n|\$\{|\$\(|=[[:space:]]*['"'"'"]?\$|process\.env|env\.|getenv|credentials\.local|(^|[+[:space:]"'"'"'{(,])test[-_][A-Za-z0-9_]*[[:space:]]*[:=]|\bmock|\bstub'
 
 HITS=""
 add_hits() { # $1 = pattern, $2 = label, $3 = "cs" for case-SENSITIVE,

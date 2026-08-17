@@ -95,6 +95,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'Name is required');
   }
 
+  // A location is required: expected quantities and stock adjustments are scoped
+  // to it, and a location-less take cannot be approved.
+  if (!data.location_id) {
+    return apiResponse.badRequest(res, 'A location is required to create a stock take');
+  }
+
   // Generate reference number
   const refResult = await sql`SELECT generate_stock_take_reference() as ref`;
   const referenceNumber = refResult[0]!.ref;

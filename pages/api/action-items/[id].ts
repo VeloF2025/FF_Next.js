@@ -2,6 +2,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import {
+  actionItemVisibility,
+  resolveActionItemAccess,
+} from '@/lib/actionItems/meetingAccess';
+import pool from '@/lib/db';
 import { ActionItemUpdateInput } from '@/types/action-items.types';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
@@ -12,8 +18,50 @@ async function handler(
 ) {
   const { id } = req.query;
 
-  if (!id || typeof id !== 'string') {
+  // action_items.id is a uuid. Checking the shape here keeps a malformed id a 404 rather
+  // than an "invalid input syntax for type uuid" exception — a 500 plus a log line per
+  // request, from a value the caller controls.
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!id || typeof id !== 'string' || !UUID.test(id)) {
     return apiResponse.validationError(res, { id: 'Invalid action item ID' });
+  }
+
+  // Gate every method BEFORE the method branches. Reading one item by id was the widest
+  // hole in this module: knowing an id was enough to read the verbatim description and
+  // transcript_url of any meeting, and PATCH and DELETE had no check at all — any
+  // authenticated user could edit or destroy any of the 5,230 rows.
+  //
+  // Writes use a STRICTER rule than reads. The read rule lets you see an operational item
+  // that belongs to no meeting, because no attendance claim can be made about it either
+  // way; that is not a reason to let you edit or delete one. Reusing the read rule for
+  // PATCH and DELETE would have handed every user destructive rights over all 324
+  // procurement and hs_audit_overdue rows.
+  //
+  // An inaccessible item answers 404, identical to a missing one. 403 would confirm the id
+  // exists, which is the one bit an enumerating caller actually wants.
+  const resolved = resolveActionItemAccess((req as AuthenticatedNextApiRequest).user);
+  if ('error' in resolved) return apiResponse.forbidden(res, resolved.error);
+
+  const isWrite = req.method === 'PATCH' || req.method === 'DELETE';
+
+  try {
+    const params: unknown[] = [id];
+    const visible = await pool.query(
+      `SELECT 1 FROM action_items ai
+        WHERE ai.id = $1
+          AND ${actionItemVisibility(resolved.access, params, 'ai', { forWrite: isWrite })}
+        LIMIT 1`,
+      params,
+    );
+    if (visible.rowCount === 0) {
+      return apiResponse.notFound(res, 'Action item', id);
+    }
+  } catch (error: unknown) {
+    log.error('Action item access check failed', {
+      module: 'action-items',
+      error: (error as Error).message,
+    });
+    return apiResponse.internalError(res, error);
   }
 
   // GET - Fetch single action item

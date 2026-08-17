@@ -10,6 +10,16 @@ import { postGrnReceiptLines, type GrnLine } from '@/services/procurement/postGr
 
 interface ConfirmRequest { grnId: string; notes?: string; }
 
+/** A concurrent confirm already moved the GRN out of draft/receiving. */
+class GrnConflictError extends Error {
+  constructor(message: string) { super(message); this.name = 'GrnConflictError'; }
+}
+
+/** Confirming this GRN would receive more than the PO line ordered. */
+class OverReceiptError extends Error {
+  constructor(message: string) { super(message); this.name = 'OverReceiptError'; }
+}
+
 export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
 
@@ -41,11 +51,12 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     if (!grn.warehouse_id) return apiResponse.badRequest(res, 'GRN has no destination warehouse');
 
     const grnItems = await query<{
-      stock_item_id: string | null; quantity_received: number; quantity_rejected: number;
+      stock_item_id: string | null; po_item_id: string | null;
+      quantity_received: number; quantity_rejected: number;
       lot_number: string | null; item_code: string | null; item_description: string | null;
       uom: string | null; unit_cost: number | null; serial_numbers: unknown; total_cost: number | null;
     }>(
-      `SELECT stock_item_id, quantity_received, quantity_rejected, lot_number, item_code, item_description,
+      `SELECT stock_item_id, po_item_id, quantity_received, quantity_rejected, lot_number, item_code, item_description,
               uom, unit_cost, serial_numbers, total_cost
          FROM goods_receipt_items WHERE grn_id = $1`, [grnId]);
 
@@ -68,6 +79,16 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     }));
 
     const { movementId, totalAccepted } = await transaction(async (txn) => {
+      // Re-check status under a row lock: the pre-check above is outside the
+      // transaction, so two concurrent confirms could both pass it and both post.
+      // FOR UPDATE serializes them; the loser sees 'completed' and aborts (409).
+      const lockedGrn = await txn.query<{ status: string }>(
+        `SELECT status FROM goods_receipt_notes WHERE id = $1 FOR UPDATE`, [grnId]);
+      if (!lockedGrn[0] || !['draft', 'receiving'].includes(lockedGrn[0].status)) {
+        throw new GrnConflictError(
+          `GRN ${grn.grn_number} is already being processed or completed`);
+      }
+
       const mvRows = await txn.query<{ id: string }>(
         `INSERT INTO stock_movements (id, project_id, movement_type, reference_number, reference_type, reference_id,
             from_location, to_location, status, movement_date, confirmed_at, requested_by, processed_by, notes, source_type)
@@ -105,9 +126,51 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         vendorsLocationId: vendors.id,
       });
 
+      // Write received quantities back to the PO lines and block over-receipt.
+      // Aggregate accepted (received - rejected) per PO line, then lock each line,
+      // reject if cumulative received would exceed ordered, and update.
+      const acceptedByPoItem = new Map<string, number>();
+      for (const it of grnItems) {
+        if (!it.po_item_id) continue;
+        const accepted = Number(it.quantity_received || 0) - Number(it.quantity_rejected || 0);
+        if (accepted <= 0) continue;
+        acceptedByPoItem.set(it.po_item_id, (acceptedByPoItem.get(it.po_item_id) ?? 0) + accepted);
+      }
+      for (const [poItemId, accepted] of acceptedByPoItem) {
+        const poLine = await txn.query<{ quantity_ordered: number; quantity_received: number; item_code: string | null }>(
+          `SELECT quantity_ordered, quantity_received, item_code
+             FROM purchase_order_items WHERE id = $1 FOR UPDATE`, [poItemId]);
+        const line = poLine[0];
+        if (!line) {
+          // GRN item references a PO line that no longer exists: stock still
+          // posts (that path keys on stock_item_id), but the receipt goes
+          // untracked against the PO. Surface it rather than silently skipping.
+          log.warn('GRN item references a missing PO line; skipping PO write-back', {
+            grnId, poItemId, module: 'procurement:grn-confirm' });
+          continue;
+        }
+        const ordered = Number(line.quantity_ordered) || 0;
+        const newReceived = (Number(line.quantity_received) || 0) + accepted;
+        if (ordered <= 0) {
+          // ordered 0/NULL means the over-receipt cap can't be enforced for this
+          // line — almost always a data problem, not an intentional "no limit".
+          log.warn('PO line has no ordered quantity; over-receipt not enforced', {
+            grnId, poItemId, itemCode: line.item_code, module: 'procurement:grn-confirm' });
+        }
+        if (ordered > 0 && newReceived > ordered) {
+          throw new OverReceiptError(
+            `Receipt exceeds the ordered quantity for ${line.item_code || 'a PO line'}: ` +
+            `${newReceived} received vs ${ordered} ordered. Adjust the GRN quantities.`);
+        }
+        await txn.query(
+          `UPDATE purchase_order_items SET quantity_received = $2, updated_at = NOW() WHERE id = $1`,
+          [poItemId, newReceived]);
+      }
+
       await txn.query(
         `UPDATE goods_receipt_notes SET status = 'completed', total_quantity_received = $2,
-            verified_by = $3, verified_at = NOW(), updated_at = NOW() WHERE id = $1`,
+            verified_by = $3, verified_at = NOW(), updated_at = NOW()
+          WHERE id = $1 AND status IN ('draft', 'receiving')`,
         [grnId, totalAccepted, userId || 'system'],
       );
 
@@ -145,6 +208,12 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       },
     });
   } catch (error) {
+    if (error instanceof GrnConflictError) {
+      return apiResponse.conflict(res, error.message);
+    }
+    if (error instanceof OverReceiptError) {
+      return apiResponse.badRequest(res, error.message);
+    }
     log.error('Failed to confirm GRN', { grnId, error, module: 'procurement:grn-confirm' });
     return apiResponse.databaseError(res, error, 'Failed to confirm GRN');
   }

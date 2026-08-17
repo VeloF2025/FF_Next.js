@@ -33,6 +33,10 @@ const sql = neon(process.env.DATABASE_URL!);
  * Send a notification to one or more users.
  * Creates in-app records and dispatches to email/WA based on preferences.
  * Non-blocking — errors are logged, never thrown to callers.
+ *
+ * Because it never throws, the returned {@link NotifyResult} is a caller's ONLY
+ * evidence that anything happened. Read its docblock before trusting
+ * `delivered`: it is deliberately narrower than "a human was notified".
  */
 export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
   const {
@@ -48,10 +52,10 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
 
   if (!recipient_user_ids || recipient_user_ids.length === 0) {
     log.warn('notify() called with no recipients', { event_type }, 'NotificationBus');
-    return { accepted_recipients: 0, suppressed_recipients: 0, failed_recipients: 0 };
+    return { delivered: 0, suppressed: 0, failed: 0 };
   }
 
-  const result: NotifyResult = { accepted_recipients: 0, suppressed_recipients: 0, failed_recipients: 0 };
+  const result: NotifyResult = { delivered: 0, suppressed: 0, failed: 0 };
 
   const icon = payload.icon || EVENT_ICONS[event_type] || 'bell';
   const severity = payload.severity || EVENT_SEVERITY[event_type] || 'info';
@@ -64,19 +68,24 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
         try {
           claimed = await claimNotification(userId, event_type, payload.idempotency_key);
         } catch (err) {
-          result.failed_recipients += 1;
+          result.failed += 1;
           log.error('Notification idempotency claim failed', {
             userId, event_type, error: err instanceof Error ? err.message : String(err),
           }, 'NotificationBus');
           continue;
         }
         if (!claimed) {
-          result.suppressed_recipients += 1;
+          result.suppressed += 1;
           continue;
         }
         claimedIdempotencyKey = payload.idempotency_key;
       }
       const channels = await getEffectiveChannels(userId, event_type);
+      // Whether any channel was actually acted on for this recipient. A user
+      // who has muted all three gets nothing written and nothing dispatched, so
+      // counting them as delivered would repeat the overstatement this result
+      // exists to end.
+      let dispatched = false;
 
       // Always create in-app notification if enabled
       let notificationId: string | null = null;
@@ -95,6 +104,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
           RETURNING id
         `;
         notificationId = result[0]?.id || null;
+        dispatched = true;
       }
 
       // Fire-and-forget email delivery
@@ -104,6 +114,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
             userId, event_type, error: err instanceof Error ? err.message : String(err),
           }, 'NotificationBus')
         );
+        dispatched = true;
       }
 
       // Fire-and-forget WhatsApp delivery
@@ -113,8 +124,19 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
             userId, event_type, error: err instanceof Error ? err.message : String(err),
           }, 'NotificationBus')
         );
+        dispatched = true;
       }
-      result.accepted_recipients += 1;
+
+      // Counted as delivered only if a channel was actually acted on, which is
+      // master's rule and the stricter of the two: the previous idempotency work
+      // incremented an `accepted` counter here unconditionally, so a recipient
+      // who had muted every channel was reported as reached. The claim taken
+      // above is deliberately NOT released in that case — nothing was sent, but
+      // a retry would send nothing either, so consuming the key is correct.
+      if (dispatched) result.delivered += 1;
+      else log.warn('notify() reached a user with every channel muted', {
+        userId, event_type,
+      }, 'NotificationBus');
     } catch (err) {
       if (claimedIdempotencyKey) {
         try {
@@ -127,12 +149,13 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
           }, 'NotificationBus');
         }
       }
-      result.failed_recipients += 1;
+      result.failed += 1;
       log.error('notify() failed for user', {
         userId, event_type, error: err instanceof Error ? err.message : String(err),
       }, 'NotificationBus');
     }
   }
+
   return result;
 }
 

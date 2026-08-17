@@ -37,8 +37,29 @@ export async function createPicking(
       projectId, jobReference, jobType,
       contractorId, contractorName, teamName,
       technicianId, technicianName, scheduledDate,
-      notes, lines,
+      notes, lines, idempotencyKey,
     } = req.body;
+
+    // ── Idempotency check ──────────────────────────────────────────────────────
+    // The offline PWA queue retries the whole submit chain on a network blip; the
+    // same client-generated key on a replay must return the existing picking
+    // instead of creating a duplicate (and issuing the stock twice). Mirrors the
+    // returns flow (migration 359 / returns/_create.ts).
+    const idempotencyValue =
+      idempotencyKey && typeof idempotencyKey === 'string' && idempotencyKey.trim() !== ''
+        ? idempotencyKey
+        : null;
+    if (idempotencyValue) {
+      const existing = await sql`
+        SELECT * FROM stock_pickings WHERE idempotency_key = ${idempotencyValue} LIMIT 1
+      `;
+      if (existing[0]) {
+        log.warn('pickings.create.idempotent_replay', {
+          idempotencyKey: idempotencyValue, pickingId: existing[0].id,
+        }, 'field-stock');
+        return apiResponse.success(res, existing[0]);
+      }
+    }
 
     if (!sourceLocationId) {
       return apiResponse.validationError(res, { sourceLocationId: 'Source location is required' });
@@ -77,22 +98,47 @@ export async function createPicking(
     const nonSerialLines = (lines as PickingLine[]).filter(
       (l) => !Array.isArray(l.serialIds) || l.serialIds.length === 0,
     );
+
+    // Positive quantity for EVERY quantity-based line, regardless of picking
+    // type. Previously only 'issue' was checked, so a transfer/scrap/receipt/
+    // return line could carry a negative plannedQuantity — at process time the
+    // source decrement (`quantity - $qty`) becomes an increment, fabricating
+    // stock at the source and destroying it at the destination.
+    const badQty = nonSerialLines.find(
+      (l) => typeof l.plannedQuantity !== 'number' || !(l.plannedQuantity > 0),
+    );
+    if (badQty) {
+      return apiResponse.badRequest(
+        res,
+        'Quantity must be greater than zero for non-serial lines',
+        { plannedQuantity: 'Quantity must be greater than zero for non-serial lines' },
+      );
+    }
+
+    // Duplicate-line guard: two lines for the same item (and lot) each pass the
+    // per-line availability check independently against the same on-hand, then
+    // both decrement at process time — driving stock negative. Reject duplicates;
+    // the client should combine them into one line.
+    const seenItems = new Set<string>();
+    for (const l of nonSerialLines) {
+      if (!l.stockItemId) continue;
+      const key = `${l.stockItemId}|${l.lotNumber ?? ''}`;
+      if (seenItems.has(key)) {
+        return apiResponse.badRequest(
+          res,
+          'Duplicate stock item in picking lines; combine them into a single line',
+          { code: 'DUPLICATE_PICKING_LINE' },
+        );
+      }
+      seenItems.add(key);
+    }
+
     if ((pickingType ?? null) === 'issue' && nonSerialLines.length > 0) {
       if (!proofPhotoKey) {
         return apiResponse.badRequest(
           res,
           'A proof photo is required when issuing non-serial stock',
           { proofPhotoKey: 'A proof photo is required when issuing non-serial stock' },
-        );
-      }
-      const badQty = nonSerialLines.find(
-        (l) => typeof l.plannedQuantity !== 'number' || !(l.plannedQuantity > 0),
-      );
-      if (badQty) {
-        return apiResponse.badRequest(
-          res,
-          'Quantity must be greater than zero for non-serial lines',
-          { plannedQuantity: 'Quantity must be greater than zero for non-serial lines' },
         );
       }
     }
@@ -179,10 +225,17 @@ export async function createPicking(
     const resolvedSerialIds = serialCheck.resolvedSerialIds ?? new Map<string, string>();
     // ── End serial availability check ────────────────────────────────────────
 
-    // Generate picking number
-    const countResult = await sql`SELECT COUNT(*) as count FROM stock_pickings`;
-    const count = countResult[0] ? Number(countResult[0].count || 0) : 0;
-    const pickingNumber = `PCK-${String(count + 1).padStart(6, '0')}`;
+    // Generate the picking number via the race-safe SQL function (migration 028),
+    // which draws from an atomic sequence (nextval) — the old COUNT(*)+1 could
+    // let two concurrent creates compute the same number and collide on the
+    // picking_number unique constraint (500). Numbers are type-prefixed, e.g.
+    // ISS-YYYYMM-##### / TRF-… (legacy pickings keep their PCK-###### numbers;
+    // nothing in the codebase parses the format, and lists order by created_at).
+    // Pass the raw type (null when absent) so the function's prefix matches the
+    // stored picking_type: a typeless picking gets the PKG- fallback, not a
+    // misleading ISS-.
+    const numResult = await sql`SELECT generate_picking_number(${pickingType || null}) AS num`;
+    const pickingNumber = numResult[0]?.num as string;
 
     // Create picking header
     const pickingResult = await sql`
@@ -194,7 +247,8 @@ export async function createPicking(
         technician_id, technician_name,
         scheduled_date, status, notes,
         created_by_staff_id,
-        proof_photo_key, proof_photo_url
+        proof_photo_key, proof_photo_url,
+        idempotency_key
       ) VALUES (
         ${pickingNumber}, ${pickingType || null},
         ${sourceLocationId}, ${destinationLocationId},
@@ -203,7 +257,8 @@ export async function createPicking(
         ${technicianId || null}, ${resolvedTechnicianName},
         ${scheduledDate || null}, 'draft', ${notes || null},
         ${createdByStaffId},
-        ${proofPhotoKey || null}, ${proofPhotoUrl || null}
+        ${proofPhotoKey || null}, ${proofPhotoUrl || null},
+        ${idempotencyValue}
       )
       RETURNING *
     `;

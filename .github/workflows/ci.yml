@@ -53,6 +53,22 @@ jobs:
       - name: Secret scan — unit tests
         run: node --test scripts/secret-scan.test.mjs
 
+      # The pre-push hook, which invokes that scanner as one of three guards. It
+      # is tested here for the same reason: two of its guards fail silently if a
+      # loop runs in a subshell or a ref shape is mishandled, and a blind review
+      # found `git push --delete` being rejected as an "auth isolation
+      # violation" — a routine operation blocked by a security gate, naming the
+      # wrong cause. Cheap: spawns bash against throwaway repos, no deps.
+      - name: Pre-push hook — unit tests
+        run: node --test scripts/pre-push.test.mjs
+
+      # The one-command setup that points git at the tracked hooks. Its failure
+      # mode is reporting success while the hooks would not actually run — a
+      # non-executable hook is skipped by git SILENTLY, and a config set against
+      # an unsupported git is ignored. Both are asserted.
+      - name: Hook setup — unit tests
+        run: node --test scripts/install-hooks.test.mjs
+
       # --branch scans lines ADDED between the merge-base and HEAD, so it cannot
       # trip on the repo's pre-existing hits (there are known ones; `--tree` is
       # the audit mode and is deliberately not gated).
@@ -420,6 +436,22 @@ jobs:
       # Requires docker on the runner.
       - name: Zone delivery DB tests — real Postgres (gate)
         run: npm run test:db:zone-delivery
+        timeout-minutes: 15
+
+      # Action-item visibility DB tests — same rationale as the zone-delivery step above:
+      # the guarantee exists ONLY at this layer. Mutation testing during review showed the
+      # unit suite is blind to the mutations that matter. Pushing an extra `TRUE` arm into
+      # actionItemVisibility, dropping the sub-select correlation `m_acc.id = ai.meeting_id`,
+      # or replacing the participant match with `IS NOT NULL` each leave all 42 unit tests
+      # green while taking a caller from their own rows to every action item in the table.
+      # All three preserve the generated SQL's substrings and its parenthesis depth, so no
+      # assertion on the query TEXT can catch them — only executing the predicate and
+      # comparing the row set can, which needs a database.
+      #
+      # Blocking, and spins its own throwaway Postgres on an EPHEMERAL port
+      # (tests/db/setup/global-setup.ts) — never the shared dev+prod database.
+      - name: Action item visibility DB tests — real Postgres (gate)
+        run: npm run test:db:action-items
         timeout-minutes: 15
 
       - name: Clean up this run's zone delivery test container

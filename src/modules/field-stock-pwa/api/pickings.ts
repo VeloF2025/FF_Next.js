@@ -36,7 +36,10 @@ import type { PwaIssueDraft, PwaPickingResult } from '../types';
  * Any failed step throws (surfaced as an inline error in the UI) rather than
  * returning a misleading "issued" result for a picking still sitting in draft.
  */
-export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResult> {
+export async function submitIssue(
+  draft: PwaIssueDraft,
+  idempotencyKey?: string,
+): Promise<PwaPickingResult> {
   const isSerialIssue = draft.serials.length > 0;
   const body = {
     pickingType: 'issue',
@@ -48,6 +51,9 @@ export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResul
     notes: draft.notes || undefined,
     proofPhotoKey: draft.proofPhotoKey,
     proofPhotoUrl: draft.proofPhotoUrl,
+    // Stable per draft (the offline-queue item id): a retry after a network blip
+    // dedupes server-side to the same picking instead of issuing stock twice.
+    idempotencyKey,
     lines: [
       {
         stockItemId: draft.stockItemId,
@@ -58,7 +64,9 @@ export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResul
     ],
   };
 
-  // 1. Create the picking (draft).
+  // 1. Create the picking. On an idempotent replay the server returns the
+  //    EXISTING picking, whose status tells us which steps already ran — so we
+  //    resume the chain rather than re-running (and re-issuing) completed steps.
   const picking = await request<{
     id: string;
     picking_number: string;
@@ -68,13 +76,22 @@ export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResul
     body: JSON.stringify(body),
   });
   const base = `/api/my/stores/pickings/${picking.id}`;
+  const status = picking.status;
+
+  // Already fully processed on a prior attempt → nothing left to do.
+  if (status !== 'draft' && status !== 'confirmed') {
+    return { pickingId: picking.id, pickingNumber: picking.picking_number, status: 'processed' };
+  }
 
   // 2. Confirm (draft → confirmed). process() rejects anything not 'confirmed'.
-  await request<unknown>(`${base}/confirm`, { method: 'POST', body: '{}' });
+  if (status === 'draft') {
+    await request<unknown>(`${base}/confirm`, { method: 'POST', body: '{}' });
+  }
 
   // 3. Persist the technician's signature. signedBy is the technician's staff
   //    UUID (not a name): process() reads stock_pickings.signed_by as the
   //    lifecycle-event actor and casts it to uuid, so a name would break it.
+  //    Signing is idempotent (overwrites), so it's safe to repeat on a replay.
   if (draft.signatureDataUrl) {
     await request<unknown>(`${base}/sign`, {
       method: 'POST',

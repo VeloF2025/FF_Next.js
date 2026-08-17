@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# 2-hourly partner-portal tracking poll (Netstar).
+# Partner-portal tracking poll (Netstar + Cartrack portal).
+# The CRON fires every 10 minutes; the actual per-account cadence lives in
+# fleet_tracking_watermarks.poll_interval_minutes and a not-due tick returns
+# before any portal call. Do not infer the poll rate from this file.
 #
 # Calls pages/api/cron/poll-portal-tracking.ts on localhost. The secret is read
 # from the deploy dir's env file at run time and passed as a header, so it never
 # appears in the crontab, in `ps`, or in this file.
 #
 # Install on velo (times are SAST — velo cron runs in local time):
-#   0 */2 * * * /home/velo/fibreflow-production/scripts/cron-portal-tracking.sh >> /home/velo/logs/poll-portal-tracking.log 2>&1
+#   */10 * * * * /home/velo/fibreflow-production/scripts/cron-portal-tracking.sh >> /home/velo/logs/poll-portal-tracking.log 2>&1
 #
 # One tick is bounded to ~25 minutes by the client's runtime budget, so a
 # degenerate portal cannot run past the next tick and strand the advisory lock.

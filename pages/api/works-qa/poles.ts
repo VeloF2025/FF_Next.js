@@ -29,11 +29,49 @@ const PRESENT_SLOTS_EXPR = `ARRAY_REMOVE(ARRAY[
         ${SLOT_META.map(s => `CASE WHEN ${s.dbColumn} IS NOT NULL THEN '${s.key}' END`).join(',\n        ')}
       ], NULL)`;
 
+/** Upper bound on a paged request. Above this, ask for another page. */
+const MAX_PAGE_SIZE = 500;
+
+/**
+ * Optional paging, off by default.
+ *
+ * Returning every pole is correct for the UI, which wants the whole board — but the
+ * response is ~76 KB for a mid-size project, and ANY consumer with a response ceiling
+ * silently receives a prefix and cannot tell. That is not hypothetical: read through the
+ * MCP connector (15,000-char cap), a 124-pole project came back as its first ~24 poles,
+ * and two label ranges from the same list were reported as two disagreeing systems.
+ *
+ * So: no `limit` → the historic bare array, byte-for-byte. With `limit` → an object
+ * carrying `total`, so a truncated read is impossible to mistake for a complete one.
+ */
+function parsePaging(
+  req: NextApiRequest,
+): { limit: number; offset: number } | null | { error: string } {
+  const raw = req.query.limit;
+  if (raw === undefined) return null; // unpaged: preserve the existing contract
+
+  const limit = Number(Array.isArray(raw) ? raw[0] : raw);
+  if (!Number.isInteger(limit) || limit < 1) {
+    return { error: `limit must be a positive integer — got "${raw}"` };
+  }
+
+  const offsetRaw = req.query.offset ?? req.query.page_offset;
+  const offset = offsetRaw === undefined ? 0 : Number(Array.isArray(offsetRaw) ? offsetRaw[0] : offsetRaw);
+  if (!Number.isInteger(offset) || offset < 0) {
+    return { error: `offset must be a non-negative integer — got "${offsetRaw}"` };
+  }
+
+  return { limit: Math.min(limit, MAX_PAGE_SIZE), offset };
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   const { project_id, zone_no, pon_no } = req.query;
   if (!project_id || typeof project_id !== 'string') return apiResponse.badRequest(res, 'project_id required');
+
+  const paging = parsePaging(req);
+  if (paging && 'error' in paging) return apiResponse.badRequest(res, paging.error);
 
   try {
     const params: (string | number)[] = [project_id];
@@ -143,7 +181,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
       return a.pole_label.localeCompare(b.pole_label);
     });
-    return apiResponse.success(res, summaries);
+
+    if (!paging) return apiResponse.success(res, summaries);
+
+    // Sliced AFTER the union and sort, not in SQL: the two row sources are merged in JS,
+    // so a per-query LIMIT would page each source separately and interleave wrongly.
+    // This bounds the RESPONSE, which is the thing that was silently truncating.
+    const page = summaries.slice(paging.offset, paging.offset + paging.limit);
+    return apiResponse.success(res, {
+      poles: page,
+      total: summaries.length,
+      returned: page.length,
+      offset: paging.offset,
+      hasMore: paging.offset + page.length < summaries.length,
+    });
   } catch (err) {
     log.error('works-qa/poles', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);

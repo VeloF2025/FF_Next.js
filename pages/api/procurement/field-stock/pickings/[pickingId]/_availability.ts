@@ -55,9 +55,16 @@ export async function validateStockAvailability(
   };
   for (const line of lines) {
     if (!line || !line.stock_item_id) continue;
+    // Lot-scoped: check the exact lot this line draws from (or the bulk/null-lot
+    // row), matching how the custody and transfer paths decrement. Without the
+    // lot filter a lot-tracked item with multiple lots at one location would take
+    // an arbitrary lot's quantity here (quants[0]) yet the decrement would hit a
+    // specific lot — an availability check that doesn't match what's decremented.
     const quants = await txn.query<StockQuantRow>(
-      `SELECT quantity FROM stock_quants WHERE stock_item_id = $1 AND location_id = $2 FOR UPDATE`,
-      [line.stock_item_id, sourceLocationId],
+      `SELECT quantity FROM stock_quants
+        WHERE stock_item_id = $1 AND location_id = $2 AND COALESCE(lot_number, '') = COALESCE($3, '')
+        FOR UPDATE`,
+      [line.stock_item_id, sourceLocationId, line.lot_number ?? null],
     );
     if (quants.length === 0) {
       errors[line.stock_item_id] =

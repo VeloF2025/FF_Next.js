@@ -302,6 +302,13 @@ export function CreatePickingForm({
                 </option>
               ))}
             </select>
+            {!loadingLocations && getLocationsByType('destination').length === 0 && (
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                No active destination locations for a &ldquo;{pickingType}&rdquo; transfer. For
+                site-to-site moves choose &ldquo;Transfer Between Locations&rdquo; above; otherwise
+                a location of the required type needs to be activated.
+              </p>
+            )}
           </div>
         </div>
       </div>
