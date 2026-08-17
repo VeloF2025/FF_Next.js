@@ -15,7 +15,7 @@ export type AttendanceNotificationPhase = typeof ATTENDANCE_NOTIFICATION_PHASES[
 export type AttendanceNotificationFailureReason =
   | 'recipient_missing' | 'recipient_ambiguous' | 'recipient_inactive'
   | 'recipient_resolution_failed' | 'candidate_query_failed'
-  | 'notification_bus_invocation_failed' | 'notification_bus_delivered_none'
+  | 'notification_bus_invocation_failed' | 'notification_bus_delivery_failed'
   | 'dispatch_claim_failed'
   | 'dispatch_status_update_failed';
 
@@ -243,10 +243,14 @@ async function dispatch(candidate: Candidate, phase: AttendanceNotificationPhase
     addFailure(report, candidate.sourceKey, 'notification_bus_invocation_failed');
     return;
   }
-  if (result.delivered === 0) {
-    // Leave the dispatch retryable rather than burning the idempotency key.
-    await markFailed(candidate.deliveryKey, 'notification_bus_delivered_none');
-    addFailure(report, candidate.sourceKey, 'notification_bus_delivered_none');
+  if (result.failed > 0) {
+    // Branch on `failed`, not on a delivered count. A recipient with in-app
+    // disabled but WhatsApp enabled records nothing yet may well be reached, so
+    // treating "nothing recorded" as failure would retry a working send forever.
+    // `failed` means the bus could not act at all — the database-outage case.
+    // claimDispatch can re-claim a 'failed' row, so this genuinely retries.
+    await markFailed(candidate.deliveryKey, 'notification_bus_delivery_failed');
+    addFailure(report, candidate.sourceKey, 'notification_bus_delivery_failed');
     return;
   }
   try {

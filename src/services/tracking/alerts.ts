@@ -202,7 +202,11 @@ export interface RaiseAlertDeps {
     source_id?: string;
     recipient_user_ids: string[];
     metadata?: Record<string, unknown>;
-  }) => Promise<void>;
+    // The bus reports per-recipient delivery counts; this consumer does not act
+    // on them, so the return value is deliberately unconstrained rather than
+    // pinned to void — pinning it coupled this interface to the bus's signature
+    // and broke the build when the bus started reporting delivery (#2506).
+  }) => Promise<unknown>;
   recipients: () => Promise<string[]>;
 }
 

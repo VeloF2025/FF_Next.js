@@ -43,9 +43,18 @@ interface ChannelPrefRow extends Record<string, unknown> {
  */
 export interface NotifyResult {
   recipients: number;
-  /** Recipients whose in-app record was written (or who had in-app disabled). */
-  delivered: number;
-  /** Recipients whose notification could not be recorded at all. */
+  /**
+   * Recipients whose in-app record was written. NOT a delivery guarantee, and
+   * deliberately not the signal callers should accept on: a recipient with
+   * in-app disabled and WhatsApp enabled is counted 0 here even though the
+   * message may well arrive. Use `failed` to decide whether a run went wrong.
+   */
+  recorded: number;
+  /**
+   * Recipients the bus could do nothing for — the in-app write threw. This is
+   * the honest failure signal: it is what a database outage looks like, and it
+   * is what a caller recording delivery state must branch on.
+   */
   failed: number;
 }
 
@@ -54,8 +63,9 @@ export interface NotifyResult {
  * Creates in-app records and dispatches to email/WA based on preferences.
  * Never throws — errors are logged and reported through the returned counts.
  *
- * `delivered` reflects the in-app record only. Email and WhatsApp remain
- * fire-and-forget, so a non-zero `delivered` does not promise those landed.
+ * Email and WhatsApp remain fire-and-forget, so no counter here promises they
+ * landed. `failed` is the only trustworthy signal, and it means "the bus could
+ * not act for this recipient at all".
  */
 export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
   const {
@@ -71,13 +81,13 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
 
   if (!recipient_user_ids || recipient_user_ids.length === 0) {
     log.warn('notify() called with no recipients', { event_type }, 'NotificationBus');
-    return { recipients: 0, delivered: 0, failed: 0 };
+    return { recipients: 0, recorded: 0, failed: 0 };
   }
 
   const icon = payload.icon || EVENT_ICONS[event_type] || 'bell';
   const severity = payload.severity || EVENT_SEVERITY[event_type] || 'info';
 
-  let delivered = 0;
+  let recorded = 0;
   let failed = 0;
 
   for (const userId of recipient_user_ids) {
@@ -120,7 +130,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
           }, 'NotificationBus')
         );
       }
-      delivered += 1;
+      if (channels.in_app) recorded += 1;
     } catch (err) {
       failed += 1;
       log.error('notify() failed for user', {
@@ -129,7 +139,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
     }
   }
 
-  return { recipients: recipient_user_ids.length, delivered, failed };
+  return { recipients: recipient_user_ids.length, recorded, failed };
 }
 
 // =============================================================================

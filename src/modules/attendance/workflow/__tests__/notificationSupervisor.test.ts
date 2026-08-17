@@ -48,7 +48,7 @@ function installDb(fixture: DbFixture = {}) {
     }
     throw new Error(`Unexpected SQL: ${text}`);
   });
-  mocks.notify.mockResolvedValue({ recipients: 1, delivered: 1, failed: 0 });
+  mocks.notify.mockResolvedValue({ recipients: 1, recorded: 1, failed: 0 });
   return { claims, sql };
 }
 

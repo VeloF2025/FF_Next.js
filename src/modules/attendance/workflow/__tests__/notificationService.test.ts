@@ -50,7 +50,14 @@ function installDb(fixture: DbFixture = {}) {
     if (/INSERT INTO attendance_notification_dispatches/i.test(text)) {
       const key = String(params[0]);
       order.push(`claim:${key}`);
-      if (claims.has(key)) return [];
+      // Interpret the ACTUAL conflict clause rather than hardcoding the
+      // expected behaviour — a mock that reimplements the reclaim would keep
+      // passing if production reverted to DO NOTHING, which is precisely the
+      // regression this suite exists to catch.
+      const reclaimable = /ON CONFLICT \(delivery_key\) DO UPDATE/i.test(text)
+        && /status = 'failed'/i.test(text)
+        && statuses.get(key) === 'failed';
+      if (claims.has(key) && !reclaimable) return [];
       claims.add(key);
       statuses.set(key, 'claimed');
       return [{ delivery_key: key }];
@@ -66,7 +73,7 @@ function installDb(fixture: DbFixture = {}) {
     // The bus reports per-recipient delivery; dispatch only marks a notification
     // `accepted` when at least one recipient landed (#2506).
     const recipients = payload.recipient_user_ids?.length ?? 1;
-    return Promise.resolve({ recipients, delivered: recipients, failed: 0 });
+    return Promise.resolve({ recipients, recorded: recipients, failed: 0 });
   });
   return { claims, statuses, sql, order };
 }
@@ -108,7 +115,11 @@ describe('worker attendance notifications', () => {
     expect(state.statuses.get(key)).toBe('accepted');
     expect(state.order.indexOf(`claim:${key}`)).toBeLessThan(state.order.indexOf('notify:attendance.clockout_due'));
     const claimSql = state.sql.find((text) => /INSERT INTO attendance_notification_dispatches/i.test(text));
-    expect(claimSql).toMatch(/ON CONFLICT \(delivery_key\) DO NOTHING/i);
+    // Was DO NOTHING, which made a failed dispatch as terminal as an accepted
+    // one. The reclaim must stay scoped to 'failed' so a concurrent run still
+    // cannot steal an in-flight 'claimed' row or re-send a delivered one.
+    expect(claimSql).toMatch(/ON CONFLICT \(delivery_key\) DO UPDATE/i);
+    expect(claimSql).toMatch(/WHERE attendance_notification_dispatches\.status = 'failed'/i);
     expect(claimSql).toMatch(/RETURNING delivery_key/i);
     expect(left.accepted + right.accepted).toBe(1);
     expect(left.skipped + right.skipped).toBe(1);
@@ -212,19 +223,60 @@ describe('worker attendance notifications', () => {
     expect(state.statuses.values().next().value).toBe('failed');
   });
 
-  it('records failed when the bus delivers to nobody', async () => {
+  it('retries a previously failed dispatch on the next run', async () => {
+    // The claim the earlier fix asserted in a comment but never proved. Without
+    // the reclaim, delivery_key is a bare primary key and a failed dispatch is
+    // as permanently dead as an accepted one — the notification is lost, not
+    // retried, and the status label is the only thing that changes.
+    const state = installDb({
+      clockout: [{ entry_id: ENTRY, staff_id: STAFF, work_date: '2026-08-03' }],
+      staffUsers: { [STAFF]: [ACTIVE_USER] },
+    });
+    const when = { phase: 'clockout' as const, now: new Date('2026-08-03T15:00:00Z') };
+
+    mocks.notify.mockResolvedValue({ recipients: 1, recorded: 0, failed: 1 });
+    const first = await runAttendanceNotifications(when);
+    expect(first).toMatchObject({ claimed: 1, accepted: 0, failed: 1 });
+    expect(state.statuses.values().next().value).toBe('failed');
+
+    // Bus recovers.
+    mocks.notify.mockResolvedValue({ recipients: 1, recorded: 1, failed: 0 });
+    const second = await runAttendanceNotifications(when);
+
+    expect(second).toMatchObject({ claimed: 1, accepted: 1, failed: 0, skipped: 0 });
+    expect(state.statuses.values().next().value).toBe('accepted');
+  });
+
+  it('does not re-send an already accepted dispatch', async () => {
+    // The other half: the reclaim must not reopen a delivered notification.
+    const state = installDb({
+      clockout: [{ entry_id: ENTRY, staff_id: STAFF, work_date: '2026-08-03' }],
+      staffUsers: { [STAFF]: [ACTIVE_USER] },
+    });
+    const when = { phase: 'clockout' as const, now: new Date('2026-08-03T15:00:00Z') };
+    mocks.notify.mockResolvedValue({ recipients: 1, recorded: 1, failed: 0 });
+
+    await runAttendanceNotifications(when);
+    mocks.notify.mockClear();
+    const second = await runAttendanceNotifications(when);
+
+    expect(second).toMatchObject({ claimed: 0, accepted: 0, skipped: 1 });
+    expect(mocks.notify).not.toHaveBeenCalled();
+    expect(state.statuses.values().next().value).toBe('accepted');
+  });
+
+  it('records failed when the bus reports a failed recipient', async () => {
     // The production shape of #2506: notify() resolves (it never throws) but
     // every recipient failed, because the bus could not reach the database.
     const state = installDb({
       clockout: [{ entry_id: ENTRY, staff_id: STAFF, work_date: '2026-08-03' }],
       staffUsers: { [STAFF]: [ACTIVE_USER] },
     });
-    mocks.notify.mockResolvedValue({ recipients: 1, delivered: 0, failed: 1 });
+    mocks.notify.mockResolvedValue({ recipients: 1, recorded: 0, failed: 1 });
 
     const report = await runAttendanceNotifications({ phase: 'clockout', now: new Date('2026-08-03T15:00:00Z') });
 
     expect(report).toMatchObject({ claimed: 1, accepted: 0, failed: 1 });
-    // Left retryable rather than burnt.
     expect(state.statuses.values().next().value).toBe('failed');
   });
 
