@@ -219,9 +219,10 @@ function union(filter: PhotoFilter): Clause {
   const qf = qfieldQuery(filter, params);
   if (!withWorksQa) return { sql: `${qa.sql} UNION ALL ${qf.sql}`, params };
   const wq = worksQaQuery(filter, params);
-  // UNION ALL, then DISTINCT ON the key below: the ~102 construction-QA rows whose
-  // storage_key starts with `projects/` are the same objects as rows in the QField
-  // corpus, and a duplicate here becomes a photo downloaded twice.
+  // UNION ALL, then DISTINCT ON the version id below. The overlap between the
+  // construction-QA and QField corpora is not the ~102 rows whose storage_key happens to
+  // start with `projects/` — it is 29,287, because copyQFieldPhotoToStorage gives the
+  // same object a second, local key. See DEDUPE_KEY.
   return { sql: `${qa.sql} UNION ALL ${qf.sql} UNION ALL ${wq.sql}`, params };
 }
 
@@ -235,8 +236,32 @@ function union(filter: PhotoFilter): Clause {
  * step label, no zone, no PON and no file size; works-QA carries a step label AND a VLM
  * verdict. The richer row wins by rank, not by accident of clock.
  */
-const DEDUPE = 'DISTINCT ON (storage_key)';
-const DEDUPE_ORDER = 'ORDER BY storage_key, corpus_rank, captured_at DESC NULLS LAST';
+/**
+ * Dedupe on the object VERSION, not the key.
+ *
+ * `copyQFieldPhotoToStorage` rewrites a QField key into a local one, so one physical
+ * photo lives in two corpora under two different keys and `DISTINCT ON (storage_key)`
+ * kept both. The comment above once claimed only ~102 rows overlapped; measured on live
+ * data it is 29,287 — every one of the 29,290 versioned construction-QA photos shares a
+ * version id with a QField row. A `source=both` search and the download manifest were
+ * returning each of them twice.
+ *
+ *   cqa : mamelodi/MAM.P.A383/v20260319102739-e5aee617
+ *   qpv : projects/2ce80264-…/DCIM/civil-audit_20260319121813445.jpg/v20260319102739-e5aee617
+ *
+ * The trailing `v<14-digit timestamp>-<hash>` is MinIO's version id and is what the two
+ * keys genuinely share. It is unambiguous: across all three corpora no version id maps
+ * to two distinct photos (checked live — construction-QA 34,322 version ids, QField
+ * 58,875, works-QA 7,797, zero ambiguous). The single works-QA version id that did map
+ * to two keys is this very bug — the same photo under a QField path and a local one.
+ *
+ * Keys with no version id (4,629 works-QA rows) fall back to the whole key, so they
+ * dedupe exactly as before rather than all collapsing onto one empty segment.
+ */
+const DEDUPE_KEY =
+  "CASE WHEN storage_key ~ '/v[0-9]{14}-' THEN split_part(storage_key, '/', -1) ELSE storage_key END";
+const DEDUPE = `DISTINCT ON (${DEDUPE_KEY})`;
+const DEDUPE_ORDER = `ORDER BY ${DEDUPE_KEY}, corpus_rank, captured_at DESC NULLS LAST`;
 
 /**
  * Rows for one page, newest first.
