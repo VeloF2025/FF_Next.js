@@ -147,8 +147,9 @@ through explicit filters. Operational loading/error state is independent: a fail
 existing Dashboard/Map and last successful operational data with an explicit stale/error warning;
 it is never rendered as all clear.
 
-`GET /api/fleet/operations/map-overlay` adds optional `staffId`, `siteId`, and scoped
-`includeGeometry`. It returns authorized operational badge rows, minimum authorized Attendance-only
+`GET /api/fleet/operations/map-overlay` requires ISO `workDate` and `asOf`, bounded pagination,
+and at least one narrow UUID selection (`projectId`, `staffId`, or `siteId`); it adds optional
+`staffId`, `siteId`, and scoped `includeGeometry`. It returns authorized operational badge rows, minimum authorized Attendance-only
 points, selected required-site geometry, evidence/status timestamps, unplottable rows, and
 evaluation metadata; it never returns raw provider payloads, unrelated geometry, contact details,
 or out-of-scope evidence. PMs remain limited to owned projects, while authorized
