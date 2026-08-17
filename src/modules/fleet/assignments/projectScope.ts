@@ -42,6 +42,50 @@ async function canAccessAssignmentProject(
   return project.project_manager === userId || project.project_manager === staffId;
 }
 
+/**
+ * Every active project the actor may act on, in one pass.
+ *
+ * Semantically identical to calling canAccessAssignmentProject for each active
+ * project, but at a fixed 3 queries instead of 3 per project: the options
+ * endpoint looped over an unbounded `projects WHERE status = 'active'` and paid
+ * a permission lookup, a project lookup and an overrides lookup for every row.
+ *
+ * Kept in this file so the two cannot drift apart — the allow/deny rules below
+ * must stay a mirror of canAccessAssignmentProject.
+ */
+export async function authorizedAssignmentProjectIds(
+  userId: string,
+  staffId: string | null,
+  role: string,
+  action: 'view' | 'edit',
+): Promise<string[]> {
+  if (!await userHasPermission(userId, 'fleet.assignments', action)) return [];
+
+  const projects = await query<ProjectScopeRow & { id: string }>(`
+    /* fleet-assignments:active-project-scope-batch */
+    SELECT id, project_manager
+    FROM projects
+    WHERE status = 'active'`);
+  if (!projects.length) return [];
+  if (role === 'super_admin' || role === 'admin') return projects.map((project) => project.id);
+
+  const oversightGrants = await query<OversightGrantRow>(`
+    /* fleet-assignments:oversight-grant */
+    SELECT id
+    FROM user_permission_overrides
+    WHERE user_id = $1::uuid
+      AND permission_key = 'fleet.assignments'
+      AND override_type = 'grant'
+      AND actions->>$2 = 'true'
+      AND (expires_at IS NULL OR expires_at > NOW())
+    LIMIT 1`, [userId, action]);
+  if (oversightGrants.length > 0) return projects.map((project) => project.id);
+
+  return projects
+    .filter((project) => project.project_manager === userId || project.project_manager === staffId)
+    .map((project) => project.id);
+}
+
 export function canViewAssignmentProject(
   userId: string,
   staffId: string | null,

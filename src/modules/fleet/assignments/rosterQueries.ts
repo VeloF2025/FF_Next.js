@@ -171,6 +171,26 @@ export async function listAssignmentOptions(
     : authorizedProjectIds;
   if (!projectIds.length) return { staff: [], teams: [], projects: [], sites: [], vehicles: [], siteSources: [] };
 
+  // Deliberately asymmetric scoping, recorded because it looks like an
+  // oversight and is not:
+  //
+  //   projects / sites / vehicles — scoped to authorizedProjectIds ($1).
+  //   staff / teams / siteSources — company-wide, on purpose.
+  //
+  // staff and teams cannot be narrowed without breaking the feature: the point
+  // of the picker is to assign someone who is NOT yet on the project, so
+  // filtering to people already assigned to an authorized project would make it
+  // impossible to add anyone new.
+  //
+  // siteSources has no scoping key to narrow BY — neither fno_atlas_project_aois
+  // nor fleet_authorized_locations carries a project column; they are a global
+  // catalogue that project-site mappings point INTO.
+  //
+  // The disclosure this accepts: anyone with view on at least one active project
+  // can enumerate active staff names, active non-contractor team names, and the
+  // AOI/authorized-location catalogue. Names and site codes only — no ID
+  // numbers, licence numbers, contact details or geometry. If that ever needs to
+  // close, it needs a real staff-visibility model, not a filter here.
   const rows = await query<{
     staff: AssignmentOption[] | null; teams: AssignmentOption[] | null; projects: AssignmentOption[] | null; sites: AssignmentOption[] | null; vehicles: AssignmentOption[] | null; site_sources: AssignmentSourceOption[] | null;
   }>(`
