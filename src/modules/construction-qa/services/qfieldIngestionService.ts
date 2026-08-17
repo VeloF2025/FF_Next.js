@@ -47,7 +47,7 @@ const FEATURE_TYPE_DISCIPLINE: Record<string, { discipline: Discipline; featureT
  * be registered for extraction and silently absent here — which is how the five entries
  * above went missing. `__tests__/qfieldProjectMap.test.ts` now cross-checks this map
  * against the Python registry and fails when they diverge. It covers the 13 entries the
- * registry knows about; the other 8 here have no registry counterpart and are checked
+ * registry knows about; the other 6 here have no registry counterpart and are checked
  * only for duplicate keys, so the DB audit below is still the wider net.
  *
  * Two reasons the DB cannot simply replace this map today:

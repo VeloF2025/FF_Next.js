@@ -17,8 +17,8 @@ import { describe, expect, it } from 'vitest';
  * database, but CI has no access to it. Comparing the two in-repo copies catches the
  * drift that actually occurred and needs nothing but the filesystem.
  *
- * Coverage is PARTIAL and the gap matters: the registry knows 13 of the map's 21
- * entries, so the other 8 (the four original *Pole Audit* projects, MAM offline,
+ * Coverage is PARTIAL and the gap matters: the registry knows 13 of the map's 19
+ * entries, so the other 6 (the four original *Pole Audit* projects, MAM offline,
  * ETWpoc1 and anything else map-only) are checked here for duplicate keys and nothing
  * else. A wrong-but-well-formed UUID on one of those passes. Only a query against
  * `qfield_projects` ⋈ `qfield_project_links` catches those, and CI has no DB.
@@ -64,7 +64,11 @@ function registry(): Array<{ name: string; qf: string; ff: string }> {
   const body = sliceBetween(readFileSync(REGISTRY, 'utf8'), 'PROJECTS = {', 'ALTERNATE_GPKGS');
   const blocks = body.matchAll(
     new RegExp(
-      `"([^"]+)":\\s*\\{[^}]*?"qf_project_id":\\s*"(${UUID})"[^}]*?"ff_project_id":\\s*"(${UUID})"`,
+      // Quote class is ["'] throughout: Python accepts either, the file happens to use
+      // double and no linter pins that. A single-quoted block would otherwise be
+      // invisible — and invisibly ADDED, which the exact count above cannot catch
+      // because the parsed total would still equal REGISTRY_ENTRY_COUNT.
+      `["']([^"']+)["']:\\s*\\{[^}]*?["']qf_project_id["']:\\s*["'](${UUID})["'][^}]*?["']ff_project_id["']:\\s*["'](${UUID})["']`,
       'gs',
     ),
   );
