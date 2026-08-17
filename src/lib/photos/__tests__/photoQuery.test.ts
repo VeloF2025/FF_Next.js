@@ -213,8 +213,14 @@ describe('query construction', () => {
     const { sql } = pageQuery(filter());
     expect(sql).toContain('WINDOW dategroup AS (PARTITION BY');
     expect(sql).not.toContain('first_value');
-    expect(sql).not.toMatch(/dategroup AS \([^)]*ORDER BY/);
     expect(sql).toContain('WHEN max(captured_at) OVER dategroup IS NULL THEN date_basis');
+    // Read the window clause off its own line rather than with a regex: the partition
+    // expression contains `)`, so a `[^)]*` pattern stops before ever reaching an
+    // ORDER BY and is true by construction — an assertion that reads like a guard and
+    // can never fail.
+    const windowClause = sql.split('\n').find((l) => l.includes('WINDOW dategroup AS ('));
+    expect(windowClause).toBeDefined();
+    expect(windowClause).not.toContain('ORDER BY');
   });
 
   it('sorts the page by recency outside the DISTINCT ON, not by key', () => {
