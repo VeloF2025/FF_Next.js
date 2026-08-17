@@ -286,7 +286,18 @@ export async function raiseTrackingAlert(
       title,
       body: `${input.provider}/${input.accountRef}: ${input.detail}`,
       source_module: 'fleet',
-      source_id: `${input.provider}:${input.accountRef}`,
+      // NO source_id. `user_notifications.source_id` is a UUID column, and this
+      // used to pass `${provider}:${accountRef}` — e.g. "cartrack:urent" — so
+      // EVERY fleet tracking alert died at the insert with
+      //   invalid input syntax for type uuid: "cartrack:urent"
+      // Silently: NotificationBus logs the per-user failure and resolves anyway
+      // rather than rethrowing, so raiseTrackingAlert saw success. Failures ran
+      // from 2026-08-08 to 2026-08-17 with zero fleet.tracking rows ever
+      // reaching user_notifications, while the table itself took 17k others.
+      // A tracker/provider pair has no UUID to give, and does not need one —
+      // provider and accountRef are already in `metadata` below, and
+      // source_module 'fleet' carries the grouping. Do not reintroduce this
+      // field with a composite key.
       recipient_user_ids: recipients,
       metadata: {
         provider: input.provider,
