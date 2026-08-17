@@ -169,6 +169,33 @@ describe('raiseTrackingAlert', () => {
     lastGapAlertAt: null,
   };
 
+  it('never sends a non-UUID source_id — the column is uuid, so a composite key kills the insert', async () => {
+    // Regression guard. This used to pass `${provider}:${accountRef}` — e.g.
+    // "netstar:europcar" — into user_notifications.source_id, which is a UUID
+    // column. Every fleet tracking alert died at the insert with
+    //   invalid input syntax for type uuid: "cartrack:urent"
+    // and NOT ONE reached a human between 2026-08-08 and 2026-08-17. It was
+    // invisible because NotificationBus logs the per-user failure and resolves
+    // rather than rethrowing, so raiseTrackingAlert still reported delivered.
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const payloads: Record<string, unknown>[] = [];
+    const notify = vi.fn(async (p: Record<string, unknown>) => { payloads.push(p); });
+
+    for (const kind of ['auth', 'gap', 'transient'] as const) {
+      await raiseTrackingAlert(
+        { ...base, kind, consecutiveFailures: 5 },
+        { notify, recipients: async () => ['u1'] }
+      );
+    }
+
+    expect(payloads.length).toBeGreaterThan(0);
+    for (const p of payloads) {
+      if (p.source_id !== undefined && p.source_id !== null) {
+        expect(String(p.source_id)).toMatch(UUID);
+      }
+    }
+  });
+
   it('does not notify when the policy says stay silent, and reports nothing delivered', async () => {
     const notify = vi.fn();
     const result = await raiseTrackingAlert(
