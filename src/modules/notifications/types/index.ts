@@ -67,6 +67,35 @@ export interface NotifyPayload {
   wa_message?: string;
 }
 
+/**
+ * What notify() reports back about a dispatch.
+ *
+ * Read `delivered` narrowly. It counts recipients for whom notify() got as far
+ * as handing the notification to at least one channel without throwing: the
+ * in-app INSERT is synchronous, so its success is genuinely known, but email
+ * and WhatsApp are dispatched fire-and-forget with `.catch()` handlers, so for
+ * a recipient reached only on those channels this means "dispatched", never
+ * "a human received it".
+ *
+ * What it does mean, reliably, is that `delivered === 0` proves nobody was
+ * reached — which is the question that matters. `notify()` catches per-recipient
+ * failures and resolves regardless (deliberately: a broken mail server must not
+ * take a caller's run down), so before these counters existed callers could only
+ * observe "the promise resolved" and read it as success. Fleet tracking alerts
+ * died at the in-app INSERT for nine days that way while reporting delivery, and
+ * the reported success stamped a 24h cooldown that suppressed the retries.
+ *
+ * `delivered + failed` can be less than `recipient_user_ids.length`: a recipient
+ * who has muted every channel had nothing written and nothing dispatched, so it
+ * is not a delivery, and nothing broke, so it is not a failure either.
+ */
+export interface NotifyResult {
+  /** Recipients whose synchronous delivery work completed without throwing. */
+  delivered: number;
+  /** Recipients whose delivery threw (already logged per-user). */
+  failed: number;
+}
+
 /** Notification preference row from DB */
 export interface NotificationPreference {
   user_id: string;

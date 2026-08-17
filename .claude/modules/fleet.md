@@ -80,7 +80,7 @@ Four guards, all of which report rather than fail silently:
 3. **Never take over from another provider.** `uq_fleet_trackers_one_active_per_vehicle` is
    fleet-wide, and `setVehicleTracker`'s deactivate is `WHERE vehicle_id = $1 AND is_active`
    with no provider predicate — so mapping a vehicle Cartrack already tracks switches the
-   Cartrack row off, silently downgrading it from a 2-minute feed to a 2-hourly scrape with
+   Cartrack row off, silently downgrading it from a 2-minute feed to the slower portal scrape with
    nothing to map it back. Vehicles tracked elsewhere are skipped and reported as
    `coverage.alreadyTrackedElsewhere` (which also means somebody is paying for two
    subscriptions).
@@ -145,7 +145,7 @@ chunks (Netstar: 31 days) until retention is discovered by two consecutive empty
 npx tsx scripts/backfill-tracking.ts --provider=netstar --floor=2024-08-01
 ```
 
-Safe to run alongside the 2-hourly poll: it only appends positions and never touches
+Safe to run alongside the portal poll: it only appends positions and never touches
 `fleet_vehicle_trackers`, so it cannot race the poll's reconcile.
 
 **Interrupting is safe for the database, not for the portal.** Every write goes through
@@ -183,7 +183,7 @@ The endpoint is inert until it is in velo's crontab. Registration wrapper resolv
 and port from the deploy dir's env file:
 
 ```
-0 */2 * * * /home/velo/fibreflow-<env>/scripts/cron-portal-tracking.sh >> /home/velo/logs/poll-portal-tracking.log 2>&1
+*/10 * * * * /home/velo/fibreflow-<env>/scripts/cron-portal-tracking.sh >> /home/velo/logs/poll-portal-tracking.log 2>&1
 ```
 
 One tick is bounded to ~25 minutes by the client's runtime budget. Without it, a degenerate
@@ -572,9 +572,18 @@ so reconcile/ingest/watermark/alerting are identical across providers.
 
 So `waap_id` (WAF pass) and `PassEnc` (login token) are separate, and each maps
 to a different repair. The ASP.NET `Iweb_SSID` cookie is **not** required and is
-deliberately not sent. Session is minted fresh per run and never persisted — at
-a 2-hourly cadence a ~5s mint is not worth caching, and nothing portal-shaped
+deliberately not sent. Session is minted fresh per run and never persisted — the ~5s mint was judged
+not worth caching at the original 2-hourly cadence, and nothing portal-shaped
 ever lands in the database.
+
+⚠️ THAT PREMISE NOW BINDS. Each mint is a full Playwright launch through
+Ituran's WAF, so the mint rate IS the challenge rate. On 2026-08-17 avis was
+moved to a 10-minute interval and tripped the bot challenge ~80 minutes
+later — `bot challenge did not clear — login form never appeared` — and the
+cadence breaker auto-demoted it 10 → 30, where it recovered. 30 minutes is
+the observed ceiling for this account; netstar and cartrack/urent run fine at
+10 because neither re-authenticates per tick. Caching the session is the
+change that would lift avis's ceiling — until then, do not re-raise it.
 
 **Three mint traps, each of which cost an attempt:**
 1. `channel: 'chromium'` is required — Playwright's default headless *shell* is
@@ -603,7 +612,7 @@ future, poisoning the watermark.
 later polls send a timestamp plus `OnlyDifferences` **and map bounds** — copying
 that shape silently drops every vehicle outside the rectangle you happened to send.
 
-Cron: `30 */2 * * *` via `scripts/cron-ituran-tracking.sh`, offset from the
+Cron: `5,15,25,35,45,55 * * * *` via `scripts/cron-ituran-tracking.sh`, offset from the
 Netstar poll. Env: `ITURAN_PORTAL_USER`, `ITURAN_PORTAL_PASS`, optional
 `ITURAN_PORTAL_URL` / `ITURAN_ACCOUNT_REF` (default `avis`).
 
@@ -630,7 +639,13 @@ the counter, and those can self-heal.
 
 **Budget:** 3 to open, then ≤1 probe/day, stopping at 12 — about 12 vendor
 attempts over nine days, leaving ~8 of Cartrack's 20 unspent. Unthrottled, a
-2-hourly cron spends all 20 in under two days.
+10-minute cron would spend all 20 in under four hours.
+
+That budget is CADENCE-INDEPENDENT, which is why tightening the poll interval
+does not bring a lockout closer: the 3-failure threshold is a count of
+consecutive failures, and `AUTH_PROBE_COOLDOWN_MS` is 24h of WALL CLOCK, not a
+tick count. At 10 minutes the breaker merely opens sooner (30 min rather than
+6 hours) — it does not spend more attempts.
 
 **Clearing a hard-stop** (fix the credential in the env file FIRST, or the next
 probe just re-arms it):

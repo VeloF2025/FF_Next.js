@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { notify } from '@/modules/notifications/services/notificationBus';
-import type { NotifyResult } from '@/modules/notifications/services/notificationBus';
+import type { NotifyResult } from '@/modules/notifications/types';
 import type { NotifyPayload } from '@/modules/notifications/types';
 import { getPeriodReadiness } from './periodQueries';
 import {
@@ -244,7 +244,7 @@ async function dispatch(candidate: Candidate, phase: AttendanceNotificationPhase
   // Await the bus and inspect the result. This used to fire-and-forget and then
   // swallow the rejection (`void invocation.catch(() => undefined)`) before
   // marking the dispatch `accepted`. Combined with notify() never throwing, no
-  // delivery failure could ever be recorded: a run against an unreachable
+  // delivery failure could ever be delivered: a run against an unreachable
   // database reported accepted=16 with zero notifications sent, and those
   // idempotency keys would have stopped a later, working run from retrying
   // them (#2506).
@@ -258,7 +258,7 @@ async function dispatch(candidate: Candidate, phase: AttendanceNotificationPhase
   if (result.failed > 0) {
     // Branch on `failed`, not on a delivered count. A recipient with in-app
     // disabled but WhatsApp enabled records nothing yet may well be reached, so
-    // treating "nothing recorded" as failure would retry a working send forever.
+    // treating "nothing delivered" as failure would retry a working send forever.
     // `failed` means the bus could not act at all — the database-outage case.
     // claimDispatch can re-claim a 'failed' row, so this genuinely retries.
     await markFailed(candidate.deliveryKey, 'notification_bus_delivery_failed');

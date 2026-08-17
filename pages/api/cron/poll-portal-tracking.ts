@@ -1,7 +1,10 @@
 /**
  * Polls the partner tracking portals and stores new positions.
  *
- * Runs every 2 hours. Registration is scripts/cron-portal-tracking.sh, which
+ * The cron fires every 10 minutes; each provider/account decides whether its
+ * own tick is due from fleet_tracking_watermarks.poll_interval_minutes, so the
+ * real cadence is data and not this file. Registration is
+ * scripts/cron-portal-tracking.sh, which
  * resolves the secret and port from the deploy dir's env file — Vercel crons do
  * not fire for this systemd-hosted app:
  *

@@ -15,13 +15,17 @@ import {
 } from '../constants';
 import type {
   NotifyPayload,
+  NotifyResult,
   UserNotification,
   ChannelPreferences,
 } from '../types';
 import { deliverEmail } from './emailDelivery';
 import { deliverWhatsApp } from './whatsappDelivery';
 
-/** Row shape of the notification_preferences lookup. */
+/**
+ * Row shape of the notification_preferences lookup. The Neon client returned
+ * `any`, so these were implicitly untyped until the driver swap.
+ */
 interface ChannelPrefRow extends Record<string, unknown> {
   channel_in_app: boolean;
   channel_email: boolean;
@@ -34,38 +38,13 @@ interface ChannelPrefRow extends Record<string, unknown> {
 // =============================================================================
 
 /**
- * Outcome of a notify() call, per recipient.
- *
- * notify() still never throws — callers that ignore the return value behave
- * exactly as before. But a caller that records delivery state MUST inspect it:
- * a failure here used to be invisible, so an attendance dispatch was marked
- * `accepted` while every recipient had failed (#2506).
- */
-export interface NotifyResult {
-  recipients: number;
-  /**
-   * Recipients whose in-app record was written. NOT a delivery guarantee, and
-   * deliberately not the signal callers should accept on: a recipient with
-   * in-app disabled and WhatsApp enabled is counted 0 here even though the
-   * message may well arrive. Use `failed` to decide whether a run went wrong.
-   */
-  recorded: number;
-  /**
-   * Recipients the bus could do nothing for — the in-app write threw. This is
-   * the honest failure signal: it is what a database outage looks like, and it
-   * is what a caller recording delivery state must branch on.
-   */
-  failed: number;
-}
-
-/**
  * Send a notification to one or more users.
  * Creates in-app records and dispatches to email/WA based on preferences.
- * Never throws — errors are logged and reported through the returned counts.
+ * Non-blocking — errors are logged, never thrown to callers.
  *
- * Email and WhatsApp remain fire-and-forget, so no counter here promises they
- * landed. `failed` is the only trustworthy signal, and it means "the bus could
- * not act for this recipient at all".
+ * Because it never throws, the returned {@link NotifyResult} is a caller's ONLY
+ * evidence that anything happened. Read its docblock before trusting
+ * `delivered`: it is deliberately narrower than "a human was notified".
  */
 export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
   const {
@@ -81,18 +60,22 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
 
   if (!recipient_user_ids || recipient_user_ids.length === 0) {
     log.warn('notify() called with no recipients', { event_type }, 'NotificationBus');
-    return { recipients: 0, recorded: 0, failed: 0 };
+    return { delivered: 0, failed: 0 };
   }
 
   const icon = payload.icon || EVENT_ICONS[event_type] || 'bell';
   const severity = payload.severity || EVENT_SEVERITY[event_type] || 'info';
-
-  let recorded = 0;
+  let delivered = 0;
   let failed = 0;
 
   for (const userId of recipient_user_ids) {
     try {
       const channels = await getEffectiveChannels(userId, event_type);
+      // Whether any channel was actually acted on for this recipient. A user
+      // who has muted all three gets nothing written and nothing dispatched, so
+      // counting them as delivered would repeat the overstatement this result
+      // exists to end.
+      let dispatched = false;
 
       // Always create in-app notification if enabled
       let notificationId: string | null = null;
@@ -111,6 +94,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
           RETURNING id
         `;
         notificationId = result[0]?.id || null;
+        dispatched = true;
       }
 
       // Fire-and-forget email delivery
@@ -120,6 +104,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
             userId, event_type, error: err instanceof Error ? err.message : String(err),
           }, 'NotificationBus')
         );
+        dispatched = true;
       }
 
       // Fire-and-forget WhatsApp delivery
@@ -129,8 +114,13 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
             userId, event_type, error: err instanceof Error ? err.message : String(err),
           }, 'NotificationBus')
         );
+        dispatched = true;
       }
-      if (channels.in_app) recorded += 1;
+
+      if (dispatched) delivered += 1;
+      else log.warn('notify() reached a user with every channel muted', {
+        userId, event_type,
+      }, 'NotificationBus');
     } catch (err) {
       failed += 1;
       log.error('notify() failed for user', {
@@ -139,7 +129,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
     }
   }
 
-  return { recipients: recipient_user_ids.length, recorded, failed };
+  return { delivered, failed };
 }
 
 // =============================================================================
