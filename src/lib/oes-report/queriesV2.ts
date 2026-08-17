@@ -166,6 +166,22 @@ export async function loadPpActivatedOnListRows(): Promise<LinkedAwaitingRow[]> 
       -- supersedes. resolution_status is never moved off 'activated' (migration
       -- 377's CHECK has no terminal member), so without this a superseded serial
       -- keeps appearing on the PP — Linked sheet as though it were still live.
+      --
+      -- Which OTHER readers of resolution_status = 'activated' need this, audited
+      -- rather than assumed, because there is no single authoritative list:
+      --   NEEDS IT  loadFtDisputeLifecycleRows (below) — already had it.
+      --   NEEDS IT  velocity-review candidateRepository — added by this PR.
+      --   MUST NOT  action-centre/overview ppResolvedMonth — counts resolution
+      --             EVENTS in the current month. Filtering would retroactively
+      --             shrink a historical metric as serials are later retired.
+      --   MUST NOT  non-invoiceables/overview resolved/total — those two are a
+      --             partition: status = activated against status != activated.
+      --             Filtering one arm makes retired rows vanish from BOTH and
+      --             the split stops summing to the set.
+      --   N/A       every != / NOT IN reader ("not yet activated"): a retired
+      --             row still reads 'activated', so it is already excluded.
+      --   N/A       stock_serials.pp_resolution_status — different table, no
+      --             decommissioned_at column.
       AND p.decommissioned_at IS NULL
     ORDER BY p.project NULLS LAST, p.date_registered NULLS LAST, p.serial_number
   `);
