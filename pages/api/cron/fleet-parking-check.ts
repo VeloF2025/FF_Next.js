@@ -23,6 +23,8 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { runParkingCheck } from '@/modules/fleet/parking/runParkingCheck';
 import { sastDateString } from '@/modules/fleet/parking/sastDate';
+import { finalizeParkingRun, startParkingRun } from '@/modules/fleet/parking/runQueries';
+import { notifyNewParkingViolations } from '@/modules/fleet/parking/violationNotifications';
 
 /** Equal-length compare in constant time; unequal lengths cannot match anyway. */
 function secretMatches(provided: string | string[] | undefined, expected: string): boolean {
@@ -77,8 +79,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.badRequest(res, resolved.error);
   }
 
+  let runId: string | null = null;
   try {
+    runId = await startParkingRun(sastDateString(resolved.checkAt), new Date());
     const report = await runParkingCheck(resolved.checkAt);
+    const notification = await notifyNewParkingViolations(report);
+    await finalizeParkingRun(runId, {
+      status: report.errors === 0 && notification.warnings === 0 ? 'succeeded' : 'partial_failure',
+      evaluatedCount: report.evaluated,
+      violationCount: report.counts.violation,
+      recordErrorCount: report.errors,
+      notificationWarningCount: notification.warnings,
+    });
     // Log only the summary — `results` is one entry per vehicle (~22/night)
     // and would otherwise flood the log every run.
     log.info('[fleet-parking-check] completed', {
@@ -89,6 +101,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     return apiResponse.success(res, report);
   } catch (error) {
+    if (runId) {
+      try {
+        await finalizeParkingRun(runId, { status: 'failed', evaluatedCount: 0, violationCount: 0, recordErrorCount: 0, notificationWarningCount: 0, errorSummary: error instanceof Error ? error.message.slice(0, 500) : 'Parking check failed' });
+      } catch (finalizeError) {
+        log.error('[fleet-parking-check] failed to finalize failed run', { finalizeError });
+      }
+    }
     log.error('[fleet-parking-check] run failed', { error });
     return apiResponse.internalError(res, error, 'Parking check failed');
   }

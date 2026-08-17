@@ -71,7 +71,7 @@ describe('notify() delivery reporting', () => {
 
     const result = await notify(payload(['11111111-1111-4111-8111-111111111111']));
 
-    expect(result).toEqual({ delivered: 0, failed: 1 });
+    expect(result).toEqual({ delivered: 0, suppressed: 0, failed: 1 });
     expect(loggerMock.error).toHaveBeenCalled();
     // Still no throw: callers depend on that, and this change must not alter it.
   });
@@ -81,7 +81,7 @@ describe('notify() delivery reporting', () => {
 
     const result = await notify(payload(['11111111-1111-4111-8111-111111111111']));
 
-    expect(result).toEqual({ delivered: 1, failed: 0 });
+    expect(result).toEqual({ delivered: 1, suppressed: 0, failed: 0 });
   });
 
   it('counts each recipient separately — one bad row does not hide the good one', async () => {
@@ -95,7 +95,7 @@ describe('notify() delivery reporting', () => {
 
     const result = await notify(payload(['11111111-1111-4111-8111-111111111111', bad]));
 
-    expect(result).toEqual({ delivered: 1, failed: 1 });
+    expect(result).toEqual({ delivered: 1, suppressed: 0, failed: 1 });
   });
 
   it('reports nothing delivered when the payload has no recipients', async () => {
@@ -103,7 +103,7 @@ describe('notify() delivery reporting', () => {
 
     const result = await notify(payload([]));
 
-    expect(result).toEqual({ delivered: 0, failed: 0 });
+    expect(result).toEqual({ delivered: 0, suppressed: 0, failed: 0 });
     expect(mockSql).not.toHaveBeenCalled();
   });
 
@@ -118,7 +118,7 @@ describe('notify() delivery reporting', () => {
 
     const result = await notify(payload(['11111111-1111-4111-8111-111111111111']));
 
-    expect(result).toEqual({ delivered: 0, failed: 0 });
+    expect(result).toEqual({ delivered: 0, suppressed: 0, failed: 0 });
     expect(deliverEmail).not.toHaveBeenCalled();
     expect(deliverWhatsApp).not.toHaveBeenCalled();
   });
@@ -133,7 +133,7 @@ describe('notify() delivery reporting', () => {
 
     const result = await notify(payload(['11111111-1111-4111-8111-111111111111']));
 
-    expect(result).toEqual({ delivered: 1, failed: 0 });
+    expect(result).toEqual({ delivered: 1, suppressed: 0, failed: 0 });
     expect(deliverEmail).toHaveBeenCalledTimes(1);
   });
 });

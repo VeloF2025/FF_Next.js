@@ -448,6 +448,16 @@ The `VehicleCalibrationModal` and `OdometerOverrideModal` use `navigator.mediaDe
 
 ## Overnight Parking Compliance (mig 483, PRs 1–3)
 
+### Operational foundations (migration 487)
+
+- `notification_idempotency_claims` provides opt-in per-recipient notification deduplication.
+- `fleet_parking_check_runs` records `running`, `succeeded`, `partial_failure`, and `failed` nightly executions.
+- New violations notify UUIDs configured in `FLEET_ALERT_USER_IDS`; payloads exclude coordinates and addresses.
+- The deduplication key is `parking-violation:<vehicle-id>:<YYYY-MM-DD>`.
+- The check remains scheduled externally for 20:00 SAST; after 20:30 a missing completion is unhealthy.
+- Health is available at `/api/fleet/parking/health` and shown on the existing `/fleet/parking` page.
+- Deployment must register and verify the server cron separately. Merging code does not mutate crontab.
+
 Nightly job that asks, for every active vehicle at 20:00 SAST: is it where its
 driver declared it parks? PR 2 added the driver-facing declaration, PR 3 the
 approval queue and the results dashboard.

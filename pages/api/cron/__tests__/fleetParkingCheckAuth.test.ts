@@ -2,8 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 const runParkingCheck = vi.fn();
+const startParkingRun = vi.fn();
+const finalizeParkingRun = vi.fn();
+const notifyNewParkingViolations = vi.fn();
 vi.mock('@/modules/fleet/parking/runParkingCheck', () => ({
   runParkingCheck: (...a: unknown[]) => runParkingCheck(...a),
+}));
+vi.mock('@/modules/fleet/parking/runQueries', () => ({
+  startParkingRun: (...a: unknown[]) => startParkingRun(...a),
+  finalizeParkingRun: (...a: unknown[]) => finalizeParkingRun(...a),
+}));
+vi.mock('@/modules/fleet/parking/violationNotifications', () => ({
+  notifyNewParkingViolations: (...a: unknown[]) => notifyNewParkingViolations(...a),
 }));
 
 import handler from '../fleet-parking-check';
@@ -33,6 +43,12 @@ const ORIGINAL_SECRET = process.env.CRON_SECRET;
 beforeEach(() => {
   runParkingCheck.mockReset();
   runParkingCheck.mockResolvedValue(REPORT);
+  startParkingRun.mockReset();
+  startParkingRun.mockResolvedValue('run-1');
+  finalizeParkingRun.mockReset();
+  finalizeParkingRun.mockResolvedValue(undefined);
+  notifyNewParkingViolations.mockReset();
+  notifyNewParkingViolations.mockResolvedValue({ warnings: 0, notifiedViolations: 0 });
   process.env.CRON_SECRET = 'test-secret';
 });
 

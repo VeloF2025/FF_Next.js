@@ -87,6 +87,11 @@ describe('TABS', () => {
     expect(hrefs).toContain('/fleet/import');
   });
 
+  it('exposes the map, parking, requests, and locations routes', () => {
+    const hrefs = allHrefs(TABS);
+    expect(hrefs).toEqual(expect.arrayContaining(['/fleet/map', '/fleet/parking', '/fleet/parking/requests', '/fleet/locations']));
+  });
+
   it('resolves every advertised href to the tab that advertises it', () => {
     // Guards the class of bug this change fixed: a link present in the bar but
     // with no matcher, so clicking it highlights the wrong tab.
