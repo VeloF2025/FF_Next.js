@@ -70,11 +70,21 @@ fi
 
 # ── 1. QField Ingest ──────────────────────────────────────────────────────────
 echo "$LOG_PREFIX [QField] Ingesting all mapped projects..."
+# `|| true` for the same reason PENDING_IDS has one below: under `set -e` a non-zero
+# curl inside a command substitution aborts the WHOLE script, so a slow ingest silently
+# takes the SharePoint and VLM steps with it. That is not hypothetical — the log shows
+# 86 "Cron Start" against 84 "Cron Done". The server keeps working after curl gives up
+# (Node does not abort on client disconnect), so the photos still land; only the rest of
+# the cron is lost, with nothing naming the cause.
+#
+# 600s, not 120s: this call fans out over every mapped project and copies each new photo
+# out of MinIO with a blocking `mc cat` at ~85 ms/object. A backlog of a few thousand
+# photos is minutes of work, and 120s could not cover it.
 QF_RESULT=$(curl -s -X POST "$PROD_URL/api/construction-qa/ingest-qfield" \
   -H "Content-Type: application/json" \
   -H "x-cron-secret: $CRON_SECRET" \
   -d '{}' \
-  --max-time 120)
+  --max-time 600) || QF_RESULT='{"error":"curl failed or timed out — server may still be ingesting"}'
 echo "$LOG_PREFIX [QField] Result: $QF_RESULT"
 
 # ── 2. SharePoint Ingest ─────────────────────────────────────────────────────
