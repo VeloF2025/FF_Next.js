@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   options: vi.fn(), roster: vi.fn(), listSites: vi.fn(), update: vi.fn(), history: vi.fn(),
 }));
+const permissions = vi.hoisted(() => ({ canEditRules: false }));
 
 vi.mock('@/components/layout/AppLayout', () => ({ AppLayout: ({ children }: { children: ReactNode }) => children }));
 vi.mock('@/components/module-page', () => ({ ModulePage: ({ children }: { children: ReactNode }) => children }));
@@ -13,6 +14,8 @@ vi.mock('@/modules/fleet/assignments/web/assignmentApi', () => ({ assignmentApi:
 vi.mock('@/modules/fleet/assignments/web/AssignmentEditor', () => ({ AssignmentEditor: () => null }));
 vi.mock('@/modules/fleet/assignments/web/ProjectSiteManager', () => ({ ProjectSiteManager: () => null }));
 vi.mock('@/modules/fleet/assignments/web/ConflictReview', () => ({ ConflictReview: () => null }));
+vi.mock('@/hooks/usePermission', () => ({ usePermission: () => ({ can: (key: string, action: string) => key === 'fleet.operations-rules' && action === 'edit' && permissions.canEditRules, isLoading: false }) }));
+vi.mock('@/modules/fleet/operations/web/StatusRulesDialog', () => ({ StatusRulesDialog: () => null }));
 vi.mock('@/modules/fleet/assignments/web/AssignmentFilters', () => ({
   AssignmentFilters: ({ onChange }: { onChange: (value: Record<string, unknown>) => void }) =>
     <button onClick={() => onChange({ from: '2026-08-17', to: '2026-08-21', projectId: 'project-1', siteId: 'site-1', source: '', unassignedScheduled: false })}>Choose project</button>,
@@ -38,6 +41,7 @@ async function selectAssignment() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  permissions.canEditRules = false;
   api.options.mockResolvedValue({ staff: [], teams: [], projects: [], sites: [{ id: 'site-1', label: 'Site One', projectId: 'project-1' }, { id: 'site-2', label: 'Site Two', projectId: 'project-1' }], vehicles: [], siteSources: [] });
   api.roster.mockResolvedValue({ items: [assignment], total: 1 });
   api.listSites.mockResolvedValue([]);
@@ -46,6 +50,16 @@ beforeEach(() => {
 });
 
 describe('AssignmentPage manager actions', () => {
+  it('hides Status Rules from users without rule edit permission', () => {
+    render(<AssignmentPage />);
+    expect(screen.queryByRole('button', { name: 'Status Rules' })).not.toBeInTheDocument();
+  });
+
+  it('shows Status Rules to users with rule edit permission', () => {
+    permissions.canEditRules = true; render(<AssignmentPage />);
+    expect(screen.getByRole('button', { name: 'Status Rules' })).toBeInTheDocument();
+  });
+
   it('moves a roster assignment with the manager-entered reason and coverage dates', async () => {
     await selectAssignment();
     fireEvent.change(screen.getByLabelText('Assignment action start date'), { target: { value: '2026-08-19' } });

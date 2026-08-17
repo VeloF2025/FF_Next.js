@@ -1,0 +1,34 @@
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+const mocks = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), oversight: vi.fn(), gates: [] as Array<[string, string]> }));
+vi.mock('@/lib/auth/middleware', () => ({ withAuth: (handler: unknown) => handler, withPermission: (key: string, action: string) => (handler: unknown) => { mocks.gates.push([key, action]); return handler; } }));
+vi.mock('@/modules/fleet/operations/projectScope', () => ({ hasOperationalOversight: mocks.oversight }));
+vi.mock('@/modules/fleet/operations/ruleQueries', async () => { const actual = await vi.importActual<typeof import('@/modules/fleet/operations/ruleQueries')>('@/modules/fleet/operations/ruleQueries'); return { ...actual, createRuleVersion: mocks.create, listRuleVersions: mocks.list }; });
+import handler from '../rules';
+const USER = '11111111-1111-4111-8111-111111111111';
+const body = { timezone: 'Africa/Johannesburg', effectiveFrom: '2099-01-01T00:00:00.000Z', monitoringBeforeMinutes: 30, monitoringAfterMinutes: 30, arrivalDwellMinutes: 5, wrongSiteConfirmationMinutes: 5, earlyDepartureConfirmationMinutes: 10, approachingDistanceMeters: 5000, approachingMinReadings: 2, minimumMovingSpeedKmh: 5, evidenceMismatchToleranceMeters: 250, changeReason: 'Approved calibration' };
+async function call(method: string, requestBody: unknown = body) { const state = { status: 200, body: undefined as unknown, headers: {} as Record<string, string> }; const res = { status(code: number) { state.status = code; return res; }, json(value: unknown) { state.body = value; return res; }, setHeader(name: string, value: string) { state.headers[name] = value; return res; } } as unknown as NextApiResponse; await handler({ method, body: requestBody, query: {}, user: { id: USER, role: 'admin' } } as unknown as NextApiRequest, res); return state; }
+beforeEach(() => { vi.clearAllMocks(); mocks.gates.length = 0; mocks.oversight.mockResolvedValue(true); mocks.create.mockResolvedValue({ version: 2 }); mocks.list.mockResolvedValue([]); });
+describe('operational rules API', () => {
+  it('allows only GET and POST with method-specific permission actions', async () => { const result = await call('PATCH'); expect(result.status).toBe(405); expect(result.headers.Allow).toBe('GET, POST'); expect(mocks.create).not.toHaveBeenCalled(); });
+  it('uses session actor and responds only after creation succeeds', async () => { const result = await call('POST', { ...body, actorUserId: 'attacker' }); expect(result.status).toBe(201); expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ changeReason: body.changeReason }), USER); });
+  it('requires oversight and validates every field including instant and reason', async () => { mocks.oversight.mockResolvedValue(false); expect((await call('POST')).status).toBe(403); mocks.oversight.mockResolvedValue(true); expect((await call('POST', { ...body, changeReason: ' ' })).status).toBe(400); expect((await call('POST', { ...body, effectiveFrom: 'invalid' })).status).toBe(400); expect(mocks.create).not.toHaveBeenCalled(); });
+  it('rejects fewer than two approaching readings at the API boundary', async () => {
+    expect((await call('POST', { ...body, approachingMinReadings: 1 })).status).toBe(400);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it.each(['2099-02-30T00:00:00.000Z', '2099-01-01', 'January 1, 2099'])(
+    'rejects malformed activation instant %s at the API boundary', async (effectiveFrom) => {
+      expect((await call('POST', { ...body, effectiveFrom })).status).toBe(400);
+      expect(mocks.create).not.toHaveBeenCalled();
+    },
+  );
+  it.each(['2099-01-01T00:00:00.000Z', '2099-01-01T02:00:00+02:00'])(
+    'accepts valid future instant %s at the API boundary', async (effectiveFrom) => {
+      expect((await call('POST', { ...body, effectiveFrom })).status).toBe(201);
+      expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ effectiveFrom }), USER);
+    },
+  );
+  it('does not convert transaction failure into success', async () => { mocks.create.mockRejectedValue(new Error('insert failed')); const result = await call('POST'); expect(result.status).toBe(500); expect(result.body).not.toMatchObject({ success: true }); });
+  it('does not convert rule-list database failure into an empty list', async () => { mocks.list.mockRejectedValue(new Error('select failed')); const result = await call('GET'); expect(result.status).toBe(500); expect(result.body).not.toMatchObject({ data: [] }); });
+});

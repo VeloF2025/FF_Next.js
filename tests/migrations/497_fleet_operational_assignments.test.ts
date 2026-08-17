@@ -189,6 +189,15 @@ async function insertDailyOverrideWithoutReason(): Promise<string> {
 beforeAll(async () => {
   await admin.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
   await admin.query(`CREATE SCHEMA ${SCHEMA}`);
+  // Pin btree_gist to public on the admin connection, before the migration's
+  // own `CREATE EXTENSION IF NOT EXISTS` runs under search_path=SCHEMA.
+  // Extensions are database-scoped but belong to ONE schema, so installing it
+  // into the scratch schema means this file's `DROP SCHEMA ... CASCADE` drops
+  // the extension out from under whichever sibling migration test runs next in
+  // the shared container — the EXCLUDE constraints then fail to be created and
+  // the overlap tests stop rejecting. Owning it in public makes the migration's
+  // statement a no-op and decouples it from scratch-schema lifetime.
+  await admin.query('CREATE EXTENSION IF NOT EXISTS btree_gist SCHEMA public');
   await db.query(PREREQUISITES);
   await db.query(FORWARD);
 });
