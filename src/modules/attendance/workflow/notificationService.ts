@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { notify } from '@/modules/notifications/services/notificationBus';
+import type { NotifyResult } from '@/modules/notifications/services/notificationBus';
 import type { NotifyPayload } from '@/modules/notifications/types';
 import { getPeriodReadiness } from './periodQueries';
 import {
@@ -14,7 +15,8 @@ export type AttendanceNotificationPhase = typeof ATTENDANCE_NOTIFICATION_PHASES[
 export type AttendanceNotificationFailureReason =
   | 'recipient_missing' | 'recipient_ambiguous' | 'recipient_inactive'
   | 'recipient_resolution_failed' | 'candidate_query_failed'
-  | 'notification_bus_invocation_failed' | 'dispatch_claim_failed'
+  | 'notification_bus_invocation_failed' | 'notification_bus_delivered_none'
+  | 'dispatch_claim_failed'
   | 'dispatch_status_update_failed';
 
 export interface AttendanceNotificationFailure {
@@ -227,14 +229,26 @@ async function dispatch(candidate: Candidate, phase: AttendanceNotificationPhase
   } catch {
     addFailure(report, candidate.sourceKey, 'dispatch_claim_failed'); return;
   }
-  let invocation: Promise<void>;
-  try { invocation = notify(candidate.payload); }
+  // Await the bus and inspect the result. This used to fire-and-forget and then
+  // swallow the rejection (`void invocation.catch(() => undefined)`) before
+  // marking the dispatch `accepted`. Combined with notify() never throwing, no
+  // delivery failure could ever be recorded: a run against an unreachable
+  // database reported accepted=16 with zero notifications sent, and those
+  // idempotency keys would have stopped a later, working run from retrying
+  // them (#2506).
+  let result: NotifyResult;
+  try { result = await notify(candidate.payload); }
   catch {
     await markFailed(candidate.deliveryKey, 'notification_bus_invocation_failed');
     addFailure(report, candidate.sourceKey, 'notification_bus_invocation_failed');
     return;
   }
-  void invocation.catch(() => undefined);
+  if (result.delivered === 0) {
+    // Leave the dispatch retryable rather than burning the idempotency key.
+    await markFailed(candidate.deliveryKey, 'notification_bus_delivered_none');
+    addFailure(report, candidate.sourceKey, 'notification_bus_delivered_none');
+    return;
+  }
   try {
     await finishDispatch(candidate.deliveryKey, 'accepted', null);
     report.accepted += 1;

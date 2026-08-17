@@ -61,9 +61,12 @@ function installDb(fixture: DbFixture = {}) {
     }
     throw new Error(`Unexpected SQL: ${text}`);
   });
-  mocks.notify.mockImplementation((payload: { event_type: string }) => {
+  mocks.notify.mockImplementation((payload: { event_type: string; recipient_user_ids?: string[] }) => {
     order.push(`notify:${payload.event_type}`);
-    return Promise.resolve();
+    // The bus reports per-recipient delivery; dispatch only marks a notification
+    // `accepted` when at least one recipient landed (#2506).
+    const recipients = payload.recipient_user_ids?.length ?? 1;
+    return Promise.resolve({ recipients, delivered: recipients, failed: 0 });
   });
   return { claims, statuses, sql, order };
 }
@@ -192,7 +195,10 @@ describe('worker attendance notifications', () => {
     expect(state.statuses.values().next().value).toBe('failed');
   });
 
-  it('records accepted for a returned bus promise without claiming downstream delivery', async () => {
+  // Inverted from "records accepted for a returned bus promise". That pinned the
+  // #2506 bug: a rejecting bus was still recorded `accepted`, burning the
+  // idempotency key so a later working run would skip the notification forever.
+  it('records failed — not accepted — when the bus rejects', async () => {
     const state = installDb({
       clockout: [{ entry_id: ENTRY, staff_id: STAFF, work_date: '2026-08-03' }],
       staffUsers: { [STAFF]: [ACTIVE_USER] },
@@ -202,8 +208,24 @@ describe('worker attendance notifications', () => {
     const report = await runAttendanceNotifications({ phase: 'clockout', now: new Date('2026-08-03T15:00:00Z') });
     await Promise.resolve();
 
-    expect(report).toMatchObject({ claimed: 1, accepted: 1, failed: 0 });
-    expect(state.statuses.values().next().value).toBe('accepted');
+    expect(report).toMatchObject({ claimed: 1, accepted: 0, failed: 1 });
+    expect(state.statuses.values().next().value).toBe('failed');
+  });
+
+  it('records failed when the bus delivers to nobody', async () => {
+    // The production shape of #2506: notify() resolves (it never throws) but
+    // every recipient failed, because the bus could not reach the database.
+    const state = installDb({
+      clockout: [{ entry_id: ENTRY, staff_id: STAFF, work_date: '2026-08-03' }],
+      staffUsers: { [STAFF]: [ACTIVE_USER] },
+    });
+    mocks.notify.mockResolvedValue({ recipients: 1, delivered: 0, failed: 1 });
+
+    const report = await runAttendanceNotifications({ phase: 'clockout', now: new Date('2026-08-03T15:00:00Z') });
+
+    expect(report).toMatchObject({ claimed: 1, accepted: 0, failed: 1 });
+    // Left retryable rather than burnt.
+    expect(state.statuses.values().next().value).toBe('failed');
   });
 
   it('isolates a recipient query failure and continues with the next candidate', async () => {

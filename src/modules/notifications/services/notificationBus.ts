@@ -6,7 +6,7 @@
  * @module notifications/services/notificationBus
  */
 
-import { neon } from '@/lib/db-neon';
+import { sql, type SqlRow } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import {
   DEFAULT_CHANNEL_PREFERENCES,
@@ -21,18 +21,43 @@ import type {
 import { deliverEmail } from './emailDelivery';
 import { deliverWhatsApp } from './whatsappDelivery';
 
-const sql = neon(process.env.DATABASE_URL!);
+/** Row shape of the notification_preferences lookup. */
+interface ChannelPrefRow extends Record<string, unknown> {
+  channel_in_app: boolean;
+  channel_email: boolean;
+  channel_whatsapp: boolean;
+}
+
 
 // =============================================================================
 // Core notify() function
 // =============================================================================
 
 /**
+ * Outcome of a notify() call, per recipient.
+ *
+ * notify() still never throws — callers that ignore the return value behave
+ * exactly as before. But a caller that records delivery state MUST inspect it:
+ * a failure here used to be invisible, so an attendance dispatch was marked
+ * `accepted` while every recipient had failed (#2506).
+ */
+export interface NotifyResult {
+  recipients: number;
+  /** Recipients whose in-app record was written (or who had in-app disabled). */
+  delivered: number;
+  /** Recipients whose notification could not be recorded at all. */
+  failed: number;
+}
+
+/**
  * Send a notification to one or more users.
  * Creates in-app records and dispatches to email/WA based on preferences.
- * Non-blocking — errors are logged, never thrown to callers.
+ * Never throws — errors are logged and reported through the returned counts.
+ *
+ * `delivered` reflects the in-app record only. Email and WhatsApp remain
+ * fire-and-forget, so a non-zero `delivered` does not promise those landed.
  */
-export async function notify(payload: NotifyPayload): Promise<void> {
+export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
   const {
     event_type,
     title,
@@ -46,11 +71,14 @@ export async function notify(payload: NotifyPayload): Promise<void> {
 
   if (!recipient_user_ids || recipient_user_ids.length === 0) {
     log.warn('notify() called with no recipients', { event_type }, 'NotificationBus');
-    return;
+    return { recipients: 0, delivered: 0, failed: 0 };
   }
 
   const icon = payload.icon || EVENT_ICONS[event_type] || 'bell';
   const severity = payload.severity || EVENT_SEVERITY[event_type] || 'info';
+
+  let delivered = 0;
+  let failed = 0;
 
   for (const userId of recipient_user_ids) {
     try {
@@ -60,7 +88,7 @@ export async function notify(payload: NotifyPayload): Promise<void> {
       let notificationId: string | null = null;
       if (channels.in_app) {
         const sourceIdValue = source_id || null;
-        const result = await sql`
+        const result = await sql<{ id: string }>`
           INSERT INTO user_notifications (
             user_id, event_type, title, body, icon, severity,
             action_url, source_module, source_id, metadata
@@ -92,12 +120,16 @@ export async function notify(payload: NotifyPayload): Promise<void> {
           }, 'NotificationBus')
         );
       }
+      delivered += 1;
     } catch (err) {
+      failed += 1;
       log.error('notify() failed for user', {
         userId, event_type, error: err instanceof Error ? err.message : String(err),
       }, 'NotificationBus');
     }
   }
+
+  return { recipients: recipient_user_ids.length, delivered, failed };
 }
 
 // =============================================================================
@@ -113,7 +145,7 @@ export async function getEffectiveChannels(
   eventType: string
 ): Promise<ChannelPreferences> {
   try {
-    const rows = await sql`
+    const rows = await sql<ChannelPrefRow>`
       SELECT channel_in_app, channel_email, channel_whatsapp
       FROM notification_preferences
       WHERE user_id = ${userId}::uuid AND event_type = ${eventType}
@@ -144,7 +176,7 @@ export async function getEffectiveChannels(
 
 /** Get unread notification count for a user */
 export async function getUnreadCount(userId: string): Promise<number> {
-  const result = await sql`
+  const result = await sql<{ count: number }>`
     SELECT COUNT(*)::int as count
     FROM user_notifications
     WHERE user_id = ${userId}::uuid AND is_read = FALSE
@@ -160,22 +192,22 @@ export async function getNotifications(
   unreadOnly = false
 ): Promise<UserNotification[]> {
   if (unreadOnly) {
-    const rows = await sql`
+    const rows = await sql<SqlRow>`
       SELECT * FROM user_notifications
       WHERE user_id = ${userId}::uuid AND is_read = FALSE
       ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
-    return rows as UserNotification[];
+    return rows as unknown as UserNotification[];
   }
 
-  const rows = await sql`
+  const rows = await sql<SqlRow>`
     SELECT * FROM user_notifications
     WHERE user_id = ${userId}::uuid
     ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
-  return rows as UserNotification[];
+  return rows as unknown as UserNotification[];
 }
 
 /** Mark specific notifications as read */
