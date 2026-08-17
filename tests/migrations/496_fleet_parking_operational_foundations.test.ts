@@ -7,12 +7,12 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Pool } from 'pg';
 
-const SCHEMA = 'mig487_fleet_foundations_scratch';
+const SCHEMA = 'mig496_fleet_foundations_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
 const SCOPED_URL = `${BASE_URL}${BASE_URL.includes('?') ? '&' : '?'}options=${encodeURIComponent(`-c search_path=${SCHEMA}`)}`;
 const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
-const FORWARD = readFileSync(join(SQL_DIR, '487_fleet_parking_operational_foundations.sql'), 'utf8');
-const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_487_fleet_parking_operational_foundations.sql'), 'utf8');
+const FORWARD = readFileSync(join(SQL_DIR, '496_fleet_parking_operational_foundations.sql'), 'utf8');
+const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_496_fleet_parking_operational_foundations.sql'), 'utf8');
 const USER = '11111111-1111-4111-8111-111111111111';
 const admin = new Pool({ connectionString: BASE_URL, ssl: false, max: 1 });
 const db = new Pool({ connectionString: SCOPED_URL, ssl: false, max: 1 });
@@ -42,7 +42,7 @@ async function namedObject(name: string): Promise<boolean> {
   return result.rows[0].present;
 }
 
-describe('migration 487', () => {
+describe('migration 496', () => {
   it('creates the required constraints and indexes', async () => {
     for (const name of [
       'notification_idempotency_claims_user_event_key_key',

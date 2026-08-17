@@ -72,12 +72,25 @@ CREATE TABLE IF NOT EXISTS fleet_operational_assignments (
     CHECK (btrim(operational_site_display_name_snapshot) <> '')
 );
 
+-- Scoped per assignment_kind rather than across all active rows. A single
+-- unscoped EXCLUDE blocked ANY two overlapping active rows for a staff member,
+-- which made the documented precedence unreachable: a one-day daily_override
+-- can only win over a roster assignment if both rows can exist at once. The
+-- real invariants are "no two rosters overlap" and "no two overrides overlap",
+-- not "nothing overlaps".
 ALTER TABLE fleet_operational_assignments
-  ADD CONSTRAINT fleet_operational_assignments_no_overlap
+  ADD CONSTRAINT fleet_operational_assignments_no_roster_overlap
   EXCLUDE USING gist (
     staff_id WITH =,
     daterange(start_date, end_date, '[]') WITH &&
-  ) WHERE (status = 'active');
+  ) WHERE (status = 'active' AND assignment_kind = 'roster');
+
+ALTER TABLE fleet_operational_assignments
+  ADD CONSTRAINT fleet_operational_assignments_no_override_overlap
+  EXCLUDE USING gist (
+    staff_id WITH =,
+    daterange(start_date, end_date, '[]') WITH &&
+  ) WHERE (status = 'active' AND assignment_kind = 'daily_override');
 
 CREATE INDEX IF NOT EXISTS ix_fleet_operational_assignments_project_date
   ON fleet_operational_assignments (project_id, start_date, end_date)

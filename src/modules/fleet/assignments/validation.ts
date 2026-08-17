@@ -1,4 +1,4 @@
-import type { AssignmentProposalRow, ProposalConflict } from './types';
+import type { AssignmentKind, AssignmentProposalRow, ProposalConflict } from './types';
 
 type EntityState = { isActive: boolean };
 type OperationalSiteState = EntityState & { projectId: string; aoiConfidence?: string | null };
@@ -8,7 +8,8 @@ export interface ProposalValidationContext {
   staffById: Record<string, EntityState>;
   projectsById: Record<string, EntityState>;
   operationalSitesById: Record<string, OperationalSiteState>;
-  existingAssignments: Array<DateRange & { staffId: string }>;
+  // assignmentKind is load-bearing: overlap is only a conflict within a kind.
+  existingAssignments: Array<DateRange & { staffId: string; assignmentKind: AssignmentKind }>;
   vehicleAssignments: Array<DateRange & { id: string; staffId: string; vehicleId: string }>;
   vehicleProjectAssignments: Array<DateRange & {
     vehicleId: string;
@@ -120,8 +121,17 @@ export function validateProposal(rows: AssignmentProposalRow[], context: Proposa
     if (row.assignmentKind === 'daily_override' && row.startDate !== row.endDate) conflicts.push(conflict(rowIndex, 'daily_override_single_day', 'endDate'));
     if (row.assignmentKind === 'daily_override' && !row.reason) conflicts.push(conflict(rowIndex, 'override_reason_required', 'reason'));
 
-    const overlaps = context.existingAssignments.some((assignment) => assignment.staffId === row.staffId && rangesOverlap(row, assignment));
-    const proposalOverlaps = rows.some((other, otherIndex) => otherIndex !== rowIndex && other.staffId === row.staffId && rangesOverlap(row, other));
+    // Overlap is only a conflict WITHIN a kind. A one-day daily_override is
+    // meant to sit on top of an active roster assignment and win for that day
+    // (see the resolver's precedence order), so cross-kind overlap must be
+    // allowed here exactly as the two kind-scoped EXCLUDE constraints allow it.
+    const overlaps = context.existingAssignments.some((assignment) => assignment.staffId === row.staffId
+      && assignment.assignmentKind === row.assignmentKind
+      && rangesOverlap(row, assignment));
+    const proposalOverlaps = rows.some((other, otherIndex) => otherIndex !== rowIndex
+      && other.staffId === row.staffId
+      && other.assignmentKind === row.assignmentKind
+      && rangesOverlap(row, other));
     if (overlaps) conflicts.push(conflict(rowIndex, 'driver_overlap', null));
     if (proposalOverlaps) conflicts.push(conflict(rowIndex, 'driver_overlap', null));
 
