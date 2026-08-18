@@ -26,8 +26,37 @@ const ROOT = path.resolve(__dirname, '..', '..');
  * Options introduced in vitest 1.x. Harmless-looking in a 0.34 config and completely
  * inert. Extend this list when a config is written against newer docs than the
  * installed version.
+ *
+ * Patterns rather than substrings, so `pool : 'forks'` cannot slip past on a space —
+ * the first draft matched the literal `'pool:'` while matching `'fileParallelism'`
+ * bare, and that inconsistency is exactly the kind of thing this file exists to stop.
+ *
+ * KNOWN LIMIT, accepted: this reads the config as TEXT, so an option reached
+ * indirectly — a computed key, or a value spread from an imported object — carries no
+ * literal to match and would pass. Nothing in this repo writes vitest config that way,
+ * and the positive assertions below still fail loudly if the serialisation itself
+ * disappears, which is the failure that actually costs something.
  */
-const UNSUPPORTED_IN_V0 = ['fileParallelism', 'poolOptions', 'pool:'] as const;
+const UNSUPPORTED_IN_V0: ReadonlyArray<{ name: string; pattern: RegExp }> = [
+  { name: 'fileParallelism', pattern: /\bfileParallelism\b/ },
+  { name: 'poolOptions', pattern: /\bpoolOptions\b/ },
+  { name: 'pool', pattern: /\bpool\s*:/ },
+];
+
+/**
+ * Remove block and line comments so prose naming an option is not a match.
+ *
+ * `//` is only treated as a comment when it does not follow a colon, so a URL such as
+ * `https://vitest.dev/...` in a comment or string keeps its tail. Truncating there
+ * could drop real code after it on the same line and turn a broken config into a pass.
+ */
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((line) => line.replace(/(^|[^:])\/\/.*$/, '$1'))
+    .join('\n');
+}
 
 function vitestConfigs(): string[] {
   return readdirSync(ROOT).filter((f) => /^vitest\..*\.config\.ts$/.test(f) || f === 'vitest.config.ts');
@@ -52,29 +81,20 @@ describe('vitest config options match the installed vitest', () => {
     if (installedMajor() >= 1) return; // the options below are valid from 1.0 onward
 
     const source = readFileSync(path.join(ROOT, file), 'utf8');
-    // Strip comments: this file and the migrations config both NAME these options while
-    // explaining why they are not used, and matching prose would be a false positive.
-    const code = source
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .split('\n')
-      .filter((line) => !line.trim().startsWith('//'))
-      .join('\n');
+    const code = stripComments(source);
 
-    for (const option of UNSUPPORTED_IN_V0) {
-      expect(code, `${file} uses ${option}, which vitest ${installedMajor()}.x ignores silently`)
-        .not.toContain(option);
+    for (const { name, pattern } of UNSUPPORTED_IN_V0) {
+      expect(
+        pattern.test(code),
+        `${file} uses ${name}, which vitest ${installedMajor()}.x ignores silently`,
+      ).toBe(false);
     }
   });
 
   it('the migrations config serialises its files by a means this vitest HONOURS', () => {
     // The mirror. Without it, deleting the option entirely would satisfy every
     // assertion above while leaving the tests parallel — which is the actual defect.
-    const source = readFileSync(path.join(ROOT, 'vitest.migrations.config.ts'), 'utf8');
-    const code = source
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .split('\n')
-      .filter((line) => !line.trim().startsWith('//'))
-      .join('\n');
+    const code = stripComments(readFileSync(path.join(ROOT, 'vitest.migrations.config.ts'), 'utf8'));
     expect(code).toContain('threads: false');
   });
 
@@ -87,12 +107,53 @@ describe('vitest config options match the installed vitest', () => {
       'vitest.db.sprinte.config.ts',
       'vitest.velocity-review-db.config.ts',
     ]) {
-      const code = readFileSync(path.join(ROOT, file), 'utf8')
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .split('\n')
-        .filter((line) => !line.trim().startsWith('//'))
-        .join('\n');
+      const code = stripComments(readFileSync(path.join(ROOT, file), 'utf8'));
       expect(code, `${file} does not serialise its test files`).toContain('threads: false');
     }
+  });
+});
+
+describe('the matching itself', () => {
+  const match = (name: string, code: string) =>
+    UNSUPPORTED_IN_V0.find((o) => o.name === name)!.pattern.test(code);
+
+  it('catches `pool` however it is spaced', () => {
+    // The first draft matched the literal 'pool:', so a space before the colon walked
+    // straight past it while `fileParallelism` was matched bare.
+    expect(match('pool', "pool: 'forks',")).toBe(true);
+    expect(match('pool', "pool : 'forks',")).toBe(true);
+    expect(match('pool', "pool\t: 'forks',")).toBe(true);
+  });
+
+  it('does not fire on a word that merely contains `pool`', () => {
+    // The mirror: a pattern that matched everything would satisfy the case above.
+    expect(match('pool', 'const poolSize = 4;')).toBe(false);
+    expect(match('pool', 'threads: false,')).toBe(false);
+  });
+
+  it('catches poolOptions and fileParallelism on a word boundary', () => {
+    expect(match('poolOptions', 'poolOptions: { threads: {} },')).toBe(true);
+    expect(match('fileParallelism', 'fileParallelism: false,')).toBe(true);
+    expect(match('fileParallelism', 'myFileParallelismNote: 1,')).toBe(false);
+  });
+
+  it('strips a TRAILING comment, so naming an option in prose is not a failure', () => {
+    // Fails closed rather than open, but it would have failed a config that was
+    // correct — training whoever hit it to distrust this test.
+    const code = stripComments("threads: false, // deliberately not fileParallelism");
+    expect(code).toContain('threads: false');
+    expect(match('fileParallelism', code)).toBe(false);
+  });
+
+  it('keeps code that follows a URL on the same line', () => {
+    // `//` inside `https://` must not truncate the line — dropping the tail could hide
+    // a real option and turn a broken config into a pass.
+    const code = stripComments("url: 'https://vitest.dev', fileParallelism: false,");
+    expect(match('fileParallelism', code)).toBe(true);
+  });
+
+  it('strips block and whole-line comments', () => {
+    expect(match('fileParallelism', stripComments('/* fileParallelism */'))).toBe(false);
+    expect(match('fileParallelism', stripComments('  // fileParallelism'))).toBe(false);
   });
 });
