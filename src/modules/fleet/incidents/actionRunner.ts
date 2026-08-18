@@ -1,7 +1,9 @@
 /**
- * Acknowledgement escalation, the 08:15 SAST morning summary, and
- * status-monitor health checks for Fleet operational incidents (design §9).
- * Invoked by `pages/api/cron/fleet-incident-actions.ts` under the
+ * Acknowledgement escalation and status-monitor health checks for Fleet
+ * operational incidents (design §9); the 08:15 SAST morning-summary phase
+ * lives in `incidentSummaryPhase.ts` and shared per-phase bookkeeping lives
+ * in `incidentActionShared.ts` — both orchestrated from here. Invoked by
+ * `pages/api/cron/fleet-incident-actions.ts` under the
  * `fleet-incident-actions` advisory lock, at least every five minutes.
  *
  * Three independent phases share one tick — escalation always runs,
@@ -10,73 +12,21 @@
  * failure never blocks or hides another's, folding errors into the
  * returned counters instead of aborting the tick.
  */
-import { log } from '@/lib/logger';
 import { query, transaction, type TxnClient } from '@/lib/db-pool';
 import { insertIncidentAction } from './incidentRepository';
-import {
-  sendEscalationNotification, sendMonitorFailedNotification, sendMorningSummaryNotification,
-} from './incidentNotifications';
-import { resolveIncidentRecipients } from './recipientService';
-import { loadEffectiveIncidentRule } from './settingsRepository';
-import { loadMonitoredRoster } from './monitorService';
-import { resolveScheduledIncidentType } from './incidentProducer';
+import { sendEscalationNotification, sendMonitorFailedNotification } from './incidentNotifications';
 import {
   findLatestMonitorRun, findStaleRunningRuns, finalizeMonitorRun, startMonitorRun,
 } from './runRepository';
 import { sastDateString } from '../parking/sastDate';
-import type { OperationalFlag, OperationalStatus, OperationalStatusSummary } from '../operations/types';
-import type { NotifyResult } from '@/modules/notifications/types';
+import { addMinutesIso, applyDelivery, boundedErrorSummary, recordPhaseError } from './incidentActionShared';
+import type { EscalationTotals, SummaryTotals } from './incidentActionShared';
+import { runMorningSummaryPhase } from './incidentSummaryPhase';
 import type {
-  IncidentActionRunnerRequest, IncidentActionRunnerResult, IncidentRule, IncidentSeverity, IncidentType,
+  IncidentActionRunnerRequest, IncidentActionRunnerResult, IncidentSeverity, IncidentType,
 } from './types';
 
-const MODULE = 'FleetIncidentActionRunner';
-const MORNING_SUMMARY_MINUTE_OF_DAY = 8 * 60 + 15; // 08:15 SAST
 const STALE_STATUS_MONITOR_MINUTES = 15; // 3x the 5-min cadence: absorbs one missed tick, still catches a real outage promptly
-const MAX_ERROR_ENTRIES = 20;
-const MAX_ERROR_SUMMARY_LENGTH = 2000;
-const SUMMARY_TYPES: readonly IncidentType[] = ['unassigned', 'unverifiable', 'vehicle_on_site_driver_unconfirmed', 'evidence_gap'];
-const DIRECT_SUMMARY_STATUS_TYPES: Partial<Record<OperationalStatus, IncidentType>> = {
-  unassigned: 'unassigned', unverifiable: 'unverifiable', vehicle_on_site_driver_unconfirmed: 'vehicle_on_site_driver_unconfirmed',
-};
-// Signal for design §3.2's "stale/missing expected evidence" — PR4 has no
-// dedicated status for it, but these flags are exactly what its evaluator
-// sets when required evidence is stale/absent, regardless of status.
-const EVIDENCE_GAP_FLAGS: readonly OperationalFlag[] = ['gps_stale', 'gps_missing', 'attendance_missing'];
-
-interface Totals { notifAccepted: number; notifFailed: number; errorCount: number; errorMessages: string[] }
-interface EscalationTotals extends Totals { escalated: number }
-interface SummaryTotals extends Totals { sent: number }
-
-function sanitizedMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.length > 300 ? `${message.slice(0, 300)}…` : message;
-}
-function boundedErrorSummary(entries: string[]): string | null {
-  if (entries.length === 0) return null;
-  const bounded = entries.slice(0, MAX_ERROR_ENTRIES).join('; ');
-  return bounded.length > MAX_ERROR_SUMMARY_LENGTH ? `${bounded.slice(0, MAX_ERROR_SUMMARY_LENGTH)}…` : bounded;
-}
-function addMinutesIso(iso: string, minutes: number): string {
-  return new Date(new Date(iso).getTime() + minutes * 60_000).toISOString();
-}
-function sastMinutesOfDay(iso: string): number {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Africa/Johannesburg', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(new Date(iso));
-  return Number(parts.find((p) => p.type === 'hour')?.value ?? '0') * 60 + Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
-}
-/** Shared per-phase failure bookkeeping: count it, keep a bounded message, and log with context — never throws, never aborts the phase's loop. */
-function recordPhaseError(totals: Totals, logLabel: string, context: { incidentId?: string; runId?: string }, error: unknown): void {
-  const message = sanitizedMessage(error);
-  const subject = context.incidentId ?? context.runId ?? null;
-  totals.errorCount += 1;
-  totals.errorMessages.push(subject ? `${subject}: ${message}` : message);
-  log.error(logLabel, { ...context, error: message }, MODULE);
-}
-function applyDelivery(totals: Totals, delivery: NotifyResult): void {
-  totals.notifAccepted += delivery.delivered; totals.notifFailed += delivery.failed;
-}
 // -- Escalation ---------------------------------------------------------
 
 interface DueEscalationRow extends Record<string, unknown> {
@@ -160,87 +110,6 @@ async function runEscalationPhase(request: IncidentActionRunnerRequest, runId: s
       recordPhaseError(totals, '[fleet-incident-actions] escalation failed for one incident', { incidentId: row.id }, error);
     }
   }
-}
-// -- Morning summary ------------------------------------------------------
-
-function summaryIncidentType(item: OperationalStatusSummary): IncidentType | null {
-  if (resolveScheduledIncidentType(item.status)) return null; // already becomes an incident, not a summary condition
-  const direct = DIRECT_SUMMARY_STATUS_TYPES[item.status];
-  if (direct) return direct;
-  return item.flags.some((flag) => EVIDENCE_GAP_FLAGS.includes(flag)) ? 'evidence_gap' : null;
-}
-
-async function loadSummaryRules(effectiveAt: string): Promise<Partial<Record<IncidentType, IncidentRule>>> {
-  const entries = await Promise.all(
-    SUMMARY_TYPES.map(async (type) => [type, await loadEffectiveIncidentRule(type, effectiveAt)] as const),
-  );
-  const rules: Partial<Record<IncidentType, IncidentRule>> = {};
-  for (const [type, rule] of entries) if (rule) rules[type] = rule;
-  return rules;
-}
-
-interface SummaryBucket { projectId: string | null; projectName: string | null; counts: Map<IncidentType, number> }
-
-function buildSummaryBuckets(
-  roster: readonly OperationalStatusSummary[], rules: Partial<Record<IncidentType, IncidentRule>>,
-): Map<string, SummaryBucket> {
-  const buckets = new Map<string, SummaryBucket>();
-  for (const item of roster) {
-    const type = summaryIncidentType(item);
-    const rule = type ? rules[type] : undefined;
-    if (!rule || !rule.enabled || !rule.includeInMorningSummary) continue;
-    const key = item.projectId ?? 'unassigned';
-    let bucket = buckets.get(key);
-    if (!bucket) { bucket = { projectId: item.projectId, projectName: item.projectName, counts: new Map() }; buckets.set(key, bucket); }
-    bucket.counts.set(type as IncidentType, (bucket.counts.get(type as IncidentType) ?? 0) + 1);
-  }
-  return buckets;
-}
-
-async function sendSummaryForBucket(bucket: SummaryBucket, workDate: string, totals: SummaryTotals): Promise<void> {
-  const recipients = await resolveIncidentRecipients(bucket.projectId);
-  if (recipients.failed) {
-    totals.errorCount += 1;
-    log.error('[fleet-incident-actions] no recipient resolved for a morning-summary bucket', { projectId: bucket.projectId }, MODULE);
-    return;
-  }
-  const items = [...bucket.counts.entries()].map(([incidentType, count]) => ({ incidentType, count }));
-  for (const recipientUserId of recipients.userIds) {
-    applyDelivery(totals, await sendMorningSummaryNotification({
-      recipientUserId, projectId: bucket.projectId, projectName: bucket.projectName, workDate, items,
-    }));
-    totals.sent += 1;
-  }
-}
-
-// True once a `morning_summary` run already exists for this SAST work date, whatever its
-// outcome — makes "once per due work date" hold without reloading the PR4 roster every tick.
-async function morningSummaryAlreadySentFor(workDate: string): Promise<boolean> {
-  const latest = await findLatestMonitorRun('morning_summary');
-  return latest !== null && sastDateString(new Date(latest.effectiveAt)) === workDate;
-}
-
-async function runMorningSummaryPhase(request: IncidentActionRunnerRequest, totals: SummaryTotals): Promise<void> {
-  if (sastMinutesOfDay(request.effectiveAt) < MORNING_SUMMARY_MINUTE_OF_DAY) return; // before 08:15 SAST — skip entirely
-  const workDate = sastDateString(new Date(request.effectiveAt));
-  if (await morningSummaryAlreadySentFor(workDate)) return;
-
-  const summaryRun = await startMonitorRun('morning_summary', request.requestedAt, request.effectiveAt);
-  let status: 'succeeded' | 'partial_failure' | 'failed' = 'succeeded';
-  try {
-    const rules = await loadSummaryRules(request.effectiveAt);
-    const roster = await loadMonitoredRoster(workDate, request.effectiveAt);
-    const buckets = buildSummaryBuckets(roster, rules);
-    for (const bucket of buckets.values()) await sendSummaryForBucket(bucket, workDate, totals);
-    status = totals.errorCount > 0 || totals.notifFailed > 0 ? 'partial_failure' : 'succeeded';
-  } catch (error) {
-    status = 'failed';
-    recordPhaseError(totals, '[fleet-incident-actions] systemic morning-summary load failure', { runId: summaryRun.id }, error);
-  }
-  await finalizeMonitorRun(summaryRun.id, {
-    status, summariesSentCount: totals.sent, notificationsAcceptedCount: totals.notifAccepted,
-    notificationsFailedCount: totals.notifFailed, errorCount: totals.errorCount, errorSummary: boundedErrorSummary(totals.errorMessages),
-  });
 }
 // -- Status-monitor health --------------------------------------------------
 
