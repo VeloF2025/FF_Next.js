@@ -230,11 +230,11 @@ PROJECTS = {
     # ("poles_20251113102437166") instead of a pole label. None matches a pole, so nothing
     # downstream can use them.
     #
-    # THIS ENTRY DOES NOT RETROACTIVELY FIX THOSE 121 ROWS. ingest_rows skips any photo
-    # whose photo_key or filename is already present, so the stale rows block their own
-    # replacements — a dry run reports "121 photos found, 1 new upserted". Correcting them
-    # means deleting the 2026-02-07 rows first and letting the extractor recreate them.
-    # What this entry does fix is every photo captured from here on.
+    # Registering alone could NOT fix those 121 rows: ingest_rows skips any photo whose
+    # photo_key or filename is already present, so the stale rows blocked their own
+    # replacements — a dry run reported "121 photos found, 1 new upserted". They were
+    # therefore deleted (backed up first; no human state on any of them) and re-extracted
+    # on 2026-08-18. Done, not outstanding.
     #
     # Also note this layer has NO recognised step columns. It carries FOUR photo-shaped
     # columns — "Pole Photo", JointPhoto, LabelPhoto, SlackPhoto — of which
@@ -251,8 +251,11 @@ PROJECTS = {
     #
     # Cost of setting zone_col: hierarchy_backfill_needed() returns True while ANY
     # pole_qa_photos row for the project has a NULL zone_no, and Grabouw has one that
-    # never will — the placeholder review QF-POLE-574a7856, which has no counterpart in
-    # the GPKG. So the "already processed this version" short-circuit can never fire and
+    # never will — the placeholder POLE_QA_PHOTOS row QF-POLE-574a7856, which has no
+    # counterpart in the GPKG. Note the table: a construction_qa_reviews row with the same
+    # id also exists, but that one is not what the check reads, so deleting the review
+    # would not stop the re-scan. Eight projects carry such a placeholder; it only costs
+    # anything where zone_col is set. So the "already processed this version" short-circuit can never fire and
     # every run re-downloads 724 KB and re-walks 3,796 rows. Small, but it defeats the
     # delta check. Accepted rather than dropping zone_col, because the zone/PON data is
     # real and the placeholder is the thing that is wrong.
@@ -261,8 +264,10 @@ PROJECTS = {
     # label_col `label_1` — the same `_1` publish-collision suffix Thembisa POP 1 carries,
     # NOT plain `label`, which does not exist here. Verified rather than assumed: all 121
     # photo-bearing rows resolve to a `GRA.P.*` label and all 121 match a row in `poles`
-    # for this project, so the ids will line up with the 122 construction_qa_reviews that
-    # already exist under that convention.
+    # for this project. Verified after the re-extract: 121/121 carry GRA.P.* ids, zero
+    # synthetic, and they line up with the 121 GRA.P.* construction_qa_reviews that
+    # already exist. Grabouw has 122 reviews in total — the 122nd is the QF-POLE-574a7856
+    # placeholder described below, which follows no convention and matches nothing.
     #
     # pon_col/zone_col ARE set here, unlike Cradock/Middelburg/Ben Farm: this layer really
     # carries pon_no and zone_no and they are populated on the photo-bearing rows.
