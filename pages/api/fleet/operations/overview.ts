@@ -2,10 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
+import { loadCompleteOperationalRoster, OperationalRosterTooLargeError } from '@/modules/fleet/operations/completeRosterLoading';
 import { buildOperationalOverview } from '@/modules/fleet/operations/overviewService';
 import { parseStrictIsoInstant } from '@/modules/fleet/operations/instantValidation';
 import { canAccessOperationalProject } from '@/modules/fleet/operations/projectScope';
-import { getOperationalRosterStatus, OperationalStatusRequestError } from '@/modules/fleet/operations/statusService';
+import { OperationalStatusRequestError } from '@/modules/fleet/operations/statusService';
 import type { OperationalStatus } from '@/modules/fleet/operations/types';
 import { resolveStaffIdForUser } from '@/modules/fleet/parking/staffLookup';
 import { isValidUUID } from '@/modules/fleet/services/mileageUtils';
@@ -51,12 +52,13 @@ async function handler(req: Request, res: NextApiResponse): Promise<void> {
     if (!await canAccessOperationalProject(user.id, staffId, user.role, projectId)) {
       return apiResponse.forbidden(res, 'You cannot view operational status for this project');
     }
-    const roster = await getOperationalRosterStatus({ projectId, workDate, asOf, page: 1, limit: 100 });
+    const roster = await loadCompleteOperationalRoster({ projectId, workDate, asOf });
     const overview = buildOperationalOverview(roster, { page, limit, ...(statusFilter ? { attentionStatuses: statusFilter } : {}) });
     const first = roster.items[0];
     return apiResponse.success(res, { ...overview, workDate, evaluatedAt: asOf,
       rule: { id: first?.ruleId ?? null, version: first?.ruleVersion ?? null } });
   } catch (error) {
+    if (error instanceof OperationalRosterTooLargeError) return apiResponse.badRequest(res, error.message);
     if (error instanceof OperationalStatusRequestError) return apiResponse.badRequest(res, error.message);
     log.error('Failed to load operational overview', { error, projectId }, 'fleet');
     return apiResponse.internalError(res, error);

@@ -15,6 +15,7 @@ vi.mock('../projectScope', () => ({
 }));
 vi.mock('@/lib/db-pool', () => ({ query: mocks.query }));
 
+import { OperationalRosterTooLargeError } from '../completeRosterLoading';
 import {
   getOperationalMapOverlay,
   OperationalMapAccessError,
@@ -213,5 +214,24 @@ describe('getOperationalMapOverlay', () => {
       asOf: '2026-08-13T12:34:56.000Z', page: 1, limit: 100 });
     expect(mocks.evidence).toHaveBeenLastCalledWith({ projectId: PROJECT, workDate: '2026-08-13',
       asOf: '2026-08-13T12:34:56.000Z', limit: 100, offset: 0 });
+  });
+
+  it('completes a roster and evidence selection spanning more than 100 staff by paging both sources', async () => {
+    mocks.roster.mockImplementation(async (req: { page: number }) => (req.page === 1
+      ? { items: Array.from({ length: 100 }, (_, i) => summary({ staffId: `s-${i}` })), page: 1, limit: 100, total: 130, hasMore: true }
+      : { items: Array.from({ length: 30 }, (_, i) => summary({ staffId: `s-${100 + i}` })), page: 2, limit: 100, total: 130, hasMore: false }));
+    mocks.evidence.mockImplementation(async (req: { offset: number }) => (req.offset === 0
+      ? { items: Array.from({ length: 100 }, (_, i) => evidence({ staffId: `s-${i}` })), total: 130 }
+      : { items: Array.from({ length: 30 }, (_, i) => evidence({ staffId: `s-${100 + i}` })), total: 130 }));
+    const result = await getOperationalMapOverlay({ ...request, page: 1, limit: 100 }, actor);
+    expect(mocks.roster).toHaveBeenCalledTimes(2);
+    expect(mocks.evidence).toHaveBeenCalledTimes(2);
+    expect(result.total).toBe(130);
+  });
+
+  it('rejects an operational selection whose roster exceeds the paging safety bound instead of looping forever', async () => {
+    mocks.roster.mockResolvedValue({ items: Array.from({ length: 100 }, (_, i) => summary({ staffId: `s-${i}` })),
+      page: 1, limit: 100, total: 999_999, hasMore: true });
+    await expect(getOperationalMapOverlay(request, actor)).rejects.toBeInstanceOf(OperationalRosterTooLargeError);
   });
 });

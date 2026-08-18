@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { OperationalRosterTooLargeError } from '@/modules/fleet/operations/completeRosterLoading';
 
 const mocks = vi.hoisted(() => ({
   roster: vi.fn(), overview: vi.fn(), overlay: vi.fn(), project: vi.fn(), projectOptions: vi.fn(), staff: vi.fn(),
@@ -155,6 +156,34 @@ describe('operational presentation APIs', () => {
 
     mocks.overlay.mockRejectedValue(new Error('database down'));
     const overlay = await call(overlayHandler, 'GET', valid); expect(overlay.status).toBe(500);
+    expect(overlay.body).not.toMatchObject({ success: true });
+  });
+
+  it('pages through a roster of more than 100 scheduled staff instead of failing on the second page', async () => {
+    mocks.roster.mockImplementation(async (request: { page: number }) => (request.page === 1
+      ? { items: Array.from({ length: 100 }, (_, i) => ({ staffId: `staff-${i}` })), page: 1, limit: 100, total: 130, hasMore: true }
+      : { items: Array.from({ length: 30 }, (_, i) => ({ staffId: `staff-${100 + i}` })), page: 2, limit: 100, total: 130, hasMore: false }));
+    const result = await call(overviewHandler, 'GET', valid);
+    expect(result.status).toBe(200);
+    expect(mocks.roster).toHaveBeenCalledTimes(2);
+    expect(mocks.roster).toHaveBeenNthCalledWith(1, { ...valid, page: 1, limit: 100 });
+    expect(mocks.roster).toHaveBeenNthCalledWith(2, { ...valid, page: 2, limit: 100 });
+    const passedRoster = mocks.overview.mock.calls[0]?.[0] as { items: unknown[]; total: number; hasMore: boolean };
+    expect(passedRoster.items).toHaveLength(130);
+    expect(passedRoster.total).toBe(130);
+    expect(passedRoster.hasMore).toBe(false);
+  });
+
+  it('surfaces a bounded, actionable 4xx instead of a 500 when a roster selection exceeds the paging safety bound', async () => {
+    mocks.roster.mockResolvedValue({ items: Array.from({ length: 100 }, (_, i) => ({ staffId: `staff-${i}` })),
+      page: 1, limit: 100, total: 999_999, hasMore: true });
+    const overview = await call(overviewHandler, 'GET', valid);
+    expect(overview.status).toBe(400);
+    expect(overview.body).not.toMatchObject({ success: true });
+
+    mocks.overlay.mockRejectedValue(new OperationalRosterTooLargeError(2000));
+    const overlay = await call(overlayHandler, 'GET', valid);
+    expect(overlay.status).toBe(400);
     expect(overlay.body).not.toMatchObject({ success: true });
   });
 });

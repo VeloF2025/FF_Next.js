@@ -1,9 +1,9 @@
 import { query } from '@/lib/db-pool';
+import { loadCompleteOperationalEvidence, loadCompleteOperationalRoster } from './completeRosterLoading';
 import { loadOperationalEvidence } from './evidenceQueries';
 import { canAccessOperationalProject, hasOperationalOversight } from './projectScope';
 import {
   getOperationalEvidenceDetail,
-  getOperationalRosterStatus,
   isOperationalAttendancePointEligible,
   type OperationalEvidenceDetail,
   type RosterStatusResult,
@@ -59,7 +59,6 @@ interface GeometryRow extends Record<string, unknown> {
 }
 interface SiteScopeRow extends Record<string, unknown> { project_id: string }
 interface JoinedRow { summary: OperationalStatusSummary; evidence: OperationalEvidence }
-const BATCH_LIMIT = 100;
 
 function detailSummary(evidence: OperationalEvidence, detail: OperationalEvidenceDetail): OperationalStatusSummary {
   return {
@@ -92,14 +91,10 @@ async function loadProjectRows(request: OperationalMapOverlayRequest, actor: Ope
   const projectId = request.projectId;
   if (!projectId) throw new OperationalMapRequestError('projectId is required for a project selection');
   await authorizeProject(projectId, actor);
-  const statusRequest = { projectId, workDate: request.workDate, asOf: request.asOf, page: 1, limit: BATCH_LIMIT };
   const [roster, evidence] = await Promise.all([
-    getOperationalRosterStatus(statusRequest),
-    loadOperationalEvidence({ projectId, workDate: request.workDate, asOf: request.asOf, limit: BATCH_LIMIT, offset: 0 }),
+    loadCompleteOperationalRoster({ projectId, workDate: request.workDate, asOf: request.asOf }),
+    loadCompleteOperationalEvidence({ projectId, workDate: request.workDate, asOf: request.asOf }),
   ]);
-  if (roster.hasMore || roster.items.length !== roster.total || evidence.items.length !== evidence.total) {
-    throw new OperationalMapRequestError('Operational map requires a complete project selection');
-  }
   return joinRows(roster, evidence.items, request);
 }
 

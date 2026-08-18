@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
+import { OperationalRosterTooLargeError } from '@/modules/fleet/operations/completeRosterLoading';
 import { parseStrictIsoInstant } from '@/modules/fleet/operations/instantValidation';
 import { getOperationalMapOverlay, OperationalMapAccessError,
   OperationalMapRequestError } from '@/modules/fleet/operations/mapOverlayService';
@@ -46,6 +47,7 @@ async function handler(req: Request, res: NextApiResponse): Promise<void> {
     return apiResponse.success(res, data);
   } catch (error) {
     if (error instanceof OperationalMapAccessError) return apiResponse.forbidden(res, error.message);
+    if (error instanceof OperationalRosterTooLargeError) return apiResponse.badRequest(res, error.message);
     if (error instanceof OperationalMapRequestError || error instanceof OperationalStatusRequestError) {
       return apiResponse.badRequest(res, error.message);
     }
