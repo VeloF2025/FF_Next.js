@@ -46,6 +46,10 @@ describe('POST /api/cortex/mcp-consent-context', () => {
       clientName: 'Claude',
       redirectUri: 'https://evil.example/cb',
       scopes: ['cortex.read'],
+      // FibreFlow's own flag, appended after parsing the Cortex context. False here
+      // because the grant is off by default; asserted explicitly so this stays an
+      // exact-shape check rather than a partial one.
+      ffApiGrant: false,
     });
     expect(JSON.stringify(response.json)).not.toContain(CALLBACK_SECRET);
     expect(JSON.stringify(response.json)).not.toContain('code_challenge');

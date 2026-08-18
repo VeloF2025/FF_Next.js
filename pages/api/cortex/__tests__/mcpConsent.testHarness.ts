@@ -51,7 +51,10 @@ interface ConsentHarnessOptions {
   callbackBase?: string;
   callbackSecret?: string | null;
   mintToken?: CortexConsentDependencies['mintToken'];
+  mintFfToken?: CortexConsentDependencies['mintFfToken'];
   fetchImpl?: CortexConsentDependencies['fetchImpl'];
+  /** Injected rather than set on process.env, so grant tests cannot leak into others. */
+  env?: CortexConsentDependencies['env'];
 }
 
 type CallbackResponder = (
@@ -164,7 +167,9 @@ export async function startConsentHandler(
   };
   const handler = createCortexConsentHandler({
     mintToken: options.mintToken,
+    mintFfToken: options.mintFfToken,
     fetchImpl: options.fetchImpl,
+    env: options.env,
     logger,
   });
   const user = options.user ?? {

@@ -8,6 +8,8 @@ import { withAuth, withPermission } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { mintMcpToken } from '@/lib/cortex/bridgeAuth';
+import { mintFfMcpToken } from '@/lib/auth/mcpToken';
+import { ffApiGrantEnabled, ffGrantLifetime } from '@/lib/cortex/ffApiGrant';
 import { log } from '@/lib/logger';
 
 const STATE_ID_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
@@ -46,11 +48,26 @@ type MintToken = (
 
 type ConsentLogger = Pick<typeof log, 'error' | 'warn' | 'info'>;
 
+/**
+ * Mints the FibreFlow-side credential. Injected like mintToken so the consent flow can
+ * be driven in a test without reaching a real `user_sessions` row.
+ */
+type MintFfToken = typeof mintFfMcpToken;
+
 export interface CortexConsentDependencies {
   mintToken?: MintToken;
+  mintFfToken?: MintFfToken;
   fetchImpl?: typeof fetch;
   logger?: ConsentLogger;
+  /** Defaults to process.env; injected so the grant flag can be exercised directly. */
+  env?: Record<string, string | undefined>;
 }
+
+/**
+ * The bridge token below is minted at 90 days, so the FibreFlow credential issued
+ * alongside it matches rather than outliving the connection it belongs to.
+ */
+const CONSENT_LIFETIME = '90d' as const;
 
 export function createCortexConsentHandler(
   dependencies: CortexConsentDependencies = {},
@@ -59,8 +76,10 @@ export function createCortexConsentHandler(
   res: NextApiResponse,
 ) => Promise<void> {
   const mintToken = dependencies.mintToken ?? mintMcpToken;
+  const mintFfToken = dependencies.mintFfToken ?? mintFfMcpToken;
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const logger = dependencies.logger ?? log;
+  const env = dependencies.env ?? process.env;
 
   return async (req, res): Promise<void> => {
     try {
@@ -97,7 +116,27 @@ export function createCortexConsentHandler(
         );
       }
 
-      const { token } = await mintToken(req.user.email, '90d');
+      const { token } = await mintToken(req.user.email, CONSENT_LIFETIME);
+
+      // The FibreFlow-side credential, issued only when the grant is switched on.
+      //
+      // read-only by construction (withAuth/requireAuth enforce it), bound to a
+      // revocable user_sessions row, and re-reading is_active and permissions on every
+      // request — so it carries the user's LIVE permissions rather than a snapshot, and
+      // deactivating them kills it on the next call rather than at expiry.
+      //
+      // req.user, never a client-supplied identity: this route is behind withAuth and
+      // the whole point of the grant is that Cortex acts as the person who authorised it.
+      let ffToken: string | undefined;
+      if (ffApiGrantEnabled(env)) {
+        const minted = await mintFfToken(req.user, ffGrantLifetime(CONSENT_LIFETIME), {
+          label: 'Cortex connector',
+          ipAddress: req.socket?.remoteAddress,
+          userAgent: req.headers['user-agent'],
+        });
+        ffToken = minted.token;
+      }
+
       let redirectUrl: unknown;
       try {
         const upstream = await fetchImpl(`${callbackBase}/authorize/complete`, {
@@ -106,7 +145,9 @@ export function createCortexConsentHandler(
             'Content-Type': 'application/json',
             'X-Cortex-MCP-Secret': secret,
           },
-          body: JSON.stringify({ stateId, token }),
+          // ffToken is omitted entirely when the grant is off — JSON.stringify drops an
+          // undefined value, so Cortex sees no key rather than a null it might store.
+          body: JSON.stringify({ stateId, token, ffToken }),
           signal: AbortSignal.timeout(CALLBACK_TIMEOUT_MS),
           redirect: 'manual',
         });

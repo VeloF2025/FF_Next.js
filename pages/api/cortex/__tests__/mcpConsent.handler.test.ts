@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -200,5 +202,97 @@ describe('POST /api/cortex/mcp-consent — verified consent', () => {
     expect(JSON.stringify(response.json)).not.toContain(sensitiveSecret);
     expect(JSON.stringify(app.logs)).not.toContain(sensitiveBearer);
     expect(JSON.stringify(app.logs)).not.toContain(sensitiveSecret);
+  });
+});
+
+describe('POST /api/cortex/mcp-consent — the FibreFlow API grant', () => {
+  // Generated rather than a literal: the secret scanner treats a token-shaped string
+  // constant as a credential, and it is right to — a fixed one here would train people
+  // to write them elsewhere. Random also proves the assertions match the VALUE passed
+  // through, not a string that happens to appear in both places.
+  const FF_TOKEN = `ff_${randomBytes(24).toString('hex')}`;
+
+  function okCallback() {
+    return startCallbackServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({
+        redirectUrl: 'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc',
+      }));
+    });
+  }
+
+  it('sends NO ffToken when the grant is off', async () => {
+    // The default. Every existing connection must keep the narrower grant it was
+    // authorised under, so the key is absent rather than null.
+    let minted = false;
+    const callback = await okCallback();
+    const app = await startConsentHandler({
+      callbackBase: callback.url,
+      mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
+      mintFfToken: (async () => { minted = true; return { token: FF_TOKEN }; }) as never,
+      env: {},
+    });
+
+    await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(minted).toBe(false);
+    const body = callback.requests[0]!.json as Record<string, unknown>;
+    expect('ffToken' in body).toBe(false);
+  });
+
+  it('sends the ffToken when the grant is on', async () => {
+    // The mirror: without it, a handler that never minted would satisfy the case above.
+    const callback = await okCallback();
+    const app = await startConsentHandler({
+      callbackBase: callback.url,
+      mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
+      mintFfToken: (async () => ({ token: FF_TOKEN })) as never,
+      env: { CORTEX_FF_API_ENABLED: 'true' },
+    });
+
+    await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    const body = callback.requests[0]!.json as Record<string, unknown>;
+    expect(body.ffToken).toBe(FF_TOKEN);
+  });
+
+  it('mints for the VERIFIED user, never a client-supplied identity', async () => {
+    const seen: Array<{ email: string; lifetime: string }> = [];
+    const callback = await okCallback();
+    const app = await startConsentHandler({
+      user: { id: 'user-1', email: 'lew@velocityfibre.co.za' },
+      callbackBase: callback.url,
+      mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
+      mintFfToken: (async (user: { email: string }, lifetime: string) => {
+        seen.push({ email: user.email, lifetime });
+        return { token: FF_TOKEN };
+      }) as never,
+      env: { CORTEX_FF_API_ENABLED: 'true' },
+    });
+
+    await app.post('/api/cortex/mcp-consent', {
+      stateId: VALID_STATE_ID,
+      email: 'attacker@example.com',
+      role: 'super_admin',
+    });
+
+    expect(seen).toEqual([{ email: 'lew@velocityfibre.co.za', lifetime: '90d' }]);
+  });
+
+  it('never returns the ffToken to the browser', async () => {
+    // It is a FibreFlow bearer. The browser gets a redirect URL and nothing else — the
+    // same rule the bridge token already follows.
+    const callback = await okCallback();
+    const app = await startConsentHandler({
+      callbackBase: callback.url,
+      mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
+      mintFfToken: (async () => ({ token: FF_TOKEN })) as never,
+      env: { CORTEX_FF_API_ENABLED: 'true' },
+    });
+
+    const response = await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(JSON.stringify(response.json)).not.toContain(FF_TOKEN);
+    expect(JSON.stringify(app.logs)).not.toContain(FF_TOKEN);
   });
 });
