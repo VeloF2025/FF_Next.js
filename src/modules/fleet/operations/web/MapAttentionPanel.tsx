@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { useState } from 'react';
 import type { OperationalStatus } from '../types';
 import type { OperationFilters } from './operationFilters';
@@ -13,6 +14,18 @@ const ACTIONABLE = new Set<OperationalStatus>([
   'late', 'wrong_site', 'evidence_mismatch', 'left_early', 'unassigned', 'unverifiable',
   'vehicle_on_site_driver_unconfirmed',
 ]);
+/** Only these four PR6 auto-produced incident types share their name with an `OperationalStatus` value; every other status is summary-only and gets no incident deep link. */
+const INCIDENT_PRODUCING_STATUSES = new Set<OperationalStatus>(['late', 'wrong_site', 'evidence_mismatch', 'left_early']);
+
+function incidentsHref(item: MapAttentionItem, filters: OperationFilters): string | null {
+  if (!INCIDENT_PRODUCING_STATUSES.has(item.row.status)) return null;
+  const query = new URLSearchParams();
+  query.set('incidentType', item.row.status);
+  const projectId = item.row.projectId ?? filters.projectId;
+  if (projectId) query.set('projectId', projectId);
+  query.set('staffId', item.row.staffId);
+  return `/fleet/incidents?${query.toString()}`;
+}
 const STATUS_LABELS: Record<OperationalStatus, string> = {
   off_duty: 'Off duty', scheduled_not_due: 'Scheduled, not due', unassigned: 'Unassigned',
   unverifiable: 'Unverifiable', late: 'Late', approaching: 'Approaching',
@@ -32,21 +45,28 @@ function EvidenceText({ item }: { item: MapAttentionItem }) {
   return <p className="text-xs">{evidenceForMapItem(item).replaceAll('_', ' ')} evidence</p>;
 }
 
-function AttentionRows({ items, selectedStaffId, onFocusStaff }: {
+function AttentionRows({ items, selectedStaffId, onFocusStaff, filters }: {
   items: MapAttentionItem[];
   selectedStaffId: string | null;
   onFocusStaff: (staffId: string) => void;
+  filters: OperationFilters;
 }) {
   if (!items.length) return <p className="p-3 text-sm">No staff currently need attention.</p>;
-  return <div className="divide-y overflow-y-auto">{items.map((item) => (
-    <button key={item.row.staffId} type="button" aria-label={`Focus ${item.row.staffName} on map`}
-      aria-pressed={item.row.staffId === selectedStaffId} onClick={() => onFocusStaff(item.row.staffId)}
-      className="block w-full p-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500">
-      <span className="font-medium">{item.row.staffName}</span>
-      <span className="ml-2 rounded bg-gray-100 px-2 py-1 text-xs">{STATUS_LABELS[item.row.status]}</span>
-      <EvidenceText item={item} />
-    </button>
-  ))}</div>;
+  return <div className="divide-y overflow-y-auto">{items.map((item) => {
+    const href = incidentsHref(item, filters);
+    return (
+      <div key={item.row.staffId} className="flex items-center justify-between gap-2 p-3">
+        <button type="button" aria-label={`Focus ${item.row.staffName} on map`}
+          aria-pressed={item.row.staffId === selectedStaffId} onClick={() => onFocusStaff(item.row.staffId)}
+          className="min-w-0 flex-1 text-left focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <span className="font-medium">{item.row.staffName}</span>
+          <span className="ml-2 rounded bg-gray-100 px-2 py-1 text-xs">{STATUS_LABELS[item.row.status]}</span>
+          <EvidenceText item={item} />
+        </button>
+        {href && <Link href={href} aria-label={`View incidents for ${item.row.staffName}`} className="shrink-0 rounded border px-2 py-1 text-xs">Incidents</Link>}
+      </div>
+    );
+  })}</div>;
 }
 
 export interface MapAttentionPanelProps {
@@ -71,7 +91,7 @@ export function MapAttentionPanel({
           <div className="flex items-center justify-between border-b p-3"><strong>Needs attention ({attention.length})</strong>
             <button type="button" aria-expanded="true" aria-label="Collapse attention panel"
               onClick={() => setDesktopExpanded(false)}>Collapse</button></div>
-          <AttentionRows items={attention} selectedStaffId={selectedStaffId} onFocusStaff={onFocusStaff} />
+          <AttentionRows items={attention} selectedStaffId={selectedStaffId} onFocusStaff={onFocusStaff} filters={filters} />
         </aside> : <button type="button" aria-expanded="false" aria-label="Expand attention panel"
           onClick={() => setDesktopExpanded(true)} className="rounded border bg-white px-3 py-2 shadow">Attention ({attention.length})</button>}
       </div>
@@ -83,7 +103,7 @@ export function MapAttentionPanel({
             Needs attention ({attention.length})
           </button>
           {mobileExpanded && <div className="max-h-64 overflow-y-auto"><AttentionRows items={attention}
-            selectedStaffId={selectedStaffId} onFocusStaff={onFocusStaff} /></div>}
+            selectedStaffId={selectedStaffId} onFocusStaff={onFocusStaff} filters={filters} /></div>}
         </section>
       </div>
     </>

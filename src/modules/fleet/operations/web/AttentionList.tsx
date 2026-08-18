@@ -3,6 +3,24 @@ import type { OperationalAttentionRow } from '../presentationTypes';
 import type { OperationalStatus } from '../types';
 import { serializeOperationFilters, type OperationFilters } from './operationFilters';
 
+/**
+ * Only the four PR6 auto-produced incident types share their name with an
+ * `OperationalStatus` value — everything else (unassigned/unverifiable/
+ * vehicle_on_site_driver_unconfirmed/…) is summary-only and never opens an
+ * incident, so it gets no "View incidents" deep link here.
+ */
+const INCIDENT_PRODUCING_STATUSES = new Set<OperationalStatus>(['late', 'wrong_site', 'evidence_mismatch', 'left_early']);
+
+function incidentsHref(row: OperationalAttentionRow, filters: OperationFilters): string | null {
+  if (!INCIDENT_PRODUCING_STATUSES.has(row.status)) return null;
+  const query = new URLSearchParams();
+  query.set('incidentType', row.status);
+  const projectId = row.projectId ?? filters.projectId;
+  if (projectId) query.set('projectId', projectId);
+  query.set('staffId', row.staffId);
+  return `/fleet/incidents?${query.toString()}`;
+}
+
 const STATUS_LABELS: Record<OperationalStatus, string> = {
   off_duty: 'Off duty', scheduled_not_due: 'Scheduled, not due', unassigned: 'Unassigned',
   unverifiable: 'Unverifiable', late: 'Late', approaching: 'Approaching',
@@ -63,6 +81,9 @@ export function AttentionList({ rows, filters, onOpenEvidence }: AttentionListPr
           <div className="flex flex-wrap gap-2">
             <Link href={mapHref(row, filters)} className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">View on map</Link>
             <Link href={assignmentHref(row, filters)} className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">Manage assignment</Link>
+            {incidentsHref(row, filters) && (
+              <Link href={incidentsHref(row, filters)!} className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">View incidents</Link>
+            )}
           </div>
         </article>
       ))}

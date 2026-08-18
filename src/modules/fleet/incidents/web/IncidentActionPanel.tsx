@@ -1,0 +1,118 @@
+/**
+ * Transition/outcome/note validation UI (Task 8 split from
+ * `IncidentReviewDrawer.tsx`, which owns fetching and every read-only
+ * section). Reflects the exact lifecycle matrix enforced server-side in
+ * `reviewTransitions.ts`: `open` -> acknowledge/comment, `acknowledged` ->
+ * start review/comment, `under_review` -> comment/resolve/dismiss, and no
+ * controls at all once the incident is terminal (`resolved`/`dismissed`
+ * reject every action, including `commented`).
+ *
+ * A failed submission never clears the draft — `note`/`outcome`/
+ * `linkedIncidentReference` stay exactly as typed so the manager can fix an
+ * evidence-required rejection and resubmit without retyping (this task's
+ * hard requirement). Success is only signalled after the API confirms it.
+ */
+import { useState } from 'react';
+import { incidentApi, IncidentApiError, type IncidentActionBody } from './incidentApi';
+import type { IncidentDetail, IncidentOutcome } from '../types';
+
+const RESOLVED_OUTCOMES: readonly IncidentOutcome[] = ['confirmed', 'valid_reason', 'assignment_error', 'geofence_error', 'no_action_required'];
+const DISMISSED_OUTCOMES: readonly IncidentOutcome[] = ['false_positive', 'data_gap', 'duplicate'];
+const OUTCOME_LABELS: Record<IncidentOutcome, string> = {
+  confirmed: 'Confirmed', valid_reason: 'Valid reason', false_positive: 'False positive', data_gap: 'Data gap',
+  assignment_error: 'Assignment error', geofence_error: 'Geofence error', duplicate: 'Duplicate', no_action_required: 'No action required',
+};
+
+type AvailableAction = 'acknowledged' | 'review_started' | 'commented' | 'resolved' | 'dismissed';
+
+function availableActions(incident: IncidentDetail): AvailableAction[] {
+  switch (incident.lifecycleStatus) {
+    case 'open': return ['acknowledged', 'commented'];
+    case 'acknowledged': return ['review_started', 'commented'];
+    case 'under_review': return ['commented', 'resolved', 'dismissed'];
+    default: return [];
+  }
+}
+
+export interface IncidentActionPanelProps {
+  incident: IncidentDetail;
+  canEdit: boolean;
+  onSubmitted: () => void;
+}
+
+export function IncidentActionPanel({ incident, canEdit, onSubmitted }: IncidentActionPanelProps) {
+  const actions = availableActions(incident);
+  const [actionType, setActionType] = useState<AvailableAction | ''>('');
+  const [note, setNote] = useState('');
+  const [outcome, setOutcome] = useState<IncidentOutcome | ''>('');
+  const [linkedIncidentReference, setLinkedIncidentReference] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!canEdit) return <p className="text-sm text-[var(--ff-text-secondary)]">You do not have permission to act on this incident.</p>;
+  if (!actions.length) return <p className="text-sm text-[var(--ff-text-secondary)]">This incident is closed. No further action is available.</p>;
+
+  const terminal = actionType === 'resolved' || actionType === 'dismissed';
+  const outcomeOptions = actionType === 'resolved' ? RESOLVED_OUTCOMES : actionType === 'dismissed' ? DISMISSED_OUTCOMES : [];
+  const noteRequired = actionType === 'commented' || terminal;
+  const valid = Boolean(actionType) && (!noteRequired || note.trim())
+    && (!terminal || outcome) && (outcome !== 'duplicate' || linkedIncidentReference.trim());
+
+  async function submit(): Promise<void> {
+    if (!actionType || !valid) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const body: IncidentActionBody = {
+        actionType, note: note.trim() || null, outcome: terminal ? (outcome as IncidentOutcome) : null,
+        linkedIncidentReference: outcome === 'duplicate' ? linkedIncidentReference.trim() : null,
+      };
+      await incidentApi.act(incident.id, body);
+      setActionType(''); setNote(''); setOutcome(''); setLinkedIncidentReference('');
+      onSubmitted();
+    } catch (caught) {
+      setError(caught instanceof IncidentApiError ? caught.message : 'Could not save this action');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section aria-label="Incident actions" className="space-y-3 rounded border border-[var(--ff-border-light)] p-3">
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        {actions.map((action) => (
+          <button key={action} type="button" aria-pressed={actionType === action}
+            onClick={() => setActionType(action)}
+            className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm capitalize">
+            {action.replaceAll('_', ' ')}
+          </button>
+        ))}
+      </div>
+      {actionType && (
+        <div className="space-y-2">
+          {terminal && (
+            <label className="block text-sm">Outcome
+              <select aria-label="Outcome" value={outcome} onChange={(event) => setOutcome(event.target.value as IncidentOutcome)} className="mt-1 block w-full">
+                <option value="">Select an outcome</option>
+                {outcomeOptions.map((item) => <option key={item} value={item}>{OUTCOME_LABELS[item]}</option>)}
+              </select>
+            </label>
+          )}
+          {outcome === 'duplicate' && (
+            <label className="block text-sm">Linked incident reference
+              <input aria-label="Linked incident reference" value={linkedIncidentReference}
+                onChange={(event) => setLinkedIncidentReference(event.target.value)} className="mt-1 block w-full" />
+            </label>
+          )}
+          <label className="block text-sm">Note{noteRequired ? '' : ' (optional)'}
+            <textarea aria-label="Note" value={note} onChange={(event) => setNote(event.target.value)} className="mt-1 block w-full" />
+          </label>
+          <button type="button" disabled={!valid || submitting} onClick={() => void submit()} className="rounded bg-[var(--ff-primary)] px-3 py-2 text-sm text-white disabled:opacity-50">
+            {submitting ? 'Saving…' : 'Submit'}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
