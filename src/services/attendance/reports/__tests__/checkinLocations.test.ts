@@ -70,6 +70,8 @@ describe('runCheckinLocations', () => {
       accuracy_m: 18,
       selfie: '/api/staff/attendance-selfie?entryId=entry-1&kind=in&context=checkin-locations',
       entry_id: 'entry-1',
+      lat: -26.3012345,
+      lon: 27.8123456,
     });
   });
 
@@ -114,7 +116,7 @@ describe('runCheckinLocations', () => {
     const result = await runCheckinLocations(input());
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]).toMatchObject({
-      verdict: 'no_gps', lat: '', lon: '', nearest_project: '',
+      verdict: 'no_gps', lat: null, lon: null, nearest_project: '',
       distance_m: null, accuracy_m: null,
     });
     expect(result.notes).toContain('1 event(s) carry no GPS fix and cannot be located.');
@@ -131,6 +133,18 @@ describe('runCheckinLocations', () => {
     );
     // ...and does NOT claim a GPS gap that isn't there.
     expect(result.notes.some((n) => n.includes('no GPS fix'))).toBe(false);
+  });
+
+  it('emits coordinates as numbers so the CSV guard cannot text-escape them', async () => {
+    const result = await runCheckinLocations(input());
+    // A string '-26.30…' trips the leading-'-' formula guard in
+    // exportSerializers and reaches Excel as text, unusable on a map.
+    expect(typeof result.rows[0]!.lat).toBe('number');
+    expect(typeof result.rows[0]!.lon).toBe('number');
+    // Full precision retained — a 'number' format would round to 2dp (~1km).
+    expect(result.rows[0]!.lat).toBe(-26.3012345);
+    const latCol = result.columns.find((c) => c.key === 'lat');
+    expect(latCol?.format).toBeUndefined();
   });
 
   it('binds the date range, supervisor scope and row cap as parameters', async () => {

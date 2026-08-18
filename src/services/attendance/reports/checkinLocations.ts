@@ -42,8 +42,13 @@ const COLUMNS: ReadonlyArray<ReportColumn> = [
   { key: 'nearest_project', label: 'Nearest project' },
   { key: 'distance_m', label: 'Distance (m)', align: 'right', format: 'integer' },
   { key: 'accuracy_m', label: 'GPS ± (m)', align: 'right', format: 'number' },
-  { key: 'lat', label: 'Lat' },
-  { key: 'lon', label: 'Lon' },
+  // Numbers, not strings: every SA latitude is negative, and the CSV
+  // formula-injection guard prefixes a leading '-' with an apostrophe, so a
+  // string coordinate lands in Excel as text ('-33.8794508) that no mapping
+  // tool will parse. Deliberately no 'number' format — that rounds to 2dp
+  // and would throw away ~1 km of precision.
+  { key: 'lat', label: 'Lat', align: 'right' },
+  { key: 'lon', label: 'Lon', align: 'right' },
   { key: 'selfie', label: 'Selfie', format: 'link' },
   { key: 'device_fingerprint', label: 'Device' },
   { key: 'entry_id', label: 'Entry ID' },
@@ -214,8 +219,8 @@ export async function runCheckinLocations(input: ReportInput): Promise<ReportRun
       nearest_project: r.nearest_project ?? '',
       distance_m: r.distance_m !== null ? Math.round(Number(r.distance_m)) : null,
       accuracy_m: r.accuracy_m !== null ? Number(r.accuracy_m) : null,
-      lat: r.lat ?? '',
-      lon: r.lon ?? '',
+      lat: r.lat !== null ? Number(r.lat) : null,
+      lon: r.lon !== null ? Number(r.lon) : null,
       selfie: r.selfie_available ? selfieLink(r.entry_id, r.event) : '',
       device_fingerprint: r.device_fingerprint ?? '',
       entry_id: r.entry_id,
