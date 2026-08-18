@@ -54,8 +54,6 @@ if (!process.env.DATABASE_URL) {
   process.exit(2);
 }
 
-
-
 interface AoiRow extends Record<string, unknown> {
   project_name: string | null;
   pole_count: number;
