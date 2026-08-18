@@ -265,8 +265,9 @@ PROJECTS = {
     # NOT plain `label`, which does not exist here. Verified rather than assumed: all 121
     # photo-bearing rows resolve to a `GRA.P.*` label and all 121 match a row in `poles`
     # for this project. Verified after the re-extract: 121/121 carry GRA.P.* ids, zero
-    # synthetic, and they line up with the 122 construction_qa_reviews already using that
-    # convention.
+    # synthetic, and they line up with the 121 GRA.P.* construction_qa_reviews that
+    # already exist. Grabouw has 122 reviews in total — the 122nd is the QF-POLE-574a7856
+    # placeholder described below, which follows no convention and matches nothing.
     #
     # pon_col/zone_col ARE set here, unlike Cradock/Middelburg/Ben Farm: this layer really
     # carries pon_no and zone_no and they are populated on the photo-bearing rows.
