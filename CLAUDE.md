@@ -80,12 +80,30 @@ bash scripts/deploy-local.sh production   # After hours only, with Hein's approv
 
 ## CI
 
-Full application CI runs on the `velo-fibreflow` self-hosted runner on `velo-server` (systemd user unit `gha-runner-fibreflow.service`, labels `self-hosted, linux, fibreflow`). The dependency-free agent-docs gate runs on `ubuntu-latest` because it executes PR-controlled generator code; keep that job off persistent self-hosted runners.
+Full application CI runs on the `velo-fibreflow-u` self-hosted runner on `velo-server` (labels `self-hosted, linux, fibreflow`). The dependency-free agent-docs gate runs on `ubuntu-latest` because it executes PR-controlled generator code; keep that job off persistent self-hosted runners.
 
-- Re-register: `~/bin/install-gha-runner VelocityFibre/FF_Next.js fibreflow` (idempotent — uses `--replace`).
-- Runner assignment: `gh run view <id> --json jobs` (the runner inventory API requires repository administration permission).
-- Service control: `systemctl --user status|restart gha-runner-fibreflow`
-- Live logs: `journalctl --user -u gha-runner-fibreflow -f`
+The runner is a **system** unit running as the `gha-fibreflow` user:
+
+```
+actions.runner.VelocityFibre-FF_Next.js.velo-fibreflow-u.service
+```
+
+- Status: `systemctl status actions.runner.VelocityFibre-FF_Next.js.velo-fibreflow-u`
+- Live logs: `sudo journalctl -u actions.runner.VelocityFibre-FF_Next.js.velo-fibreflow-u -f`
+- Which runner served a run: `gh api repos/VelocityFibre/FF_Next.js/actions/runs/<id>/jobs --jq '.jobs[].runner_name'`. **Not** `gh run view <id> --json jobs` — that returns `name`/`status`/`conclusion`/`steps` and no runner field at all, so it cannot answer this question. (The runner *inventory* API is separate and needs repository administration permission.)
+
+⚠️ **`gha-runner-fibreflow.service` (systemd USER unit) is a dead orphan — ignore it.** It reports `inactive (dead)` with `Failed to create a session. The runner registration has been deleted from the server, please re-configure`, which reads exactly like a broken runner. It is not one; `velo-fibreflow-u` above is serving jobs normally. Verified 2026-08-17: run 32045067240 completed `success` on `velo-fibreflow-u` while the orphan unit was dead throughout.
+
+**Do NOT "fix" it with `~/bin/install-gha-runner`.** The two are registered under *different* names, so `--replace` would not disturb the live one:
+
+| | `agentName` | `agentId` | runs as | working dir |
+|---|---|---|---|---|
+| Live | `velo-fibreflow-u` | 24 | `gha-fibreflow` | `/home/gha-fibreflow/actions-runner-fibreflow` |
+| Orphan | `velo-fibreflow` | 22 | `hein` | `~/actions-runner-fibreflow` |
+
+The risk is not a deleted registration — it is a **second live runner competing for the same jobs**. `install-gha-runner` sets `RUNNER_NAME="velo-${SHORT}"` and `LABELS="self-hosted,linux,velo,${SHORT}"`, so re-registering `fibreflow` brings up a runner carrying all three labels this repo's `runs-on: [self-hosted, linux, fibreflow]` requires — under a different user, from a different directory, with a different environment. Jobs would then land on either box non-deterministically, producing failures that reproduce on one machine and not the other. Leave the orphan dead.
+
+**A queued job is more often a GitHub outage than a local fault.** Check `curl -s https://www.githubstatus.com/api/v2/components.json` before touching the runner — on 2026-08-17 Actions/API/PRs were all `major_outage` and a run still sat queued ~15 minutes before completing normally.
 
 **Standing review-and-merge rule.** When the user says "review and merge" or "review the PR":
 
