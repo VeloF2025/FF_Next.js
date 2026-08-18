@@ -27,8 +27,32 @@
  *     shouting.
  */
 
-import { sql } from '../../src/lib/db-pool';
-import { log } from '../../src/lib/logger';
+import * as dotenv from 'dotenv';
+
+// Cron entry points write to stderr, matching the sibling attendance crons.
+//
+// Precisely why, because the shorthand in those files ("the logger is a
+// no-op") is not quite right: @/lib/logger sends warn/error to stderr
+// always, but info/debug ONLY when LOG_STDOUT=true (src/lib/logger.ts:152).
+// Cron does not set it, so every progress line — how many AOIs were found,
+// how many were written — would vanish, and the log would contain nothing
+// but silence on a good night and a bare error on a bad one. This script's
+// whole value under cron is its progress output. console.* is disallowed by
+// lint (#2007), so stderr it is.
+function stderr(msg: string): void {
+  process.stderr.write(`${new Date().toISOString()} ${msg}\n`);
+}
+
+// Environment: .env.production in prod, .env.local for dev runs. tsx does NOT
+// load these on its own — without this the pg client gets an undefined
+// password and dies with "SASL: client password must be a string".
+dotenv.config({ path: '.env.production' });
+dotenv.config({ path: '.env.local', override: false });
+
+if (!process.env.DATABASE_URL) {
+  stderr('[project-aoi-refresh] DATABASE_URL not set — aborting refresh');
+  process.exit(2);
+}
 
 interface AoiRow extends Record<string, unknown> {
   project_name: string | null;
@@ -37,6 +61,11 @@ interface AoiRow extends Record<string, unknown> {
 }
 
 async function main(): Promise<void> {
+  // Imported here, not at the top: db-pool reads DATABASE_URL when the module
+  // first loads, and a static import would be hoisted above dotenv.config().
+  // A top-level await is not an option — tsx emits CJS, which rejects it.
+  const { sql } = await import('../../src/lib/db-pool');
+
   const dryRun = process.argv.includes('--dry-run');
 
   const before = await sql.query<AoiRow>(
@@ -45,15 +74,13 @@ async function main(): Promise<void> {
       ORDER BY pr.project_name`,
     [],
   );
-  log.info('[project-aoi-refresh] current state', { aoiCount: before.length });
+  stderr(`[project-aoi-refresh] current state: ${before.length} AOI(s)`);
 
   if (dryRun) {
     for (const r of before) {
-      log.info('[project-aoi-refresh] existing', {
-        project: r.project_name, poleCount: r.pole_count, computedAt: r.computed_at,
-      });
+      stderr(`[project-aoi-refresh] existing: ${r.project_name} poles=${r.pole_count} computedAt=${r.computed_at}`);
     }
-    log.info('[project-aoi-refresh] dry run — no changes written');
+    stderr('[project-aoi-refresh] dry run — no changes written');
     return;
   }
 
@@ -70,11 +97,7 @@ async function main(): Promise<void> {
     [],
   );
 
-  log.info('[project-aoi-refresh] complete', {
-    written,
-    aoiCount: after.length,
-    previousCount: before.length,
-  });
+  stderr(`[project-aoi-refresh] complete: written=${written} aois=${after.length} previous=${before.length}`);
 
   // Zero AOIs is a failure, not an empty success: every subsequent clock-in
   // would silently record no project at all.
@@ -86,6 +109,6 @@ async function main(): Promise<void> {
 main()
   .then(() => process.exit(0))
   .catch((err: unknown) => {
-    log.error('[project-aoi-refresh] failed', err instanceof Error ? { message: err.message } : { err });
+    stderr(`[project-aoi-refresh] failed: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   });
