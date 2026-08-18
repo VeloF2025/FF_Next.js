@@ -201,6 +201,15 @@ export async function runBulkAcknowledge(
   const results: BulkAcknowledgeItemResult[] = [];
   for (const id of incidentIds) {
     const outcome = await transaction((txn) => acknowledgeIncident(id, actorUserId, null, requestCorrelationId, txn));
+    // The validation SELECT above is unlocked, so another manager can still resolve/dismiss
+    // this incident between validation and this incident's own row-locked transaction.
+    // acknowledgeIncident correctly detects that race and returns terminal_conflict without
+    // mutating — abort the batch here rather than folding an untouched incident into a
+    // uniform success list, matching the single-incident path (runAcknowledged) which
+    // throws the same error for the same outcome.
+    if (outcome.outcome === 'terminal_conflict') {
+      throw new IncidentTransitionConflictError(`Incident ${id} is already closed`, outcome.lifecycleStatus);
+    }
     results.push({ incidentId: id, lifecycleStatus: outcome.lifecycleStatus, actionId: outcome.actionId ?? '' });
   }
   return { results };

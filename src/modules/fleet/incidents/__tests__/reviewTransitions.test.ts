@@ -229,4 +229,22 @@ describe('runBulkAcknowledge', () => {
     ]);
     expect(db.transaction).toHaveBeenCalledTimes(2);
   });
+
+  // Race: the one unlocked validation SELECT sees both as 'open', but between
+  // validation and this incident's own per-item transaction another manager
+  // resolves it — acknowledgeIncident (row-locked) correctly detects that and
+  // returns 'terminal_conflict' without mutating. The batch must surface that
+  // distinctly, never fold the untouched incident into a uniform success list.
+  it('surfaces a per-item terminal_conflict race instead of reporting it as succeeded', async () => {
+    db.query.mockResolvedValue([
+      { id: INCIDENT, lifecycle_status: 'open', project_id: null },
+      { id: OTHER_INCIDENT, lifecycle_status: 'open', project_id: null },
+    ]);
+    repo.acknowledgeIncident
+      .mockResolvedValueOnce({ outcome: 'acknowledged', lifecycleStatus: 'acknowledged', actionId: 'a1' })
+      .mockResolvedValueOnce({ outcome: 'terminal_conflict', lifecycleStatus: 'resolved', actionId: null });
+
+    await expect(runBulkAcknowledge([INCIDENT, OTHER_INCIDENT], USER, unrestrictedScope, null))
+      .rejects.toBeInstanceOf(IncidentTransitionConflictError);
+  });
 });
