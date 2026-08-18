@@ -83,7 +83,7 @@ async function loadActiveProjectIds(): Promise<string[]> {
  * (project discovery or any one project's roster call) is systemic: the
  * caller must never partially process a roster it could not fully load.
  *
- * Exported so `actionRunner`'s morning-summary phase (Task 5) reuses this
+ * Exported so `incidentSummaryPhase`'s morning-summary phase reuses this
  * exact "enumerate active projects, load each project's complete roster"
  * definition instead of re-deriving it — there is exactly one definition of
  * "the monitored roster" for PR6.
