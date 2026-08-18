@@ -287,11 +287,15 @@ Two independent cron endpoints, both behind `pages/api/cron/...` and a matching
 | `/api/cron/fleet-operational-monitor` | every 5 min | Loads every active project's complete PR 4 roster (one roster-loading *phase*; any one project's load failing fails the whole phase — never a silent partial), runs `incidentProducer` per staff row, sends `opened` notifications after each incident transaction commits. |
 | `/api/cron/fleet-incident-actions` | at least every 5 min | Three independent phases in one tick: escalation (always), 08:15 SAST morning summary (at most once per SAST work date, skipped entirely before 08:15), status-monitor health check (always). One phase's failure never blocks or hides another's. |
 
-**Auth is `Authorization: Bearer <CRON_SECRET>`** — the repo's dominant convention
-(`appeals-vlm.ts`, `auto-qa.ts`, `backfill-onemap-data.ts`), fail-closed when unset.
-Both endpoints deliberately do **not** also accept the minority `x-cron-secret`
-header used elsewhere in the repo — supporting two undocumented secret paths on one
-endpoint is exactly what this repo's secret-handling rules forbid.
+**Auth is `x-cron-secret: <CRON_SECRET>`** — matching this Fleet module's own
+existing convention (`fleet-parking-check.ts`, `fleet-check-reminders.ts`), fail-
+closed when unset. `Authorization: Bearer <CRON_SECRET>` is used by some other,
+unrelated cron endpoints in the repo (`appeals-vlm.ts`, `auto-qa.ts`,
+`backfill-onemap-data.ts`), but a header-check count found `x-cron-secret` more
+common overall — and either way, one module should not mix both conventions.
+Both endpoints deliberately do **not** also accept `Authorization: Bearer` —
+supporting two undocumented secret paths on one endpoint is exactly what this
+repo's secret-handling rules forbid.
 
 Both endpoints run their work inside `runWithCronLock` (`cronLock.ts`), which
 mirrors `appeals-vlm.ts`'s pinned-connection discipline: `pool.connect()`,

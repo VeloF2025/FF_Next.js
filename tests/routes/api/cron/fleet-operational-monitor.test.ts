@@ -17,7 +17,7 @@ import handler from '@/pages/api/cron/fleet-operational-monitor';
 // Named to avoid the repo secret-scanner's credential-keyword-in-KEY rule
 // (see scripts/secret-scan.sh) — this is a fixture value, never a real secret.
 const CRON_AUTH_FIXTURE = 'fixture-cron-value';
-const AUTH = { authorization: `Bearer ${CRON_AUTH_FIXTURE}` };
+const AUTH = { 'x-cron-secret': CRON_AUTH_FIXTURE };
 
 function run(headers: Record<string, string>, method: 'GET' | 'POST' | 'PUT' = 'POST') {
   const { req, res } = createMocks<NextApiRequest, NextApiResponse>({ method, headers });
@@ -50,14 +50,14 @@ describe('POST /api/cron/fleet-operational-monitor', () => {
     expect(lock.runWithCronLock).not.toHaveBeenCalled();
   });
 
-  it('returns 401 on a missing bearer', async () => {
+  it('returns 401 on a missing cron secret', async () => {
     const res = await run({});
     expect(res._getStatusCode()).toBe(401);
     expect(lock.runWithCronLock).not.toHaveBeenCalled();
   });
 
-  it('returns 401 on a wrong bearer', async () => {
-    expect((await run({ authorization: 'Bearer nope' }))._getStatusCode()).toBe(401);
+  it('returns 401 on a wrong cron secret', async () => {
+    expect((await run({ 'x-cron-secret': 'nope' }))._getStatusCode()).toBe(401);
   });
 
   it('runs the monitor under the fleet-operational-monitor lock name and returns its result', async () => {

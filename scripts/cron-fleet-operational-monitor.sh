@@ -3,7 +3,8 @@
 #
 # Calls pages/api/cron/fleet-operational-monitor.ts on localhost. The secret is
 # read from the deploy dir's env file at run time and passed as an
-# Authorization header, so it never appears in the crontab, in `ps`, or in
+# x-cron-secret header (this Fleet module's own convention, same as
+# fleet-parking-check.ts), so it never appears in the crontab, in `ps`, or in
 # this file.
 #
 # Install on velo (SAST — velo cron runs in local time):
@@ -49,8 +50,8 @@ echo "$LOG_PREFIX === Fleet operational monitor start (port ${PORT}) ==="
 
 # -sS keeps it quiet on success but prints the error on failure; -f makes an
 # HTTP 4xx/5xx a non-zero exit so a rejected secret is not logged as a success.
-# This endpoint authenticates on Authorization: Bearer, not x-cron-secret.
-if ! curl -sS -f -m 120 -X POST -H "Authorization: Bearer ${CRON_SECRET}" "$URL"; then
+# This endpoint authenticates on x-cron-secret, not Authorization: Bearer.
+if ! curl -sS -f -m 120 -X POST -H "x-cron-secret: ${CRON_SECRET}" "$URL"; then
   echo ""
   echo "$LOG_PREFIX ERROR: operational monitor request failed" >&2
   exit 1

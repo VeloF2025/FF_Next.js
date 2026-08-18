@@ -6,12 +6,15 @@
  * `pages/api/cron/appeals-vlm.ts`) and `runOperationalMonitor` (roster load,
  * per-staff producer calls, run finalization — see monitorService.ts).
  *
- * Auth matches this repo's dominant cron convention (`appeals-vlm.ts`,
- * `auto-qa.ts`, `backfill-onemap-data.ts`, `action-centre-rules.ts`, and
- * others): `Authorization: Bearer <CRON_SECRET>`, fail-closed when unset.
- * A minority of cron endpoints in this repo instead use `x-cron-secret`;
- * this endpoint intentionally does not accept that header too — supporting
- * two undocumented secret paths on one endpoint is exactly what this repo's
+ * Auth matches this Fleet module's own convention — `x-cron-secret`, same
+ * as `fleet-parking-check.ts` and `fleet-check-reminders.ts` — rather than
+ * this repo's `Authorization: Bearer <CRON_SECRET>` convention used
+ * elsewhere (`appeals-vlm.ts`, `auto-qa.ts`, and others); a per-repo count
+ * of actual header checks found `x-cron-secret` more common overall, and
+ * mixing both conventions inside one module is worse than picking either
+ * one consistently. Fail-closed when unset. This endpoint intentionally
+ * does not also accept `Authorization: Bearer` — supporting two
+ * undocumented secret paths on one endpoint is exactly what this repo's
  * secret-handling rules forbid.
  *
  * Schedule: every 5 minutes via scripts/cron-fleet-operational-monitor.sh.
@@ -37,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     log.error('CRON_SECRET not configured', undefined, MODULE);
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Server misconfigured: CRON_SECRET not set');
   }
-  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+  if (req.headers['x-cron-secret'] !== cronSecret) {
     return apiResponse.unauthorized(res, 'Invalid or missing cron secret');
   }
 

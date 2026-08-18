@@ -7,11 +7,12 @@
  * `pages/api/cron/appeals-vlm.ts`) and `runIncidentActions` (escalation,
  * summary, and health orchestration — see actionRunner.ts).
  *
- * Auth matches `fleet-operational-monitor.ts` (Task 4)'s established
- * convention: `Authorization: Bearer <CRON_SECRET>`, fail-closed when unset.
- * This endpoint intentionally does not also accept `x-cron-secret` —
- * supporting two undocumented secret paths on one endpoint is exactly what
- * this repo's secret-handling rules forbid.
+ * Auth matches `fleet-operational-monitor.ts` and this Fleet module's own
+ * convention — `x-cron-secret`, same as `fleet-parking-check.ts` and
+ * `fleet-check-reminders.ts` — fail-closed when unset. This endpoint
+ * intentionally does not also accept `Authorization: Bearer` — supporting
+ * two undocumented secret paths on one endpoint is exactly what this
+ * repo's secret-handling rules forbid.
  *
  * Schedule: at least every 5 minutes via scripts/cron-fleet-incident-actions.sh.
  * Registering that schedule on velo's crontab is a deployment action
@@ -36,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     log.error('CRON_SECRET not configured', undefined, MODULE);
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Server misconfigured: CRON_SECRET not set');
   }
-  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+  if (req.headers['x-cron-secret'] !== cronSecret) {
     return apiResponse.unauthorized(res, 'Invalid or missing cron secret');
   }
 
