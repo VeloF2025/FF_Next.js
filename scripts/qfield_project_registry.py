@@ -224,6 +224,47 @@ PROJECTS = {
         "table_name": "civil_audit_mt__civil_audit_bf",
         "label_col": "Label",
     },
+    # Grabouw had rows BEFORE it was registered, which is why they look wrong rather than
+    # absent: 121 qfield_photo_validations rows from a one-off import on 2026-02-07, with
+    # checklist_step NULL and feature_id set to the FILENAME STEM
+    # ("poles_20251113102437166") instead of a pole label. None matches a pole, so nothing
+    # downstream can use them.
+    #
+    # THIS ENTRY DOES NOT RETROACTIVELY FIX THOSE 121 ROWS. ingest_rows skips any photo
+    # whose photo_key or filename is already present, so the stale rows block their own
+    # replacements — a dry run reports "121 photos found, 1 new upserted". Correcting them
+    # means deleting the 2026-02-07 rows first and letting the extractor recreate them.
+    # What this entry does fix is every photo captured from here on.
+    #
+    # Also note this layer has NO recognised step columns — 3 "extra photo" columns
+    # (Pole Photo, LabelPhoto, …) rather than a numbered civil-audit checklist. The extra
+    # column path inserts checklist_step/step_label as NULL by design, so Grabouw photos
+    # arrive unstepped whatever this entry says. That is a property of the source data,
+    # not something a registry entry can change.
+    #
+    # Read off the live file (Poles.gpkg v20260219132551): one table, `Poles`, 3,796 rows,
+    # label_col `label_1` — the same `_1` publish-collision suffix Thembisa POP 1 carries,
+    # NOT plain `label`, which does not exist here. Verified rather than assumed: all 121
+    # photo-bearing rows resolve to a `GRA.P.*` label and all 121 match a row in `poles`
+    # for this project, so the ids will line up with the 122 construction_qa_reviews that
+    # already exist under that convention.
+    #
+    # pon_col/zone_col ARE set here, unlike Cradock/Middelburg/Ben Farm: this layer really
+    # carries pon_no and zone_no and they are populated on the photo-bearing rows.
+    #
+    # Only the QA project is registered. Grabouw also has a second QFieldCloud project,
+    # Drill Survey (0fc570b5…), holding exactly ONE photo under a `gra-moling_*` id. This
+    # dict is keyed by FibreFlow project name and carries one qf_project_id, so it cannot
+    # express both; the QA project is where 121 of the 122 photos are.
+    "Grabouw": {
+        "qf_project_id": "aa6aba62-e57e-4701-8b55-30d2cce996c8",
+        "ff_project_id": "574a7856-3582-46aa-9094-1c434855d176",
+        "gpkg_path": "Poles.gpkg",
+        "table_name": "Poles",
+        "label_col": "label_1",
+        "pon_col": "pon_no",
+        "zone_col": "zone_no",
+    },
 }
 
 # Also check these alternate GPKGs per project (civil audit vs poles audit)

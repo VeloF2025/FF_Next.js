@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
  * database, but CI has no access to it. Comparing the two in-repo copies catches the
  * drift that actually occurred and needs nothing but the filesystem.
  *
- * Coverage is PARTIAL and the gap matters: the registry knows 13 of the map's 19
+ * Coverage is PARTIAL and the gap matters: the registry knows 14 of the map's 20
  * entries, so the other 6 (the four original *Pole Audit* projects, MAM offline,
  * ETWpoc1 and anything else map-only) are checked here for duplicate keys and nothing
  * else. A wrong-but-well-formed UUID on one of those passes. Only a query against
@@ -30,7 +30,7 @@ const REGISTRY = join(REPO_ROOT, 'scripts/qfield_project_registry.py');
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
 /** Registry blocks in `scripts/qfield_project_registry.py`. Bump deliberately. */
-const REGISTRY_ENTRY_COUNT = 13;
+const REGISTRY_ENTRY_COUNT = 14;
 
 /**
  * Text between two markers, throwing if either is missing.

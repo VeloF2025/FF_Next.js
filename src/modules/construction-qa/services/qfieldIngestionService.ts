@@ -99,6 +99,13 @@ const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   'f076fad4-b2a5-40b8-bafe-35c20ce09827': 'de408530-76f0-4d10-bf08-cfcd3202f69e', // HT_Middelburg → Middelburg
   'b32184d6-1776-4b89-8afd-2907dfca86d4': '183fe626-7bf7-4793-bdb9-1a1dc2e21aa6', // HT_Namakgale_P3_A1 → Phalaborwa - Namakgale
   'ef0b7147-e56f-43a1-9074-6807e0bedf50': '67df5c8d-0b3d-4784-9d63-70e3cdd1e2b8', // HT_Phalaborwa_Benfarm_V1 → Phalaborwa - Ben Farm
+  // Deliberately NOT added in #2510: at that point Grabouw's 121 rows carried filename
+  // stems ("poles_20251113102437166") instead of pole labels, because the project had
+  // never been registered for extraction, and ingesting them would have created 121
+  // untraceable reviews beside the 122 correct ones. It is registered now, the stale
+  // rows have been deleted and re-extracted, and all 121 resolve to a GRA.P.* label
+  // matching a row in `poles`. Only then is this line safe.
+  'aa6aba62-e57e-4701-8b55-30d2cce996c8': '574a7856-3582-46aa-9094-1c434855d176', // Grabouw QA → Grabouw
 };
 
 /** Reverse map: FibreFlow project UUID → QFieldCloud project UUIDs */
