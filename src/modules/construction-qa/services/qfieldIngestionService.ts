@@ -50,7 +50,7 @@ const FEATURE_TYPE_DISCIPLINE: Record<string, { discipline: Discipline; featureT
  * registry knows about; the other 6 here have no registry counterpart and are checked
  * only for duplicate keys, so the DB audit below is still the wider net.
  *
- * Two reasons the DB cannot simply replace this map today:
+ * Three reasons the DB cannot simply replace this map today:
  *   - It is not a superset. `380147aa…` (ETWpoc1) is here but has no row in
  *     `qfield_projects` at all — no link, no photos. Dead config; left rather than
  *     removed as a drive-by.
