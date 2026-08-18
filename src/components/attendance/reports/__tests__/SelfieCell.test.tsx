@@ -62,15 +62,44 @@ describe('ReportTable selfie_link wiring', () => {
 
   it('routes a selfie_link column through SelfieCell, not fmtCell', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ReportTable, { columns, rows: [{ selfie: HREF }], loading: false }),
+      React.createElement(ReportTable, {
+        columns, rows: [{ selfie: HREF }], loading: false, auditContext: 'checkin-locations',
+      }),
     );
     expect(html).toContain('<button');
     expect(html).not.toContain(`href="${HREF}"`);
   });
 
+  it('records the caller-supplied slug as the audit context, not a hardcoded one', async () => {
+    // context lands in attendance_selfie_access_log.context — a POPIA audit
+    // field. A hardcoded value would mislabel every click from a second
+    // report that adopts selfie_link.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ success: true, data: { url: '/storage/x.jpg' } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('open', vi.fn());
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(React.createElement(ReportTable, {
+        columns, rows: [{ selfie: HREF }], loading: false, auditContext: 'some-other-report',
+      }));
+    });
+    await act(async () => { host.querySelector('button')!.click(); });
+    expect(String(fetchMock.mock.calls[0]![0])).toContain('context=some-other-report');
+    expect(String(fetchMock.mock.calls[0]![0])).not.toContain('checkin-locations');
+    await act(async () => { root.unmount(); });
+    document.body.removeChild(host);
+    vi.unstubAllGlobals();
+  });
+
   it('leaves an empty selfie cell inert', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ReportTable, { columns, rows: [{ selfie: '' }], loading: false }),
+      React.createElement(ReportTable, {
+        columns, rows: [{ selfie: '' }], loading: false, auditContext: 'checkin-locations',
+      }),
     );
     expect(html).not.toContain('<button');
   });

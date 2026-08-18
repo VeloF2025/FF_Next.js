@@ -9,6 +9,8 @@ export type ScopeNote =
   | { kind: 'no_scope'; reason: string };
 
 interface Props {
+  /** Report slug — becomes the POPIA audit context for any selfie viewed here. */
+  slug: string;
   columns: ReadonlyArray<ReportColumn>;
   rows: Array<Record<string, unknown>>;
   notes: string[];
@@ -17,7 +19,7 @@ interface Props {
   error: string | null;
 }
 
-export function ReportResultPanel({ columns, rows, notes, scopeNote, loading, error }: Props) {
+export function ReportResultPanel({ slug, columns, rows, notes, scopeNote, loading, error }: Props) {
   return (
     <>
       {error && (
@@ -32,7 +34,7 @@ export function ReportResultPanel({ columns, rows, notes, scopeNote, loading, er
         </div>
       )}
       <div className="mt-4">
-        <ReportTable columns={columns} rows={rows} loading={loading} />
+        <ReportTable columns={columns} rows={rows} loading={loading} auditContext={slug} />
       </div>
       {scopeNote && (
         <div className="mt-3 text-xs text-neutral-500">

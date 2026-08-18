@@ -12,11 +12,18 @@ import { fmtCell } from './reportFormatters';
 import { SelfieCell } from './SelfieCell';
 
 export function ReportTable({
-  columns, rows, loading,
+  columns, rows, loading, auditContext,
 }: {
   columns: ReadonlyArray<ReportColumn>;
   rows: Array<Record<string, unknown>>;
   loading: boolean;
+  /**
+   * Report slug, recorded verbatim in the POPIA selfie access log as the
+   * reason the photo was viewed. Must identify the report the click came
+   * from — a hardcoded value here would falsify the audit trail the moment
+   * a second report adopts `selfie_link`.
+   */
+  auditContext: string;
 }) {
   return (
     <div className="overflow-x-auto border border-neutral-800 rounded">
@@ -60,7 +67,7 @@ export function ReportTable({
                   className={`px-3 py-2 whitespace-nowrap ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}
                 >
                   {c.format === 'selfie_link' && typeof row[c.key] === 'string' && row[c.key] !== ''
-                    ? <SelfieCell href={String(row[c.key])} context="checkin-locations" />
+                    ? <SelfieCell href={String(row[c.key])} context={auditContext} />
                     : fmtCell(row[c.key], c)}
                 </td>
               ))}
