@@ -18,11 +18,12 @@ vi.mock('../settingsRepository', () => settings);
 const producer = vi.hoisted(() => ({
   produceIncident: vi.fn(),
   resolveScheduledIncidentType: vi.fn(),
+  evaluateConditionClearing: vi.fn(),
 }));
 vi.mock('../incidentProducer', () => producer);
 
-const bus = vi.hoisted(() => ({ notify: vi.fn() }));
-vi.mock('@/modules/notifications/services/notificationBus', () => bus);
+const notifications = vi.hoisted(() => ({ sendIncidentOpenedNotification: vi.fn() }));
+vi.mock('../incidentNotifications', () => notifications);
 
 import { runOperationalMonitor } from '../monitorService';
 import type { OperationalStatusSummary } from '../../operations/types';
@@ -30,7 +31,6 @@ import type { IncidentRule } from '../types';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const PROJECT_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-const PROJECT_MANAGER = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const STAFF_A = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const STAFF_B = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const INCIDENT_A = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
@@ -72,16 +72,16 @@ beforeEach(() => {
   runs.startMonitorRun.mockResolvedValue(runRow());
   runs.finalizeMonitorRun.mockImplementation(async (id: string, input: Record<string, unknown>) =>
     runRow({ id, status: input.status, completedAt: '2026-08-18T08:00:05.000Z', ...input }));
-  db.query.mockImplementation((sql: string) => {
-    if (sql.includes('project_manager')) return Promise.resolve([{ project_manager: PROJECT_MANAGER }]);
-    return Promise.resolve([{ id: PROJECT_ID }]);
-  });
+  db.query.mockResolvedValue([{ id: PROJECT_ID }]);
   roster.loadCompleteOperationalRoster.mockResolvedValue({ items: [statusRow()], page: 1, limit: 100, total: 1, hasMore: false });
   settings.loadEffectiveIncidentRule.mockImplementation(async (incidentType: string) =>
-    incidentType === 'late' ? incidentRule() : null);
+    (incidentType === 'late' ? incidentRule() : null));
   producer.resolveScheduledIncidentType.mockImplementation((status: string) => (status === 'late' ? 'late' : null));
-  producer.produceIncident.mockResolvedValue({ outcome: 'opened', incidentId: INCIDENT_A, requiresInitialNotification: true });
-  bus.notify.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
+  producer.produceIncident.mockResolvedValue({
+    outcome: 'opened', incidentId: INCIDENT_A, incidentReference: 'INC-LATE-20260818-AAA111', requiresInitialNotification: true,
+  });
+  producer.evaluateConditionClearing.mockResolvedValue({ outcome: 'unchanged', incidentId: null, requiresInitialNotification: false });
+  notifications.sendIncidentOpenedNotification.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
 });
 
 describe('runOperationalMonitor', () => {
@@ -115,13 +115,13 @@ describe('runOperationalMonitor', () => {
     );
   });
 
-  it('sends the opened notification only after produceIncident resolves (post-commit)', async () => {
+  it('sends the opened notification through incidentNotifications only after produceIncident resolves (post-commit)', async () => {
     const order: string[] = [];
     producer.produceIncident.mockImplementation(async () => {
       order.push('produced');
-      return { outcome: 'opened', incidentId: INCIDENT_A, requiresInitialNotification: true };
+      return { outcome: 'opened', incidentId: INCIDENT_A, incidentReference: 'INC-LATE-20260818-AAA111', requiresInitialNotification: true };
     });
-    bus.notify.mockImplementation(async () => {
+    notifications.sendIncidentOpenedNotification.mockImplementation(async () => {
       order.push('notified');
       return { delivered: 1, suppressed: 0, failed: 0 };
     });
@@ -129,30 +129,34 @@ describe('runOperationalMonitor', () => {
     await runOperationalMonitor(REQUEST);
 
     expect(order).toEqual(['produced', 'notified']);
+    expect(notifications.sendIncidentOpenedNotification).toHaveBeenCalledWith(expect.objectContaining({
+      incidentId: INCIDENT_A, incidentType: 'late', producerKind: 'scheduled_detection', projectId: PROJECT_ID,
+    }));
   });
 
   it('does not call produceIncident again for an "updated" outcome and skips notification', async () => {
-    producer.produceIncident.mockResolvedValue({ outcome: 'updated', incidentId: INCIDENT_A, requiresInitialNotification: false });
+    producer.produceIncident.mockResolvedValue({ outcome: 'updated', incidentId: INCIDENT_A, incidentReference: 'INC-LATE-20260818-AAA111', requiresInitialNotification: false });
 
     await runOperationalMonitor(REQUEST);
 
-    expect(bus.notify).not.toHaveBeenCalled();
+    expect(notifications.sendIncidentOpenedNotification).not.toHaveBeenCalled();
     expect(runs.finalizeMonitorRun).toHaveBeenCalledWith(RUN_ID, expect.objectContaining({
       incidentsOpenedCount: 0, incidentsUpdatedCount: 1, status: 'succeeded',
     }));
   });
 
-  it('skips staff whose status has no mapped incident type', async () => {
+  it('skips staff whose status has no mapped incident type but evidence is not confirmed healthy', async () => {
     producer.resolveScheduledIncidentType.mockReturnValue(null);
     roster.loadCompleteOperationalRoster.mockResolvedValue({
-      items: [statusRow({ status: 'attendance_confirmed' })], page: 1, limit: 100, total: 1, hasMore: false,
+      items: [statusRow({ status: 'off_duty' })], page: 1, limit: 100, total: 1, hasMore: false,
     });
 
     await runOperationalMonitor(REQUEST);
 
     expect(producer.produceIncident).not.toHaveBeenCalled();
+    expect(producer.evaluateConditionClearing).not.toHaveBeenCalled();
     expect(runs.finalizeMonitorRun).toHaveBeenCalledWith(RUN_ID, expect.objectContaining({
-      rosterEvaluatedCount: 1, incidentsOpenedCount: 0, status: 'succeeded',
+      rosterEvaluatedCount: 1, incidentsOpenedCount: 0, incidentsClearedCount: 0, status: 'succeeded',
     }));
   });
 
@@ -170,7 +174,7 @@ describe('runOperationalMonitor', () => {
     });
     producer.produceIncident
       .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValueOnce({ outcome: 'opened', incidentId: INCIDENT_A, requiresInitialNotification: true });
+      .mockResolvedValueOnce({ outcome: 'opened', incidentId: INCIDENT_A, incidentReference: 'INC-LATE-20260818-AAA111', requiresInitialNotification: true });
 
     const result = await runOperationalMonitor(REQUEST);
 
@@ -182,27 +186,12 @@ describe('runOperationalMonitor', () => {
   });
 
   it('records a notification failure without dropping the opened incident, and does not report a false all-clear', async () => {
-    bus.notify.mockResolvedValue({ delivered: 0, suppressed: 0, failed: 1 });
+    notifications.sendIncidentOpenedNotification.mockResolvedValue({ delivered: 0, suppressed: 0, failed: 1 });
 
     const result = await runOperationalMonitor(REQUEST);
 
     expect(runs.finalizeMonitorRun).toHaveBeenCalledWith(RUN_ID, expect.objectContaining({
       status: 'partial_failure', incidentsOpenedCount: 1, notificationsFailedCount: 1,
-    }));
-    expect(result.status).toBe('partial_failure');
-  });
-
-  it('records a notification failure when no project manager can be resolved (empty recipient set)', async () => {
-    db.query.mockImplementation((sql: string) => {
-      if (sql.includes('project_manager')) return Promise.resolve([{ project_manager: null }]);
-      return Promise.resolve([{ id: PROJECT_ID }]);
-    });
-
-    const result = await runOperationalMonitor(REQUEST);
-
-    expect(bus.notify).not.toHaveBeenCalled();
-    expect(runs.finalizeMonitorRun).toHaveBeenCalledWith(RUN_ID, expect.objectContaining({
-      notificationsFailedCount: 1, status: 'partial_failure',
     }));
     expect(result.status).toBe('partial_failure');
   });
@@ -239,5 +228,101 @@ describe('runOperationalMonitor', () => {
     const call = runs.finalizeMonitorRun.mock.calls[0]?.[1] as { errorSummary: string | null };
     expect(call.errorSummary).not.toBeNull();
     expect(call.errorSummary?.length).toBeLessThan(2000);
+  });
+});
+
+describe('condition clearing', () => {
+  it('clears healthy conditions for a confirmed-present staff member with no flags, for all four scheduled types', async () => {
+    producer.resolveScheduledIncidentType.mockReturnValue(null);
+    roster.loadCompleteOperationalRoster.mockResolvedValue({
+      items: [statusRow({ status: 'attendance_confirmed', flags: [] })], page: 1, limit: 100, total: 1, hasMore: false,
+    });
+    producer.evaluateConditionClearing.mockResolvedValue({ outcome: 'cleared', incidentId: INCIDENT_A, requiresInitialNotification: false });
+
+    const result = await runOperationalMonitor(REQUEST);
+
+    expect(producer.evaluateConditionClearing).toHaveBeenCalledTimes(4);
+    expect(producer.evaluateConditionClearing).toHaveBeenCalledWith(expect.objectContaining({
+      staffId: STAFF_A, evidenceHealthy: true, workDate: '2026-08-18',
+    }));
+    expect(result.incidentsClearedCount).toBe(4);
+    expect(runs.finalizeMonitorRun).toHaveBeenCalledWith(RUN_ID, expect.objectContaining({ incidentsClearedCount: 4 }));
+  });
+
+  it('also clears for on_site_dual with no flags', async () => {
+    producer.resolveScheduledIncidentType.mockReturnValue(null);
+    roster.loadCompleteOperationalRoster.mockResolvedValue({
+      items: [statusRow({ status: 'on_site_dual', flags: [] })], page: 1, limit: 100, total: 1, hasMore: false,
+    });
+    producer.evaluateConditionClearing.mockResolvedValue({ outcome: 'unchanged', incidentId: null, requiresInitialNotification: false });
+
+    await runOperationalMonitor(REQUEST);
+
+    expect(producer.evaluateConditionClearing).toHaveBeenCalledTimes(4);
+  });
+
+  it('never attempts to clear when the confirmed status still carries a flag (stale/missing/uncertain evidence)', async () => {
+    producer.resolveScheduledIncidentType.mockReturnValue(null);
+    roster.loadCompleteOperationalRoster.mockResolvedValue({
+      items: [statusRow({ status: 'attendance_confirmed', flags: ['gps_stale'] })], page: 1, limit: 100, total: 1, hasMore: false,
+    });
+
+    const result = await runOperationalMonitor(REQUEST);
+
+    expect(producer.evaluateConditionClearing).not.toHaveBeenCalled();
+    expect(result.incidentsClearedCount).toBe(0);
+  });
+
+  it('never attempts to clear for a status that is merely "not currently a problem" (off_duty, approaching, scheduled_not_due)', async () => {
+    producer.resolveScheduledIncidentType.mockReturnValue(null);
+    roster.loadCompleteOperationalRoster.mockResolvedValue({
+      items: [
+        statusRow({ staffId: STAFF_A, status: 'off_duty', flags: [] }),
+        statusRow({ staffId: STAFF_B, status: 'approaching', flags: [] }),
+      ], page: 1, limit: 100, total: 2, hasMore: false,
+    });
+
+    await runOperationalMonitor(REQUEST);
+
+    expect(producer.evaluateConditionClearing).not.toHaveBeenCalled();
+  });
+
+  it('never attempts clearing for a status that itself maps to a scheduled incident type', async () => {
+    producer.resolveScheduledIncidentType.mockImplementation((status: string) => (status === 'late' ? 'late' : null));
+    roster.loadCompleteOperationalRoster.mockResolvedValue({
+      items: [statusRow({ status: 'late' })], page: 1, limit: 100, total: 1, hasMore: false,
+    });
+
+    await runOperationalMonitor(REQUEST);
+
+    expect(producer.evaluateConditionClearing).not.toHaveBeenCalled();
+  });
+
+  it('isolates one clearing failure without aborting the run or losing other clears', async () => {
+    producer.resolveScheduledIncidentType.mockReturnValue(null);
+    roster.loadCompleteOperationalRoster.mockResolvedValue({
+      items: [statusRow({ status: 'attendance_confirmed', flags: [] })], page: 1, limit: 100, total: 1, hasMore: false,
+    });
+    producer.evaluateConditionClearing
+      .mockRejectedValueOnce(new Error('db hiccup'))
+      .mockResolvedValue({ outcome: 'cleared', incidentId: INCIDENT_A, requiresInitialNotification: false });
+
+    const result = await runOperationalMonitor(REQUEST);
+
+    expect(producer.evaluateConditionClearing).toHaveBeenCalledTimes(4);
+    expect(result.incidentsClearedCount).toBe(3);
+    expect(result.status).toBe('partial_failure');
+  });
+
+  it('never sends a notification for a cleared condition', async () => {
+    producer.resolveScheduledIncidentType.mockReturnValue(null);
+    roster.loadCompleteOperationalRoster.mockResolvedValue({
+      items: [statusRow({ status: 'attendance_confirmed', flags: [] })], page: 1, limit: 100, total: 1, hasMore: false,
+    });
+    producer.evaluateConditionClearing.mockResolvedValue({ outcome: 'cleared', incidentId: INCIDENT_A, requiresInitialNotification: false });
+
+    await runOperationalMonitor(REQUEST);
+
+    expect(notifications.sendIncidentOpenedNotification).not.toHaveBeenCalled();
   });
 });

@@ -14,42 +14,49 @@
  * `resolveScheduledIncidentType` (Task 3) is reused rather than
  * re-deriving PR6's four-status mapping here.
  *
- * Scope note (documented per the Task 3 handoff): this monitor only opens
- * and updates the four automatic incident types. It does not attempt
- * condition-clearing for a healthy status — `evaluateConditionClearing`
- * exists in `incidentProducer` but correctly deciding "evidence is healthy"
- * from the roster *summary* alone (no per-staff evidence detail is loaded
- * here) is a distinct, safety-relevant decision that this task's required
- * coverage does not exercise. Clearing is left to a dedicated follow-up
- * rather than shipped unverified. `incidentsClearedCount` is therefore
- * always 0 from this module today.
+ * Condition clearing (Task 5): a staff row whose current status does NOT
+ * map to one of the four scheduled incident types is checked for healthy
+ * clearing of any still-open incident of those four types. "Healthy" is
+ * deliberately narrow and conservative — Task 4 correctly flagged that
+ * deriving "evidence is healthy" from the roster *summary* is a
+ * safety-relevant judgment, so this only clears when BOTH:
+ *   - the current status is one of the two PR4 statuses that mean "evidence
+ *     positively confirms presence at the right place" (`attendance_confirmed`,
+ *     `on_site_dual`) — not merely "not currently flagged as one of the four
+ *     problem types" (e.g. `off_duty`, `approaching`, `scheduled_not_due`
+ *     say nothing positive about evidence and never clear); and
+ *   - the evaluation carries no flags at all (any flag — stale/missing GPS,
+ *     missing attendance, low-confidence geometry, a pending confirmation,
+ *     etc. — is itself evidence uncertainty and blocks clearing).
+ * `evaluateConditionClearing` (Task 3) is itself the final safety gate: it
+ * only ever sets `condition_cleared_at`, never resolves/dismisses, and is a
+ * safe no-op when there is no matching open incident.
  *
  * `ScheduledIncidentProducerRequest` (Task 3's authoritative contract) has
  * no dedicated monitor-run field — only `requestCorrelationId`. Rather than
  * widen that contract (out of this task's exact file scope), the run id is
  * threaded through as `requestCorrelationId`, which `incidentProducer`
- * already stores on the `opened` action's `request_correlation_id` column,
- * giving action-to-run traceability without touching Task 3's files.
+ * already stores on the `opened`/`condition_cleared` actions' correlation
+ * column, giving action-to-run traceability without touching Task 3's files.
  *
- * Initial "opened" notifications are sent here (design §8.1 step 7) using a
- * minimal, self-contained project-manager lookup — `recipientService`
- * (PR6 Task 5) does not exist yet. This keeps the monitor independently
- * correct and mergeable; Task 5 should fold this project-manager-only path
- * into the fuller PM + oversight-member resolution it introduces.
+ * Initial "opened" notifications are sent through `incidentNotifications`
+ * (Task 5), which resolves recipients via `recipientService` — the ONE
+ * recipient-resolution path for PR6. This supersedes the interim,
+ * self-contained project-manager-only lookup this module carried while
+ * Task 5 did not exist yet.
  */
 import { log } from '@/lib/logger';
 import { query } from '@/lib/db-pool';
-import { notify } from '@/modules/notifications/services/notificationBus';
-import type { NotifyResult } from '@/modules/notifications/types';
 import { loadCompleteOperationalRoster } from '../operations/completeRosterLoading';
-import type { OperationalStatusSummary } from '../operations/types';
+import type { OperationalStatus, OperationalStatusSummary } from '../operations/types';
 import { sastDateString } from '../parking/sastDate';
 import { finalizeMonitorRun, startMonitorRun } from './runRepository';
 import { loadEffectiveIncidentRule } from './settingsRepository';
-import { produceIncident, resolveScheduledIncidentType } from './incidentProducer';
+import { evaluateConditionClearing, produceIncident, resolveScheduledIncidentType } from './incidentProducer';
 import { buildAssignmentIdentity, computeObservationFingerprint } from './observationFingerprint';
+import { sendIncidentOpenedNotification } from './incidentNotifications';
 import type {
-  IncidentMonitorRequest, IncidentMonitorResult, IncidentRule, IncidentSeverity,
+  IncidentMonitorRequest, IncidentMonitorResult, IncidentRule,
   ScheduledIncidentProducerRequest, ScheduledIncidentType,
 } from './types';
 
@@ -57,9 +64,11 @@ const MODULE = 'FleetOperationalMonitor';
 const SCHEDULED_TYPES: readonly ScheduledIncidentType[] = ['late', 'wrong_site', 'evidence_mismatch', 'left_early'];
 const MAX_ERROR_SUMMARY_LENGTH = 2000;
 const MAX_ERROR_ENTRIES = 20;
+// See module docblock: the only two PR4 statuses that positively confirm
+// evidence, as opposed to merely not (yet) flagging a problem.
+const HEALTHY_CLEARING_STATUSES: readonly OperationalStatus[] = ['attendance_confirmed', 'on_site_dual'];
 
 interface ProjectIdRow extends Record<string, unknown> { id: string }
-interface ProjectManagerRow extends Record<string, unknown> { project_manager: string | null }
 
 /** No system-wide "monitored roster" call exists (statusService is always project-scoped); this discovers the projects to iterate. Mirrors the exact "active" definition already used by `operations/projectScope.ts`. */
 async function loadActiveProjectIds(): Promise<string[]> {
@@ -69,8 +78,17 @@ async function loadActiveProjectIds(): Promise<string[]> {
   return rows.map((row) => row.id);
 }
 
-/** The whole roster-loading phase for the tick. A failure anywhere in it (project discovery or any one project's roster call) is systemic: the caller must never partially process a roster it could not fully load. */
-async function loadMonitoredRoster(workDate: string, effectiveAt: string): Promise<OperationalStatusSummary[]> {
+/**
+ * The whole roster-loading phase for one tick. A failure anywhere in it
+ * (project discovery or any one project's roster call) is systemic: the
+ * caller must never partially process a roster it could not fully load.
+ *
+ * Exported so `actionRunner`'s morning-summary phase (Task 5) reuses this
+ * exact "enumerate active projects, load each project's complete roster"
+ * definition instead of re-deriving it — there is exactly one definition of
+ * "the monitored roster" for PR6.
+ */
+export async function loadMonitoredRoster(workDate: string, effectiveAt: string): Promise<OperationalStatusSummary[]> {
   const projectIds = await loadActiveProjectIds();
   const items: OperationalStatusSummary[] = [];
   for (const projectId of projectIds) {
@@ -139,61 +157,37 @@ function buildScheduledRequest(
   };
 }
 
-function incidentTypeLabel(incidentType: ScheduledIncidentType): string {
-  return incidentType.replaceAll('_', ' ');
-}
-
-/** Interim, self-contained recipient resolution (see module docblock). Never throws — matches the NotificationBus's own "non-blocking, errors logged not thrown" convention — so a lookup failure surfaces as a counted notification failure rather than aborting this staff member's cycle. */
-async function notifyIncidentOpened(input: {
-  incidentId: string; incidentType: ScheduledIncidentType; severity: IncidentSeverity;
-  projectId: string | null; staffName: string | null; monitorRunId: string;
-}): Promise<NotifyResult> {
-  let recipientUserId: string | null = null;
-  try {
-    if (input.projectId) {
-      const rows = await query<ProjectManagerRow>(
-        `/* fleet-operational-monitor:project-manager */ SELECT project_manager FROM projects WHERE id = $1::uuid LIMIT 1`,
-        [input.projectId],
-      );
-      recipientUserId = rows[0]?.project_manager ?? null;
-    }
-  } catch (error) {
-    log.error('[fleet-operational-monitor] project-manager lookup failed', {
-      incidentId: input.incidentId, error: sanitizedMessage(error),
-    }, MODULE);
-    return { delivered: 0, suppressed: 0, failed: 1 };
-  }
-
-  if (!recipientUserId) {
-    log.warn('[fleet-operational-monitor] no recipient resolved for opened incident', {
-      incidentId: input.incidentId, incidentType: input.incidentType,
-    }, MODULE);
-    return { delivered: 0, suppressed: 0, failed: 1 };
-  }
-
-  try {
-    return await notify({
-      event_type: 'fleet.operational_incident_opened',
-      title: `Fleet incident opened: ${incidentTypeLabel(input.incidentType)}`,
-      body: input.staffName ? `${input.staffName} — review required` : 'Review required',
-      action_url: `/fleet/incidents?incidentId=${input.incidentId}`,
-      source_module: 'fleet-incidents',
-      source_id: input.incidentId,
-      metadata: { severity: input.severity, incidentType: input.incidentType, monitorRunId: input.monitorRunId },
-      recipient_user_ids: [recipientUserId],
-      idempotency_key: `fleet-incident-opened:${input.incidentId}`,
-    });
-  } catch (error) {
-    log.error('[fleet-operational-monitor] notify() threw for an opened incident', {
-      incidentId: input.incidentId, error: sanitizedMessage(error),
-    }, MODULE);
-    return { delivered: 0, suppressed: 0, failed: 1 };
-  }
-}
-
 interface RunTotals {
-  opened: number; updated: number; notificationsAccepted: number; notificationsFailed: number;
+  opened: number; updated: number; cleared: number; notificationsAccepted: number; notificationsFailed: number;
   errorCount: number; errorMessages: string[];
+}
+
+/** See module docblock: positively confirmed presence, with zero evaluation flags of any kind. */
+function hasHealthyEvidence(item: OperationalStatusSummary): boolean {
+  return HEALTHY_CLEARING_STATUSES.includes(item.status) && item.flags.length === 0;
+}
+
+/** Clears any still-open incident of the four scheduled types for this staff/day when this tick's evidence is healthy. A no-op per type when there is no matching active incident — cheap and safe to call unconditionally for every healthy staff row. */
+async function clearHealthyConditions(
+  item: OperationalStatusSummary, workDate: string, effectiveAt: string, requestCorrelationId: string, totals: RunTotals,
+): Promise<void> {
+  if (!item.staffId || !hasHealthyEvidence(item)) return;
+  const staffId = item.staffId;
+  for (const incidentType of SCHEDULED_TYPES) {
+    try {
+      const result = await evaluateConditionClearing({
+        staffId, incidentType, workDate, operationalAssignmentId: null,
+        observedAt: effectiveAt, evidenceHealthy: true, requestCorrelationId,
+      });
+      if (result.outcome === 'cleared') totals.cleared += 1;
+    } catch (error) {
+      totals.errorCount += 1;
+      totals.errorMessages.push(`${staffId}:${incidentType}: ${sanitizedMessage(error)}`);
+      log.error('[fleet-operational-monitor] condition-clearing failed', {
+        staffId, incidentType, error: sanitizedMessage(error),
+      }, MODULE);
+    }
+  }
 }
 
 async function processStaffMember(
@@ -201,7 +195,10 @@ async function processStaffMember(
   workDate: string, request: IncidentMonitorRequest, monitorRunId: string, totals: RunTotals,
 ): Promise<void> {
   const scheduledType = resolveScheduledIncidentType(item.status);
-  if (!scheduledType) return; // healthy/summary-only status — no automatic incident (see module docblock re: clearing scope)
+  if (!scheduledType) {
+    await clearHealthyConditions(item, workDate, request.effectiveAt, monitorRunId, totals);
+    return;
+  }
 
   const rule = rules[scheduledType];
   if (!rule || !rule.enabled || !rule.createsIncident) return; // configured off — not an error
@@ -212,9 +209,11 @@ async function processStaffMember(
     if (result.outcome === 'opened') {
       totals.opened += 1;
       if (result.requiresInitialNotification && result.incidentId) {
-        const delivery = await notifyIncidentOpened({
-          incidentId: result.incidentId, incidentType: scheduledType, severity: rule.severity,
-          projectId: item.projectId, staffName: item.staffName, monitorRunId,
+        const delivery = await sendIncidentOpenedNotification({
+          incidentId: result.incidentId, incidentType: scheduledType,
+          severity: rule.severity, producerKind: 'scheduled_detection', rule, projectId: item.projectId,
+          staffName: item.staffName, projectName: item.projectName, operationalSiteName: item.operationalSiteName,
+          detectedAt: request.effectiveAt, reasonCodes: item.reasonCodes,
         });
         totals.notificationsAccepted += delivery.delivered;
         totals.notificationsFailed += delivery.failed;
@@ -255,7 +254,9 @@ export async function runOperationalMonitor(request: IncidentMonitorRequest): Pr
     };
   }
 
-  const totals: RunTotals = { opened: 0, updated: 0, notificationsAccepted: 0, notificationsFailed: 0, errorCount: 0, errorMessages: [] };
+  const totals: RunTotals = {
+    opened: 0, updated: 0, cleared: 0, notificationsAccepted: 0, notificationsFailed: 0, errorCount: 0, errorMessages: [],
+  };
   for (const item of roster) {
     await processStaffMember(item, rules, workDate, request, run.id, totals);
   }
@@ -264,14 +265,14 @@ export async function runOperationalMonitor(request: IncidentMonitorRequest): Pr
   const status = hasFailures ? 'partial_failure' : 'succeeded';
   const finalized = await finalizeMonitorRun(run.id, {
     status, rosterEvaluatedCount: roster.length, incidentsOpenedCount: totals.opened,
-    incidentsUpdatedCount: totals.updated, incidentsClearedCount: 0,
+    incidentsUpdatedCount: totals.updated, incidentsClearedCount: totals.cleared,
     notificationsAcceptedCount: totals.notificationsAccepted, notificationsFailedCount: totals.notificationsFailed,
     summariesSentCount: 0, errorCount: totals.errorCount, errorSummary: boundedErrorSummary(totals.errorMessages),
   });
 
   return {
     monitorRunId: run.id, status: finalized.status, rosterEvaluatedCount: roster.length,
-    incidentsOpenedCount: totals.opened, incidentsUpdatedCount: totals.updated, incidentsClearedCount: 0,
+    incidentsOpenedCount: totals.opened, incidentsUpdatedCount: totals.updated, incidentsClearedCount: totals.cleared,
     notifications: { delivered: totals.notificationsAccepted, suppressed: 0, failed: totals.notificationsFailed },
   };
 }
