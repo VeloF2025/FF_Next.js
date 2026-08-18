@@ -21,12 +21,14 @@
  *
  * fibreflow-DEV, not production, matching every sibling attendance cron
  * (reconcile, cartrack-reconcile). dev and production share one database, so
- * which dir it runs from only decides whose checkout supplies the code — and
- * dev tracks master, while production can sit commits behind. An earlier
- * draft of this header said production; the crontab said dev. Anyone who
- * "corrected" the crontab to match would have pointed it at a checkout
- * without this file's dotenv fix, and it would have died nightly on
- * "SASL: client password must be a string". Keep the two in step.
+ * the directory only decides whose checkout supplies the code — and dev
+ * tracks master while production can sit commits behind.
+ *
+ * If this header and the installed crontab ever disagree, trust the crontab
+ * and fix the header. Repointing the job to match a stale header can land it
+ * on a checkout missing this file's dotenv loading, where it dies nightly on
+ * "SASL: client password must be a string" — and the only symptom is the
+ * check-in locations report warning about stale geometry days later.
  *
  * Notes:
  *   - Pole data changes slowly (survey imports), so daily is ample. This is
