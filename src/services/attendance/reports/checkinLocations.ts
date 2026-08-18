@@ -172,6 +172,13 @@ export async function runCheckinLocations(input: ReportInput): Promise<ReportRun
         ) AS dist_m
       FROM project_aoi a
       JOIN projects pr ON pr.id = a.project_id
+      -- Load-bearing, NOT redundant with the CASE above. The CASE only picks
+      -- the verdict string; nearest_project and distance_m are read
+      -- straight off n.*. Drop this clause and a no-GPS event yields
+      -- ST_MakePoint(NULL,NULL) -> NULL distance for every project, so
+      -- ORDER BY ... LIMIT 1 returns an arbitrary one and the row displays a
+      -- project it was never near. Verified on the live DB: without it a
+      -- NULL-coordinate event reports 'Lawley' with a NULL distance.
       WHERE ev.lat IS NOT NULL AND ev.lon IS NOT NULL
       ORDER BY 2 ASC
       LIMIT 1

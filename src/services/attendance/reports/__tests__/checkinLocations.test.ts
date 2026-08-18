@@ -183,6 +183,21 @@ describe('runCheckinLocations', () => {
     expect(text.match(/FROM attendance_entries/g)).toHaveLength(1);
   });
 
+  it('refuses to attribute a project to an event with no coordinates', async () => {
+    await runCheckinLocations(input());
+    const [text] = sqlMock.query.mock.calls[0] as [string];
+    // Without this clause ST_Distance is NULL for every project, ORDER BY
+    // ... LIMIT 1 picks an arbitrary one, and a no_gps row displays a site
+    // it was never near. Confirmed against the live DB — it returned
+    // 'Lawley' for a NULL-coordinate event.
+    expect(text).toContain('WHERE ev.lat IS NOT NULL AND ev.lon IS NOT NULL');
+    // Pin WHY it matters: the guard sits inside the nearest-project LATERAL,
+    // not in the outer CASE that only selects the verdict string.
+    const lateral = text.slice(text.indexOf('LEFT JOIN LATERAL'));
+    expect(lateral).toContain('ev.lat IS NOT NULL');
+    expect(lateral).toContain('ORDER BY 2 ASC');
+  });
+
   it('throws before mapping when the result overflows the row cap', async () => {
     const overflow = Array.from({ length: REPORT_ROW_CAP + 1 }, (_, i) => ({
       ...FACT, entry_id: `entry-${i}`,
