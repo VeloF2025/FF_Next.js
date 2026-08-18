@@ -387,16 +387,21 @@ service never touches lifecycle columns or calls `incidentNotifications`.
 
 `fleet.incidents` (view/edit) gates the review queue; `fleet.incidents-settings`
 (view/edit) separately gates rule/oversight-membership management —
-`reviewScope.ts` duplicates `operations/projectScope.ts`'s "base permission AND
-(admin role OR an active per-user override grant)" idiom against these two keys
-rather than reusing that module directly, since its `canAccessOperationalProject`
-hardcodes a different permission key. A plain `manager` role (which the migration
-grants base `fleet.incidents`/`fleet.incidents-settings` access to) never gains
-cross-project or projectless reach without an explicit `admin`/`super_admin` role
-or an active override grant. A projectless incident always requires that
-unrestricted scope — a PM never sees it. Bulk-acknowledge validates every requested
-incident (exists, not already terminal, in scope) before mutating any; each
-acknowledgement then still runs as its own row-locked transaction.
+`reviewScope.ts` calls `operations/projectScope.ts`'s `hasOperationalOversight`
+directly against these two keys (it is parameterized on permission key and
+action, already called with a non-default key at
+`pages/api/fleet/operations/rules.ts`), rather than duplicating its "base
+permission AND (admin role OR an active per-user override grant)" idiom.
+Migration 499 grants base `fleet.incidents` to `manager`/`project_manager` —
+NOT `fleet.incidents-settings`, which is `admin`/`super_admin` only. So a
+plain `manager` role never gains cross-project or projectless `fleet.incidents`
+reach without an explicit `admin`/`super_admin` role or an active override
+grant. A projectless incident always requires that unrestricted scope — a PM
+never sees it. Bulk-acknowledge validates every requested incident (exists,
+not already terminal, in scope) before mutating any; each acknowledgement then
+still runs as its own row-locked transaction, and a per-item `terminal_conflict`
+race (another manager resolved it in between) aborts the batch rather than
+being reported as a silent success.
 
 ### Rule and oversight configuration
 

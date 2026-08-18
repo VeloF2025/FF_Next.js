@@ -9,9 +9,10 @@
  * `pages/api/fleet/operations/rules.ts`), so this module calls it directly
  * rather than duplicating its (base permission AND (admin role OR an
  * active per-user grant override)) pattern — so a generic `manager` role —
- * which the migration grants base `fleet.incidents`/`fleet.incidents-edit`
- * access to — never gains cross-project or projectless reach without an
- * explicit admin role or override grant.
+ * which the migration (499) grants base `fleet.incidents` access to, but
+ * NOT `fleet.incidents-settings` (that one is admin/super_admin only) —
+ * never gains cross-project or projectless reach without an explicit
+ * admin role or override grant.
  *
  * `isProjectOwnedByScope` below is NOT similarly reused from
  * `projectScope.ts`: that module's project-scope helpers deliberately
