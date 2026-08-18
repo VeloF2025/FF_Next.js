@@ -49,7 +49,7 @@ const COLUMNS: ReadonlyArray<ReportColumn> = [
   // and would throw away ~1 km of precision.
   { key: 'lat', label: 'Lat', align: 'right' },
   { key: 'lon', label: 'Lon', align: 'right' },
-  { key: 'selfie', label: 'Selfie', format: 'link' },
+  { key: 'selfie', label: 'Selfie', format: 'selfie_link' },
   { key: 'device_fingerprint', label: 'Device' },
   { key: 'entry_id', label: 'Entry ID' },
 ];

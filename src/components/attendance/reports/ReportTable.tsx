@@ -9,6 +9,7 @@
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { ReportColumn } from '@/services/attendance/reports/types';
 import { fmtCell } from './reportFormatters';
+import { SelfieCell } from './SelfieCell';
 
 export function ReportTable({
   columns, rows, loading,
@@ -58,17 +59,8 @@ export function ReportTable({
                   key={c.key}
                   className={`px-3 py-2 whitespace-nowrap ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}
                 >
-                  {c.format === 'link' && typeof row[c.key] === 'string' && row[c.key] !== ''
-                    ? (
-                      <a
-                        href={String(row[c.key])}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-emerald-400 hover:text-emerald-300 underline"
-                      >
-                        View
-                      </a>
-                    )
+                  {c.format === 'selfie_link' && typeof row[c.key] === 'string' && row[c.key] !== ''
+                    ? <SelfieCell href={String(row[c.key])} context="checkin-locations" />
                     : fmtCell(row[c.key], c)}
                 </td>
               ))}

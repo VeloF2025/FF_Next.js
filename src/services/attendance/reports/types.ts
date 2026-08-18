@@ -177,10 +177,12 @@ export interface ReportColumn {
   align?: 'left' | 'right';
   /**
    * Render hint. 'number' for tabular-nums right-align, 'currency_rand' to
-   * fmt cents → R, 'link' to render the cell value as an anchor on screen
-   * while exports keep the raw URL.
+   * fmt cents → R, 'selfie_link' for a cell holding an audited
+   * `/api/staff/attendance-selfie` path — that route answers with JSON, so
+   * the cell renders a button that fetches and unwraps it rather than an
+   * anchor that would open a tab of JSON. Exports keep the path as text.
    */
-  format?: 'number' | 'currency_rand' | 'integer' | 'link';
+  format?: 'number' | 'currency_rand' | 'integer' | 'selfie_link';
 }
 
 export interface ReportRunResult {
