@@ -208,7 +208,15 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
     let paramIdx = 1;
     const qfPlaceholders = qfProjectIds.map(() => `$${paramIdx++}`).join(', ');
     const wtPlaceholders = workTypes.map(() => `$${paramIdx++}`).join(', ');
-    const params: (string | number)[] = [...qfProjectIds, ...workTypes];
+    // Scopes the dedupe below to THIS FibreFlow project. Without it the NOT EXISTS
+    // matches on feature_id alone, so a photo under a label that exists in two projects
+    // suppresses ingestion of a genuinely different photo in the other. Four labels are
+    // duplicated across projects today -- three junk placeholders ("New pole" x6,
+    // "New Pole" x3, "Drop Pole" x2) and one real pole label, MAM.P.B120, in two.
+    // Pre-existing, but widening the filename match above enlarges its reach, and
+    // projectId is already in scope here.
+    const dedupeProjectParam = `$${paramIdx++}`;
+    const params: (string | number)[] = [...qfProjectIds, ...workTypes, projectId];
 
     let query = `
       SELECT
@@ -234,6 +242,7 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
           SELECT 1 FROM construction_qa_photos cqp
           JOIN construction_qa_reviews cqr ON cqr.id = cqp.review_id
           WHERE cqr.feature_id = qpv.feature_id
+            AND cqr.project_id = ${dedupeProjectParam}::uuid
             -- Match EITHER filename convention. photo_key gained a trailing MinIO
             -- version segment at some point, so the basename of a modern key is the
             -- version token (v20251110164715-1e5f2261), not the filename -- while rows
@@ -247,6 +256,10 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
             -- post-versioning — no other project's behaviour changes.
             AND cqp.filename IN (
               regexp_replace(qpv.photo_key, '^.*/', ''),
+              -- Lowercase hex only, matching every version id QFieldCloud emits today
+              -- (62,210 versioned keys, 0 exceptions). If that ever changes, form-2 stops
+              -- stripping and this falls back to form-1 alone -- which fails in the
+              -- DUPLICATE-INSERT direction, i.e. the thing this clause exists to stop.
               regexp_replace(regexp_replace(qpv.photo_key, '/v[0-9]{14}-[0-9a-f]+$', ''), '^.*/', '')
             )
         )
