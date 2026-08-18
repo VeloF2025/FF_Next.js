@@ -13,6 +13,11 @@ import type { NextApiRequest, NextApiResponse, NextApiHandler } from 'next';
 import { neon } from '@/lib/db-neon';
 import { verifyToken } from './jwt';
 import { isReadOnlyViolation, MCP_READ_ONLY_CODE, MCP_READ_ONLY_MESSAGE } from './readOnly';
+import {
+  isDeniedAreaViolation,
+  MCP_DENIED_AREA_CODE,
+  MCP_DENIED_AREA_MESSAGE,
+} from './mcpDeniedAreas';
 import { touchSessionUsage } from './sessionUsage';
 import type { AuthUser, AuthRole, SessionKind } from './types';
 import { ROLE_HIERARCHY } from './types';
@@ -216,6 +221,15 @@ export function withAuth(handler: AuthenticatedHandler): NextApiHandler {
         });
       }
 
+      // Beside the read-only gate, for the same reason it lives here rather than in
+      // each route: every current and future endpoint inherits it and none can forget.
+      if (isDeniedAreaViolation(user, req.url)) {
+        return res.status(403).json({
+          success: false,
+          error: { code: MCP_DENIED_AREA_CODE, message: MCP_DENIED_AREA_MESSAGE },
+        });
+      }
+
       // Attach user and session to request
       (req as AuthenticatedNextApiRequest).user = user;
       (req as AuthenticatedNextApiRequest).sessionId = payload.sessionId;
@@ -365,6 +379,15 @@ export function withOptionalAuth(
                 error: { code: MCP_READ_ONLY_CODE, message: MCP_READ_ONLY_MESSAGE },
               });
             }
+
+            // Beside the read-only gate, for the same reason it lives here rather than in
+            // each route: every current and future endpoint inherits it and none can forget.
+            if (isDeniedAreaViolation(user, req.url)) {
+              return res.status(403).json({
+                success: false,
+                error: { code: MCP_DENIED_AREA_CODE, message: MCP_DENIED_AREA_MESSAGE },
+              });
+            }
             const optionalReq = req as NextApiRequest & { user?: AuthUser; sessionId?: string };
             optionalReq.user = user;
             optionalReq.sessionId = payload.sessionId;
@@ -442,6 +465,15 @@ export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: Nex
               return res.status(403).json({
                 success: false,
                 error: { code: MCP_READ_ONLY_CODE, message: MCP_READ_ONLY_MESSAGE },
+              });
+            }
+
+            // Beside the read-only gate, for the same reason it lives here rather than in
+            // each route: every current and future endpoint inherits it and none can forget.
+            if (isDeniedAreaViolation(user, req.url)) {
+              return res.status(403).json({
+                success: false,
+                error: { code: MCP_DENIED_AREA_CODE, message: MCP_DENIED_AREA_MESSAGE },
               });
             }
             fleetReq.user = user;
