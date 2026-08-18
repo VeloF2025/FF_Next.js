@@ -204,9 +204,9 @@ CREATE TABLE IF NOT EXISTS fleet_operational_incident_observations (
   monitor_run_id UUID REFERENCES fleet_operational_monitor_runs(id) ON DELETE SET NULL,
   source_event_id TEXT,
   CONSTRAINT fleet_operational_incident_observations_fingerprint_nonblank CHECK (btrim(observation_fingerprint) <> ''),
-  CONSTRAINT fleet_operational_incident_observations_evidence_snapshot_object CHECK (jsonb_typeof(evidence_snapshot) = 'object'),
+  CONSTRAINT fleet_operational_incident_observations_evidence_snapshot_obj CHECK (jsonb_typeof(evidence_snapshot) = 'object'),
   CONSTRAINT fleet_operational_incident_observations_rule_pair_check CHECK ((rule_id IS NULL) = (rule_version IS NULL) AND (rule_version IS NULL OR rule_version > 0)),
-  CONSTRAINT fleet_operational_incident_observations_incident_fingerprint_unique UNIQUE (incident_id, observation_fingerprint)
+  CONSTRAINT fleet_operational_incident_observations_fingerprint_unique UNIQUE (incident_id, observation_fingerprint)
 );
 CREATE INDEX IF NOT EXISTS ix_fleet_operational_incident_observations_incident_observed ON fleet_operational_incident_observations (incident_id, observed_at DESC);
 CREATE TABLE IF NOT EXISTS fleet_operational_incident_actions (
