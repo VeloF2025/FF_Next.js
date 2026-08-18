@@ -11,11 +11,22 @@
  *   npx tsx scripts/cron/refresh-project-aois.ts
  *   npx tsx scripts/cron/refresh-project-aois.ts --dry-run
  *
- * Cron (03:15 SAST daily — after the 02:00 DB backup and the 02:30 selfie
- * retention sweep, before the working day):
- *   15 3 * * * cd /home/velo/fibreflow-production && \
- *     /usr/bin/npx tsx scripts/cron/refresh-project-aois.ts \
- *     >> /var/log/project-aoi-refresh.log 2>&1
+ * Installed in the velo crontab, 03:15 SAST daily — after the 02:00 DB
+ * backup, the 02:30 selfie retention sweep and the 02:45/03:00 attendance
+ * reconciles:
+ *
+ *   15 3 * * * cd /home/velo/fibreflow-dev && \
+ *     ./node_modules/.bin/tsx scripts/cron/refresh-project-aois.ts \
+ *     >> /home/velo/logs/project-aoi-refresh.log 2>&1
+ *
+ * fibreflow-DEV, not production, matching every sibling attendance cron
+ * (reconcile, cartrack-reconcile). dev and production share one database, so
+ * which dir it runs from only decides whose checkout supplies the code — and
+ * dev tracks master, while production can sit commits behind. An earlier
+ * draft of this header said production; the crontab said dev. Anyone who
+ * "corrected" the crontab to match would have pointed it at a checkout
+ * without this file's dotenv fix, and it would have died nightly on
+ * "SASL: client password must be a string". Keep the two in step.
  *
  * Notes:
  *   - Pole data changes slowly (survey imports), so daily is ample. This is
