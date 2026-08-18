@@ -101,7 +101,7 @@ ALTER TABLE attendance_entries
   ADD COLUMN IF NOT EXISTS clock_in_aoi_distance_m numeric(10,2);
 
 COMMENT ON COLUMN attendance_entries.clock_in_aoi_project_id IS
-  'Nearest project AOI at clock-in. NULL when no GPS fix, or when no project had a derivable AOI.';
+  'Nearest project AOI at clock-in. NULL when no project had a derivable AOI, or for entries not created by the portal clock-in path (manual admin entries never set it). The portal itself rejects a clock-in without coordinates, so "no GPS fix" is not reachable there.';
 COMMENT ON COLUMN attendance_entries.clock_in_aoi_distance_m IS
   'Metres from the clock-in fix to that AOI. 0 means inside the site boundary.';
 
