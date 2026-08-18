@@ -58,7 +58,18 @@ export function ReportTable({
                   key={c.key}
                   className={`px-3 py-2 whitespace-nowrap ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}
                 >
-                  {fmtCell(row[c.key], c)}
+                  {c.format === 'link' && typeof row[c.key] === 'string' && row[c.key] !== ''
+                    ? (
+                      <a
+                        href={String(row[c.key])}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-400 hover:text-emerald-300 underline"
+                      >
+                        View
+                      </a>
+                    )
+                    : fmtCell(row[c.key], c)}
                 </td>
               ))}
             </tr>

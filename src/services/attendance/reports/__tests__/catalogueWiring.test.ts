@@ -37,7 +37,7 @@ describe('geofence-patterns slug is wired', () => {
 });
 
 describe('authoritative attendance reports are wired end to end', () => {
-  it.each(['exception-ageing', 'payroll-readiness', 'evidence-quality'] as const)(
+  it.each(['exception-ageing', 'payroll-readiness', 'evidence-quality', 'checkin-locations'] as const)(
     'registers %s in catalogue and dispatcher',
     (slug) => {
       expect(ALL_REPORT_SLUGS).toContain(slug);
@@ -51,10 +51,11 @@ describe('authoritative attendance reports are wired end to end', () => {
     expect(html).toContain('Exception ageing');
     expect(html).toContain('Payroll readiness');
     expect(html).toContain('Evidence quality');
+    expect(html).toContain('Check-in locations');
     expect(html).not.toContain('Looking for late-arrivals?');
   });
 
-  it.each(['exception-ageing', 'payroll-readiness', 'evidence-quality'] as const)(
+  it.each(['exception-ageing', 'payroll-readiness', 'evidence-quality', 'checkin-locations'] as const)(
     'preserves %s columns for screen and export when supervisor scope is empty',
     async (slug) => {
       const input: ReportInput = {
