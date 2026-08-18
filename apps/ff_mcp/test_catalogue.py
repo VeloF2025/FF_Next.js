@@ -81,3 +81,41 @@ def test_catalogue_ships_with_the_package(svc):
     from ff_mcp import catalogue
     assert Path(catalogue.CATALOGUE_PATH).exists()
     assert len(catalogue._load_routes()) > 100
+
+
+def test_catalogue_keeps_field_stock_and_the_other_field_routes():
+    """The group-vs-path decision, pinned at the CATALOGUE level.
+
+    `field` cannot go in DENIED_GROUPS because the hyphenated-sibling rule would also
+    match `field-stock`. That was pinned for the runtime guard but NOT here, so the
+    generator kept its own 'field' entry and silently dropped the whole warehouse module
+    plus nine unrelated /api/field/* routes while every test still passed. This asserts
+    the catalogue itself, which is what tells the model what exists.
+    """
+    from ff_mcp import catalogue
+
+    routes = catalogue._load_routes()
+    paths = {r["path"] for r in routes}
+    groups = {r["group"] for r in routes}
+
+    assert "field-stock" in groups, "the warehouse module must stay catalogued"
+    assert any(p.startswith("/api/field/") for p in paths), "other /api/field/* routes must stay"
+
+
+def test_catalogue_excludes_the_path_denied_route():
+    """The mirror: the one route that IS denied must not be advertised.
+
+    Cataloguing it would promise an endpoint the runtime guard always refuses, and leave
+    the two mechanisms disagreeing about what is reachable.
+    """
+    from ff_mcp import catalogue
+    from ff_mcp import tools
+
+    paths = {r["path"] for r in catalogue._load_routes()}
+    assert "/api/field/attendance" not in paths
+
+    # And every catalogued path must survive the runtime guard, so the generator's
+    # denylists and tools.py's cannot drift apart in either direction.
+    for path in paths:
+        concrete = path.replace(":", "").replace("[", "").replace("]", "")
+        assert tools._denied_path(concrete) is None, path

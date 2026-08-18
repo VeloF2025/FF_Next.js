@@ -14,6 +14,7 @@ into payroll while answering a question about drops.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import urllib.error
@@ -45,7 +46,36 @@ DENIED_GROUPS = (
     "cortex-remote-mcp",
     "ff-remote-mcp",
     "action-items",
+    # Added 2026-08-18 after an audit of the COMBINED surface: each of these holds a
+    # route that reads the same rows as a sanctioned tool under a weaker gate.
+    # `meetings` covers /api/meetings (withAuth-only, returns full summary text and a
+    # wider attendance predicate than find_meetings); `procurement` covers
+    # purchase-orders and boq-spend-summary (withAuth-only PO/BOQ money that
+    # get_procurement_summary withholds from callers lacking `procurement` view).
+    # The sanctioned tools are unaffected — they all call the `reporting` group.
+    #
+    # `field` is deliberately NOT here: the hyphenated-sibling rule would make it match
+    # `field-stock` and take out the whole warehouse module. See DENIED_PATHS.
+    "meetings",
+    "procurement",
 )
+
+# Individual routes withheld where denying the whole GROUP would be too broad.
+#
+# Matched on the canonical path, exactly or as a path prefix, so query strings and
+# trailing segments cannot walk around an entry. Group denial stays the default — this
+# exists for the case where one route in an otherwise legitimate area is the problem.
+#
+# /api/field/attendance carries the same permission key as the supervisor-scoped report
+# (`people.staff.attendance.search`) but applies NO scope: its only predicates are
+# `role IN ('technician','casual')` and a date range, so any holder gets the entire field
+# workforce with clock_in_at/clock_out_at and site_geofence_id. Denying the `field` group
+# instead would also deny `field-stock`, which is unrelated and legitimate.
+#
+# Like DENIED_GROUPS this is blast-radius, not a boundary — the route still needs its own
+# scope, which cannot be applied until staff.reports_to is populated (currently zero of
+# the 32 active field staff have a supervisor set).
+DENIED_PATHS = ("/api/field/attendance",)
 
 MAX_RESPONSE_CHARS = 15_000
 
@@ -67,13 +97,45 @@ def _canonical(path: str) -> str:
     `/api/%2e%2e/x` walk straight past an exact-match denylist and a literal ".."
     substring check. Decoding is repeated until stable so a double-encoded `%252e`
     cannot survive one pass.
+
+    Single-dot segments are then collapsed. Before this, ONE character defeated every deny
+    in this module: `_group_of("/api/./meetings")` returned "." rather than "meetings", so
+    the group check passed, and the literal path check failed to match too.
+
+    Measured, so the reason is not overstated: FibreFlow's own router does NOT resolve dot
+    segments — `curl --path-as-is /api/field/./attendance` returns 404, the same as a
+    route that does not exist, where the plain path returns 401. So this was not a live
+    hole in THIS deployment; the earlier claim that it returned 401 came from curl
+    collapsing "./" client-side before sending.
+
+    It is collapsed anyway because the guard must not be made to read a different string
+    than whatever eventually routes the request. Any proxy, CDN or client library that
+    does normalise (most do, per RFC 3986 §6.2.2.3) would turn the mismatch into a real
+    bypass, and this module is upstream of all of them.
+
+    `..` is NOT resolved here. It stays a refusal in _guard_path — collapsing it would
+    silently accept `/api/staff/../field/x`, and a caller with a legitimate path has no
+    reason to send one.
     """
     prev, cur = None, path
     for _ in range(5):
         if cur == prev:
             break
         prev, cur = cur, urllib.parse.unquote(cur)
-    return cur.lower()
+    cur = cur.lower()
+
+    # Drop "." segments while preserving everything else, including a trailing slash and
+    # any query string (which later checks strip themselves).
+    if "." in cur:
+        head, sep, tail = cur.partition("?")
+        segments = [seg for seg in head.split("/") if seg != "."]
+        head = "/".join(segments)
+        # A path that was entirely dots after /api/ must not collapse to "" and lose its
+        # leading slash, which would fail the /api/ prefix check for the wrong reason.
+        if not head.startswith("/") and path.startswith("/"):
+            head = "/" + head
+        cur = head + sep + tail
+    return cur
 
 
 def _group_of(path: str) -> str:
@@ -93,6 +155,63 @@ def _denied_group(group: str) -> str | None:
     normalised = group.lower()
     for denied in DENIED_GROUPS:
         if normalised == denied or normalised.startswith(denied + "-"):
+            return denied
+    return None
+
+
+# What an API path may contain, after canonicalisation (already lower-cased).
+# Deliberately narrow: real routes are lower-case alphanumerics with dashes,
+# underscores, dots (file extensions) and slashes. Anything else — control bytes,
+# whitespace, a fragment, a backslash, a homoglyph — is refused rather than guessed at.
+_ALLOWED_PATH = re.compile(r"^/api(/[a-z0-9][a-z0-9._\-]*)*/?$")
+
+
+def _malformed(canonical: str) -> str | None:
+    """Refuse a path whose SHAPE could make the denylists read it as something else.
+
+    Returns the refusal message, or None when the path is a clean API path.
+    """
+    bare = canonical.split("?", 1)[0]
+
+    if "#" in canonical:
+        # `_denied_path` stripped the fragment and `_group_of` did not, so the two checks
+        # disagreed about where the path ended. urllib drops it before the wire anyway, so
+        # a fragment is never useful here — only a way to make the guards disagree.
+        return "path must not contain '#'."
+
+    if any(ch.isspace() or ord(ch) < 0x20 or ord(ch) == 0x7F for ch in bare):
+        return "path must not contain whitespace or control characters."
+
+    if not _ALLOWED_PATH.match(bare):
+        return (
+            "path must be a plain FibreFlow API path — lower-case letters, digits, "
+            "'-', '_', '.' and '/' only."
+        )
+
+    # A segment ending in "." is the same route to some servers and a different string to
+    # the denylists, which is precisely the mismatch this function exists to remove.
+    if any(seg.endswith(".") for seg in bare.split("/") if seg):
+        return "path segments must not end with '.'."
+
+    return None
+
+
+def _denied_path(canonical: str) -> str | None:
+    """Match a denied route exactly, or as a path prefix so sub-paths cannot slip by.
+
+    Prefix matching is on a path SEGMENT boundary: `/api/field/attendance` denies
+    `/api/field/attendance/2026-08` but not a hypothetical `/api/field/attendance-policy`,
+    which is a different route and not what this entry is about.
+
+    The query string and fragment are stripped before matching. `fibreflow_get` takes the
+    query as its own parameter, but nothing stops a model putting it in the path — and
+    `/api/field/attendance?from=2026-01-01` must not walk around the entry just because it
+    is no longer string-equal. The group check does not need this (it splits on "/" and so
+    never sees the query), which is exactly why it was missed here first.
+    """
+    bare = canonical.split("?", 1)[0].split("#", 1)[0]
+    for denied in DENIED_PATHS:
+        if bare == denied or bare.startswith(denied + "/"):
             return denied
     return None
 
@@ -189,6 +308,28 @@ def _guard_path(target: str) -> dict[str, object] | None:
         }
     if ".." in canonical or "//" in canonical[1:]:
         return {"message": "path must not contain '..' or '//'.", "received": target}
+
+    shape = _malformed(canonical)
+    if shape:
+        # Refused rather than normalised. The denylists match a path against a literal, so
+        # ANY trailing byte that is not "/" slipped past both of them:
+        # `_group_of("/api/meetings\x00")` is "meetings\x00", which != "meetings", and
+        # "/api/field/attendance." is neither equal to the denied path nor prefixed by it.
+        # Today FibreFlow's stack 400s or 404s those, so nothing was reachable — but that
+        # is upstream leniency this module does not control and explicitly does not claim
+        # to rely on. Enumerating bad bytes would be a losing game, so this states what a
+        # path may contain and refuses everything else.
+        return {"message": shape, "received": target}
+
+    denied_path = _denied_path(canonical)
+    if denied_path:
+        return {
+            "message": (
+                f"'{denied_path}' is not available through this connector. This is a "
+                "deliberate restriction, not a missing endpoint."
+            ),
+            "path": canonical,
+        }
 
     group = _group_of(canonical)
     denied = _denied_group(group)
