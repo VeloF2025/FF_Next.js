@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-18T07:16:17.479Z",
+  "generatedAt": "2026-08-18T07:41:53.634Z",
   "routes": [
     {
       "path": "/api/activate/:dropNumber",
@@ -1690,6 +1690,73 @@
       ],
       "group": "exfo",
       "description": "EXFO Exchange Sync API"
+    },
+    {
+      "path": "/api/field-stock/reports/daily-reconciliation",
+      "methods": [
+        "GET"
+      ],
+      "group": "field-stock",
+      "description": "Daily Stock Reconciliation Report API"
+    },
+    {
+      "path": "/api/field/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "field",
+      "description": "Field Task Export API"
+    },
+    {
+      "path": "/api/field/quality-checks",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/schedules",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/sync",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/tasks",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/tasks/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "field",
+      "description": "Field App — Task by ID"
+    },
+    {
+      "path": "/api/field/technicians",
+      "methods": [
+        "GET"
+      ],
+      "group": "field"
+    },
+    {
+      "path": "/api/field/users",
+      "methods": [
+        "GET"
+      ],
+      "group": "field",
+      "description": "Generic field-user create/list endpoint."
     },
     {
       "path": "/api/fleet/analytics",

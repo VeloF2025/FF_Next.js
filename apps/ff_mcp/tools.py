@@ -96,13 +96,38 @@ def _canonical(path: str) -> str:
     `/api/%2e%2e/x` walk straight past an exact-match denylist and a literal ".."
     substring check. Decoding is repeated until stable so a double-encoded `%252e`
     cannot survive one pass.
+
+    Single-dot segments are then collapsed, because Next.js resolves them before routing:
+    `/api/field/./attendance` reaches the same handler as `/api/field/attendance`. Without
+    this the guards saw a different string than the router did, and ONE character defeated
+    every deny in this module — `_group_of("/api/./meetings")` returned "." rather than
+    "meetings", so the group check passed, and the literal path check failed to match too.
+    Confirmed live before the fix: the dotted form returned 401 (the real route, awaiting
+    auth) where a genuinely unknown route returns 404.
+
+    `..` is NOT resolved here. It stays a refusal in _guard_path — collapsing it would
+    silently accept `/api/staff/../field/x`, and a caller with a legitimate path has no
+    reason to send one.
     """
     prev, cur = None, path
     for _ in range(5):
         if cur == prev:
             break
         prev, cur = cur, urllib.parse.unquote(cur)
-    return cur.lower()
+    cur = cur.lower()
+
+    # Drop "." segments while preserving everything else, including a trailing slash and
+    # any query string (which later checks strip themselves).
+    if "." in cur:
+        head, sep, tail = cur.partition("?")
+        segments = [seg for seg in head.split("/") if seg != "."]
+        head = "/".join(segments)
+        # A path that was entirely dots after /api/ must not collapse to "" and lose its
+        # leading slash, which would fail the /api/ prefix check for the wrong reason.
+        if not head.startswith("/") and path.startswith("/"):
+            head = "/" + head
+        cur = head + sep + tail
+    return cur
 
 
 def _group_of(path: str) -> str:

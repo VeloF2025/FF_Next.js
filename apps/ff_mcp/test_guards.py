@@ -213,3 +213,61 @@ def test_meetings_and_procurement_are_denied_as_groups(svc):
     # …and the sanctioned reporting equivalents still work.
     assert tools._guard_path("/api/reporting/meetings") is None
     assert tools._guard_path("/api/reporting/project-section") is None
+
+
+# ---------------------------------------------------------------------------
+# Dot segments.
+#
+# Next.js resolves "." before routing, so /api/field/./attendance reaches the same
+# handler as /api/field/attendance. The guards ran on the raw canonical string, so ONE
+# character defeated every deny here: _group_of("/api/./meetings") returned "." rather
+# than "meetings", and the literal path match missed too. Confirmed against the running
+# app before the fix — the dotted form returned 401 (the real route, awaiting auth)
+# where a genuinely unknown route returns 404.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/field/./attendance",
+        "/api/./field/attendance",
+        "/api/field/./././attendance",
+        "/api/%2e/field/attendance",
+        "/api/%252e/field/attendance",
+    ],
+)
+def test_dot_segments_do_not_bypass_the_path_deny(svc, path):
+    _, tools = svc
+    assert tools._guard_path(path) is not None, path
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/api/./meetings", "/api/./procurement/purchase-orders", "/api/meetings/./123"],
+)
+def test_dot_segments_do_not_bypass_the_group_deny(svc, path):
+    _, tools = svc
+    assert tools._guard_path(path) is not None, path
+
+
+def test_dot_segments_do_not_break_a_LEGITIMATE_path(svc):
+    """The mirror. Collapsing "." must not turn an allowed path into a refusal, or the
+    fix above would be indistinguishable from denying everything."""
+    _, tools = svc
+    assert tools._guard_path("/api/reporting/./meetings") is None
+    assert tools._guard_path("/api/field-stock/./reports/daily-reconciliation") is None
+
+
+def test_double_dot_is_still_REFUSED_not_resolved(svc):
+    """`..` must stay a refusal rather than being collapsed away: resolving it would
+    silently accept /api/staff/../field/x, which reads as a denied path."""
+    _, tools = svc
+    assert tools._guard_path("/api/staff/../field/workers") is not None
+    assert tools._guard_path("/api/field/attendance/../attendance") is not None
+
+
+def test_canonical_keeps_a_dotted_filename_intact(svc):
+    """Only whole "." SEGMENTS are dropped — a dot inside a segment is data."""
+    _, tools = svc
+    assert tools._canonical("/api/photos/a.b.jpg") == "/api/photos/a.b.jpg"
