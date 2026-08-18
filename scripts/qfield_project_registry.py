@@ -236,11 +236,26 @@ PROJECTS = {
     # means deleting the 2026-02-07 rows first and letting the extractor recreate them.
     # What this entry does fix is every photo captured from here on.
     #
-    # Also note this layer has NO recognised step columns — 3 "extra photo" columns
-    # (Pole Photo, LabelPhoto, …) rather than a numbered civil-audit checklist. The extra
-    # column path inserts checklist_step/step_label as NULL by design, so Grabouw photos
-    # arrive unstepped whatever this entry says. That is a property of the source data,
-    # not something a registry entry can change.
+    # Also note this layer has NO recognised step columns. It carries FOUR photo-shaped
+    # columns — "Pole Photo", JointPhoto, LabelPhoto, SlackPhoto — of which
+    # EXTRA_PHOTO_PATTERNS matches three: LabelPhoto is MISSED, because that pattern is
+    # spelled `^Lable.*Photo$` (another project's misspelling) and nothing matches
+    # `Label`. Harmless today — only "Pole Photo" is populated (121 values; the other
+    # three are empty) — but the day a crew fills LabelPhoto those photos are dropped
+    # with no error. Not fixed here: that pattern list is shared by every project, so
+    # widening it belongs in its own change rather than a Grabouw onboarding.
+    #
+    # The extra-column path inserts checklist_step/step_label as NULL by design, so
+    # Grabouw photos arrive unstepped whatever this entry says. Property of the source
+    # data, not something a registry entry can change.
+    #
+    # Cost of setting zone_col: hierarchy_backfill_needed() returns True while ANY
+    # pole_qa_photos row for the project has a NULL zone_no, and Grabouw has one that
+    # never will — the placeholder review QF-POLE-574a7856, which has no counterpart in
+    # the GPKG. So the "already processed this version" short-circuit can never fire and
+    # every run re-downloads 724 KB and re-walks 3,796 rows. Small, but it defeats the
+    # delta check. Accepted rather than dropping zone_col, because the zone/PON data is
+    # real and the placeholder is the thing that is wrong.
     #
     # Read off the live file (Poles.gpkg v20260219132551): one table, `Poles`, 3,796 rows,
     # label_col `label_1` — the same `_1` publish-collision suffix Thembisa POP 1 carries,
