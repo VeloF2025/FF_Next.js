@@ -107,7 +107,11 @@ describe('FleetMap operational composition', () => {
     expect(popupText).toContain('ABC 123 GP');
     expect(popupText).toContain('Jane Doe');
     expect(popupText).toContain('Parked · no contact · 43 km/h');
-    expect(popupText).toContain('Last fix: 7h ago (stale)');
+    // master 8f8e6ba23 deliberately dropped the "(stale)" suffix here because it
+    // contradicted the "Parked" label; `style.label` already carries freshness.
+    // Assert both halves so neither the field nor that decision can regress.
+    expect(popupText).toContain('Last fix: 7h ago');
+    expect(popupText).not.toContain('(stale)');
     expect(popupText).toContain('via cartrack');
     expect(layers.markers).toHaveBeenCalledTimes(1);
   });
