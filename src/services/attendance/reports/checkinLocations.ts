@@ -24,7 +24,7 @@
 
 import { sql } from '@/lib/db-pool';
 import { buildBaseWhere, makeParamBuilder } from './sqlHelpers';
-import { PROJECT_AOI_CTE } from './projectAoiSql';
+import { AOI_STALE_AFTER_HOURS, PROJECT_AOI_CTE } from './projectAoiSql';
 import { REPORT_ROW_CAP, ReportTooLargeError } from './runner';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
 
@@ -82,6 +82,7 @@ interface Row extends Record<string, unknown> {
   lon: string | null;
   selfie_available: boolean;
   device_fingerprint: string | null;
+  aoi_computed_at_ms: string | null;
 }
 
 /**
@@ -166,7 +167,18 @@ export async function runCheckinLocations(input: ReportInput): Promise<ReportRun
       ev.lat::text                                  AS lat,
       ev.lon::text                                  AS lon,
       ev.selfie_available                           AS selfie_available,
-      ev.device_fingerprint                         AS device_fingerprint
+      ev.device_fingerprint                         AS device_fingerprint,
+      -- Carried on every row so a stalled AOI refresh is visible in the
+      -- report rather than silently serving geometry from weeks ago. Scalar
+      -- subquery over a 9-row table; no extra round trip.
+      --
+      -- Epoch millis, not ::text. A timestamptz rendered to text carries its
+      -- offset under the default DateStyle and parses correctly — but a
+      -- timestamp string WITHOUT an offset is read by new Date() as local
+      -- time, which here would be 2 hours out and would silently suppress or
+      -- fabricate the staleness warning. An integer cannot be misread.
+      (SELECT (EXTRACT(EPOCH FROM MAX(a2.computed_at)) * 1000)::bigint
+         FROM project_aois a2)::text AS aoi_computed_at_ms
     FROM events ev
     LEFT JOIN LATERAL (
       SELECT
@@ -204,6 +216,20 @@ export async function runCheckinLocations(input: ReportInput): Promise<ReportRun
   const notes = [
     'Distances are to the convex hull of each project’s surveyed poles, so 0 m means inside the site boundary.',
   ];
+  // A stalled refresh cron is invisible otherwise: the report keeps answering,
+  // just against sites as they were whenever it last ran. Say so.
+  // Every row carries the same scalar; row 0 is representative.
+  const computedAtMs = rows[0]?.aoi_computed_at_ms ?? null;
+  if (rows.length > 0 && !computedAtMs) {
+    notes.push('No project AOIs are loaded — every event will read as unmatched. Run the AOI refresh.');
+  } else if (computedAtMs) {
+    const ageHours = (Date.now() - Number(computedAtMs)) / 3_600_000;
+    if (ageHours > AOI_STALE_AFTER_HOURS) {
+      notes.push(
+        `Project AOIs were last rebuilt ${Math.floor(ageHours / 24)} day(s) ago — newer sites may be missing.`,
+      );
+    }
+  }
   if (noGps > 0) notes.push(`${noGps} event(s) carry no GPS fix and cannot be located.`);
   if (noAoi > 0) notes.push(`${noAoi} event(s) had coordinates but no project has enough poles to form an AOI.`);
 

@@ -73,6 +73,7 @@ export default defineConfig({
       'tests/migrations/498_fleet_operational_evidence.test.ts',
       'tests/migrations/498_fleet_operational_status_rules.test.ts',
       'tests/migrations/498_fleet_status_geometry.test.ts',
+      'tests/migrations/499_attendance_project_aois.test.ts',
       'tests/migrations/metric-registry-execution.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.

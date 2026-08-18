@@ -4,7 +4,6 @@ const { sqlMock } = vi.hoisted(() => ({ sqlMock: { query: vi.fn() } }));
 vi.mock('@/lib/db-pool', () => ({ sql: sqlMock }));
 
 import { runCheckinLocations, NEAR_THRESHOLD_M } from '../checkinLocations';
-import { MIN_POLES_FOR_AOI, SA_LAT_MIN, SA_LON_MAX } from '../projectAoiSql';
 import { REPORT_ROW_CAP, ReportTooLargeError } from '../runner';
 import type { ReportInput } from '../types';
 
@@ -38,6 +37,7 @@ const FACT = {
   lon: '27.8123456',
   selfie_available: true,
   device_fingerprint: 'fp-abc',
+  aoi_computed_at_ms: String(Date.now()),
 };
 
 beforeEach(() => {
@@ -147,6 +147,26 @@ describe('runCheckinLocations', () => {
     expect(latCol?.format).toBeUndefined();
   });
 
+  it('warns when the AOI geometry is stale rather than serving it silently', async () => {
+    const eightDaysAgo = String(Date.now() - 8 * 86_400_000);
+    sqlMock.query.mockResolvedValueOnce([{ ...FACT, aoi_computed_at_ms: eightDaysAgo }]);
+    const result = await runCheckinLocations(input());
+    expect(result.notes.some((n) => n.includes('8 day(s) ago'))).toBe(true);
+  });
+
+  it('stays quiet when the AOI geometry is fresh', async () => {
+    const result = await runCheckinLocations(input());
+    expect(result.notes.some((n) => /last rebuilt/.test(n))).toBe(false);
+    // ...and the freshness really was evaluated, not skipped.
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it('says so loudly when no AOIs are loaded at all', async () => {
+    sqlMock.query.mockResolvedValueOnce([{ ...FACT, aoi_computed_at_ms: null }]);
+    const result = await runCheckinLocations(input());
+    expect(result.notes.some((n) => n.includes('No project AOIs are loaded'))).toBe(true);
+  });
+
   it('binds the date range, supervisor scope and row cap as parameters', async () => {
     await runCheckinLocations(input());
     const [text, params] = sqlMock.query.mock.calls[0] as [string, unknown[]];
@@ -166,16 +186,15 @@ describe('runCheckinLocations', () => {
     expect(text).toContain(`LIMIT $5`);
   });
 
-  it('measures distance against the pole hull, materialised and SA-bounded', async () => {
+  it('reads the stored AOI table rather than rebuilding the hulls', async () => {
     await runCheckinLocations(input());
     const [text] = sqlMock.query.mock.calls[0] as [string];
-    // MATERIALIZED is a performance contract, not a style choice: without it
-    // Postgres re-aggregates every pole per event row (4.9s vs 107ms).
-    expect(text).toContain('project_aoi AS MATERIALIZED');
-    expect(text).toContain('ST_ConvexHull');
-    expect(text).toContain(`p.latitude  BETWEEN ${SA_LAT_MIN}`);
-    expect(text).toContain(`AND ${SA_LON_MAX}`);
-    expect(text).toContain(`HAVING COUNT(*) >= ${MIN_POLES_FOR_AOI}`);
+    expect(text).toContain('FROM project_aois');
+    // Building the hulls here would be a SECOND definition of the geometry the
+    // clock-in path already records against, free to disagree about which
+    // sites exist. It is also 25x slower (105ms vs 4.2ms per lookup).
+    expect(text).not.toContain('ST_ConvexHull');
+    expect(text).not.toContain('FROM poles');
     // Not the empty fleet_authorized_locations table the geo-mismatch report uses.
     expect(text).not.toContain('fleet_authorized_locations');
   });
