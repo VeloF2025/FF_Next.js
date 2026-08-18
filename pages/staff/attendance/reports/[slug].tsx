@@ -184,6 +184,7 @@ export default function ReportSlugPage() {
         <ReportFilterBar def={def} form={form} setForm={setForm} onRun={runFetch} loading={loading} />
 
         <ReportResultPanel
+          slug={def.slug}
           columns={columns}
           rows={rows}
           notes={data?.notes ?? []}

@@ -37,6 +37,7 @@ import { runBceaPremium } from './bceaPremium';
 import { runExceptionAgeing } from './exceptionAgeing';
 import { runPayrollReadiness } from './payrollReadiness';
 import { runEvidenceQuality } from './evidenceQuality';
+import { runCheckinLocations } from './checkinLocations';
 
 export const REPORT_ROW_CAP = 50_000;
 
@@ -225,6 +226,7 @@ const DISPATCH: Record<ReportSlug, (input: ReportInput) => Promise<ReportRunResu
   'exception-ageing':  runExceptionAgeing,
   'payroll-readiness': runPayrollReadiness,
   'evidence-quality':  runEvidenceQuality,
+  'checkin-locations': runCheckinLocations,
 };
 
 /**
@@ -244,7 +246,8 @@ export async function runReport(
   let errorMsg: string | null = null;
   try {
     if (!input.hasAnyStaff) {
-      const keepsStableColumns = slug === 'exception-ageing' || slug === 'payroll-readiness' || slug === 'evidence-quality';
+      const keepsStableColumns = slug === 'exception-ageing' || slug === 'payroll-readiness'
+        || slug === 'evidence-quality' || slug === 'checkin-locations';
       const schema = keepsStableColumns
         ? await DISPATCH[slug](input)
         : { rows: [], columns: [], notes: [] };

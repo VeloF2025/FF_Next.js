@@ -20,7 +20,8 @@ export type ReportSlug =
   | 'bcea-premium'
   | 'exception-ageing'
   | 'payroll-readiness'
-  | 'evidence-quality';
+  | 'evidence-quality'
+  | 'checkin-locations';
 
 export const ALL_REPORT_SLUGS: ReadonlyArray<ReportSlug> = [
   'monthly-totals',
@@ -33,6 +34,7 @@ export const ALL_REPORT_SLUGS: ReadonlyArray<ReportSlug> = [
   'exception-ageing',
   'payroll-readiness',
   'evidence-quality',
+  'checkin-locations',
 ];
 
 /** Catalogue entry — drives the index tile grid and the per-slug page. */
@@ -156,6 +158,16 @@ export const REPORT_CATALOGUE: ReadonlyArray<ReportDef> = [
       { kind: 'departments_text' },
     ],
   },
+  {
+    slug: 'checkin-locations',
+    title: 'Check-in locations',
+    blurb: 'Every clock in/out with its GPS fix, nearest project AOI, distance and selfie.',
+    inputs: [
+      { kind: 'date_range', defaultPreset: 'last_30d' },
+      { kind: 'departments_text' },
+      { kind: 'staff_ids_text' },
+    ],
+  },
 ];
 
 /** Result column metadata — drives table rendering and XLSX header order. */
@@ -163,8 +175,14 @@ export interface ReportColumn {
   key: string;
   label: string;
   align?: 'left' | 'right';
-  /** Render hint: 'number' for tabular-nums right-align, 'currency_rand' to fmt cents → R. */
-  format?: 'number' | 'currency_rand' | 'integer';
+  /**
+   * Render hint. 'number' for tabular-nums right-align, 'currency_rand' to
+   * fmt cents → R, 'selfie_link' for a cell holding an audited
+   * `/api/staff/attendance-selfie` path — that route answers with JSON, so
+   * the cell renders a button that fetches and unwraps it rather than an
+   * anchor that would open a tab of JSON. Exports keep the path as text.
+   */
+  format?: 'number' | 'currency_rand' | 'integer' | 'selfie_link';
 }
 
 export interface ReportRunResult {

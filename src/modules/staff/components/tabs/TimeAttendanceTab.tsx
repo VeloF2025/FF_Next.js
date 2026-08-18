@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Camera, ExternalLink } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { log } from '@/lib/logger';
+import { openAuditedSelfie } from '@/components/attendance/openAuditedSelfie';
 
 interface ApiEntry {
   entryId: string;
@@ -54,42 +54,6 @@ type ApiFailure = { success: false; error?: { message?: string; details?: { reas
 function extractErrorMessage(body: unknown, fallback: string): string {
   const err = (body as ApiFailure | undefined)?.error;
   return (typeof err?.message === 'string' && err.message) || fallback;
-}
-
-async function openSelfie(
-  entryId: string,
-  kind: 'in' | 'out',
-  setRowError: (msg: string) => void
-): Promise<void> {
-  try {
-    const res = await fetch(
-      `/api/staff/attendance-selfie?entryId=${entryId}&kind=${kind}&context=staff_detail`,
-      { credentials: 'include' }
-    );
-    const body = (await res.json().catch(() => null)) as ApiBody | ApiFailure | null;
-    if (!res.ok || !body || body.success !== true) {
-      const reason = (body as ApiFailure | null)?.error?.details?.reason;
-      if (reason === 'audit_write_failed') {
-        setRowError('Compliance audit failed — selfie access denied. Please try again.');
-        return;
-      }
-      if (reason === 'unavailable') {
-        setRowError('Selfie unavailable (never captured or deleted under retention policy).');
-        return;
-      }
-      setRowError(extractErrorMessage(body, 'Could not load the selfie.'));
-      return;
-    }
-    const url = (body as { data?: { url?: string } }).data?.url;
-    if (!url) {
-      setRowError('Server returned an empty selfie URL.');
-      return;
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
-  } catch (err) {
-    log.error('TimeAttendanceTab: selfie fetch failed', err instanceof Error ? { message: err.message } : { err });
-    setRowError('Network error — could not load the selfie.');
-  }
 }
 
 export function TimeAttendanceTab({ staffId }: { staffId: string }) {
@@ -258,7 +222,7 @@ function SelfieButton({
   return (
     <button
       type="button"
-      onClick={() => void openSelfie(entryId, kind, onError)}
+      onClick={() => void openAuditedSelfie(entryId, kind, 'staff_detail', onError)}
       className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/15 text-blue-300 text-xs hover:bg-blue-500/25 border border-blue-500/30"
     >
       <Camera className="w-3 h-3" />
