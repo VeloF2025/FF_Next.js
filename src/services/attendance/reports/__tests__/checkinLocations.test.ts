@@ -4,7 +4,6 @@ const { sqlMock } = vi.hoisted(() => ({ sqlMock: { query: vi.fn() } }));
 vi.mock('@/lib/db-pool', () => ({ sql: sqlMock }));
 
 import { runCheckinLocations, NEAR_THRESHOLD_M } from '../checkinLocations';
-import { MIN_POLES_FOR_AOI, SA_LAT_MIN, SA_LON_MAX } from '../projectAoiSql';
 import { REPORT_ROW_CAP, ReportTooLargeError } from '../runner';
 import type { ReportInput } from '../types';
 
@@ -166,16 +165,15 @@ describe('runCheckinLocations', () => {
     expect(text).toContain(`LIMIT $5`);
   });
 
-  it('measures distance against the pole hull, materialised and SA-bounded', async () => {
+  it('reads the stored AOI table rather than rebuilding the hulls', async () => {
     await runCheckinLocations(input());
     const [text] = sqlMock.query.mock.calls[0] as [string];
-    // MATERIALIZED is a performance contract, not a style choice: without it
-    // Postgres re-aggregates every pole per event row (4.9s vs 107ms).
-    expect(text).toContain('project_aoi AS MATERIALIZED');
-    expect(text).toContain('ST_ConvexHull');
-    expect(text).toContain(`p.latitude  BETWEEN ${SA_LAT_MIN}`);
-    expect(text).toContain(`AND ${SA_LON_MAX}`);
-    expect(text).toContain(`HAVING COUNT(*) >= ${MIN_POLES_FOR_AOI}`);
+    expect(text).toContain('FROM project_aois');
+    // Building the hulls here would be a SECOND definition of the geometry the
+    // clock-in path already records against, free to disagree about which
+    // sites exist. It is also 25x slower (105ms vs 4.2ms per lookup).
+    expect(text).not.toContain('ST_ConvexHull');
+    expect(text).not.toContain('FROM poles');
     // Not the empty fleet_authorized_locations table the geo-mismatch report uses.
     expect(text).not.toContain('fleet_authorized_locations');
   });
