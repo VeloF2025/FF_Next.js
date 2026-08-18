@@ -27,15 +27,32 @@ export interface ResolvedIncidentRecipients {
   failed: boolean;
 }
 
-interface ProjectManagerRow extends Record<string, unknown> { project_manager: string | null }
+// `projects.project_manager` is not reliably a `users.id` — the same column
+// is checked against both a `users.id` and a `staff.id` in
+// reviewScope.isProjectOwnedByScope, reviewQueries.buildWhere, and both
+// fleet/operations and fleet/assignments projectScope helpers. Resolving it
+// straight as a user id would silently drop that PM from every notification
+// (while they still see the incident in the review queue, since the scope
+// check already tolerates both forms). COALESCE(u.id, s.user_id) matches
+// either shape: a direct user id passes through via `u`; a staff id resolves
+// through `staff.user_id` — which, per the same nullable-link precedent as
+// `parking/decisionNotifications.ts`, is null for staff with no linked
+// FibreFlow account, in which case there is legitimately nobody to notify.
+interface ProjectManagerRow extends Record<string, unknown> { resolved_user_id: string | null }
 interface ActiveUserRow extends Record<string, unknown> { id: string }
 
 async function loadProjectManagerId(projectId: string): Promise<string | null> {
   const rows = await query<ProjectManagerRow>(
-    `/* fleet-incident-recipients:project-manager */ SELECT project_manager FROM projects WHERE id = $1::uuid LIMIT 1`,
+    `/* fleet-incident-recipients:project-manager */
+     SELECT COALESCE(u.id, s.user_id) AS resolved_user_id
+     FROM projects p
+     LEFT JOIN users u ON u.id = p.project_manager
+     LEFT JOIN staff s ON s.id = p.project_manager
+     WHERE p.id = $1::uuid
+     LIMIT 1`,
     [projectId],
   );
-  return rows[0]?.project_manager ?? null;
+  return rows[0]?.resolved_user_id ?? null;
 }
 
 async function filterToActiveUserIds(userIds: readonly string[]): Promise<string[]> {
