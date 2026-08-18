@@ -48,7 +48,24 @@ export default defineConfig({
     hookTimeout: 120_000,
     // These hit one shared container; parallel files would race on the same
     // tables and on migration application order.
-    fileParallelism: false,
+    //
+    // `threads: false`, NOT `fileParallelism: false`. This repo is on vitest 0.34.6 and
+    // fileParallelism landed in vitest 1.0 — the string appears nowhere in
+    // node_modules/vitest/dist, so it was accepted and silently ignored, and these files
+    // have been running in PARALLEL the whole time despite the comment above.
+    //
+    // What that cost: 497 and 498 both `CREATE EXTENSION IF NOT EXISTS btree_gist`.
+    // That statement is check-then-insert and is not atomic, so two files running it at
+    // once both saw "not exists" and one lost the insert with
+    // 23505 duplicate key value violates unique constraint "pg_extension_name_index".
+    // It failed twice on CI (including a clean re-run) while passing locally, which is
+    // what a parallelism race looks like on a runner with more cores.
+    //
+    // The three sibling DB configs — vitest.db.config.ts, vitest.db.sprinte.config.ts,
+    // vitest.velocity-review-db.config.ts — all already use `threads: false`. This one
+    // was the odd one out. See scripts/__tests__/vitest-config-options.test.ts, which
+    // fails if an option unsupported by the installed vitest reappears in any config.
+    threads: false,
   },
   resolve: {
     alias: [
