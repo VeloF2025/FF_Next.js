@@ -182,6 +182,20 @@ accessibility rather than color alone.
 PR 5 has no migration. Roll back presentation with a normal PR revert: PR 4 APIs/rules remain
 valid and no database/data rollback is required.
 
+### Known limitations (PR 5)
+
+Oversight users cannot yet select **All Projects**. `GET /api/fleet/operations/overview` requires a
+`projectId`, and PR 4's `RosterStatusRequest.projectId` is a mandatory string. Project-manager scope
+works correctly. This was deferred deliberately rather than change merged PR 4 service contracts
+mid-stack; a follow-up PR must make the roster query optional-project and gate it to oversight roles.
+
+Large selections do the per-staff evidence work twice. `getOperationalMapOverlay` pages the roster
+and the evidence loader concurrently, but `getOperationalRosterStatus` already loads evidence per
+page, so the geospatial/attendance joins in `evidenceQueries.ts` run twice per staff member. It is
+bounded by `MAX_COMPLETE_ROSTER_ROWS` (2000; beyond that both endpoints return 400, never a 500 and
+never a silent truncation) and it is correct, but a project near that bound is measurably slower
+than a single-page selection. Worth collapsing to one evidence pass in a follow-up.
+
 ## Tracking (Live GPS)
 
 Vehicle position history lands in `fleet_vehicle_positions` via two provider-blind ingestion
