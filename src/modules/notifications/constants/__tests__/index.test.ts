@@ -24,9 +24,8 @@ describe('Fleet operational notification registrations', () => {
     expect(EVENT_GROUPS[eventType]).toBe('Fleet');
   });
 
-  it('uses mandatory channels for critical safety and monitor failures', () => {
+  it('uses mandatory channels for monitor health failures', () => {
     for (const eventType of [
-      'fleet.operational_incident_escalated',
       'fleet.operational_monitor_failed',
     ]) {
       expect(DEFAULT_CHANNEL_PREFERENCES[eventType]).toEqual({
@@ -37,9 +36,15 @@ describe('Fleet operational notification registrations', () => {
     }
   });
 
-  it('keeps routine incident and summary notifications off WhatsApp', () => {
+  // Escalation shares the routine default: a routine/high/scheduled incident
+  // escalating past its ack target must never gain WhatsApp by accident.
+  // Critical explicit-source-event escalations still get WhatsApp, but via
+  // the same sendMandatoryWhatsApp bypass `sendIncidentOpenedNotification`
+  // uses — never by broadening this default (see incidentNotifications.ts).
+  it('keeps routine incident, escalation, and summary notifications off WhatsApp', () => {
     for (const eventType of [
       'fleet.operational_incident_opened',
+      'fleet.operational_incident_escalated',
       'fleet.operational_incident_resolved',
       'fleet.operational_morning_summary',
     ]) {

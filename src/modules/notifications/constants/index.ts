@@ -54,7 +54,11 @@ export const DEFAULT_CHANNEL_PREFERENCES: Record<string, ChannelPreferences> = {
   'fleet.tracking_data_gap':        { in_app: true, email: true,  whatsapp: false },
   'fleet.tracking_pull_degraded':   { in_app: true, email: true,  whatsapp: false },
   'fleet.operational_incident_opened': { in_app: true, email: true, whatsapp: false },
-  'fleet.operational_incident_escalated': { in_app: true, email: true, whatsapp: true },
+  // Routine default, same as _opened/_resolved: a critical explicit-source-event
+  // escalation still reaches WhatsApp, but via the sendMandatoryWhatsApp bypass in
+  // incidentNotifications.ts — never by broadening this default (see that file's
+  // module docblock for why notify() alone cannot express a per-call override).
+  'fleet.operational_incident_escalated': { in_app: true, email: true, whatsapp: false },
   'fleet.operational_incident_resolved': { in_app: true, email: true, whatsapp: false },
   'fleet.operational_morning_summary': { in_app: true, email: true, whatsapp: false },
   'fleet.operational_monitor_failed': { in_app: true, email: true, whatsapp: true },

@@ -62,7 +62,7 @@ function dueRow(overrides: Record<string, unknown> = {}) {
     id: INCIDENT_A, incident_reference: 'INC-LATE-20260818-AAA111', incident_type: 'late', severity: 'high',
     project_id: PROJECT, staff_name_snapshot: 'Jane Driver', project_name_snapshot: 'Project One',
     operational_site_name_snapshot: 'Site One', escalation_level: 0,
-    opened_at: '2026-08-18T06:00:00.000Z', next_escalation_at: null,
+    opened_at: '2026-08-18T06:00:00.000Z', next_escalation_at: null, source_event_id: null,
     acknowledgement_target_minutes: 15, reminder_interval_minutes: 15, maximum_escalation_level: 3,
     ...overrides,
   };
@@ -101,7 +101,17 @@ describe('escalation phase', () => {
 
     expect(result.escalatedCount).toBe(1);
     expect(notifications.sendEscalationNotification).toHaveBeenCalledWith(expect.objectContaining({
-      incidentId: INCIDENT_A, escalationLevel: 1,
+      incidentId: INCIDENT_A, escalationLevel: 1, producerKind: 'scheduled_detection',
+    }));
+  });
+
+  it('derives producerKind "source_event" from a non-null source_event_id', async () => {
+    db.query.mockResolvedValueOnce([dueRow({ source_event_id: 'evt-123' })]);
+
+    await runIncidentActions(AFTER_0815);
+
+    expect(notifications.sendEscalationNotification).toHaveBeenCalledWith(expect.objectContaining({
+      producerKind: 'source_event',
     }));
   });
 

@@ -140,7 +140,8 @@ describe('sendIncidentOpenedNotification', () => {
 describe('sendEscalationNotification', () => {
   const input = {
     incidentId: INCIDENT, incidentReference: 'INC-LATE-20260818-ABC123', incidentType: 'late' as const,
-    severity: 'high' as const, projectId: PROJECT, staffName: 'Jane Driver', projectName: 'Project One',
+    severity: 'high' as const, producerKind: 'scheduled_detection' as const,
+    projectId: PROJECT, staffName: 'Jane Driver', projectName: 'Project One',
     operationalSiteName: 'Site One', escalationLevel: 2,
   };
 
@@ -165,6 +166,37 @@ describe('sendEscalationNotification', () => {
 
     expect(bus.notify).not.toHaveBeenCalled();
     expect(result.failed).toBe(1);
+  });
+
+  // Locked product decision: routine/high/scheduled incidents must never gain
+  // mandatory WhatsApp just because they escalated.
+  it('never sends mandatory WhatsApp for a routine scheduled escalation, even at a late escalation level', async () => {
+    await sendEscalationNotification({ ...input, severity: 'high', producerKind: 'scheduled_detection', escalationLevel: 3 });
+
+    expect(wa.deliverWhatsApp).not.toHaveBeenCalled();
+  });
+
+  it('never sends mandatory WhatsApp for a critical scheduled-detection escalation (producerKind gates it too)', async () => {
+    await sendEscalationNotification({ ...input, severity: 'critical', producerKind: 'scheduled_detection' });
+
+    expect(wa.deliverWhatsApp).not.toHaveBeenCalled();
+  });
+
+  it('sends mandatory WhatsApp directly to every recipient for a critical source-event escalation, in addition to notify()', async () => {
+    await sendEscalationNotification({ ...input, severity: 'critical', producerKind: 'source_event', incidentType: 'accident_sos' });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({ event_type: 'fleet.operational_incident_escalated' }));
+    expect(wa.deliverWhatsApp).toHaveBeenCalledTimes(2);
+    expect(wa.deliverWhatsApp).toHaveBeenCalledWith(PM, expect.anything(), null);
+    expect(wa.deliverWhatsApp).toHaveBeenCalledWith(OVERSIGHT, expect.anything(), null);
+  });
+
+  it('counts a mandatory WhatsApp delivery failure on escalation without throwing', async () => {
+    wa.deliverWhatsApp.mockRejectedValueOnce(new Error('WA bridge down'));
+
+    const result = await sendEscalationNotification({ ...input, severity: 'critical', producerKind: 'source_event', incidentType: 'accident_sos' });
+
+    expect(result.failed).toBeGreaterThanOrEqual(1);
   });
 });
 

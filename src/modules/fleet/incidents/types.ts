@@ -248,11 +248,24 @@ export interface IncidentNotificationPlan {
   mandatoryChannels: NotificationChannel[];
 }
 
+// Shared predicate for the one case that must always reach WhatsApp
+// regardless of the routine `whatsapp: false` default or a muted per-user
+// preference: a critical incident on an explicit source event. Used both for
+// the opened notification (via the plan below) and for escalation
+// notifications (`sendEscalationNotification` in incidentNotifications.ts) —
+// keep both call sites on this single predicate rather than re-deriving it.
+export function requiresMandatoryIncidentWhatsApp(
+  severity: IncidentSeverity,
+  producerKind: IncidentProducerKind,
+): boolean {
+  return severity === 'critical' && producerKind === 'source_event';
+}
+
 export function resolveIncidentOpenedNotification(
   rule: IncidentRule,
   producerKind: IncidentProducerKind,
 ): IncidentNotificationPlan {
-  const requiresWhatsApp = rule.severity === 'critical' && producerKind === 'source_event';
+  const requiresWhatsApp = requiresMandatoryIncidentWhatsApp(rule.severity, producerKind);
 
   return {
     channels: {

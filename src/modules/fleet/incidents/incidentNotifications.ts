@@ -15,12 +15,15 @@
  * override and has no per-call channel override (see
  * `src/services/tracking/alerts.ts` and its "encode channel policy in event
  * type" commit for the established precedent) — and
- * `fleet.operational_incident_opened` is registered with `whatsapp: false`
- * by default so that routine/high/scheduled incidents never gain WhatsApp by
- * accident. So for the one case that must always get WhatsApp regardless of
- * that default or a muted per-user preference, this module places a direct,
- * best-effort `deliverWhatsApp` call to every resolved recipient IN ADDITION
- * TO the normal `notify()` call, exactly as the brief specifies ("in
+ * `fleet.operational_incident_opened` and `fleet.operational_incident_escalated`
+ * are both registered with `whatsapp: false` by default so that routine/high/
+ * scheduled incidents never gain WhatsApp by accident — escalating a routine
+ * incident must not turn it into a WhatsApp blast either. So for the one case
+ * that must always get WhatsApp regardless of that default or a muted
+ * per-user preference (a critical incident on an explicit source event, see
+ * `requiresMandatoryIncidentWhatsApp` in `./types`), this module places a
+ * direct, best-effort `deliverWhatsApp` call to every resolved recipient IN
+ * ADDITION TO the normal `notify()` call, exactly as the brief specifies ("in
  * addition to configured in-app/email delivery"). A failure there is counted
  * in the returned `NotifyResult.failed` and never thrown.
  */
@@ -29,7 +32,7 @@ import { notify } from '@/modules/notifications/services/notificationBus';
 import { deliverWhatsApp } from '@/modules/notifications/services/whatsappDelivery';
 import type { NotifyPayload, NotifyResult } from '@/modules/notifications/types';
 import { resolveIncidentRecipients } from './recipientService';
-import { resolveIncidentOpenedNotification } from './types';
+import { requiresMandatoryIncidentWhatsApp, resolveIncidentOpenedNotification } from './types';
 import type {
   IncidentOutcome, IncidentProducerKind, IncidentRule, IncidentSeverity, IncidentType, MonitorRunKind,
 } from './types';
@@ -145,6 +148,7 @@ export function buildIncidentEscalatedIdempotencyKey(incidentId: string, escalat
 
 export interface EscalationNotificationInput {
   incidentId: string; incidentReference: string; incidentType: IncidentType; severity: IncidentSeverity;
+  producerKind: IncidentProducerKind;
   projectId: string | null; staffName: string | null; projectName: string | null;
   operationalSiteName: string | null; escalationLevel: number;
 }
@@ -159,7 +163,7 @@ export async function sendEscalationNotification(input: EscalationNotificationIn
   }
   const who = input.staffName ?? 'Unknown staff';
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
-  return safeNotify({
+  const payload: NotifyPayload = {
     event_type: 'fleet.operational_incident_escalated',
     title: `Fleet incident escalated (level ${input.escalationLevel}): ${humanizeCode(input.incidentType)}`,
     body: `${who} — ${where} — still unacknowledged at escalation level ${input.escalationLevel}`,
@@ -172,7 +176,16 @@ export async function sendEscalationNotification(input: EscalationNotificationIn
     },
     recipient_user_ids: recipients.userIds,
     idempotency_key: buildIncidentEscalatedIdempotencyKey(input.incidentId, input.escalationLevel),
-  }, { incidentId: input.incidentId });
+  };
+  const result = await safeNotify(payload, { incidentId: input.incidentId });
+
+  if (requiresMandatoryIncidentWhatsApp(input.severity, input.producerKind)) {
+    const { recipient_user_ids: _drop, idempotency_key: _drop2, ...waPayload } = payload;
+    const waFailed = await sendMandatoryWhatsApp(recipients.userIds, waPayload, { incidentId: input.incidentId });
+    result.failed += waFailed;
+  }
+
+  return result;
 }
 
 // -- Resolution / dismissal -------------------------------------------------
