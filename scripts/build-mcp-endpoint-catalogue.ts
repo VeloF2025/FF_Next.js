@@ -33,6 +33,25 @@ export const DENIED_GROUPS = new Set([
   // invites exactly the wandering this list exists to prevent.
   'cortex-remote-mcp',
   'ff-remote-mcp',
+  // Added 2026-08-18 after an audit of the COMBINED tool surface. Each of these groups
+  // holds a route that reads the same rows as a sanctioned reporting tool, under a
+  // weaker gate — so an agent that wandered into them got around the narrowing the tool
+  // advertises. This list is blast-radius, not a boundary (see above): the routes below
+  // still need their own RBAC, tracked separately. What it does buy is that a model
+  // answering a question about drops cannot stumble into them.
+  //   field       — /api/field/attendance carries the same permission key as the scoped
+  //                 report but applies NO supervisor scope, returning the whole field
+  //                 workforce with clock times and geofence ids.
+  //   meetings    — /api/meetings is withAuth-only and returns full summary JSONB,
+  //                 participants and user_notes; find_meetings requires people.meetings
+  //                 and deliberately returns an index with no summary text.
+  //   procurement — /api/procurement/purchase-orders and boq-spend-summary are
+  //                 withAuth-only and expose per-PO totals and BOQ spend, which
+  //                 get_procurement_summary withholds from callers lacking
+  //                 `procurement` view.
+  'field',
+  'meetings',
+  'procurement',
   // `action-items` rows carry meeting content — descriptions extracted verbatim from
   // transcripts. FibreFlow gates meetings on ATTENDANCE (see
   // pages/api/meetings/[id]/transcript.ts), but /api/action-items is withAuth-only with

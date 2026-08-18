@@ -90,6 +90,7 @@ describe('manco route enforcement (real Postgres)', () => {
   let idHandler: (r: NextApiRequest, s: NextApiResponse) => Promise<unknown>;
   let linkHandler: (r: NextApiRequest, s: NextApiResponse) => Promise<unknown>;
   let linkedHandler: (r: NextApiRequest, s: NextApiResponse) => Promise<unknown>;
+  let statsHandler: (r: NextApiRequest, s: NextApiResponse) => Promise<unknown>;
   let itemId: string;
 
   beforeAll(async () => {
@@ -142,6 +143,7 @@ describe('manco route enforcement (real Postgres)', () => {
     idHandler = (await import('@/pages/api/manco-action-items/[id]')).default as typeof idHandler;
     linkHandler = (await import('@/pages/api/manco-action-items/link-meeting')).default as typeof linkHandler;
     linkedHandler = (await import('@/pages/api/manco-action-items/linked-meetings')).default as typeof linkedHandler;
+    statsHandler = (await import('@/pages/api/manco-action-items/stats')).default as typeof statsHandler;
   });
 
   afterAll(async () => {
@@ -224,6 +226,16 @@ describe('manco route enforcement (real Postgres)', () => {
       expect(JSON.stringify(captured.body ?? '')).not.toContain('Board meeting');
     });
 
+    it('cannot read the STATS — 403, and no counts come back', async () => {
+      // The fifth route in the group and the last one still on bare withAuth. Counts are
+      // a small payload, but they answer "how much is outstanding" for a board this
+      // caller is not entitled to read.
+      const { res, captured } = mockRes();
+      await statsHandler(req('GET', { user: DENIED }), res);
+      expect(captured.status).toBe(403);
+      expect(JSON.stringify(captured.body ?? '')).not.toContain('total');
+    });
+
     it('cannot UNLINK a meeting', async () => {
       const { res, captured } = mockRes();
       await linkHandler(
@@ -262,6 +274,16 @@ describe('manco route enforcement (real Postgres)', () => {
       expect(captured.status).not.toBe(403);
       const { rows } = await pool.query('SELECT count(*)::int n FROM manco_action_item_meetings');
       expect(rows[0].n).toBe(1);
+    });
+
+    it('CAN read the stats, and actually gets a count', async () => {
+      // The mirror: without it, a route that 403'd everyone would satisfy the denial
+      // test above. One item exists in the fixture, so `total` must be a real number.
+      const { res, captured } = mockRes();
+      await statsHandler(req('GET', { user: ALLOWED }), res);
+      expect(captured.status).not.toBe(403);
+      const data = (captured.body as { data?: { total?: number } })?.data;
+      expect(typeof data?.total).toBe('number');
     });
 
     it('CAN read the linked meetings, and actually gets the title', async () => {

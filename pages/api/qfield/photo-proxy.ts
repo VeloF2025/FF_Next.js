@@ -10,6 +10,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { withPermission } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -144,11 +145,17 @@ async function handler(
     }
   } catch (error) {
     log.error('qfield-photo-proxy', error instanceof Error ? { message: error.message } : { error }, 'Proxy error');
-    return res.status(500).json({
-      error: 'Failed to proxy photo',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
+    // Through apiResponse rather than echoing error.message: outside development that
+    // helper suppresses the detail, and the MCP transport forwards an upstream error
+    // body verbatim into the model's context. The full error is in the log line above.
+    return apiResponse.internalError(res, error);
   }
 }
 
-export default withAuth(handler);
+// Same permission as the construction-qa twin at pages/api/construction-qa/photo-proxy.ts.
+// These two routes reach the same QField site photos — qa-validations returns photo_key,
+// photo-proxy serves the bytes — so leaving them on bare withAuth made the twin's gate
+// decorative for anyone who used this pair instead. Every active human role holds
+// construction-qa.qa-centre; only the `system` service account does not, and no script
+// or cron calls either route.
+export default withAuth(withPermission('construction-qa.qa-centre')(handler));

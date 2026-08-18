@@ -8,6 +8,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { withPermission } from '@/lib/auth/middleware';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -327,4 +328,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+// Same permission as the construction-qa twin at pages/api/construction-qa/photo-proxy.ts.
+// These two routes reach the same QField site photos — qa-validations returns photo_key,
+// photo-proxy serves the bytes — so leaving them on bare withAuth made the twin's gate
+// decorative for anyone who used this pair instead. Every active human role holds
+// construction-qa.qa-centre; only the `system` service account does not, and no script
+// or cron calls either route.
+export default withAuth(withPermission('construction-qa.qa-centre')(handler));

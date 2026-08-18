@@ -45,7 +45,36 @@ DENIED_GROUPS = (
     "cortex-remote-mcp",
     "ff-remote-mcp",
     "action-items",
+    # Added 2026-08-18 after an audit of the COMBINED surface: each of these holds a
+    # route that reads the same rows as a sanctioned tool under a weaker gate.
+    # `meetings` covers /api/meetings (withAuth-only, returns full summary text and a
+    # wider attendance predicate than find_meetings); `procurement` covers
+    # purchase-orders and boq-spend-summary (withAuth-only PO/BOQ money that
+    # get_procurement_summary withholds from callers lacking `procurement` view).
+    # The sanctioned tools are unaffected — they all call the `reporting` group.
+    #
+    # `field` is deliberately NOT here: the hyphenated-sibling rule would make it match
+    # `field-stock` and take out the whole warehouse module. See DENIED_PATHS.
+    "meetings",
+    "procurement",
 )
+
+# Individual routes withheld where denying the whole GROUP would be too broad.
+#
+# Matched on the canonical path, exactly or as a path prefix, so query strings and
+# trailing segments cannot walk around an entry. Group denial stays the default — this
+# exists for the case where one route in an otherwise legitimate area is the problem.
+#
+# /api/field/attendance carries the same permission key as the supervisor-scoped report
+# (`people.staff.attendance.search`) but applies NO scope: its only predicates are
+# `role IN ('technician','casual')` and a date range, so any holder gets the entire field
+# workforce with clock_in_at/clock_out_at and site_geofence_id. Denying the `field` group
+# instead would also deny `field-stock`, which is unrelated and legitimate.
+#
+# Like DENIED_GROUPS this is blast-radius, not a boundary — the route still needs its own
+# scope, which cannot be applied until staff.reports_to is populated (currently zero of
+# the 32 active field staff have a supervisor set).
+DENIED_PATHS = ("/api/field/attendance",)
 
 MAX_RESPONSE_CHARS = 15_000
 
@@ -93,6 +122,26 @@ def _denied_group(group: str) -> str | None:
     normalised = group.lower()
     for denied in DENIED_GROUPS:
         if normalised == denied or normalised.startswith(denied + "-"):
+            return denied
+    return None
+
+
+def _denied_path(canonical: str) -> str | None:
+    """Match a denied route exactly, or as a path prefix so sub-paths cannot slip by.
+
+    Prefix matching is on a path SEGMENT boundary: `/api/field/attendance` denies
+    `/api/field/attendance/2026-08` but not a hypothetical `/api/field/attendance-policy`,
+    which is a different route and not what this entry is about.
+
+    The query string and fragment are stripped before matching. `fibreflow_get` takes the
+    query as its own parameter, but nothing stops a model putting it in the path — and
+    `/api/field/attendance?from=2026-01-01` must not walk around the entry just because it
+    is no longer string-equal. The group check does not need this (it splits on "/" and so
+    never sees the query), which is exactly why it was missed here first.
+    """
+    bare = canonical.split("?", 1)[0].split("#", 1)[0]
+    for denied in DENIED_PATHS:
+        if bare == denied or bare.startswith(denied + "/"):
             return denied
     return None
 
@@ -189,6 +238,16 @@ def _guard_path(target: str) -> dict[str, object] | None:
         }
     if ".." in canonical or "//" in canonical[1:]:
         return {"message": "path must not contain '..' or '//'.", "received": target}
+
+    denied_path = _denied_path(canonical)
+    if denied_path:
+        return {
+            "message": (
+                f"'{denied_path}' is not available through this connector. This is a "
+                "deliberate restriction, not a missing endpoint."
+            ),
+            "path": canonical,
+        }
 
     group = _group_of(canonical)
     denied = _denied_group(group)

@@ -154,3 +154,62 @@ def test_denied_group_is_case_insensitive_on_its_own(svc, group):
     lower-cases, which would leave this branch unexercised."""
     _, tools = svc
     assert tools._denied_group(group) is not None
+
+
+# ---------------------------------------------------------------------------
+# Path-level denial.
+#
+# `field` cannot go in DENIED_GROUPS: the hyphenated-sibling rule would match
+# `field-stock` and take out the whole warehouse module. So /api/field/attendance —
+# same permission key as the supervisor-scoped report, no scope applied — is denied by
+# path instead. These pin that it is actually refused, that it does not take the
+# warehouse with it, and that the refusal happens at the shared guard rather than in
+# one tool.
+# ---------------------------------------------------------------------------
+
+
+def test_field_attendance_is_refused_by_path(svc):
+    _, tools = svc
+    refusal = tools._guard_path("/api/field/attendance")
+    assert refusal is not None
+    assert "/api/field/attendance" in refusal["message"]
+
+
+def test_field_attendance_refusal_survives_a_query_string_and_encoding(svc):
+    """The guard runs on the canonical form, so neither trick reaches the route."""
+    _, tools = svc
+    assert tools._guard_path("/api/field/attendance?from=2026-01-01") is not None
+    assert tools._guard_path("/api/field/%61ttendance") is not None
+
+
+def test_field_attendance_denies_its_subpaths(svc):
+    _, tools = svc
+    assert tools._guard_path("/api/field/attendance/2026-08") is not None
+
+
+def test_field_stock_is_STILL_REACHABLE(svc):
+    """The mirror, and the reason this is a path deny rather than a group deny.
+
+    Without this, moving `field` into DENIED_GROUPS would satisfy every assertion
+    above while silently removing the entire warehouse module from the connector.
+    """
+    _, tools = svc
+    assert tools._guard_path("/api/field-stock/reports/daily-reconciliation") is None
+    assert tools._guard_path("/api/field/workers") is None
+
+
+def test_denied_path_matches_on_a_segment_boundary(svc):
+    """A prefix match must not swallow a differently-named neighbouring route."""
+    _, tools = svc
+    assert tools._denied_path("/api/field/attendance-policy") is None
+    assert tools._denied_path("/api/field/attendance") == "/api/field/attendance"
+
+
+def test_meetings_and_procurement_are_denied_as_groups(svc):
+    """These two do not over-match, so the coarser group denial is correct for them."""
+    _, tools = svc
+    assert tools._guard_path("/api/meetings") is not None
+    assert tools._guard_path("/api/procurement/purchase-orders") is not None
+    # …and the sanctioned reporting equivalents still work.
+    assert tools._guard_path("/api/reporting/meetings") is None
+    assert tools._guard_path("/api/reporting/project-section") is None

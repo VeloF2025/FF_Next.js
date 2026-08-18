@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { checkMancoAccess } from '@/lib/actionItems/mancoAccess';
 import { MancoActionItemStats } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
@@ -11,6 +13,18 @@ async function handler(
 ) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // The fifth route in this group, and the only one that was not gated. Its four
+  // siblings all check here; this one counted every row in manco_action_items for any
+  // authenticated caller, including the role that `dashboard.action-items` denies.
+  // Counts are a small payload, but they still answer "how much is outstanding" for a
+  // board that the caller is not entitled to read.
+  const access = await checkMancoAccess((req as AuthenticatedNextApiRequest).user.id, req.method);
+  if (!access.ok) {
+    return access.status === 403
+      ? apiResponse.forbidden(res, access.message)
+      : apiResponse.internalError(res, new Error(access.message));
   }
 
   try {
