@@ -51,7 +51,15 @@ interface ConsentHarnessOptions {
   callbackBase?: string;
   callbackSecret?: string | null;
   mintToken?: CortexConsentDependencies['mintToken'];
+  mintFfToken?: CortexConsentDependencies['mintFfToken'];
+  /** Session store seams, so orphan cleanup can be observed without a real DB. */
+  deleteSession?: CortexConsentDependencies['deleteSession'];
+  listSessions?: CortexConsentDependencies['listSessions'];
+  /** Extra request headers, so proxy-forwarded values can be asserted. */
+  headers?: Record<string, string>;
   fetchImpl?: CortexConsentDependencies['fetchImpl'];
+  /** Injected rather than set on process.env, so grant tests cannot leak into others. */
+  env?: CortexConsentDependencies['env'];
 }
 
 type CallbackResponder = (
@@ -164,7 +172,11 @@ export async function startConsentHandler(
   };
   const handler = createCortexConsentHandler({
     mintToken: options.mintToken,
+    mintFfToken: options.mintFfToken,
+    deleteSession: options.deleteSession,
+    listSessions: options.listSessions,
     fetchImpl: options.fetchImpl,
+    env: options.env,
     logger,
   });
   const user = options.user ?? {
@@ -209,7 +221,7 @@ export async function startConsentHandler(
   ): Promise<HarnessResponse> {
     const response = await fetch(`${url}${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...(options.headers ?? {}) },
       body: JSON.stringify(body),
     });
     return {

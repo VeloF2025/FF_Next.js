@@ -1,4 +1,10 @@
 export interface CortexMcpConsentContext {
+  /**
+   * Whether this authorisation also grants Cortex read-only access to FibreFlow's API
+   * as the consenting user. Set by FibreFlow after parsing, never supplied by Cortex —
+   * the grant is FF's to make, and the consent screen must state it.
+   */
+  ffApiGrant?: boolean;
   clientId: string;
   clientName: string | null;
   redirectUri: string;

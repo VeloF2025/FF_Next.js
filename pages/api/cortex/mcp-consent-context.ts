@@ -9,6 +9,7 @@ import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { parseCortexMcpConsentContext } from '@/lib/cortex/mcpConsentContext';
 import { log } from '@/lib/logger';
+import { ffApiGrantEnabled } from '@/lib/cortex/ffApiGrant';
 
 const STATE_ID_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
 const CONTEXT_TIMEOUT_MS = 5_000;
@@ -144,7 +145,14 @@ export function createCortexConsentContextHandler(
           GATEWAY_MESSAGE,
         );
       }
-      return apiResponse.success(res, context);
+      // The FibreFlow grant is FF's own decision, not part of the context Cortex sends,
+      // so it is appended after parsing rather than validated as an upstream field.
+      // The consent screen has to state it: with the grant on, the user is agreeing to
+      // "Cortex reads anything in FibreFlow I can", not "Cortex reads my meetings".
+      return apiResponse.success(res, {
+        ...context,
+        ffApiGrant: ffApiGrantEnabled(process.env),
+      });
     } catch {
       logger.warn(
         'Cortex MCP context unavailable',

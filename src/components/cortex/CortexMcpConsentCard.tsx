@@ -4,6 +4,7 @@ import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import type { CortexMcpConsentContext } from '@/lib/cortex/mcpConsentContext';
+import { ffGrantConsentScope } from '@/lib/cortex/ffApiGrant';
 
 export type CortexMcpConsentPhase =
   | 'checking'
@@ -122,6 +123,19 @@ export function CortexMcpConsentCard({
           </code>
         </div>
       </div>
+      {context.ffApiGrant ? (
+        <div
+          data-testid="ff-api-grant-notice"
+          className="mt-4 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] px-3 py-2"
+        >
+          <p className="text-xs font-medium text-[var(--ff-text-primary)]">
+            This also grants FibreFlow access
+          </p>
+          <p className="mt-1 text-xs text-[var(--ff-text-tertiary)]">
+            {ffGrantConsentScope()}
+          </p>
+        </div>
+      ) : null}
       <div className="mt-5 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] px-3 py-2">
         <p className="text-xs text-[var(--ff-text-tertiary)]">Signed in as</p>
         <p className="text-sm font-medium text-[var(--ff-text-primary)]">

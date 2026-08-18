@@ -96,6 +96,10 @@ describe('default Cortex consent context route — real auth and permission midd
       clientName: 'Claude',
       redirectUri: 'https://evil.example/route-callback',
       scopes: ['cortex.read'],
+      // FibreFlow's own flag, appended after parsing the Cortex context. False here
+      // because the grant is off by default; asserted explicitly so this stays an
+      // exact-shape check rather than a partial one.
+      ffApiGrant: false,
     });
     expect(route.callback).toMatchObject({
       count: 1,
