@@ -23,6 +23,8 @@ import {
   listIncidentRuleVersions,
   listOversightMembers,
   loadEffectiveIncidentRule,
+  resolveActiveUserNames,
+  searchActiveUsers,
   versionIncidentRule,
 } from '../settingsRepository';
 import type { IncidentRuleChangeRequest } from '../types';
@@ -175,5 +177,37 @@ describe('oversight membership', () => {
     db.queryOne.mockResolvedValue(null);
 
     await expect(endOversightMembership(MEMBER_ID, USER, 'Role change')).rejects.toBeInstanceOf(OversightMembershipNotFoundError);
+  });
+});
+
+describe('active user search and name resolution', () => {
+  it('searches active users by name only, and never selects or returns email', async () => {
+    db.query.mockResolvedValue([{ id: USER, first_name: 'Nomvula', last_name: 'Khumalo' }]);
+
+    await expect(searchActiveUsers('Nomvula')).resolves.toEqual([{ id: USER, name: 'Nomvula Khumalo' }]);
+    const [text, params] = db.query.mock.calls[0] as [string, unknown[]];
+    expect(text).toContain('is_active = true');
+    expect(text).not.toMatch(/\bemail\b/);
+    expect(params[0]).toBe('%Nomvula%');
+  });
+
+  it('falls back to a generic label when a matched user has no name on file', async () => {
+    db.query.mockResolvedValue([{ id: USER, first_name: null, last_name: null }]);
+
+    await expect(searchActiveUsers('x')).resolves.toEqual([{ id: USER, name: 'Unnamed user' }]);
+  });
+
+  it('resolves display names for a set of user ids, active only', async () => {
+    db.query.mockResolvedValue([{ id: USER, first_name: 'Nomvula', last_name: 'Khumalo' }]);
+
+    await expect(resolveActiveUserNames([USER])).resolves.toEqual([{ id: USER, name: 'Nomvula Khumalo' }]);
+    const [text, params] = db.query.mock.calls[0] as [string, unknown[]];
+    expect(text).toContain('is_active = true');
+    expect(params[0]).toEqual([USER]);
+  });
+
+  it('resolves an empty list without a database round trip', async () => {
+    await expect(resolveActiveUserNames([])).resolves.toEqual([]);
+    expect(db.query).not.toHaveBeenCalled();
   });
 });

@@ -284,3 +284,10 @@ export interface OversightMembershipRequest {
   reason?: string | null;
   actorUserId: string;
 }
+
+/** An active FibreFlow user as exposed by the settings user-search/name-resolution
+ * endpoint — deliberately excludes email and every other account field. */
+export interface ActiveUserOption {
+  id: string;
+  name: string;
+}

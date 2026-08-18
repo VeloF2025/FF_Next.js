@@ -17,10 +17,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { INCIDENT_TYPES, SEVERITIES } from '../reviewValidation';
 import type {
-  IncidentDetail, IncidentEvidence, IncidentLifecycleStatus, IncidentListResult, IncidentOutcome,
+  ActiveUserOption, IncidentDetail, IncidentEvidence, IncidentLifecycleStatus, IncidentListResult, IncidentOutcome,
   IncidentRule, IncidentRuleChangeRequest, IncidentSeverity, IncidentTransitionResult, IncidentType,
   OversightMembership,
 } from '../types';
+
+export type { ActiveUserOption };
 
 const LIFECYCLE_STATUSES: readonly IncidentLifecycleStatus[] = ['open', 'acknowledged', 'under_review', 'resolved', 'dismissed'];
 
@@ -140,9 +142,7 @@ export interface EvidenceUploadBody {
 export interface BulkAcknowledgeItemResult { incidentId: string; lifecycleStatus: IncidentLifecycleStatus; actionId: string }
 export interface BulkAcknowledgeResult { results: BulkAcknowledgeItemResult[] }
 export interface IncidentEvidenceUploadResult { evidence: IncidentEvidence; actionId: string }
-export interface ActiveUserOption { id: string; label: string; email: string }
-interface RawUserRow { id: string; email: string; firstName: string | null; lastName: string | null }
-interface RawUserSearchResponse { users: RawUserRow[] }
+interface UserSearchResponse { users: ActiveUserOption[] }
 
 export const incidentApi = {
   list(filters: IncidentQueueFilters, page: { page: number; limit: number }, signal?: AbortSignal): Promise<IncidentListResult> {
@@ -178,11 +178,17 @@ export const incidentApi = {
   endOversightMembership(body: { membershipId: string; reason: string }): Promise<OversightMembership> {
     return request('/api/fleet/incidents/settings/oversight-members', { method: 'DELETE', body: JSON.stringify(body) });
   },
+  /** Scoped to `fleet.incidents-settings:edit` (never `/api/admin/users`, which requires the `admin` role and
+   * would 403 a non-admin holding that permission via an active override grant — see `reviewScope.ts`). */
   searchActiveUsers(searchTerm: string, signal?: AbortSignal): Promise<ActiveUserOption[]> {
-    const params = new URLSearchParams({ search: searchTerm, status: 'active' });
-    return request<RawUserSearchResponse>(`/api/admin/users?${params.toString()}`, { signal }).then((data) => data.users.map((user) => ({
-      id: user.id, label: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email, email: user.email,
-    })));
+    const params = new URLSearchParams({ search: searchTerm });
+    return request<UserSearchResponse>(`/api/fleet/incidents/settings/user-search?${params.toString()}`, { signal }).then((data) => data.users);
+  },
+  /** Resolves display names for oversight-membership rows so they never render the raw `userId` UUID. */
+  resolveOversightUserNames(userIds: string[], signal?: AbortSignal): Promise<ActiveUserOption[]> {
+    if (userIds.length === 0) return Promise.resolve([]);
+    const params = new URLSearchParams({ ids: userIds.join(',') });
+    return request<UserSearchResponse>(`/api/fleet/incidents/settings/user-search?${params.toString()}`, { signal }).then((data) => data.users);
   },
 };
 

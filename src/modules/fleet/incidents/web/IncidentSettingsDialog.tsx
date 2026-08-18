@@ -2,14 +2,18 @@
  * Compact rules and oversight settings dialog (Task 8), opened from the
  * queue rather than a separate settings page (design §11.1). `canEdit`
  * gates every mutation control; a view-only visitor (or a closed dialog)
- * only ever reads. No person is ever hardcoded — oversight membership is
- * only ever added by searching active FibreFlow users through
- * `incidentApi.searchActiveUsers` (`/api/admin/users`).
+ * only ever reads.
+ *
+ * Oversight membership itself — search, add, end, history, and the
+ * `userId` -> display-name resolution that keeps raw UUIDs out of the
+ * visible UI — lives in `./OversightSection` (split out to stay under the
+ * 200-line component cap once name resolution was added).
  */
 import { useCallback, useEffect, useState } from 'react';
 import { OUTCOMES } from '../reviewValidation';
-import type { IncidentOutcome, IncidentRule, IncidentSeverity, IncidentType, OversightMembership } from '../types';
-import { incidentApi, IncidentApiError, type ActiveUserOption } from './incidentApi';
+import type { IncidentOutcome, IncidentRule, IncidentSeverity, IncidentType } from '../types';
+import { incidentApi, IncidentApiError } from './incidentApi';
+import { OversightSection } from './OversightSection';
 const RULED_TYPES: readonly IncidentType[] = ['late', 'wrong_site', 'evidence_mismatch', 'left_early'];
 const SEVERITIES: readonly IncidentSeverity[] = ['normal', 'high', 'critical'];
 type BooleanDraftKey = 'enabled' | 'createsIncident' | 'immediateNotification' | 'inApp' | 'email' | 'whatsapp' | 'includeInMorningSummary';
@@ -113,67 +117,6 @@ function RulesSection({ canEdit }: { canEdit: boolean }) {
       <details><summary className="cursor-pointer text-sm">Version history ({rules.length})</summary>
         {rules.map((rule) => <p key={rule.id} className="text-sm">v{rule.version} — effective {new Date(rule.effectiveFrom).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}{rule.effectiveTo ? ` to ${new Date(rule.effectiveTo).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}` : ' (current)'}</p>)}
       </details>
-    </section>
-  );
-}
-function OversightSection({ canEdit }: { canEdit: boolean }) {
-  const [members, setMembers] = useState<OversightMembership[]>([]);
-  const [history, setHistory] = useState<OversightMembership[] | null>(null);
-  const [query, setQuery] = useState('');
-  const [matches, setMatches] = useState<ActiveUserOption[]>([]);
-  const [endReasons, setEndReasons] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const load = useCallback(async () => {
-    try { setMembers(await incidentApi.listOversightMembers(true)); setError(null); }
-    catch (caught) { setError(caught instanceof IncidentApiError ? caught.message : 'Could not load oversight membership'); }
-  }, []);
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => {
-    if (!query.trim()) { setMatches([]); return; }
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => { void incidentApi.searchActiveUsers(query.trim(), controller.signal).then(setMatches).catch(() => setMatches([])); }, 300);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [query]);
-  async function toggleHistory(): Promise<void> {
-    if (history) { setHistory(null); return; }
-    try { setHistory((await incidentApi.listOversightMembers(false)).filter((member) => member.effectiveTo !== null)); }
-    catch (caught) { setError(caught instanceof IncidentApiError ? caught.message : 'Could not load oversight history'); }
-  }
-  async function add(user: ActiveUserOption): Promise<void> {
-    setBusy(user.id); setError(null);
-    try { await incidentApi.addOversightMember({ userId: user.id, reason: null }); setQuery(''); setMatches([]); await load(); }
-    catch (caught) { setError(caught instanceof IncidentApiError ? caught.message : 'Could not add this oversight member'); }
-    finally { setBusy(null); }
-  }
-  async function end(membership: OversightMembership): Promise<void> {
-    const reason = (endReasons[membership.id] ?? '').trim();
-    if (!reason) return;
-    setBusy(membership.id); setError(null);
-    try { await incidentApi.endOversightMembership({ membershipId: membership.id, reason }); await load(); }
-    catch (caught) { setError(caught instanceof IncidentApiError ? caught.message : 'Could not end this oversight membership'); }
-    finally { setBusy(null); }
-  }
-  return (
-    <section aria-label="Fleet oversight membership" className="space-y-2">
-      <h3 className="font-semibold text-[var(--ff-text-primary)]">Oversight membership</h3>
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <ul>{members.map((member) => <li key={member.id} className="flex items-center gap-2 text-sm">
-        <span>{member.userId}</span>
-        {canEdit && <><input aria-label={`Reason to end membership for ${member.userId}`} value={endReasons[member.id] ?? ''}
-          onChange={(event) => setEndReasons({ ...endReasons, [member.id]: event.target.value })} placeholder="Reason to end" className="rounded border px-2 py-1" />
-        <button type="button" disabled={!(endReasons[member.id] ?? '').trim() || busy === member.id} onClick={() => void end(member)} className="rounded border px-2 py-1 disabled:opacity-50">End</button></>}
-      </li>)}</ul>
-      {canEdit && <div className="space-y-1">
-        <label className="text-sm">Search active FibreFlow users
-          <input aria-label="Search active FibreFlow users" value={query} onChange={(event) => setQuery(event.target.value)} className="ml-2 rounded border px-2 py-1" />
-        </label>
-        <ul>{matches.map((match) => <li key={match.id} className="text-sm">{match.label} ({match.email}){' '}
-          <button type="button" disabled={busy === match.id} onClick={() => void add(match)} className="rounded border px-2 py-1">Add</button>
-        </li>)}</ul>
-      </div>}
-      <button type="button" onClick={() => void toggleHistory()} className="text-sm underline">{history ? 'Hide' : 'Show'} history</button>
-      {history && <ul>{history.map((member) => <li key={member.id} className="text-sm">{member.userId}: {member.effectiveFrom} to {member.effectiveTo} — {member.reason ?? 'No reason recorded'}</li>)}</ul>}
     </section>
   );
 }

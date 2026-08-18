@@ -88,3 +88,26 @@ export function parseOversightEndBody(body: unknown): ParsedOversightEndBody {
   }
   return { membershipId: value.membershipId, reason: value.reason.trim(), endedAt };
 }
+
+export type ParsedUserSearchQuery =
+  | { mode: 'ids'; ids: string[] }
+  | { mode: 'search'; search: string };
+
+/**
+ * `ids` takes priority over `search` when both are present — the dialog's
+ * name-resolution calls always send only `ids`, and its live-search calls
+ * always send only `search`, so this only matters for a hand-built request.
+ */
+export function parseUserSearchQuery(query: Record<string, string | string[] | undefined>): ParsedUserSearchQuery {
+  if (typeof query.ids === 'string' && query.ids.trim()) {
+    const ids = query.ids.split(',').map((id) => id.trim()).filter(Boolean);
+    if (ids.length === 0 || ids.some((id) => !isValidUUID(id))) {
+      throw new IncidentValidationError('ids must be a comma-separated list of valid UUIDs');
+    }
+    return { mode: 'ids', ids };
+  }
+  if (typeof query.search !== 'string' || !query.search.trim()) {
+    throw new IncidentValidationError('search is required (or provide ids)');
+  }
+  return { mode: 'search', search: query.search.trim() };
+}

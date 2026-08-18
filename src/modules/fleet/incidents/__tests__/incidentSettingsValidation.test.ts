@@ -4,6 +4,7 @@ import {
   parseOversightAddBody,
   parseOversightEndBody,
   parseRuleChangeBody,
+  parseUserSearchQuery,
 } from '../incidentSettingsValidation';
 
 const validRuleBody = {
@@ -81,5 +82,40 @@ describe('parseOversightEndBody', () => {
     expect(() => parseOversightEndBody({ membershipId, reason: 'left team', endedAt: 'bogus' })).toThrow(IncidentValidationError);
     const result = parseOversightEndBody({ membershipId, reason: 'left team', endedAt: '2099-01-01T00:00:00.000Z' });
     expect(result).toMatchObject({ membershipId, reason: 'left team', endedAt: '2099-01-01T00:00:00.000Z' });
+  });
+});
+
+describe('parseUserSearchQuery', () => {
+  const idA = '11111111-1111-4111-8111-111111111111';
+  const idB = '22222222-2222-4222-8222-222222222222';
+
+  it('parses a trimmed search term', () => {
+    expect(parseUserSearchQuery({ search: '  Nomvula  ' })).toEqual({ mode: 'search', search: 'Nomvula' });
+  });
+
+  it('rejects a missing search when no ids are given', () => {
+    expect(() => parseUserSearchQuery({})).toThrow(IncidentValidationError);
+    expect(() => parseUserSearchQuery({ search: '   ' })).toThrow(IncidentValidationError);
+  });
+
+  it('parses a comma-separated ids list, trimming whitespace', () => {
+    expect(parseUserSearchQuery({ ids: ` ${idA} , ${idB} ` })).toEqual({ mode: 'ids', ids: [idA, idB] });
+  });
+
+  it('prefers ids over search when both are present', () => {
+    expect(parseUserSearchQuery({ ids: idA, search: 'Nomvula' })).toEqual({ mode: 'ids', ids: [idA] });
+  });
+
+  it('rejects an ids list containing an invalid UUID', () => {
+    expect(() => parseUserSearchQuery({ ids: `${idA},not-a-uuid` })).toThrow(IncidentValidationError);
+  });
+
+  it('rejects an ids list that is empty after trimming', () => {
+    expect(() => parseUserSearchQuery({ ids: ' , ' })).toThrow(IncidentValidationError);
+  });
+
+  it('rejects a non-string search or ids value (array query params)', () => {
+    expect(() => parseUserSearchQuery({ search: ['a', 'b'] })).toThrow(IncidentValidationError);
+    expect(() => parseUserSearchQuery({ ids: ['a', 'b'] })).toThrow(IncidentValidationError);
   });
 });

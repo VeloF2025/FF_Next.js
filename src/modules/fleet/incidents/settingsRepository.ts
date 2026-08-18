@@ -10,7 +10,7 @@
 import { query, queryOne, transaction } from '@/lib/db-pool';
 import { parseStrictIsoInstant } from '../operations/instantValidation';
 import type {
-  IncidentOutcome, IncidentRule, IncidentRuleChangeRequest, IncidentSeverity, IncidentType,
+  ActiveUserOption, IncidentOutcome, IncidentRule, IncidentRuleChangeRequest, IncidentSeverity, IncidentType,
   OversightMembership, OversightMembershipRequest,
 } from './types';
 
@@ -215,4 +215,41 @@ export async function endOversightMembership(
   );
   if (!updated) throw new OversightMembershipNotFoundError(`No active oversight membership found for id ${id}`);
   return mapMembership(updated);
+}
+
+interface ActiveUserRow extends Record<string, unknown> { id: string; first_name: string | null; last_name: string | null }
+
+function mapActiveUser(row: ActiveUserRow): ActiveUserOption {
+  const name = [row.first_name, row.last_name].filter((part) => Boolean(part && part.trim())).join(' ').trim();
+  return { id: row.id, name: name || 'Unnamed user' };
+}
+
+const USER_SEARCH_LIMIT = 20;
+
+/**
+ * Active-only user search for the incident-settings "add oversight member"
+ * flow (design §7). Matches on name only — the `users` table's `email`
+ * column is never selected or referenced here — so only `{ id, name }`
+ * ever leaves this function.
+ */
+export async function searchActiveUsers(term: string): Promise<ActiveUserOption[]> {
+  const rows = await query<ActiveUserRow>(
+    `SELECT id, first_name, last_name FROM users
+     WHERE is_active = true AND (first_name ILIKE $1 OR last_name ILIKE $1)
+     ORDER BY first_name ASC NULLS LAST, last_name ASC NULLS LAST
+     LIMIT $2`,
+    [`%${term}%`, USER_SEARCH_LIMIT],
+  );
+  return rows.map(mapActiveUser);
+}
+
+/** Resolves display names for a known set of user ids (active only), so oversight
+ * membership rows can render a name instead of the raw `userId` UUID. */
+export async function resolveActiveUserNames(userIds: string[]): Promise<ActiveUserOption[]> {
+  if (userIds.length === 0) return [];
+  const rows = await query<ActiveUserRow>(
+    `SELECT id, first_name, last_name FROM users WHERE is_active = true AND id = ANY($1::uuid[])`,
+    [userIds],
+  );
+  return rows.map(mapActiveUser);
 }

@@ -16,6 +16,14 @@ const createdRule: IncidentRule = { ...currentRule, id: 'rule-3', version: 3, ef
 const activeMember: OversightMembership = { id: 'membership-1', userId: 'user-active-1', effectiveFrom: '2026-06-01T00:00:00.000Z', effectiveTo: null, reason: null };
 const endedMember: OversightMembership = { id: 'membership-0', userId: 'user-ended-1', effectiveFrom: '2026-01-01T00:00:00.000Z', effectiveTo: '2026-05-01T00:00:00.000Z', reason: 'Role change' };
 
+/** Display names the scoped `/settings/user-search?ids=...` endpoint resolves for each
+ * fixture userId — membership rows must render these, never the raw `userId` UUID. */
+const NAME_BY_USER_ID: Record<string, string> = {
+  'user-active-1': 'Asha Naidoo',
+  'user-ended-1': 'Kabelo Mokoena',
+  'user-found-1': 'Nomvula Khumalo',
+};
+
 function ok(data: unknown, status = 200): Response { return { ok: true, status, json: async () => ({ success: true, data }) } as Response; }
 function fail(status: number, code: string, message: string): Response { return { ok: false, status, json: async () => ({ success: false, error: { code, message } }) } as Response; }
 async function flush(): Promise<void> { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); }
@@ -56,12 +64,16 @@ function routeFetch(): { rules: IncidentRule[]; members: OversightMembership[] }
       state.members = state.members.map((member) => (member.id === activeMember.id ? ended : member));
       return Promise.resolve(ok(ended));
     }
-    if (url.includes('/api/admin/users')) {
-      const query = new URL(url, 'http://localhost').searchParams.get('search') ?? '';
-      const users = query === 'Nomvula'
-        ? [{ id: 'user-found-1', email: 'found1@example.test', firstName: 'Nomvula', lastName: 'Khumalo', isActive: true }]
-        : [];
-      return Promise.resolve(ok({ users, total: users.length, roles: [] }));
+    if (url.includes('/settings/user-search')) {
+      const params = new URL(url, 'http://localhost').searchParams;
+      const idsParam = params.get('ids');
+      if (idsParam) {
+        const users = idsParam.split(',').filter((id) => id in NAME_BY_USER_ID).map((id) => ({ id, name: NAME_BY_USER_ID[id] }));
+        return Promise.resolve(ok({ users }));
+      }
+      const search = params.get('search') ?? '';
+      const users = search === 'Nomvula' ? [{ id: 'user-found-1', name: NAME_BY_USER_ID['user-found-1'] }] : [];
+      return Promise.resolve(ok({ users }));
     }
     return Promise.resolve(fail(404, 'NOT_FOUND', `Unhandled request: ${url}`));
   });
@@ -125,28 +137,33 @@ describe('IncidentSettingsDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await flush();
     expect(fetchMock).toHaveBeenCalledWith('/api/fleet/incidents/settings/oversight-members', expect.objectContaining({ method: 'POST' }));
-    await waitFor(() => expect(screen.getByText('user-found-1')).toBeInTheDocument());
+    // The new row must render the resolved display name, never the raw userId UUID.
+    await waitFor(() => expect(screen.getByText('Nomvula Khumalo')).toBeInTheDocument());
+    expect(screen.queryByText('user-found-1')).not.toBeInTheDocument();
   });
 
-  it('shows active membership and requires a reason before ending it', async () => {
+  it('shows active membership and requires a reason before ending it, rendering a name rather than the raw userId', async () => {
     render(<IncidentSettingsDialog open onClose={vi.fn()} canEdit />);
     await flush();
-    expect(screen.getByText('user-active-1')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Asha Naidoo')).toBeInTheDocument());
+    expect(screen.queryByText('user-active-1')).not.toBeInTheDocument();
     const endButton = screen.getByRole('button', { name: 'End' });
     expect(endButton).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Reason to end membership for user-active-1'), { target: { value: 'Role change' } });
+    fireEvent.change(screen.getByLabelText('Reason to end membership for Asha Naidoo'), { target: { value: 'Role change' } });
     expect(endButton).toBeEnabled();
     fireEvent.click(endButton);
     await flush();
     expect(fetchMock).toHaveBeenCalledWith('/api/fleet/incidents/settings/oversight-members', expect.objectContaining({ method: 'DELETE' }));
   });
 
-  it('shows membership history only on request, separate from the active list', async () => {
+  it('shows membership history only on request, with a resolved name rather than the raw userId', async () => {
     render(<IncidentSettingsDialog open onClose={vi.fn()} canEdit />);
     await flush();
-    expect(screen.queryByText('user-ended-1')).not.toBeInTheDocument();
+    expect(screen.queryByText(/user-ended-1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Kabelo Mokoena/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
     await flush();
-    expect(screen.getByText(/user-ended-1/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Kabelo Mokoena/)).toBeInTheDocument());
+    expect(screen.queryByText(/user-ended-1/)).not.toBeInTheDocument();
   });
 });
