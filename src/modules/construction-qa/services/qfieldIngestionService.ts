@@ -46,7 +46,7 @@ const FEATURE_TYPE_DISCIPLINE: Record<string, { discipline: Discipline; featureT
  * `scripts/qfield_project_registry.py`. Nothing compared the copies, so a project could
  * be registered for extraction and silently absent here — which is how the five entries
  * above went missing. `__tests__/qfieldProjectMap.test.ts` now cross-checks this map
- * against the Python registry and fails when they diverge. It covers the 13 entries the
+ * against the Python registry and fails when they diverge. It covers the 14 entries the
  * registry knows about; the other 6 here have no registry counterpart and are checked
  * only for duplicate keys, so the DB audit below is still the wider net.
  *
@@ -57,13 +57,15 @@ const FEATURE_TYPE_DISCIPLINE: Record<string, { discipline: Discipline; featureT
  *   - `Record<string, string>` cannot express what the table holds. `Master_2026` and
  *     `FT_Master_Progress` each link to SIX FibreFlow projects. Both carry zero photos
  *     today, so they are omitted here rather than modelled wrongly.
- *   - Being linked in the DB is not sufficient on its own. Grabouw QA and Grabouw Drill
- *     Survey are linked and carry 122 photos, but were never onboarded for EXTRACTION,
- *     so no `label_col` was configured and their `feature_id`s are raw GPKG row ids
- *     (`poles_20251113101137422`) rather than pole labels. None of the 121 matches
- *     Grabouw's existing reviews (`GRA.P.A282`, …) or any of its 3,793 poles, so adding
- *     them here would create 121 untraceable reviews beside the 122 correct ones. The
- *     fix is a registry entry with the right label_col, not a line in this map.
+ *   - Being linked in the DB is not sufficient on its own — a project must be
+ *     registered for EXTRACTION first, or its `feature_id`s are raw GPKG row ids rather
+ *     than pole labels. Grabouw was the worked example: 121 rows keyed
+ *     `poles_20251113101137422`, matching none of its reviews and none of its 3,793
+ *     poles. It has since been registered, its stale rows deleted and re-extracted, and
+ *     all 121 now resolve to a `GRA.P.*` label — which is what makes the entry below
+ *     safe. Grabouw Drill Survey (`0fc570b5…`) is still linked-but-unregistered and is
+ *     deliberately absent: its single row carries a `gra-moling_*` id and a NULL
+ *     feature_type.
  */
 const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   // Original Pole Audit projects
@@ -99,6 +101,13 @@ const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   'f076fad4-b2a5-40b8-bafe-35c20ce09827': 'de408530-76f0-4d10-bf08-cfcd3202f69e', // HT_Middelburg → Middelburg
   'b32184d6-1776-4b89-8afd-2907dfca86d4': '183fe626-7bf7-4793-bdb9-1a1dc2e21aa6', // HT_Namakgale_P3_A1 → Phalaborwa - Namakgale
   'ef0b7147-e56f-43a1-9074-6807e0bedf50': '67df5c8d-0b3d-4784-9d63-70e3cdd1e2b8', // HT_Phalaborwa_Benfarm_V1 → Phalaborwa - Ben Farm
+  // Deliberately NOT added in #2510: at that point Grabouw's 121 rows carried filename
+  // stems ("poles_20251113102437166") instead of pole labels, because the project had
+  // never been registered for extraction, and ingesting them would have created 121
+  // untraceable reviews beside the 122 correct ones. It is registered now, the stale
+  // rows have been deleted and re-extracted, and all 121 resolve to a GRA.P.* label
+  // matching a row in `poles`. Only then is this line safe.
+  'aa6aba62-e57e-4701-8b55-30d2cce996c8': '574a7856-3582-46aa-9094-1c434855d176', // Grabouw QA → Grabouw
 };
 
 /** Reverse map: FibreFlow project UUID → QFieldCloud project UUIDs */
@@ -199,7 +208,15 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
     let paramIdx = 1;
     const qfPlaceholders = qfProjectIds.map(() => `$${paramIdx++}`).join(', ');
     const wtPlaceholders = workTypes.map(() => `$${paramIdx++}`).join(', ');
-    const params: (string | number)[] = [...qfProjectIds, ...workTypes];
+    // Scopes the dedupe below to THIS FibreFlow project. Without it the NOT EXISTS
+    // matches on feature_id alone, so a photo under a label that exists in two projects
+    // suppresses ingestion of a genuinely different photo in the other. Four labels are
+    // duplicated across projects today -- three junk placeholders ("New pole" x6,
+    // "New Pole" x3, "Drop Pole" x2) and one real pole label, MAM.P.B120, in two.
+    // Pre-existing, but widening the filename match above enlarges its reach, and
+    // projectId is already in scope here.
+    const dedupeProjectParam = `$${paramIdx++}`;
+    const params: (string | number)[] = [...qfProjectIds, ...workTypes, projectId];
 
     let query = `
       SELECT
@@ -225,7 +242,26 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
           SELECT 1 FROM construction_qa_photos cqp
           JOIN construction_qa_reviews cqr ON cqr.id = cqp.review_id
           WHERE cqr.feature_id = qpv.feature_id
-            AND cqp.filename = regexp_replace(qpv.photo_key, '^.*/', '')
+            AND cqr.project_id = ${dedupeProjectParam}::uuid
+            -- Match EITHER filename convention. photo_key gained a trailing MinIO
+            -- version segment at some point, so the basename of a modern key is the
+            -- version token (v20251110164715-1e5f2261), not the filename -- while rows
+            -- ingested before that carry the real filename (poles_....jpeg). Live split:
+            -- 59,684 version-token vs 38,449 real-filename. Comparing only the basename
+            -- misses every pre-versioning row and re-inserts it; comparing only the
+            -- stripped filename misses every post-versioning row. Measured on prod:
+            -- basename-only leaves 486 survivors, stripped-only 55,548 (i.e. ~55k
+            -- duplicates), both forms 365. The 121-row difference between 486 and 365 is
+            -- exactly Grabouw, whose photos were ingested pre-versioning and re-extracted
+            -- post-versioning — no other project's behaviour changes.
+            AND cqp.filename IN (
+              regexp_replace(qpv.photo_key, '^.*/', ''),
+              -- Lowercase hex only, matching every version id QFieldCloud emits today
+              -- (62,210 versioned keys, 0 exceptions). If that ever changes, form-2 stops
+              -- stripping and this falls back to form-1 alone -- which fails in the
+              -- DUPLICATE-INSERT direction, i.e. the thing this clause exists to stop.
+              regexp_replace(regexp_replace(qpv.photo_key, '/v[0-9]{14}-[0-9a-f]+$', ''), '^.*/', '')
+            )
         )
     `;
 
