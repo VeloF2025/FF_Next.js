@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AssignmentOption } from '../../assignments/rosterQueries';
-import { assignmentApi, AssignmentApiError } from '../../assignments/web/assignmentApi';
+import type { OperationalProjectOption } from '../projectScope';
 import type { OperationalAttentionRow, OperationalStatusGroup } from '../presentationTypes';
 import { AttentionList } from './AttentionList';
 import { OperationalEvidenceDrawer } from './OperationalEvidenceDrawer';
 import { parseOperationFilters, serializeOperationFilters, type OperationFilters } from './operationFilters';
+import { OperationsPresentationApiError, operationsPresentationApi } from './operationsPresentationApi';
 import { StatusCountBar } from './StatusCountBar';
 import { isCurrentOperationDate, useOperationalOverview } from './useOperationalOverview';
 
@@ -46,7 +46,7 @@ function replaceLocation(filters: OperationFilters, replace: boolean): void {
 
 interface OperationsPanelProps {
   filters: OperationFilters;
-  projects: AssignmentOption[];
+  projects: OperationalProjectOption[];
   onChange: (filters: OperationFilters) => void;
 }
 
@@ -107,7 +107,7 @@ function OperationsPanel({ filters, projects, onChange }: OperationsPanelProps) 
 export function TodayOperations() {
   const [filters, setFilters] = useState<OperationFilters>(locationFilters);
   const currentFilters = useRef(filters);
-  const [projects, setProjects] = useState<AssignmentOption[]>([]);
+  const [projects, setProjects] = useState<OperationalProjectOption[]>([]);
   const [optionsState, setOptionsState] = useState<'loading' | 'ready' | 'error' | 'permission'>('loading');
   const change = useCallback((next: OperationFilters, replace = false) => {
     currentFilters.current = next; replaceLocation(next, replace); setFilters(next);
@@ -124,22 +124,22 @@ export function TodayOperations() {
 
   useEffect(() => {
     let active = true; setOptionsState('loading');
-    const query = new URLSearchParams({ from: filters.workDate!, to: filters.workDate! }).toString();
-    void assignmentApi.options(query).then((options) => {
+    const controller = new AbortController();
+    void operationsPresentationApi.projectOptions(controller.signal).then((options) => {
       if (!active) return;
-      setProjects(options.projects); setOptionsState('ready');
+      setProjects(options); setOptionsState('ready');
       const current = currentFilters.current;
-      const projectId = options.projects.some((item) => item.id === current.projectId)
-        ? current.projectId : options.projects[0]?.id;
+      const projectId = options.some((item) => item.id === current.projectId)
+        ? current.projectId : options[0]?.id;
       if (projectId !== current.projectId) change({ ...current, projectId }, true);
     }).catch((caught: unknown) => {
       if (!active) return;
-      const permission = caught instanceof AssignmentApiError && (caught.status === 401 || caught.status === 403);
+      const permission = caught instanceof OperationsPresentationApiError && caught.kind === 'permission';
       if (permission) setProjects([]);
       setOptionsState(permission ? 'permission' : 'error');
     });
-    return () => { active = false; };
-  }, [change, filters.workDate]);
+    return () => { active = false; controller.abort(); };
+  }, [change]);
 
   if (optionsState === 'permission') return null;
   if (optionsState === 'loading') return <section aria-label="Today's Operations" className="rounded-lg border p-5">Loading Today&apos;s Operations…</section>;

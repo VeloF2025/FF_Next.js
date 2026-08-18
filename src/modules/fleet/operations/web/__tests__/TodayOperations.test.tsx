@@ -100,6 +100,9 @@ function installFetch(options: { overview?: OperationalOverviewResponse; overvie
     if (url.startsWith('/api/fleet/assignments/options')) {
       return Promise.resolve(ok({ staff: [], teams: [], projects: [{ id: PROJECT_ID, label: 'Lawley' }], sites: [], vehicles: [], siteSources: [] }));
     }
+    if (url.startsWith('/api/fleet/operations/project-options')) {
+      return Promise.resolve(ok([{ id: PROJECT_ID, label: 'Lawley' }]));
+    }
     if (url.startsWith('/api/fleet/operations/status/')) return Promise.resolve(options.detailFailure ?? ok(detail));
     if (url.startsWith('/api/fleet/operations/overview')) {
       if (options.overviewFailure) return Promise.resolve(options.overviewFailure);
@@ -214,7 +217,7 @@ describe('TodayOperations', () => {
     const fetchMock = vi.mocked(global.fetch);
     fetchMock.mockImplementation((input) => {
       const url = String(input);
-      if (url.startsWith('/api/fleet/assignments/options')) return Promise.resolve(ok({ staff: [], teams: [], projects: [{ id: PROJECT_ID, label: 'Lawley' }], sites: [], vehicles: [], siteSources: [] }));
+      if (url.startsWith('/api/fleet/operations/project-options')) return Promise.resolve(ok([{ id: PROJECT_ID, label: 'Lawley' }]));
       if (url.startsWith('/api/fleet/operations/overview')) {
         overviewCalls += 1;
         const asOf = new URL(url, 'http://localhost').searchParams.get('asOf') ?? AS_OF;
@@ -239,6 +242,22 @@ describe('TodayOperations', () => {
     await waitFor(() => expect(screen.queryByRole('region', { name: "Today's Operations" })).not.toBeInTheDocument());
     expect(screen.queryByText('Sensitive project name')).not.toBeInTheDocument();
   });
+  it('uses operations-status project options rather than assignment options', async () => {
+    global.fetch = vi.fn((input) => {
+      const url = String(input);
+      if (url.startsWith('/api/fleet/assignments/options')) return Promise.resolve(fail(403, 'FORBIDDEN', 'Assignment options are private'));
+      if (url.startsWith('/api/fleet/operations/project-options')) return Promise.resolve(ok([{ id: PROJECT_ID, label: 'Lawley' }]));
+      if (url.startsWith('/api/fleet/operations/status/')) return Promise.resolve(ok(detail));
+      if (url.startsWith('/api/fleet/operations/overview')) return Promise.resolve(ok(overview()));
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    render(<TodayOperations />);
+
+    expect(await screen.findByText('Late Driver')).toBeInTheDocument();
+    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => String(url).startsWith('/api/fleet/operations/project-options'))).toBe(true);
+    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => String(url).startsWith('/api/fleet/assignments/options'))).toBe(false);
+  });
+
   it('hides project options after an options 401', async () => {
     global.fetch = vi.fn().mockResolvedValue(fail(401, 'UNAUTHORIZED', 'Private options'));
     render(<TodayOperations />);

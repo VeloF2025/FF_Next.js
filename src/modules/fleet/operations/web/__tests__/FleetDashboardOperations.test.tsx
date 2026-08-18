@@ -25,7 +25,7 @@ beforeEach(() => {
     if (url.startsWith('/api/fleet/vehicles')) return Promise.resolve(response(true, 200, { data: [{ id: 'v1', status: 'active' }] }));
     if (url === '/api/fleet/locations') return Promise.resolve(response(true, 200, { data: [{ id: 'l1' }] }));
     if (url.startsWith('/api/fleet/investigation')) return Promise.resolve(response(true, 200, { data: [] }));
-    if (url.startsWith('/api/fleet/assignments/options')) return Promise.resolve(response(true, 200, { success: true, data: { staff: [], teams: [], projects: [{ id: PROJECT_ID, label: 'Lawley' }], sites: [], vehicles: [], siteSources: [] } }));
+    if (url.startsWith('/api/fleet/operations/project-options')) return Promise.resolve(response(true, 200, { success: true, data: [{ id: PROJECT_ID, label: 'Lawley' }] }));
     if (url.startsWith('/api/fleet/operations/overview')) return Promise.resolve(response(false, 503, { success: false, error: { code: 'SERVICE_UNAVAILABLE', message: 'Operations unavailable' } }));
     throw new Error(`Unexpected request: ${url}`);
   });
