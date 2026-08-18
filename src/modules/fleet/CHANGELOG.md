@@ -6,6 +6,33 @@ Format: `## [Commit Hash] - YYYY-MM-DD - Author - Type`
 
 ---
 
+## [PR 6] - 2026-08-18 - Feature
+
+**feat(fleet): operational incidents, escalation, and manager review queue**
+
+Migration 499 (unapplied pending deployment approval) adds durable,
+deduplicated incidents for four PR 4 operational statuses (`late`,
+`wrong_site`, `evidence_mismatch`, `left_early`), a 5-minute detection cron
+(`fleet-operational-monitor`), an escalation/08:15-SAST-summary/health cron
+(`fleet-incident-actions`), a manager review queue at `/fleet/incidents`
+(`fleet.incidents`/`fleet.incidents-settings` permissions), VF Storage
+evidence attachment, and mandatory WhatsApp for critical explicit
+source-event incidents. Six safety/telematics incident types
+(`accident_sos`, `dangerous_area_entry`, `theft_after_hours_movement`,
+`severe_driving`, `prolonged_unauthorized_stop`, `lost_contact_moving`) are
+modeled and gated but have no producer wired in this PR. Requires no driver
+action. See `.claude/modules/fleet.md` (Operational Incidents section) and
+`docs/operations/fleet-operational-incidents.md`.
+
+**Files:** `src/modules/fleet/incidents/**`, `pages/api/fleet/incidents/**`,
+`pages/api/cron/fleet-operational-monitor.ts`,
+`pages/api/cron/fleet-incident-actions.ts`, `pages/fleet/incidents.tsx`,
+`scripts/migrations/sql/499_fleet_operational_incidents.sql`,
+`src/lib/vfStorageUpload.ts` (extended, SiteCam path unchanged),
+`src/modules/notifications/constants/index.ts` (5 new events).
+
+---
+
 ## [5afe860] - 2026-03-11 - Hein van Vuuren - Fix
 
 **fix(error-handling): add logging to TIER 1 silent catches (fleet, procurement, qfield, staff-docs, notifications)**

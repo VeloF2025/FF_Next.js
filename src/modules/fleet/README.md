@@ -146,3 +146,13 @@ npm test -- tests/unit/modules/fleet/gpsParser.test.ts
 - PRD: `docs/PRDs/PRD-039-fleet-module.md`
 - Migration: `scripts/migrations/039_fleet_module.sql`
 - Test Specs: `tests/specs/fleet-module.spec.md`
+
+## Operational Incidents (migration 499, PR 6)
+
+`src/modules/fleet/incidents/` turns four PR 4 operational statuses (`late`,
+`wrong_site`, `evidence_mismatch`, `left_early`) into durable, reviewable
+incidents on a 5-minute monitor cron, plus escalation, an 08:15 SAST summary,
+and manager review at `/fleet/incidents`. Full reference:
+`.claude/modules/fleet.md` (Operational Incidents section) and
+`docs/operations/fleet-operational-incidents.md`. Migration execution and
+cron scheduling are separate deployment approvals — not part of this PR.

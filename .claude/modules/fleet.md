@@ -196,6 +196,230 @@ bounded by `MAX_COMPLETE_ROSTER_ROWS` (2000; beyond that both endpoints return 4
 never a silent truncation) and it is correct, but a project near that bound is measurably slower
 than a single-page selection. Worth collapsing to one evidence pass in a follow-up.
 
+## Operational Incidents (migration 499, PR 6)
+
+PR 6 turns four of PR 4's read-time statuses into durable, reviewable incidents and
+adds a separate escalation/summary/health cron. Implementation lives in
+`src/modules/fleet/incidents/`; protected APIs are under `/api/fleet/incidents`; the
+manager queue is `/fleet/incidents` (Operations → Incidents, not a new dashboard).
+
+**Migration execution and scheduler installation are deployment actions requiring
+separate approval — neither has happened yet.** Merging this code does not create a
+table, register a cron entry, or send a notification. **PR 6 requires no driver
+action**: only managers/oversight record a reason, comment, or evidence.
+
+### Incident types and lifecycle
+
+Fourteen `incident_type` values fall into three groups, enforced by a CHECK
+constraint on both `fleet_operational_incident_rules` and
+`fleet_operational_incidents`:
+
+| Group | Types | How they're produced |
+|---|---|---|
+| Scheduled (auto-detected) | `late`, `wrong_site`, `evidence_mismatch`, `left_early` | Every 5-minute monitor tick, straight off the PR 4 roster/status output. |
+| Summary-only | `unassigned`, `unverifiable`, `vehicle_on_site_driver_unconfirmed`, `evidence_gap` | Never open an incident. Counted into the 08:15 SAST summary only when the type's rule has `includeInMorningSummary`. |
+| Source-event (safety/telematics) | `accident_sos`, `dangerous_area_entry`, `theft_after_hours_movement`, `severe_driving`, `prolonged_unauthorized_stop`, `lost_contact_moving` | Require an explicit typed `IncidentSourceEvent` with a stable `sourceEventId` — **PR 6 ships no producer that calls these**; a future telematics/H&S integration calls `produceIncident({ producerKind: 'source_event', ... })`. |
+
+`resolveScheduledIncidentType` (`incidentProducer.ts`) is the single source of truth
+for the scheduled mapping — every other PR 4 status (`off_duty`, `approaching`,
+`on_site_dual`, etc.) maps to `null` and never opens or feeds anything.
+
+Lifecycle is `open -> acknowledged -> under_review -> resolved|dismissed`, enforced
+both by a `lifecycle_status`+detail-columns CHECK constraint (each status requires
+exactly its own actor/timestamp columns, no more, no less) and by
+`reviewTransitions.ts` locking the row `FOR UPDATE` inside every transition. A
+transition on an already-terminal incident is a 409, first-acknowledgement wins
+(later acknowledgements are idempotent no-ops), and `resolved`/`dismissed` each
+require a note plus an outcome drawn from their own fixed set (`resolved`:
+`confirmed`/`valid_reason`/`assignment_error`/`geofence_error`/`no_action_required`;
+`dismissed`: `false_positive`/`data_gap`/`duplicate`) — a further CHECK constraint
+enforces that pairing at the database level, not just in application code. A
+`duplicate` outcome requires a `linkedIncidentReference` resolving to a different,
+existing incident. A rule can additionally require evidence for specific outcomes
+(`evidence_required_outcomes`); the terminal transition 400s without at least one
+`fleet_operational_incident_evidence` row when the chosen outcome is in that list —
+acknowledgement is never blocked by this, only the terminal step.
+
+Observations and actions are append-only (the migration only grants
+`fibreflow_user` `SELECT, INSERT` on both tables, never `UPDATE`/`DELETE`).
+Recurrence works after a terminal close: the "one active incident" uniqueness index
+(`ux_fleet_operational_incidents_active_assignment`) is a **partial** index scoped
+to `lifecycle_status IN ('open','acknowledged','under_review')`, so a new detection
+for the same staff/type/day/assignment after a resolved-or-dismissed row opens a
+fresh incident rather than colliding with history.
+
+### Condition clearing — deliberately narrow
+
+`evaluateConditionClearing` only ever sets `condition_cleared_at` on a still-open
+incident — it never resolves or dismisses one, and is a safe no-op when there's no
+matching active incident. The monitor (`monitorService.ts`) calls it for every
+staff row whose *current* tick does **not** map to one of the four scheduled types,
+but only actually clears when **both**:
+
+- the current status is `attendance_confirmed` or `on_site_dual` — the only two PR 4
+  statuses that *positively confirm* evidence, as opposed to merely not (yet)
+  flagging a problem (`off_duty`, `approaching`, `scheduled_not_due` say nothing
+  positive and never clear); **and**
+- the evaluation carries zero flags of any kind — stale/missing GPS, missing
+  attendance, low-confidence geometry, a pending confirmation, etc. all block
+  clearing.
+
+Stale, missing, or ambiguous evidence therefore never clears an incident — absence
+of a problem signal is not proof the problem is gone. Recurrence before closure
+(the condition reappears before a human closes the incident) removes
+`condition_cleared_at` again without opening a second incident, via the same
+"touch last-seen" path a repeated detection already takes.
+
+`ScheduledIncidentProducerRequest` has no dedicated monitor-run field.
+`RecordObservationInput.monitorRunId` is deliberately left `null` for scheduled
+detections; run traceability instead flows through `requestCorrelationId`, which
+`incidentProducer` stores on the `opened`/`condition_cleared` actions — the monitor
+run ID is threaded in as that correlation ID rather than widening the Task 3
+contract.
+
+### Cron wrappers, auth, and health
+
+Two independent cron endpoints, both behind `pages/api/cron/...` and a matching
+`scripts/cron-fleet-*.sh` wrapper:
+
+| Endpoint | Cadence | Does |
+|---|---|---|
+| `/api/cron/fleet-operational-monitor` | every 5 min | Loads every active project's complete PR 4 roster (one roster-loading *phase*; any one project's load failing fails the whole phase — never a silent partial), runs `incidentProducer` per staff row, sends `opened` notifications after each incident transaction commits. |
+| `/api/cron/fleet-incident-actions` | at least every 5 min | Three independent phases in one tick: escalation (always), 08:15 SAST morning summary (at most once per SAST work date, skipped entirely before 08:15), status-monitor health check (always). One phase's failure never blocks or hides another's. |
+
+**Auth is `Authorization: Bearer <CRON_SECRET>`** — the repo's dominant convention
+(`appeals-vlm.ts`, `auto-qa.ts`, `backfill-onemap-data.ts`), fail-closed when unset.
+Both endpoints deliberately do **not** also accept the minority `x-cron-secret`
+header used elsewhere in the repo — supporting two undocumented secret paths on one
+endpoint is exactly what this repo's secret-handling rules forbid.
+
+Both endpoints run their work inside `runWithCronLock` (`cronLock.ts`), which
+mirrors `appeals-vlm.ts`'s pinned-connection discipline: `pool.connect()`,
+`pg_try_advisory_lock(hashtext($1))` on that one connection, run the work, then
+`pg_advisory_unlock`. If the unlock query itself fails, the connection is destroyed
+via `client.release(true)` rather than returned to the pool — handing back a
+connection that still thinks it holds the lock would leak that lock for the pool's
+lifetime. Lock names are distinct per endpoint: `fleet-operational-monitor` and
+`fleet-incident-actions`.
+
+**Health.** `fleet_operational_monitor_runs` records `running` → `succeeded` /
+`partial_failure` / `failed` for each of the three run kinds
+(`status_monitor`/`escalation`/`morning_summary`). The incident-actions tick checks
+the *other* cron's health: a `status_monitor` run stuck `running` for more than 15
+minutes (3× the 5-minute cadence — absorbs one missed tick, still catches a real
+outage promptly) is converted to `failed` and alerted; if nothing is stale, a
+`status_monitor` run that hasn't started at all recently is also alerted.
+**This can only work because the incident-actions cron is itself still running.**
+If the entire external scheduler or host stops and *neither* endpoint executes,
+nothing inside either one can observe that — an outage of that kind requires
+external host/scheduler monitoring, not application code.
+
+### Recipients, notifications, and escalation
+
+`recipientService.resolveIncidentRecipients(projectId)` is the **one** recipient
+path for every PR 6 notification: the active project manager
+(`projects.project_manager`) plus active Fleet oversight members
+(`fleet_operational_oversight_members`, effective-dated, one active row per user),
+deduplicated and filtered to `users.is_active = true`. A projectless incident (or a
+project-agnostic notification such as monitor-health) goes to oversight only. An
+empty result is not thrown — it's returned as `{ failed: true }`, which every
+caller records as a notification failure without rolling back the incident.
+
+Seven events, registered in `src/modules/notifications/constants/index.ts`:
+`fleet.operational_incident_opened`, `_escalated`, `_resolved`,
+`_morning_summary`, `_monitor_failed`, plus the two settings permissions
+`fleet.incidents`/`fleet.incidents-settings` (not notification events). Idempotency
+keys are exact strings, not implementation detail: `fleet-incident-opened:<id>`,
+`fleet-incident-escalated:<id>:<level>`, `fleet-incident-resolved:<id>:<outcome>`,
+`fleet-morning-summary:<userId>:<projectId|unassigned>:<workDate>`,
+`fleet-monitor-failed:<runKind>:<runId|missing>`.
+
+**Mandatory WhatsApp for critical explicit-source incidents.** `notify()` resolves
+channels from `DEFAULT_CHANNEL_PREFERENCES` plus a per-user override and has no
+per-call channel override, and `fleet.operational_incident_opened` defaults to
+`whatsapp: false` so routine/scheduled incidents never gain WhatsApp by accident.
+So for the one case that must always get WhatsApp — `severity === 'critical' &&
+producerKind === 'source_event'` — `incidentNotifications.ts` places a direct,
+best-effort `deliverWhatsApp` call to every resolved recipient **in addition to**
+the normal `notify()` call. A WhatsApp failure there is counted in the returned
+`NotifyResult.failed` and never thrown; it cannot block the in-app/email delivery.
+
+Escalation (`actionRunner.ts`) is a row-locked, atomic level increment: due
+incidents are every `open` incident whose configured `acknowledgementTargetMinutes`
+(first check) or `reminderIntervalMinutes` (later checks) has elapsed, below the
+rule's `maximumEscalationLevel`. Seeded defaults: 15 minutes for the four scheduled
+types, 5 minutes for the six critical source-event types, 15-minute reminders, max
+level 3. Acknowledging an incident stops reminders by construction — escalation
+only ever fires on `lifecycle_status = 'open'` rows, and acknowledgement moves the
+row off `open` in its own transaction.
+
+### VF Storage evidence
+
+`uploadCategorizedFile` (`src/lib/vfStorageUpload.ts`) is a new, stricter,
+category-aware sibling to the existing `uploadToVfStorage` — SiteCam's function and
+behaviour are untouched; Fleet incident evidence uses only the new one. Fleet
+storage keys are `<incidentId>-<randomUUID()>.<ext>` — **never any component of the
+caller's filename or path** (`evidenceService.buildStorageFilename`); the display
+filename is sanitized separately via `safeFilename` and only ever affects the
+`original_filename` column, never the storage key.
+
+`uploadCategorizedFile` validates MIME (`image/jpeg`, `image/png`,
+`application/pdf`), size (15 MB, `MAX_EVIDENCE_BYTES`), and base64 shape **before**
+any network call, and rejects a returned URL that isn't an approved VF Storage
+origin (`isAllowedPhotoUrl`) via `VfStorageOriginError`. The upload only happens
+**after** `evidenceService.addIncidentEvidence` has resolved scope, loaded and
+scope-checked the incident, and confirmed it isn't `resolved`/`dismissed`. If the
+database insert then fails — evidence row plus `evidence_added` action, one
+transaction — the file is already sitting in VF Storage with nothing pointing at
+it: this is logged as a structured orphan-storage reference (incident ID, storage
+key/URL, MIME — never file content) via `IncidentEvidenceOrphanError`, for manual
+reconciliation. **No delete path exists anywhere in this module** — evidence is
+append-only both in the service and at the database grant level (`GRANT SELECT,
+INSERT` only on `fleet_operational_incident_evidence`); a photo/upload failure can
+never block acknowledgement or emergency notification delivery, because this
+service never touches lifecycle columns or calls `incidentNotifications`.
+
+### Review APIs and scope
+
+`fleet.incidents` (view/edit) gates the review queue; `fleet.incidents-settings`
+(view/edit) separately gates rule/oversight-membership management —
+`reviewScope.ts` duplicates `operations/projectScope.ts`'s "base permission AND
+(admin role OR an active per-user override grant)" idiom against these two keys
+rather than reusing that module directly, since its `canAccessOperationalProject`
+hardcodes a different permission key. A plain `manager` role (which the migration
+grants base `fleet.incidents`/`fleet.incidents-settings` access to) never gains
+cross-project or projectless reach without an explicit `admin`/`super_admin` role
+or an active override grant. A projectless incident always requires that
+unrestricted scope — a PM never sees it. Bulk-acknowledge validates every requested
+incident (exists, not already terminal, in scope) before mutating any; each
+acknowledgement then still runs as its own row-locked transaction.
+
+### Rule and oversight configuration
+
+`fleet_operational_incident_rules` versions are effective-dated and non-overlapping
+(a `gist` EXCLUDE constraint plus a partial unique index enforcing exactly one open
+version per `incident_type`); `versionIncidentRule` locks the current stream,
+closes it at the new effective timestamp, and inserts `version + 1` in one
+transaction — never overwrites history. `fleet_operational_oversight_members` is
+the same effective-dated shape: `addOversightMember` requires an active FibreFlow
+user (`isActiveFibreFlowUser`, checked before insert), and ending membership
+(`endOversightMembership`) requires a reason and only ever sets `effective_to` —
+membership is never deleted. **The migration seeds rules by incident type only;
+no person is seeded anywhere.** The settings dialog's user-search
+(`/api/fleet/incidents/settings/user-search`) is scoped to
+`fleet.incidents-settings:edit` — it was fixed post-merge (commit
+`41622266e`) after initially calling the admin-only `/api/admin/users`, which
+403'd a non-admin holding settings access via an override grant.
+
+### Dashboard/Map integration
+
+`AttentionList.tsx` and `MapAttentionPanel.tsx` add a "View incidents"/"Incidents"
+deep link **only** for the four incident-producing statuses (`late`, `wrong_site`,
+`evidence_mismatch`, `left_early`) — every other attention status is summary-only
+and gets no link. The link carries `incidentType`, `projectId`, and `staffId` into
+`/fleet/incidents?...` so the queue opens pre-filtered. No new dashboard tab or
+replacement page exists; the existing Dashboard and Map are unmodified otherwise.
+
 ## Tracking (Live GPS)
 
 Vehicle position history lands in `fleet_vehicle_positions` via two provider-blind ingestion
