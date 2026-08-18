@@ -36,7 +36,7 @@ const FACT = {
   accuracy_m: '18.00',
   lat: '-26.3012345',
   lon: '27.8123456',
-  selfie_url: 'https://app.fibreflow.app/storage/selfies/entry-1-in.jpg',
+  selfie_available: true,
   device_fingerprint: 'fp-abc',
 };
 
@@ -68,7 +68,7 @@ describe('runCheckinLocations', () => {
       nearest_project: 'Lawley',
       distance_m: 312,
       accuracy_m: 18,
-      selfie_url: FACT.selfie_url,
+      selfie: '/api/staff/attendance-selfie?entryId=entry-1&kind=in&context=checkin-locations',
       entry_id: 'entry-1',
     });
   });
@@ -76,7 +76,34 @@ describe('runCheckinLocations', () => {
   it('labels a clock-out event distinctly from a clock-in', async () => {
     sqlMock.query.mockResolvedValueOnce([{ ...FACT, event: 'out' }]);
     const result = await runCheckinLocations(input());
-    expect(result.rows[0]).toMatchObject({ event: 'Clock out' });
+    expect(result.rows[0]).toMatchObject({
+      event: 'Clock out',
+      // The link's kind must follow the event, or it resolves the wrong selfie.
+      selfie: '/api/staff/attendance-selfie?entryId=entry-1&kind=out&context=checkin-locations',
+    });
+  });
+
+  it('leaves the selfie cell empty when the event captured none', async () => {
+    sqlMock.query.mockResolvedValueOnce([{ ...FACT, selfie_available: false }]);
+    const result = await runCheckinLocations(input());
+    expect(result.rows[0]).toMatchObject({ selfie: '' });
+  });
+
+  it('never emits a raw storage URL for a selfie', async () => {
+    // The /storage/ proxy serves attendance selfies with no cookie, so a raw
+    // URL in an exportable report is unauthenticated access to biometrics.
+    // Selfies must resolve through the RBAC-checked, access-logged API route.
+    const result = await runCheckinLocations(input());
+    const [text] = sqlMock.query.mock.calls[0] as [string];
+    // The URL is reduced to a boolean in SQL, so it never reaches this layer.
+    expect(text).toContain('IS NOT NULL AS selfie_available');
+
+    for (const row of result.rows) {
+      for (const value of Object.values(row)) {
+        expect(String(value)).not.toContain('/storage/');
+      }
+    }
+    expect(result.rows[0]!.selfie).toContain('/api/staff/attendance-selfie?');
   });
 
   it('keeps a missing GPS fix as a locatable-nothing row rather than dropping it', async () => {

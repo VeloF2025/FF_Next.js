@@ -4,7 +4,15 @@
  * One row per clock **event** — a clock-in and a clock-out are two separate
  * rows — because location is a property of the event, not of the day. Each
  * row carries where it happened, how far that was from the nearest project
- * AOI, how trustworthy the fix was, and the selfie captured with it.
+ * AOI, how trustworthy the fix was, and a link to the selfie captured with it.
+ *
+ * The selfie column is a link to `/api/staff/attendance-selfie`, never the
+ * raw `/storage/...` URL. The storage proxy serves those bytes to anyone
+ * holding the link with no cookie, so putting them in a report — which
+ * exports to XLSX and travels — would hand out unauthenticated access to
+ * staff biometrics. The API route enforces RBAC, narrows to the viewer's
+ * supervisor scope, and writes the POPIA access-log row. `evidenceQuality`
+ * and `dayExceptionQueries` report selfie presence for the same reason.
  *
  * The distance is measured against a convex hull of the project's poles
  * (see `projectAoiSql.ts`), not against `fleet_authorized_locations`: that
@@ -36,7 +44,7 @@ const COLUMNS: ReadonlyArray<ReportColumn> = [
   { key: 'accuracy_m', label: 'GPS ± (m)', align: 'right', format: 'number' },
   { key: 'lat', label: 'Lat' },
   { key: 'lon', label: 'Lon' },
-  { key: 'selfie_url', label: 'Selfie', format: 'link' },
+  { key: 'selfie', label: 'Selfie', format: 'link' },
   { key: 'device_fingerprint', label: 'Device' },
   { key: 'entry_id', label: 'Entry ID' },
 ];
@@ -67,8 +75,17 @@ interface Row extends Record<string, unknown> {
   accuracy_m: string | null;
   lat: string | null;
   lon: string | null;
-  selfie_url: string | null;
+  selfie_available: boolean;
   device_fingerprint: string | null;
+}
+
+/**
+ * Audited selfie path. Resolving it requires `people.staff.attendance.manage`
+ * plus supervisor scope, and records who looked. Never emit the underlying
+ * `/storage/...` URL — see the module comment.
+ */
+function selfieLink(entryId: string, event: 'in' | 'out'): string {
+  return `/api/staff/attendance-selfie?entryId=${entryId}&kind=${event}&context=checkin-locations`;
 }
 
 export async function runCheckinLocations(input: ReportInput): Promise<ReportRunResult> {
@@ -113,7 +130,8 @@ export async function runCheckinLocations(input: ReportInput): Promise<ReportRun
     events AS (
       SELECT
         b.id, b.work_date, b.full_name, b.employee_id, b.department, b.device_fingerprint,
-        ev.event, ev.occurred_at, ev.lat, ev.lon, ev.accuracy_m, ev.selfie_url
+        ev.event, ev.occurred_at, ev.lat, ev.lon, ev.accuracy_m,
+        NULLIF(BTRIM(ev.selfie_url), '') IS NOT NULL AS selfie_available
       FROM base b
       CROSS JOIN LATERAL (VALUES
         ('in',  b.clock_in_at,  b.clock_in_lat,  b.clock_in_lon,  b.clock_in_accuracy_m,  b.selfie_in_url),
@@ -142,7 +160,7 @@ export async function runCheckinLocations(input: ReportInput): Promise<ReportRun
       ev.accuracy_m::text                           AS accuracy_m,
       ev.lat::text                                  AS lat,
       ev.lon::text                                  AS lon,
-      ev.selfie_url                                 AS selfie_url,
+      ev.selfie_available                           AS selfie_available,
       ev.device_fingerprint                         AS device_fingerprint
     FROM events ev
     LEFT JOIN LATERAL (
@@ -191,7 +209,7 @@ export async function runCheckinLocations(input: ReportInput): Promise<ReportRun
       accuracy_m: r.accuracy_m !== null ? Number(r.accuracy_m) : null,
       lat: r.lat ?? '',
       lon: r.lon ?? '',
-      selfie_url: r.selfie_url ?? '',
+      selfie: r.selfie_available ? selfieLink(r.entry_id, r.event) : '',
       device_fingerprint: r.device_fingerprint ?? '',
       entry_id: r.entry_id,
     })),
