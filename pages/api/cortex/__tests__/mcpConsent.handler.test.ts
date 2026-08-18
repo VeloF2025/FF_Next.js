@@ -296,3 +296,171 @@ describe('POST /api/cortex/mcp-consent — the FibreFlow API grant', () => {
     expect(JSON.stringify(app.logs)).not.toContain(FF_TOKEN);
   });
 });
+
+describe('POST /api/cortex/mcp-consent — the grant must not outlive a failed authorization', () => {
+  const FF_SESSION = 'ff-session-0001';
+
+  function ffDeps(revoked: string[], active: unknown[] = []) {
+    return {
+      mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
+      mintFfToken: (async () => ({
+        token: `ff_${randomBytes(24).toString('hex')}`,
+        sessionId: FF_SESSION,
+      })) as never,
+      deleteSession: (async (id: string) => { revoked.push(id); }) as never,
+      listSessions: (async () => active) as never,
+      env: { CORTEX_FF_API_ENABLED: 'true' },
+    };
+  }
+
+  it('REVOKES the credential when the upstream refuses', async () => {
+    // The token is minted before the call, because Cortex needs it in the body. If the
+    // call then fails, the row is a live 90-day credential no grant points at.
+    const revoked: string[] = [];
+    const callback = await startCallbackServer((_req, response) => {
+      response.writeHead(500, { 'content-type': 'application/json' });
+      response.end('{}');
+    });
+    const app = await startConsentHandler({ callbackBase: callback.url, ...ffDeps(revoked) });
+
+    const response = await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(response.status).toBe(502);
+    expect(revoked).toEqual([FF_SESSION]);
+  });
+
+  it('REVOKES the credential when the upstream is unreachable', async () => {
+    const revoked: string[] = [];
+    const app = await startConsentHandler({
+      callbackBase: 'http://127.0.0.1:1',
+      ...ffDeps(revoked),
+    });
+
+    const response = await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(response.status).toBe(502);
+    expect(revoked).toEqual([FF_SESSION]);
+  });
+
+  it('REVOKES the credential when the redirect is unsafe', async () => {
+    // A javascript: redirect never reaches the browser, so the grant never completes.
+    const revoked: string[] = [];
+    const callback = await startCallbackServer((_req, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ redirectUrl: 'javascript:alert(1)' }));
+    });
+    const app = await startConsentHandler({ callbackBase: callback.url, ...ffDeps(revoked) });
+
+    const response = await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(response.status).toBe(502);
+    expect(revoked).toEqual([FF_SESSION]);
+  });
+
+  it('KEEPS the credential when the grant succeeds', async () => {
+    // The mirror. Without it, revoking unconditionally would satisfy all three above
+    // while making the feature useless.
+    const revoked: string[] = [];
+    const callback = await startCallbackServer((_req, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({
+        redirectUrl: 'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc',
+      }));
+    });
+    const app = await startConsentHandler({ callbackBase: callback.url, ...ffDeps(revoked) });
+
+    const response = await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(response.status).toBe(200);
+    expect(revoked).toEqual([]);
+  });
+
+  it('does not revoke anything when the grant is OFF', async () => {
+    // Nothing was minted, so there is nothing to clean up — and deleteSession must not
+    // be called with undefined.
+    const revoked: string[] = [];
+    const callback = await startCallbackServer((_req, response) => {
+      response.writeHead(500, { 'content-type': 'application/json' });
+      response.end('{}');
+    });
+    const app = await startConsentHandler({
+      callbackBase: callback.url,
+      ...ffDeps(revoked),
+      env: {},
+    });
+
+    await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(revoked).toEqual([]);
+  });
+
+  it('refuses to mint past the active-token cap, and mints nothing', async () => {
+    let minted = false;
+    const callback = await startCallbackServer((_req, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ redirectUrl: 'https://claude.ai/cb' }));
+    });
+    const app = await startConsentHandler({
+      callbackBase: callback.url,
+      mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
+      mintFfToken: (async () => { minted = true; return { token: 'x', sessionId: FF_SESSION }; }) as never,
+      listSessions: (async () => new Array(10).fill({})) as never,
+      env: { CORTEX_FF_API_ENABLED: 'true' },
+    });
+
+    const response = await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(response.status).toBe(400);
+    expect(minted).toBe(false);
+  });
+
+  it('mints normally when under the cap', async () => {
+    // The mirror for the cap: a handler that always refused would pass the case above.
+    let minted = false;
+    const callback = await startCallbackServer((_req, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({
+        redirectUrl: 'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc',
+      }));
+    });
+    const app = await startConsentHandler({
+      callbackBase: callback.url,
+      mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
+      mintFfToken: (async () => { minted = true; return { token: 'x', sessionId: FF_SESSION }; }) as never,
+      listSessions: (async () => new Array(9).fill({})) as never,
+      env: { CORTEX_FF_API_ENABLED: 'true' },
+    });
+
+    const response = await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(response.status).toBe(200);
+    expect(minted).toBe(true);
+  });
+
+  it('records the forwarded client IP, not the loopback proxy address', async () => {
+    // Behind nginx on the same host req.socket.remoteAddress is always 127.0.0.1, which
+    // makes the audit column useless on exactly the deployment that matters.
+    const seen: Array<string | undefined> = [];
+    const callback = await startCallbackServer((_req, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({
+        redirectUrl: 'https://claude.ai/api/mcp/auth_callback?code=ctxc_abc',
+      }));
+    });
+    const app = await startConsentHandler({
+      callbackBase: callback.url,
+      mintToken: async () => ({ token: MINTED_TOKEN, expiresAt: null }),
+      mintFfToken: (async (_u: unknown, _l: unknown, opts: { ipAddress?: string }) => {
+        seen.push(opts?.ipAddress);
+        return { token: 'x', sessionId: FF_SESSION };
+      }) as never,
+      listSessions: (async () => []) as never,
+      env: { CORTEX_FF_API_ENABLED: 'true' },
+      headers: { 'x-forwarded-for': '196.25.1.9, 10.0.0.1' },
+    });
+
+    await app.post('/api/cortex/mcp-consent', { stateId: VALID_STATE_ID });
+
+    expect(seen).toEqual(['196.25.1.9']);
+  });
+});

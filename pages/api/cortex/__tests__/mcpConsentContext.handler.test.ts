@@ -182,3 +182,32 @@ describe('POST /api/cortex/mcp-consent-context', () => {
     });
   });
 });
+
+describe('POST /api/cortex/mcp-consent-context — the grant flag reaches the screen', () => {
+  it('reports ffApiGrant TRUE when the grant is enabled', async () => {
+    // The wiring, not the predicate. ffApiGrant.test.ts proves ffApiGrantEnabled reads
+    // the env correctly; nothing proved this ROUTE calls it, so a wrong variable name or
+    // a hardcoded false would have shipped a grant with no notice on the consent screen.
+    const previous = process.env.CORTEX_FF_API_ENABLED;
+    process.env.CORTEX_FF_API_ENABLED = 'true';
+    try {
+      const callback = await startContextService((_request, response) => {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({
+          client_id: 'grant-client',
+          client_name: 'Claude',
+          redirect_uri: 'https://claude.ai/cb',
+          scopes: ['cortex.read'],
+        }));
+      });
+      const app = await startConsentContextHandler({ callbackBase: callback.url });
+
+      const response = await app.post({ stateId: VALID_STATE_ID });
+
+      expect((response.json.data as { ffApiGrant?: boolean }).ffApiGrant).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.CORTEX_FF_API_ENABLED;
+      else process.env.CORTEX_FF_API_ENABLED = previous;
+    }
+  });
+});
