@@ -14,6 +14,7 @@ into payroll while answering a question about drops.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import urllib.error
@@ -97,13 +98,20 @@ def _canonical(path: str) -> str:
     substring check. Decoding is repeated until stable so a double-encoded `%252e`
     cannot survive one pass.
 
-    Single-dot segments are then collapsed, because Next.js resolves them before routing:
-    `/api/field/./attendance` reaches the same handler as `/api/field/attendance`. Without
-    this the guards saw a different string than the router did, and ONE character defeated
-    every deny in this module — `_group_of("/api/./meetings")` returned "." rather than
-    "meetings", so the group check passed, and the literal path check failed to match too.
-    Confirmed live before the fix: the dotted form returned 401 (the real route, awaiting
-    auth) where a genuinely unknown route returns 404.
+    Single-dot segments are then collapsed. Before this, ONE character defeated every deny
+    in this module: `_group_of("/api/./meetings")` returned "." rather than "meetings", so
+    the group check passed, and the literal path check failed to match too.
+
+    Measured, so the reason is not overstated: FibreFlow's own router does NOT resolve dot
+    segments — `curl --path-as-is /api/field/./attendance` returns 404, the same as a
+    route that does not exist, where the plain path returns 401. So this was not a live
+    hole in THIS deployment; the earlier claim that it returned 401 came from curl
+    collapsing "./" client-side before sending.
+
+    It is collapsed anyway because the guard must not be made to read a different string
+    than whatever eventually routes the request. Any proxy, CDN or client library that
+    does normalise (most do, per RFC 3986 §6.2.2.3) would turn the mismatch into a real
+    bypass, and this module is upstream of all of them.
 
     `..` is NOT resolved here. It stays a refusal in _guard_path — collapsing it would
     silently accept `/api/staff/../field/x`, and a caller with a legitimate path has no
@@ -148,6 +156,43 @@ def _denied_group(group: str) -> str | None:
     for denied in DENIED_GROUPS:
         if normalised == denied or normalised.startswith(denied + "-"):
             return denied
+    return None
+
+
+# What an API path may contain, after canonicalisation (already lower-cased).
+# Deliberately narrow: real routes are lower-case alphanumerics with dashes,
+# underscores, dots (file extensions) and slashes. Anything else — control bytes,
+# whitespace, a fragment, a backslash, a homoglyph — is refused rather than guessed at.
+_ALLOWED_PATH = re.compile(r"^/api(/[a-z0-9][a-z0-9._\-]*)*/?$")
+
+
+def _malformed(canonical: str) -> str | None:
+    """Refuse a path whose SHAPE could make the denylists read it as something else.
+
+    Returns the refusal message, or None when the path is a clean API path.
+    """
+    bare = canonical.split("?", 1)[0]
+
+    if "#" in canonical:
+        # `_denied_path` stripped the fragment and `_group_of` did not, so the two checks
+        # disagreed about where the path ended. urllib drops it before the wire anyway, so
+        # a fragment is never useful here — only a way to make the guards disagree.
+        return "path must not contain '#'."
+
+    if any(ch.isspace() or ord(ch) < 0x20 or ord(ch) == 0x7F for ch in bare):
+        return "path must not contain whitespace or control characters."
+
+    if not _ALLOWED_PATH.match(bare):
+        return (
+            "path must be a plain FibreFlow API path — lower-case letters, digits, "
+            "'-', '_', '.' and '/' only."
+        )
+
+    # A segment ending in "." is the same route to some servers and a different string to
+    # the denylists, which is precisely the mismatch this function exists to remove.
+    if any(seg.endswith(".") for seg in bare.split("/") if seg):
+        return "path segments must not end with '.'."
+
     return None
 
 
@@ -263,6 +308,18 @@ def _guard_path(target: str) -> dict[str, object] | None:
         }
     if ".." in canonical or "//" in canonical[1:]:
         return {"message": "path must not contain '..' or '//'.", "received": target}
+
+    shape = _malformed(canonical)
+    if shape:
+        # Refused rather than normalised. The denylists match a path against a literal, so
+        # ANY trailing byte that is not "/" slipped past both of them:
+        # `_group_of("/api/meetings\x00")` is "meetings\x00", which != "meetings", and
+        # "/api/field/attendance." is neither equal to the denied path nor prefixed by it.
+        # Today FibreFlow's stack 400s or 404s those, so nothing was reachable — but that
+        # is upstream leniency this module does not control and explicitly does not claim
+        # to rely on. Enumerating bad bytes would be a losing game, so this states what a
+        # path may contain and refuses everything else.
+        return {"message": shape, "received": target}
 
     denied_path = _denied_path(canonical)
     if denied_path:

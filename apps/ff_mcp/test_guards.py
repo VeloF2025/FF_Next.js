@@ -221,9 +221,12 @@ def test_meetings_and_procurement_are_denied_as_groups(svc):
 # Next.js resolves "." before routing, so /api/field/./attendance reaches the same
 # handler as /api/field/attendance. The guards ran on the raw canonical string, so ONE
 # character defeated every deny here: _group_of("/api/./meetings") returned "." rather
-# than "meetings", and the literal path match missed too. Confirmed against the running
-# app before the fix — the dotted form returned 401 (the real route, awaiting auth)
-# where a genuinely unknown route returns 404.
+# than "meetings", and the literal path match missed too.
+#
+# Measured: FibreFlow's router does NOT resolve dot segments (curl --path-as-is returns
+# 404, same as an unknown route), so this was not a live hole HERE. It is collapsed
+# anyway because the guard must not read a different string than whatever routes the
+# request — any proxy or client that normalises per RFC 3986 would make it one.
 # ---------------------------------------------------------------------------
 
 
@@ -271,3 +274,76 @@ def test_canonical_keeps_a_dotted_filename_intact(svc):
     """Only whole "." SEGMENTS are dropped — a dot inside a segment is data."""
     _, tools = svc
     assert tools._canonical("/api/photos/a.b.jpg") == "/api/photos/a.b.jpg"
+
+
+# ---------------------------------------------------------------------------
+# Path SHAPE.
+#
+# The denylists match a canonical path against a literal, so any trailing byte that is
+# not "/" slipped past both of them: _group_of("/api/meetings\x00") is "meetings\x00",
+# which != "meetings", and "/api/field/attendance." is neither equal to the denied path
+# nor prefixed by it. FibreFlow's stack happens to 400/404 those today, so nothing was
+# reachable — but that is upstream leniency this module does not control.
+#
+# Enumerating bad bytes is a losing game, so _malformed states what a path may contain
+# and refuses the rest.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/field/attendance\x00",
+        "/api/field/attendance.",
+        "/api/field/attendance ",
+        "/api/field/attendance\t",
+        "/api/field/attendance\n",
+        "/api/meetings\x00",
+        "/api/meetings.",
+        "/api/meetings\x7f",
+    ],
+)
+def test_a_trailing_byte_cannot_walk_around_a_deny(svc, path):
+    _, tools = svc
+    assert tools._guard_path(path) is not None, path
+
+
+def test_a_fragment_is_refused_rather_than_letting_the_checks_disagree(svc):
+    """_denied_path stripped "#" and _group_of did not, so the two disagreed about where
+    the path ended. A fragment never reaches the wire anyway — urllib drops it — so it is
+    only ever a way to make the guards read different strings."""
+    _, tools = svc
+    assert tools._guard_path("/api/other#/api/field/attendance") is not None
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/api/field\\attendance", "/api/fiel／attendance", "/api/meetings;x=1", "/api/meetings%00"],
+)
+def test_odd_separators_and_params_are_refused(svc, path):
+    _, tools = svc
+    assert tools._guard_path(path) is not None, path
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/reporting/meetings",
+        "/api/reporting/attendance?since=2026-01-01&person=ab",
+        "/api/field-stock/reports/daily-reconciliation",
+        "/api/field/workers",
+        "/api/photos/a.b.jpg",
+        "/api/qfield/project-stats",
+        "/api/sow/drops/search",
+        "/api/reporting/project-section/",
+    ],
+)
+def test_LEGITIMATE_paths_still_pass_the_shape_check(svc, path):
+    """The mirror, and the one that matters most.
+
+    A shape guard that refused everything would satisfy every assertion above. These are
+    real paths the sanctioned tools call, including a query string, a hyphenated group, a
+    dotted filename and a trailing slash.
+    """
+    _, tools = svc
+    assert tools._guard_path(path) is None, path
