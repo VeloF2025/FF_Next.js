@@ -29,9 +29,16 @@
 
 import * as dotenv from 'dotenv';
 
-// Cron entry points log to stderr, matching the sibling attendance crons:
-// @/lib/logger is a no-op in a standalone tsx script and console.* is
-// disallowed by lint (#2007).
+// Cron entry points write to stderr, matching the sibling attendance crons.
+//
+// Precisely why, because the shorthand in those files ("the logger is a
+// no-op") is not quite right: @/lib/logger sends warn/error to stderr
+// always, but info/debug ONLY when LOG_STDOUT=true (src/lib/logger.ts:152).
+// Cron does not set it, so every progress line — how many AOIs were found,
+// how many were written — would vanish, and the log would contain nothing
+// but silence on a good night and a bare error on a bad one. This script's
+// whole value under cron is its progress output. console.* is disallowed by
+// lint (#2007), so stderr it is.
 function stderr(msg: string): void {
   process.stderr.write(`${new Date().toISOString()} ${msg}\n`);
 }
