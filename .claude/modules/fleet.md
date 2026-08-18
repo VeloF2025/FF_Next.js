@@ -322,17 +322,19 @@ external host/scheduler monitoring, not application code.
 
 `recipientService.resolveIncidentRecipients(projectId)` is the **one** recipient
 path for every PR 6 notification: the active project manager
-(`projects.project_manager`) plus active Fleet oversight members
+(`projects.project_manager`, which may hold either a `users.id` or a `staff.id`,
+so it is resolved through both) plus active Fleet oversight members
 (`fleet_operational_oversight_members`, effective-dated, one active row per user),
 deduplicated and filtered to `users.is_active = true`. A projectless incident (or a
 project-agnostic notification such as monitor-health) goes to oversight only. An
 empty result is not thrown — it's returned as `{ failed: true }`, which every
 caller records as a notification failure without rolling back the incident.
 
-Seven events, registered in `src/modules/notifications/constants/index.ts`:
+Five notification events, registered in `src/modules/notifications/constants/index.ts`:
 `fleet.operational_incident_opened`, `_escalated`, `_resolved`,
-`_morning_summary`, `_monitor_failed`, plus the two settings permissions
-`fleet.incidents`/`fleet.incidents-settings` (not notification events). Idempotency
+`fleet.operational_morning_summary`, and `fleet.operational_monitor_failed`.
+`fleet.incidents` and `fleet.incidents-settings` are RBAC permissions, not events —
+do not count them here. Idempotency
 keys are exact strings, not implementation detail: `fleet-incident-opened:<id>`,
 `fleet-incident-escalated:<id>:<level>`, `fleet-incident-resolved:<id>:<outcome>`,
 `fleet-morning-summary:<userId>:<projectId|unassigned>:<workDate>`,
