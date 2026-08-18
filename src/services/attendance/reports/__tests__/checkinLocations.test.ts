@@ -37,7 +37,7 @@ const FACT = {
   lon: '27.8123456',
   selfie_available: true,
   device_fingerprint: 'fp-abc',
-  aoi_computed_at: new Date().toISOString(),
+  aoi_computed_at_ms: String(Date.now()),
 };
 
 beforeEach(() => {
@@ -148,8 +148,8 @@ describe('runCheckinLocations', () => {
   });
 
   it('warns when the AOI geometry is stale rather than serving it silently', async () => {
-    const eightDaysAgo = new Date(Date.now() - 8 * 86_400_000).toISOString();
-    sqlMock.query.mockResolvedValueOnce([{ ...FACT, aoi_computed_at: eightDaysAgo }]);
+    const eightDaysAgo = String(Date.now() - 8 * 86_400_000);
+    sqlMock.query.mockResolvedValueOnce([{ ...FACT, aoi_computed_at_ms: eightDaysAgo }]);
     const result = await runCheckinLocations(input());
     expect(result.notes.some((n) => n.includes('8 day(s) ago'))).toBe(true);
   });
@@ -162,7 +162,7 @@ describe('runCheckinLocations', () => {
   });
 
   it('says so loudly when no AOIs are loaded at all', async () => {
-    sqlMock.query.mockResolvedValueOnce([{ ...FACT, aoi_computed_at: null }]);
+    sqlMock.query.mockResolvedValueOnce([{ ...FACT, aoi_computed_at_ms: null }]);
     const result = await runCheckinLocations(input());
     expect(result.notes.some((n) => n.includes('No project AOIs are loaded'))).toBe(true);
   });

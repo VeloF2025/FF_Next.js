@@ -82,7 +82,7 @@ interface Row extends Record<string, unknown> {
   lon: string | null;
   selfie_available: boolean;
   device_fingerprint: string | null;
-  aoi_computed_at: string | null;
+  aoi_computed_at_ms: string | null;
 }
 
 /**
@@ -171,7 +171,14 @@ export async function runCheckinLocations(input: ReportInput): Promise<ReportRun
       -- Carried on every row so a stalled AOI refresh is visible in the
       -- report rather than silently serving geometry from weeks ago. Scalar
       -- subquery over a 9-row table; no extra round trip.
-      (SELECT MAX(a2.computed_at) FROM project_aois a2)::text AS aoi_computed_at
+      --
+      -- Epoch millis, not ::text. A timestamptz rendered to text carries its
+      -- offset under the default DateStyle and parses correctly — but a
+      -- timestamp string WITHOUT an offset is read by new Date() as local
+      -- time, which here would be 2 hours out and would silently suppress or
+      -- fabricate the staleness warning. An integer cannot be misread.
+      (SELECT (EXTRACT(EPOCH FROM MAX(a2.computed_at)) * 1000)::bigint
+         FROM project_aois a2)::text AS aoi_computed_at_ms
     FROM events ev
     LEFT JOIN LATERAL (
       SELECT
@@ -211,11 +218,12 @@ export async function runCheckinLocations(input: ReportInput): Promise<ReportRun
   ];
   // A stalled refresh cron is invisible otherwise: the report keeps answering,
   // just against sites as they were whenever it last ran. Say so.
-  const computedAt = rows[0]?.aoi_computed_at ?? null;
-  if (rows.length > 0 && !computedAt) {
+  // Every row carries the same scalar; row 0 is representative.
+  const computedAtMs = rows[0]?.aoi_computed_at_ms ?? null;
+  if (rows.length > 0 && !computedAtMs) {
     notes.push('No project AOIs are loaded — every event will read as unmatched. Run the AOI refresh.');
-  } else if (computedAt) {
-    const ageHours = (Date.now() - new Date(computedAt).getTime()) / 3_600_000;
+  } else if (computedAtMs) {
+    const ageHours = (Date.now() - Number(computedAtMs)) / 3_600_000;
     if (ageHours > AOI_STALE_AFTER_HOURS) {
       notes.push(
         `Project AOIs were last rebuilt ${Math.floor(ageHours / 24)} day(s) ago — newer sites may be missing.`,
