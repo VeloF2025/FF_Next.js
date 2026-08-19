@@ -270,6 +270,57 @@ describe('morning summary phase', () => {
     expect(monitor.loadMonitoredRoster).not.toHaveBeenCalled();
   });
 
+  it('retries the summary after a run that failed earlier the same work date', async () => {
+    // A `failed` run sent nothing. Treating it as "already sent" cost every project
+    // manager that day's summary, and no health check covers `morning_summary`.
+    runs.findLatestMonitorRun.mockImplementation(async (kind: string) => (kind === 'morning_summary'
+      ? runRow({ runKind: 'morning_summary', status: 'failed', effectiveAt: AFTER_0815.effectiveAt })
+      : runRow({ runKind: 'status_monitor', status: 'succeeded', startedAt: AFTER_0815.effectiveAt })));
+    monitor.loadMonitoredRoster.mockResolvedValue([staffItem()]);
+    settings.loadEffectiveIncidentRule.mockImplementation(async (type: string) => (type === 'unassigned' ? unassignedRule : null));
+
+    await runIncidentActions(AFTER_0815);
+
+    expect(notifications.sendMorningSummaryNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('still treats a crashed `running` run as retryable, not as already sent', async () => {
+    // The cron's advisory lock already excludes a concurrent second invocation, so a
+    // `running` row for today can only be a run that died before finalizing.
+    runs.findLatestMonitorRun.mockImplementation(async (kind: string) => (kind === 'morning_summary'
+      ? runRow({ runKind: 'morning_summary', status: 'running', effectiveAt: AFTER_0815.effectiveAt })
+      : runRow({ runKind: 'status_monitor', status: 'succeeded', startedAt: AFTER_0815.effectiveAt })));
+    monitor.loadMonitoredRoster.mockResolvedValue([staffItem()]);
+    settings.loadEffectiveIncidentRule.mockImplementation(async (type: string) => (type === 'unassigned' ? unassignedRule : null));
+
+    await runIncidentActions(AFTER_0815);
+
+    expect(notifications.sendMorningSummaryNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('one project failing does not cost the remaining projects their summary', async () => {
+    const OTHER_PROJECT = '55555555-5555-4555-8555-555555555555';
+    monitor.loadMonitoredRoster.mockResolvedValue([
+      staffItem(),
+      staffItem({ staffId: 'staff-2', projectId: OTHER_PROJECT, projectName: 'Project Two' }),
+    ]);
+    settings.loadEffectiveIncidentRule.mockImplementation(async (type: string) => (type === 'unassigned' ? unassignedRule : null));
+    // The first bucket's recipient lookup throws rather than returning `failed` — a
+    // transient DB error. It must not abort the buckets that follow.
+    recipientSvc.resolveIncidentRecipients.mockImplementation(async (projectId: string | null) => {
+      if (projectId === PROJECT) throw new Error('connection terminated');
+      return { userIds: [PM], failed: false };
+    });
+
+    const result = await runIncidentActions(AFTER_0815);
+
+    expect(notifications.sendMorningSummaryNotification).toHaveBeenCalledTimes(1);
+    expect(notifications.sendMorningSummaryNotification).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: OTHER_PROJECT,
+    }));
+    expect(result.summariesSentCount).toBe(1);
+  });
+
   it('produces no incidents for summary-only conditions', async () => {
     monitor.loadMonitoredRoster.mockResolvedValue([staffItem()]);
     settings.loadEffectiveIncidentRule.mockImplementation(async (type: string) => (type === 'unassigned' ? unassignedRule : null));

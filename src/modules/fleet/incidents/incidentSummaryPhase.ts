@@ -78,11 +78,19 @@ async function sendSummaryForBucket(bucket: SummaryBucket, workDate: string, tot
   }
 }
 
-// True once a `morning_summary` run already exists for this SAST work date, whatever its
-// outcome — makes "once per due work date" hold without reloading the PR4 roster every tick.
+// True once a `morning_summary` run for this SAST work date actually got through its send
+// loop — `succeeded` or `partial_failure`. Deliberately NOT "a run exists, whatever its
+// outcome": a `failed` run sent nothing (the phase threw), and a `running` row can only be a
+// crashed run, because the cron's advisory lock already excludes a concurrent second
+// invocation. Counting either as done costs every project manager that day's summary with
+// nothing to surface it — runStatusMonitorHealthCheck only ever inspects `status_monitor`.
+// Retrying is safe: every summary carries the idempotency key
+// `fleet-morning-summary:{user}:{project}:{date}`, so claimNotification deduplicates a
+// recipient who was already reached instead of messaging them twice.
 async function morningSummaryAlreadySentFor(workDate: string): Promise<boolean> {
   const latest = await findLatestMonitorRun('morning_summary');
-  return latest !== null && sastDateString(new Date(latest.effectiveAt)) === workDate;
+  if (latest === null || sastDateString(new Date(latest.effectiveAt)) !== workDate) return false;
+  return latest.status === 'succeeded' || latest.status === 'partial_failure';
 }
 
 export async function runMorningSummaryPhase(request: IncidentActionRunnerRequest, totals: SummaryTotals): Promise<void> {
@@ -96,7 +104,17 @@ export async function runMorningSummaryPhase(request: IncidentActionRunnerReques
     const rules = await loadSummaryRules(request.effectiveAt);
     const roster = await loadMonitoredRoster(workDate, request.effectiveAt);
     const buckets = buildSummaryBuckets(roster, rules);
-    for (const bucket of buckets.values()) await sendSummaryForBucket(bucket, workDate, totals);
+    for (const bucket of buckets.values()) {
+      // Per-bucket isolation, matching runEscalationPhase: one project's failure must not
+      // cost every later bucket its summary. Without this the loop aborts mid-way and the
+      // run finalizes `failed`, so the buckets that were never reached get nothing.
+      try {
+        await sendSummaryForBucket(bucket, workDate, totals);
+      } catch (bucketError) {
+        recordPhaseError(totals, '[fleet-incident-actions] morning-summary bucket failed',
+          { runId: summaryRun.id, projectId: bucket.projectId }, bucketError);
+      }
+    }
     status = totals.errorCount > 0 || totals.notifFailed > 0 ? 'partial_failure' : 'succeeded';
   } catch (error) {
     status = 'failed';

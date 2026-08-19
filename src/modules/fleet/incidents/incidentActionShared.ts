@@ -34,7 +34,7 @@ export function sastMinutesOfDay(iso: string): number {
   return Number(parts.find((p) => p.type === 'hour')?.value ?? '0') * 60 + Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
 }
 /** Shared per-phase failure bookkeeping: count it, keep a bounded message, and log with context — never throws, never aborts the phase's loop. */
-export function recordPhaseError(totals: Totals, logLabel: string, context: { incidentId?: string; runId?: string }, error: unknown): void {
+export function recordPhaseError(totals: Totals, logLabel: string, context: { incidentId?: string; runId?: string; projectId?: string | null }, error: unknown): void {
   const message = sanitizedMessage(error);
   const subject = context.incidentId ?? context.runId ?? null;
   totals.errorCount += 1;
