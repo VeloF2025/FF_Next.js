@@ -329,6 +329,8 @@ export interface ClockEntry {
   selfieInUrl: string | null;
   selfieOutUrl: string | null;
   durationMs: number | null;
+  /** Open day exception this entry can be corrected against, if any. */
+  correctionExceptionId: string | null;
 }
 
 export interface ClockInResponse {
