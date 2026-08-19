@@ -9,7 +9,8 @@
  * visible UI — lives in `./OversightSection` (split out to stay under the
  * 200-line component cap once name resolution was added).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { OUTCOMES } from '../reviewValidation';
 import type { IncidentOutcome, IncidentRule, IncidentSeverity, IncidentType } from '../types';
 import { incidentApi, IncidentApiError } from './incidentApi';
@@ -121,11 +122,37 @@ function RulesSection({ canEdit }: { canEdit: boolean }) {
   );
 }
 export interface IncidentSettingsDialogProps { open: boolean; onClose: () => void; canEdit: boolean }
-export function IncidentSettingsDialog({ open, onClose, canEdit }: IncidentSettingsDialogProps) {
-  if (!open) return null;
+
+/**
+ * Split from the exported wrapper so the focus hooks below are unconditional — the wrapper
+ * returns null while closed, which would otherwise make them conditional hooks. Mounting
+ * fresh on each open is also what lets the opener be captured during the first render.
+ */
+function SettingsDialogBody({ onClose, canEdit }: Omit<IncidentSettingsDialogProps, 'open'>) {
+  const dialog = useRef<HTMLDivElement>(null);
+  // Captured in a lazy initializer, which runs during the first render — by the time an
+  // effect could look, autoFocus has already moved focus to the Close button.
+  const [opener] = useState<HTMLElement | null>(
+    () => (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement ? document.activeElement : null),
+  );
+
+  useEffect(() => () => { if (opener?.isConnected) opener.focus(); }, [opener]);
+
+  // Same trap IncidentReviewDrawer implements: without it Tab walks straight out of an open
+  // modal into the page behind it, and Close drops focus on document.body.
+  function handleKeys(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])') ?? []);
+    if (!focusable.length) return;
+    const first = focusable[0]!; const last = focusable.at(-1)!;
+    if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  }
+
   return (
-    <div role="dialog" aria-modal="true" aria-label="Fleet incident settings" className="fixed inset-0 z-50 overflow-auto bg-black/60 p-6"
-      onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }}>
+    <div ref={dialog} role="dialog" aria-modal="true" aria-label="Fleet incident settings" className="fixed inset-0 z-50 overflow-auto bg-black/60 p-6"
+      onKeyDown={handleKeys}>
       <div className="mx-auto max-w-3xl space-y-4 rounded-lg bg-[var(--ff-bg-primary)] p-6">
         <header className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">Fleet incident settings</h2>
@@ -136,4 +163,9 @@ export function IncidentSettingsDialog({ open, onClose, canEdit }: IncidentSetti
       </div>
     </div>
   );
+}
+
+export function IncidentSettingsDialog({ open, onClose, canEdit }: IncidentSettingsDialogProps) {
+  if (!open) return null;
+  return <SettingsDialogBody onClose={onClose} canEdit={canEdit} />;
 }

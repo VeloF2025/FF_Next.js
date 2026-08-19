@@ -108,10 +108,8 @@ describe('IncidentSettingsDialog', () => {
     fireEvent.click(submit);
     await flush();
 
-    const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST' && String(fetchMock.mock.calls[0]));
     expect(fetchMock).toHaveBeenCalledWith('/api/fleet/incidents/settings/rules', expect.objectContaining({ method: 'POST' }));
     await waitFor(() => expect(screen.getByText(/v3 — effective/)).toBeInTheDocument());
-    void post;
   });
 
   it('finds active FibreFlow users by search — never a hardcoded roster', async () => {
@@ -165,5 +163,30 @@ describe('IncidentSettingsDialog', () => {
     await flush();
     await waitFor(() => expect(screen.getByText(/Kabelo Mokoena/)).toBeInTheDocument());
     expect(screen.queryByText(/user-ended-1/)).not.toBeInTheDocument();
+  });
+
+  it('keeps Tab inside the dialog instead of letting it walk into the page behind', () => {
+    render(<IncidentSettingsDialog open onClose={vi.fn()} canEdit />);
+    const dialog = screen.getByRole('dialog', { name: 'Fleet incident settings' });
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])'));
+    const last = focusable.at(-1)!;
+    last.focus();
+
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+
+    expect(document.activeElement).toBe(focusable[0]);
+  });
+
+  it('returns focus to whatever opened it on close', () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { rerender } = render(<IncidentSettingsDialog open onClose={vi.fn()} canEdit />);
+    expect(document.activeElement).not.toBe(opener);
+    rerender(<IncidentSettingsDialog open={false} onClose={vi.fn()} canEdit />);
+
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
   });
 });
