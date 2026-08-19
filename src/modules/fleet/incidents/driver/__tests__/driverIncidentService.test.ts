@@ -194,6 +194,28 @@ describe('getDriverIncident — IDOR safety and redaction', () => {
     expect(JSON.stringify(result)).not.toMatch(/incidentType|severity|theft_after_hours_movement|accident_sos/);
   });
 
+  it('never forwards an unlisted repository field, even when the repository row actually carries one — the response is built from a named allowlist, not `{ ...item }`', async () => {
+    // This is the regression itself, not the hand-written `detailItem` fixture: feed the
+    // mocked repository a row shaped like a future regression (internal enum fields back on
+    // the object, plus a made-up internal-only field) and confirm none of it survives to the
+    // driver DTO. Against a `{ ...item, ... }` spread implementation this fails, because a
+    // spread forwards every key from `item` including ones the driver-safe type never
+    // declared — exactly how `incidentType`/`severity` leaked once before (commit fbec56448).
+    repo.findDriverIncidentDetail.mockResolvedValue({
+      ...detailItem,
+      incidentType: 'theft_after_hours_movement',
+      severity: 'critical',
+      internalNote: 'flagged by fraud team — do not show to driver',
+    });
+
+    const result = await getDriverIncident(STAFF, INCIDENT);
+
+    expect(result).not.toBeNull();
+    expect(result).not.toHaveProperty('incidentType');
+    expect(result).not.toHaveProperty('severity');
+    expect(result).not.toHaveProperty('internalNote');
+  });
+
   it('sets explanationSummary to null (no safe generator exists yet)', async () => {
     const result = await getDriverIncident(STAFF, INCIDENT);
 
@@ -213,6 +235,12 @@ describe('getDriverIncident — IDOR safety and redaction', () => {
     expect(submissionsCall?.[1]).toEqual([INCIDENT, STAFF]);
     const linksCall = db.query.mock.calls.find(([text]: [string]) => text.includes('fleet_incident_attendance_correction_links'));
     expect(linksCall?.[1]).toEqual([INCIDENT, STAFF]);
+  });
+
+  it('passes sessionStaffId to listVisibleTimeline, so the timeline read is staff-scoped even standalone', async () => {
+    await getDriverIncident(STAFF, INCIDENT);
+
+    expect(repo.listVisibleTimeline).toHaveBeenCalledWith(STAFF, INCIDENT);
   });
 
   it('marks a request-expired, still-active incident ineligible with reason "expired"', async () => {

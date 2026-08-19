@@ -16,6 +16,16 @@ import {
 } from '@/modules/fleet/incidents/driver/submissionService';
 import type { SubmitDriverResponseCommand } from '@/modules/fleet/incidents/driver/types';
 
+// `explanation` is capped at 4000 characters (see `MAX_EXPLANATION_LENGTH` in
+// `submissionService.ts`); worst-case multi-byte UTF-8 (4 bytes/char) is
+// 16kb, plus `submissionKind`/`concernCategory`/`idempotencyKey` and JSON
+// overhead. 32kb comfortably covers that with headroom, matching the
+// `/my` convention of sizing the limit to the largest legitimate payload
+// (e.g. `receipts/save.ts`'s 64kb) rather than leaving it unbounded.
+export const config = {
+  api: { bodyParser: { sizeLimit: '32kb' } },
+};
+
 type ParsedBody = Omit<SubmitDriverResponseCommand, 'incidentId'>;
 
 /**

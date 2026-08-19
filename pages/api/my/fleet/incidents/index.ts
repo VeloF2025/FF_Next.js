@@ -13,6 +13,10 @@ import {
   DriverIncidentValidationError, listDriverIncidents, type ListDriverIncidentsFilters,
 } from '@/modules/fleet/incidents/driver/driverIncidentService';
 
+export const config = {
+  api: { bodyParser: { sizeLimit: '4kb' } },
+};
+
 function parseBoolean(value: unknown): boolean { return value === 'true' || value === '1'; }
 function parseOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;

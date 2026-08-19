@@ -89,7 +89,7 @@ async function runSubmissionTransaction(
       incidentTerminalAt: locked.terminalAt, postClosureResponseEnabled: settings.postClosureResponseEnabled,
       postClosureResponseWindowDays: settings.postClosureResponseWindowDays,
     });
-    if (!eligibility.eligible) throw new DriverSubmissionNotEligibleError(eligibility.reason as ResponseIneligibleReason);
+    if (!eligibility.eligible) throw new DriverSubmissionNotEligibleError(eligibility.reason);
 
     const insertResult = await insertDriverSubmission({
       incidentId: parsed.incidentId, inputRequestId: currentRequest?.id ?? null, staffId: sessionStaffId,

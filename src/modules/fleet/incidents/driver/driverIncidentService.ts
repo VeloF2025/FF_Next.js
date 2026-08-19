@@ -29,7 +29,10 @@ export class DriverIncidentValidationError extends Error {
 }
 
 export type ResponseIneligibleReason = 'closed' | 'expired' | 'outside_window';
-export interface ResponseEligibility { eligible: boolean; reason: ResponseIneligibleReason | null }
+/** Discriminated on `eligible` so `reason` is non-null exactly when `eligible` is `false` — callers narrow with a plain `if (!eligibility.eligible)` and need no cast to read `reason`. */
+export type ResponseEligibility =
+  | { eligible: true; reason: null }
+  | { eligible: false; reason: ResponseIneligibleReason };
 export interface ComputeResponseEligibilityArgs {
   /** Server-derived current instant (ISO). */
   now: string;
@@ -186,9 +189,15 @@ export async function getDriverIncident(sessionStaffId: string, incidentId: stri
   if (!item) return null;
 
   const [timeline, ownSubmissions, ownCorrectionLinks, incidentTerminalAt] = await Promise.all([
-    listVisibleTimeline(incidentId),
+    listVisibleTimeline(sessionStaffId, incidentId),
     loadOwnSubmissions(sessionStaffId, incidentId),
     loadOwnCorrectionLinks(sessionStaffId, incidentId),
+    // NOTE: this read and `findDriverIncidentDetail`'s own `resolved_at`
+    // read above are two separate, untransacted SELECTs. A concurrent
+    // closure between them can make this payload internally inconsistent
+    // (e.g. `lifecyclePresentation: "Open"` alongside
+    // `responseIneligibleReason: "closed"`). Read-only and not exploitable
+    // — left as-is deliberately, not an oversight.
     loadIncidentTerminalAt(sessionStaffId, incidentId),
   ]);
 
@@ -198,8 +207,19 @@ export async function getDriverIncident(sessionStaffId: string, incidentId: stri
     postClosureResponseWindowDays: settings.postClosureResponseWindowDays,
   });
 
+  // Named field-by-field rather than `{ ...item, ... }`: a spread would
+  // forward any field `findDriverIncidentDetail` ever adds in future
+  // (`incidentType`/`severity` already leaked into this DTO once — commit
+  // fbec56448) with no compiler signal. Naming each driver-safe field here
+  // means a new upstream field is excluded by default, not forwarded by
+  // default — see `driverIncidentService.test.ts`'s
+  // "never forwards an unlisted repository field" test for the regression
+  // this guards against.
   return {
-    ...item,
+    id: item.id, incidentReference: item.incidentReference, neutralLabel: item.neutralLabel,
+    projectLabel: item.projectLabel, siteLabel: item.siteLabel, detectedAt: item.detectedAt,
+    conditionState: item.conditionState, lifecyclePresentation: item.lifecyclePresentation,
+    driverInputState: item.driverInputState, currentRequest: item.currentRequest, respondedAt: item.respondedAt,
     // No safe generator exists yet for a plain-language "why this incident
     // was flagged" summary — the only raw material is `evidenceSnapshot`,
     // which design §4/§9 forbids sending to a driver (it can carry

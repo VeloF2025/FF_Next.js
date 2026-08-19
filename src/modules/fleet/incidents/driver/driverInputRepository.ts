@@ -217,16 +217,30 @@ function mapTimelineLabel(source: TimelineRow['source'], typeKey: string): strin
   return source === 'evidence' ? (EVIDENCE_TIMELINE_LABELS[typeKey] ?? 'Evidence added') : (ACTION_TIMELINE_LABELS[typeKey] ?? 'Update');
 }
 
-/** Every driver-visible action/evidence row for the incident (`visibility <> 'internal'`, i.e. `shared_with_driver` or `driver_submitted`), newest first. The server applies this filter — never the client (design §9). */
-export async function listVisibleTimeline(incidentId: string): Promise<DriverIncidentTimelineEntry[]> {
+/**
+ * Every driver-visible action/evidence row for the incident (`visibility <>
+ * 'internal'`, i.e. `shared_with_driver` or `driver_submitted`), newest
+ * first. The server applies this filter — never the client (design §9).
+ *
+ * Scoped by `staffId` in SQL (joined against `fleet_operational_incidents`)
+ * so this query is safe standalone rather than depending entirely on its
+ * one current caller (`getDriverIncidentService.getDriverIncident`) having
+ * already confirmed ownership — mirroring `loadOwnSubmissions`/
+ * `loadOwnCorrectionLinks`'s defense-in-depth `staff_id` predicate.
+ */
+export async function listVisibleTimeline(staffId: string, incidentId: string): Promise<DriverIncidentTimelineEntry[]> {
   const rows = await query<TimelineRow>(
     `SELECT id, 'action' AS source, action_type AS type_key, visibility, occurred_at, note
-       FROM fleet_operational_incident_actions WHERE incident_id = $1::uuid AND visibility <> 'internal'
+       FROM fleet_operational_incident_actions
+       WHERE incident_id = $1::uuid AND visibility <> 'internal'
+         AND EXISTS (SELECT 1 FROM fleet_operational_incidents i WHERE i.id = $1::uuid AND i.staff_id = $2::uuid)
      UNION ALL
      SELECT id, 'evidence' AS source, evidence_type AS type_key, visibility, created_at AS occurred_at, description AS note
-       FROM fleet_operational_incident_evidence WHERE incident_id = $1::uuid AND visibility <> 'internal'
+       FROM fleet_operational_incident_evidence
+       WHERE incident_id = $1::uuid AND visibility <> 'internal'
+         AND EXISTS (SELECT 1 FROM fleet_operational_incidents i WHERE i.id = $1::uuid AND i.staff_id = $2::uuid)
      ORDER BY occurred_at DESC`,
-    [incidentId],
+    [incidentId, staffId],
   );
   return rows.map((row) => ({
     id: row.id, kind: mapTimelineKind(row.source, row.type_key),

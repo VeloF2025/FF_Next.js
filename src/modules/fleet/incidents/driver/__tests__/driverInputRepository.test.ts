@@ -332,7 +332,7 @@ describe('listVisibleTimeline', () => {
       { id: 'a2', source: 'action', type_key: 'driver_input_requested', visibility: 'shared_with_driver', occurred_at: '2026-08-10T08:00:00.000Z', note: 'Please explain the late start' },
     ]);
 
-    const timeline = await listVisibleTimeline(INCIDENT);
+    const timeline = await listVisibleTimeline(STAFF, INCIDENT);
 
     expect(timeline.map((entry) => entry.id)).toEqual(['e1', 'a1', 'a2']);
     expect(timeline[1]).toMatchObject({ kind: 'submission', visibility: 'driver_submitted' });
@@ -340,7 +340,7 @@ describe('listVisibleTimeline', () => {
     expect(timeline[0]).toMatchObject({ kind: 'evidence' });
     const [text, params] = db.query.mock.calls[0]!;
     expect(text).toContain("visibility <> 'internal'");
-    expect(params).toEqual([INCIDENT]);
+    expect(params).toEqual([INCIDENT, STAFF]);
   });
 
   it('delegates chronological ordering to SQL, and says so in the query', async () => {
@@ -350,7 +350,7 @@ describe('listVisibleTimeline', () => {
     // has to be asserted where it actually lives, in the SQL text.
     db.query.mockResolvedValue([]);
 
-    await listVisibleTimeline(INCIDENT);
+    await listVisibleTimeline(STAFF, INCIDENT);
 
     const [text] = db.query.mock.calls[0]!;
     expect(text).toMatch(/ORDER BY\s+occurred_at\s+DESC/i);
@@ -366,8 +366,18 @@ describe('listVisibleTimeline', () => {
       { id: 'new', source: 'action', type_key: 'driver_response_received', visibility: 'driver_submitted', occurred_at: '2026-08-10T09:00:00.000Z', note: 'later' },
     ]);
 
-    const timeline = await listVisibleTimeline(INCIDENT);
+    const timeline = await listVisibleTimeline(STAFF, INCIDENT);
 
     expect(timeline.map((entry) => entry.id)).toEqual(['old', 'new']);
+  });
+
+  it('scopes the timeline query to the supplied staff id in SQL, so the query is safe even if a future caller reorders ownership checks', async () => {
+    db.query.mockResolvedValue([]);
+
+    await listVisibleTimeline(STAFF, INCIDENT);
+
+    const [text, params] = db.query.mock.calls[0]!;
+    expect(text).toMatch(/staff_id = \$2::uuid/);
+    expect(params).toEqual([INCIDENT, STAFF]);
   });
 });
