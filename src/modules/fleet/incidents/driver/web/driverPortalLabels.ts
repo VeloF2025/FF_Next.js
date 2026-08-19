@@ -36,20 +36,6 @@ export const CONCERN_CATEGORY_LABELS: Record<DriverConcernCategory, string> = {
   other: 'Something else',
 };
 
-/**
- * Shared `localStorage` key for the Attendance-correction-link retry gap
- * fix (PR7 Task 7): `pages/my/attendance/corrections/new.tsx` writes to
- * this key when a Fleet-side link POST fails after Attendance already
- * accepted the correction, and `DriverIncidentDetail.tsx` reads it back so
- * the retry survives navigating away (or closing the app) — see both
- * files' own comments for the full story. Lives here (a non-component
- * file) rather than in `DriverIncidentDetail.tsx` itself so re-exporting
- * it does not trip `react-refresh/only-export-components`.
- */
-export function pendingCorrectionStorageKey(incidentId: string): string {
-  return `fleet-incident-pending-correction:${incidentId}`;
-}
-
 /** `en-ZA`, SAST — matches `AttendanceCorrectionLink.tsx`/`corrections.tsx`'s existing date conventions in this portal. */
 export function formatIncidentDateTime(iso: string): string {
   return new Intl.DateTimeFormat('en-ZA', {

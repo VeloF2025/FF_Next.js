@@ -149,7 +149,17 @@ export interface DriverEvidenceResult {
 
 export type AttendanceCorrectionEligibility =
   | { eligible: true; exceptionId: string; entryId: string }
-  | { eligible: false; reason: 'no_required_exception' | 'period_locked' | 'outside_response_window' };
+  /**
+   * `retryCorrectionId`: a correction the driver already submitted for this
+   * work date that Fleet has not yet linked to this incident, or `null` if
+   * none exists — the server-derived fact the driver portal offers a
+   * "retry linking" action for. Replaces a former client-side `localStorage`
+   * marker written on link failure, which had a silent permanent-failure
+   * mode when the *write* itself failed (private mode, storage full, or the
+   * driver finishing the correction on a different device).
+   */
+  | { eligible: false; reason: 'no_required_exception'; retryCorrectionId: string | null }
+  | { eligible: false; reason: 'period_locked' | 'outside_response_window' };
 
 export interface AttendanceCorrectionLinkResult {
   linkId: string;

@@ -88,6 +88,60 @@ async function findRequiredExceptionForWorkDate(staffId: string, workDate: strin
   );
 }
 
+interface SubmittedAdjustmentRow extends Record<string, unknown> { adjustment_id: string }
+
+/**
+ * The Attendance correction already submitted for `staffId` on `workDate`,
+ * if any — independent of `CORRECTION_ELIGIBILITY_SQL`, which requires
+ * `de.adjustment_id IS NULL` and therefore excludes exactly the row a
+ * driver has already submitted a correction for. Mirrors that shared
+ * predicate's `ds.result_version = de.result_version` guard (the same
+ * disambiguator across recomputations covering multiple exceptions on one
+ * work date), so a stale exception row from a superseded computation never
+ * surfaces a correction here.
+ */
+async function findSubmittedAdjustmentForWorkDate(staffId: string, workDate: string): Promise<string | null> {
+  const row = await queryOne<SubmittedAdjustmentRow>(
+    `SELECT de.adjustment_id::text AS adjustment_id
+     FROM attendance_day_exceptions de
+     JOIN attendance_daily_summaries ds
+       ON ds.staff_id = de.staff_id AND ds.work_date = de.work_date
+     WHERE de.staff_id = $1::uuid
+       AND de.kind = 'missing_clock_out'
+       AND de.work_date = $2::date
+       AND de.adjustment_id IS NOT NULL
+       AND ds.result_version = de.result_version
+     LIMIT 1`,
+    [staffId, workDate],
+  );
+  return row?.adjustment_id ?? null;
+}
+
+/** Whether `attendanceCorrectionId` already has a `fleet_incident_attendance_correction_links` row for `incidentId` specifically — the link table's uniqueness is per `(incident_id, attendance_correction_id)`, so a correction already linked to a *different* incident must still be reported as retryable here. */
+async function isLinkedToIncident(incidentId: string, attendanceCorrectionId: string): Promise<boolean> {
+  const row = await queryOne(
+    `SELECT 1 FROM fleet_incident_attendance_correction_links
+     WHERE incident_id = $1::uuid AND attendance_correction_id = $2::uuid`,
+    [incidentId, attendanceCorrectionId],
+  );
+  return row !== null;
+}
+
+/**
+ * Server-derived replacement for what used to be a client-side
+ * `localStorage` marker: the one correction (if any) the driver already
+ * submitted for the incident's work date that is not yet linked to THIS
+ * incident. `staffId`-scoped throughout, so this can never surface another
+ * driver's correction.
+ */
+async function findRetryableCorrectionId(staffId: string, incidentId: string, workDate: string | null): Promise<string | null> {
+  if (!workDate) return null;
+  const adjustmentId = await findSubmittedAdjustmentForWorkDate(staffId, workDate);
+  if (!adjustmentId) return null;
+  if (await isLinkedToIncident(incidentId, adjustmentId)) return null;
+  return adjustmentId;
+}
+
 /** Mirrors `../../attendance/workflow/requiredActionCorrection.ts`'s own `period_locked` computation. */
 async function isPeriodLocked(workDate: string): Promise<boolean> {
   const row = await queryOne<{ locked: boolean }>(
@@ -115,7 +169,10 @@ export async function getAttendanceCorrectionEligibility(
   if (!incident) throw new IncidentNotFoundError(`No incident found for id ${incidentId}`);
 
   const exception = await findRequiredExceptionForWorkDate(sessionStaffId, incident.workDate);
-  if (!exception) return { eligible: false, reason: 'no_required_exception' };
+  if (!exception) {
+    const retryCorrectionId = await findRetryableCorrectionId(sessionStaffId, incidentId, incident.workDate);
+    return { eligible: false, reason: 'no_required_exception', retryCorrectionId };
+  }
 
   // Evaluated here so the query order is unchanged, but REPORTED below the response-window
   // check. `period_locked` reads as actionable — "contact your supervisor to request an

@@ -11,46 +11,35 @@
  * plan's Task 7 file list): once a driver's Attendance correction
  * submission succeeds but the Fleet-side link POST fails, the retry
  * button on `pages/my/attendance/corrections/new.tsx` only lives in that
- * page's own React state — leaving once discards it forever. That page
- * now also records the failed attempt in `localStorage` keyed by incident
- * id; this component reads it back so the driver has a durable retry path
- * that survives navigating away (and even closing the app), using the
- * same `linkMyAttendanceCorrection` call that page already uses.
+ * page's own React state — leaving once discards it forever. This
+ * component offers its own retry, driven by the same
+ * `attendance-correction-link` GET the `AttendanceCorrectionLink` widget
+ * below already calls: when the incident's work date has a correction the
+ * driver already submitted that Fleet has not yet linked
+ * (`retryCorrectionId` on `AttendanceCorrectionEligibility`, see
+ * `../types.ts` and `../attendanceCorrectionLinkService.ts`'s
+ * `findRetryableCorrectionId`), that fact is server-derived and durable —
+ * unlike a `localStorage` marker, it survives the driver finishing the
+ * correction on a different device, and it cannot go stale from a failed
+ * client-side write.
  */
-import { log } from '@/lib/logger';
 import React from 'react';
-import type { DriverIncidentDetail as DriverIncidentDetailDto } from '../types';
+import type { AttendanceCorrectionEligibility, DriverIncidentDetail as DriverIncidentDetailDto } from '../types';
 import { AttendanceCorrectionLink } from './AttendanceCorrectionLink';
 import { DriverResponseForm } from './DriverResponseForm';
-import { DriverIncidentApiError, getMyFleetIncident, linkMyAttendanceCorrection } from './driverIncidentApi';
 import {
-  DRIVER_INPUT_STATE_LABELS, RESPONSE_INELIGIBLE_COPY, formatIncidentDateTime, pendingCorrectionStorageKey,
-} from './driverPortalLabels';
+  DriverIncidentApiError, fetchAttendanceCorrectionEligibility, getMyFleetIncident, linkMyAttendanceCorrection,
+} from './driverIncidentApi';
+import { DRIVER_INPUT_STATE_LABELS, RESPONSE_INELIGIBLE_COPY, formatIncidentDateTime } from './driverPortalLabels';
 
 export interface DriverIncidentDetailProps {
   incidentId: string;
 }
 
-function readPendingCorrectionId(incidentId: string): string | null {
-  try {
-    return window.localStorage.getItem(pendingCorrectionStorageKey(incidentId));
-  } catch {
-    return null; // Storage unavailable (private mode, SSR) — the retry section simply does not offer itself.
-  }
-}
-
-function clearPendingCorrectionId(incidentId: string): void {
-  try {
-    window.localStorage.removeItem(pendingCorrectionStorageKey(incidentId));
-  } catch (error) {
-    // Not rethrown: the link itself already succeeded, so failing to tidy the marker must not
-    // present as a failed retry. Logged rather than discarded because the consequence is
-    // visible — a stale marker keeps offering "Retry linking correction" for a correction
-    // that is already linked, and an empty catch would leave nobody able to explain why.
-    log.warn('could not clear the pending correction-link marker', {
-      incidentId, error: error instanceof Error ? error.message : String(error),
-    }, 'DriverIncidentDetail');
-  }
+/** Extracts the retryable correction id (if any) from an eligibility result — `null` for every other shape, including a fetch failure (`eligibility === null`), in which case the retry section simply does not offer itself. `AttendanceCorrectionLink` below makes this exact same call and already renders a visible error for this endpoint, so a failure here never needs its own separate surfacing. */
+function retryableCorrectionId(eligibility: AttendanceCorrectionEligibility | null): string | null {
+  if (!eligibility || eligibility.eligible || eligibility.reason !== 'no_required_exception') return null;
+  return eligibility.retryCorrectionId;
 }
 
 type LoadState =
@@ -61,13 +50,19 @@ type LoadState =
 
 export function DriverIncidentDetail({ incidentId }: DriverIncidentDetailProps): React.ReactElement {
   const [state, setState] = React.useState<LoadState>({ status: 'loading' });
-  const [pendingCorrectionId, setPendingCorrectionId] = React.useState<string | null>(null);
+  const [eligibility, setEligibility] = React.useState<AttendanceCorrectionEligibility | null>(null);
   const [retryStatus, setRetryStatus] = React.useState<'idle' | 'retrying' | 'success' | 'error'>('idle');
   const [retryError, setRetryError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    setPendingCorrectionId(readPendingCorrectionId(incidentId));
+  const loadEligibility = React.useCallback((): (() => void) => {
+    let cancelled = false;
+    fetchAttendanceCorrectionEligibility(incidentId)
+      .then((result) => { if (!cancelled) setEligibility(result); })
+      .catch(() => { if (!cancelled) setEligibility(null); });
+    return () => { cancelled = true; };
   }, [incidentId]);
+
+  React.useEffect(() => loadEligibility(), [loadEligibility]);
 
   const loadDetail = React.useCallback((): (() => void) => {
     let cancelled = false;
@@ -87,20 +82,25 @@ export function DriverIncidentDetail({ incidentId }: DriverIncidentDetailProps):
 
   React.useEffect(() => loadDetail(), [loadDetail]);
 
+  const pendingCorrectionId = retryableCorrectionId(eligibility);
+
   const handleRetryLink = React.useCallback(async () => {
     if (!pendingCorrectionId) return;
     setRetryStatus('retrying');
     setRetryError(null);
     try {
       await linkMyAttendanceCorrection(incidentId, pendingCorrectionId);
-      clearPendingCorrectionId(incidentId);
-      setPendingCorrectionId(null);
       setRetryStatus('success');
+      // Refetches so the server-derived `retryCorrectionId` clears once the
+      // link is confirmed — `retryStatus === 'success'` already hides the
+      // retry panel below regardless, so this is a consistency refresh, not
+      // something the UI blocks on.
+      loadEligibility();
     } catch (error) {
       setRetryStatus('error');
       setRetryError(error instanceof Error ? error.message : 'Could not link the correction. You can try again.');
     }
-  }, [incidentId, pendingCorrectionId]);
+  }, [incidentId, pendingCorrectionId, loadEligibility]);
 
   if (state.status === 'loading') return <div className="py-8 text-center text-sm text-neutral-400">Loading…</div>;
   if (state.status === 'not-found') {

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   getMyFleetIncident: vi.fn(),
   linkMyAttendanceCorrection: vi.fn(),
+  fetchAttendanceCorrectionEligibility: vi.fn(),
   DriverIncidentApiError: class DriverIncidentApiError extends Error {
     constructor(public status: number, public code: string, message: string) { super(message); this.name = 'DriverIncidentApiError'; }
   },
@@ -23,7 +24,8 @@ vi.mock('../DriverResponseForm', () => ({
 import { DriverIncidentDetail } from '../DriverIncidentDetail';
 
 const INCIDENT = '11111111-1111-4111-8111-111111111111';
-const PENDING_KEY = `fleet-incident-pending-correction:${INCIDENT}`;
+const CORRECTION = '55555555-5555-4555-8555-555555555555';
+const NO_RETRY_ELIGIBILITY = { eligible: false as const, reason: 'no_required_exception' as const, retryCorrectionId: null };
 
 const BASE_DETAIL = {
   id: INCIDENT, incidentReference: 'INC-LATE-20260810-ABC123', neutralLabel: 'Attendance timing needs review',
@@ -36,8 +38,11 @@ const BASE_DETAIL = {
   enabledConcernCategories: ['other'],
 };
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); window.localStorage.clear(); });
-beforeEach(() => { vi.clearAllMocks(); window.localStorage.clear(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+beforeEach(() => {
+  vi.clearAllMocks();
+  api.fetchAttendanceCorrectionEligibility.mockResolvedValue(NO_RETRY_ELIGIBILITY);
+});
 
 describe('DriverIncidentDetail', () => {
   it('shows a loading state before the fetch resolves', () => {
@@ -99,41 +104,56 @@ describe('DriverIncidentDetail', () => {
     expect(container.textContent).not.toMatch(/violation|fraud|misconduct|offence/i);
   });
 
-  describe('Attendance correction link retry (closing the known navigate-away gap)', () => {
-    it('offers no retry section when nothing is pending', async () => {
+  describe('Attendance correction link retry (server-derived, closing the known navigate-away gap)', () => {
+    it('offers no retry section when the server reports nothing to retry', async () => {
       api.getMyFleetIncident.mockResolvedValue(BASE_DETAIL);
+      api.fetchAttendanceCorrectionEligibility.mockResolvedValue(NO_RETRY_ELIGIBILITY);
       render(<DriverIncidentDetail incidentId={INCIDENT} />);
       await screen.findByText('INC-LATE-20260810-ABC123');
       expect(screen.queryByRole('button', { name: /retry linking/i })).not.toBeInTheDocument();
     });
 
-    it('offers a retry when a previous Fleet-side link attempt failed and was recorded for this incident', async () => {
-      window.localStorage.setItem(PENDING_KEY, '55555555-5555-4555-8555-555555555555');
+    it('offers no retry section when the incident is fully eligible for a new correction', async () => {
       api.getMyFleetIncident.mockResolvedValue(BASE_DETAIL);
+      api.fetchAttendanceCorrectionEligibility.mockResolvedValue({ eligible: true, exceptionId: 'exc-1', entryId: 'entry-1' });
+      render(<DriverIncidentDetail incidentId={INCIDENT} />);
+      await screen.findByText('INC-LATE-20260810-ABC123');
+      expect(screen.queryByRole('button', { name: /retry linking/i })).not.toBeInTheDocument();
+    });
+
+    it('offers a retry when the server reports a submitted correction not yet linked to this incident', async () => {
+      api.getMyFleetIncident.mockResolvedValue(BASE_DETAIL);
+      api.fetchAttendanceCorrectionEligibility.mockResolvedValue({
+        eligible: false, reason: 'no_required_exception', retryCorrectionId: CORRECTION,
+      });
       render(<DriverIncidentDetail incidentId={INCIDENT} />);
 
       expect(await screen.findByRole('button', { name: /retry linking/i })).toBeVisible();
     });
 
-    it('re-attempts the link with the stored correction id and clears the pending flag on success', async () => {
-      window.localStorage.setItem(PENDING_KEY, '55555555-5555-4555-8555-555555555555');
+    it('re-attempts the link with the server-reported correction id and hides the panel on success', async () => {
       api.getMyFleetIncident.mockResolvedValue(BASE_DETAIL);
+      api.fetchAttendanceCorrectionEligibility.mockResolvedValue({
+        eligible: false, reason: 'no_required_exception', retryCorrectionId: CORRECTION,
+      });
       api.linkMyAttendanceCorrection.mockResolvedValue({
-        linkId: 'link-1', incidentId: INCIDENT, attendanceCorrectionId: '55555555-5555-4555-8555-555555555555', correctionState: 'pending',
+        linkId: 'link-1', incidentId: INCIDENT, attendanceCorrectionId: CORRECTION, correctionState: 'pending',
       });
       const user = userEvent.setup();
       render(<DriverIncidentDetail incidentId={INCIDENT} />);
 
       await user.click(await screen.findByRole('button', { name: /retry linking/i }));
 
-      await waitFor(() => expect(api.linkMyAttendanceCorrection).toHaveBeenCalledWith(INCIDENT, '55555555-5555-4555-8555-555555555555'));
-      await waitFor(() => expect(window.localStorage.getItem(PENDING_KEY)).toBeNull());
+      await waitFor(() => expect(api.linkMyAttendanceCorrection).toHaveBeenCalledWith(INCIDENT, CORRECTION));
       expect(screen.getByText(/linked/i)).toBeVisible();
+      expect(screen.queryByRole('button', { name: /retry linking/i })).not.toBeInTheDocument();
     });
 
-    it('keeps the pending flag and lets the driver retry again when the retry itself fails', async () => {
-      window.localStorage.setItem(PENDING_KEY, '55555555-5555-4555-8555-555555555555');
+    it('lets the driver retry again when the retry itself fails, without discarding the retryable correction id', async () => {
       api.getMyFleetIncident.mockResolvedValue(BASE_DETAIL);
+      api.fetchAttendanceCorrectionEligibility.mockResolvedValue({
+        eligible: false, reason: 'no_required_exception', retryCorrectionId: CORRECTION,
+      });
       api.linkMyAttendanceCorrection.mockRejectedValue(new api.DriverIncidentApiError(500, 'INTERNAL_ERROR', 'still failing'));
       const user = userEvent.setup();
       render(<DriverIncidentDetail incidentId={INCIDENT} />);
@@ -141,8 +161,8 @@ describe('DriverIncidentDetail', () => {
       await user.click(await screen.findByRole('button', { name: /retry linking/i }));
 
       await waitFor(() => expect(api.linkMyAttendanceCorrection).toHaveBeenCalledTimes(1));
-      expect(window.localStorage.getItem(PENDING_KEY)).toBe('55555555-5555-4555-8555-555555555555');
       expect(await screen.findByRole('button', { name: /retry linking/i })).toBeVisible();
+      expect(screen.getByText(/still failing/i)).toBeVisible();
     });
   });
 });

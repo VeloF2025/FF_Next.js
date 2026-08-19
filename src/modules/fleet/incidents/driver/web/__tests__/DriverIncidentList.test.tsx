@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -113,16 +113,24 @@ describe('DriverIncidentList', () => {
 });
 
 describe('DriverIncidentList — proving the disciplinary-language guard actually guards something', () => {
-  it('WOULD fail the language assertion if a disciplinary word were rendered (sanity check on the matcher itself)', async () => {
+  it('makes the real guard assertion fail once a disciplinary word is actually present, and pass again once it is removed', async () => {
     api.listMyFleetIncidents.mockResolvedValue(listResponse([ITEM_REQUESTED]));
-    render(<DriverIncidentList />);
+    const { container } = render(<DriverIncidentList />);
     const row = await screen.findByText('INC-LATE-20260810-ABC123');
-    // Injecting the forbidden word directly proves the /violation|fraud|misconduct|offence/i
-    // matcher used above is not a tautology against this fixture.
+
+    // Baseline: the SAME assertion the guard test above runs currently passes.
+    expect(container.textContent).not.toMatch(/violation|fraud|misconduct|offence/i);
+
     const probe = document.createElement('span');
     probe.textContent = 'violation';
     row.closest('li')?.appendChild(probe);
-    expect(within(row.closest('li') as HTMLElement).getByText('violation').textContent).toMatch(/violation/i);
+
+    // With the forbidden word actually present in the DOM, that exact assertion now fails —
+    // proving the guard test's matcher is not a tautology against this fixture, and would
+    // have caught a real regression (the guard's own assertion deleted, or the word rendered).
+    expect(() => expect(container.textContent).not.toMatch(/violation|fraud|misconduct|offence/i)).toThrow();
+
     probe.remove();
+    expect(container.textContent).not.toMatch(/violation|fraud|misconduct|offence/i);
   });
 });

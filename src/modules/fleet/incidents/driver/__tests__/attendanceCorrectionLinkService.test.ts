@@ -82,13 +82,14 @@ describe('getAttendanceCorrectionEligibility', () => {
     expect(params).toEqual([INCIDENT, OTHER_STAFF]);
   });
 
-  it('reports no_required_exception when no open missing_clock_out exception matches the incident work date', async () => {
+  it('reports no_required_exception with no retry when no open exception matches and no correction was ever submitted for this work date', async () => {
     db.queryOne
       .mockResolvedValueOnce(ownedIncidentRow())
-      .mockResolvedValueOnce(null); // exception lookup
+      .mockResolvedValueOnce(null) // exception lookup
+      .mockResolvedValueOnce(null); // submitted-adjustment lookup
 
     await expect(getAttendanceCorrectionEligibility(INCIDENT, STAFF)).resolves.toEqual({
-      eligible: false, reason: 'no_required_exception',
+      eligible: false, reason: 'no_required_exception', retryCorrectionId: null,
     });
   });
 
@@ -96,9 +97,67 @@ describe('getAttendanceCorrectionEligibility', () => {
     db.queryOne.mockResolvedValueOnce(ownedIncidentRow({ work_date: null }));
 
     await expect(getAttendanceCorrectionEligibility(INCIDENT, STAFF)).resolves.toEqual({
-      eligible: false, reason: 'no_required_exception',
+      eligible: false, reason: 'no_required_exception', retryCorrectionId: null,
     });
     expect(db.queryOne).toHaveBeenCalledTimes(1);
+  });
+
+  describe('retryCorrectionId (server-derived replacement for the removed localStorage marker)', () => {
+    it('offers the correction the driver already submitted for this work date when Fleet has not yet linked it to this incident', async () => {
+      db.queryOne
+        .mockResolvedValueOnce(ownedIncidentRow())
+        .mockResolvedValueOnce(null) // exception lookup: none open (already submitted)
+        .mockResolvedValueOnce({ adjustment_id: CORRECTION }) // submitted-adjustment lookup
+        .mockResolvedValueOnce(null); // not yet linked to this incident
+
+      await expect(getAttendanceCorrectionEligibility(INCIDENT, STAFF)).resolves.toEqual({
+        eligible: false, reason: 'no_required_exception', retryCorrectionId: CORRECTION,
+      });
+    });
+
+    it('does not offer a retry once the correction is already linked to this incident', async () => {
+      db.queryOne
+        .mockResolvedValueOnce(ownedIncidentRow())
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ adjustment_id: CORRECTION })
+        .mockResolvedValueOnce({ present: 1 }); // link row exists for (incident, correction)
+
+      await expect(getAttendanceCorrectionEligibility(INCIDENT, STAFF)).resolves.toEqual({
+        eligible: false, reason: 'no_required_exception', retryCorrectionId: null,
+      });
+    });
+
+    it('still offers the retry when the correction is already linked to a DIFFERENT incident, since the link key is per (incident, correction)', async () => {
+      db.queryOne
+        .mockResolvedValueOnce(ownedIncidentRow())
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ adjustment_id: CORRECTION })
+        .mockResolvedValueOnce(null); // no link row for THIS incident id specifically
+
+      await expect(getAttendanceCorrectionEligibility(INCIDENT, STAFF)).resolves.toEqual({
+        eligible: false, reason: 'no_required_exception', retryCorrectionId: CORRECTION,
+      });
+
+      const [linkSql, linkParams] = db.queryOne.mock.calls[3]!;
+      expect(linkSql).toMatch(/fleet_incident_attendance_correction_links/);
+      expect(linkParams).toEqual([INCIDENT, CORRECTION]);
+    });
+
+    it('scopes the submitted-adjustment lookup to the session staff id, so a driver can never see or retry another staff member\'s correction', async () => {
+      db.queryOne
+        .mockResolvedValueOnce(ownedIncidentRow())
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null); // scoped to STAFF: another driver's submitted correction never matches
+
+      await expect(getAttendanceCorrectionEligibility(INCIDENT, STAFF)).resolves.toEqual({
+        eligible: false, reason: 'no_required_exception', retryCorrectionId: null,
+      });
+
+      const [sql, params] = db.queryOne.mock.calls[2]!;
+      expect(sql).toMatch(/de\.staff_id = \$1::uuid/);
+      expect(sql).toMatch(/ds\.result_version = de\.result_version/);
+      expect(params).toEqual([STAFF, WORK_DATE]);
+    });
   });
 
   it('queries Attendance using the real shared eligibility predicate, not a duplicated copy of it', async () => {

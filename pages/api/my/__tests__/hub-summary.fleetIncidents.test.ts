@@ -27,8 +27,10 @@ const mocks = vi.hoisted(() => ({
   findLatestReceiptForStaff: vi.fn().mockResolvedValue(null),
   findRequiredAttendanceAction: vi.fn().mockResolvedValue(null),
   listDriverIncidents: vi.fn().mockResolvedValue({ incidents: [], total: 0, recentWindowDays: 90, historyWindowDays: 365 }),
+  logWarn: vi.fn(),
 }));
 
+vi.mock('@/lib/logger', () => ({ log: { warn: mocks.logWarn, error: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
 vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
 vi.mock('@/modules/attendance/portal/clockUtils', () => ({
   findOpenEntry: mocks.findOpenEntry, findActiveVehicleAssignment: mocks.findActiveVehicleAssignment, sastWorkDate: mocks.sastWorkDate,
@@ -100,5 +102,33 @@ describe('GET /api/my/hub-summary — fleetIncidents', () => {
     expect((res.body as { data: { fleetIncidents: { activeCount: number; inputRequestedCount: number } } }).data.fleetIncidents).toEqual({
       inputRequestedCount: 0, activeCount: 0,
     });
+  });
+
+  it('counts only the returned page (never fetches beyond the route\'s own 100-item limit) when total exceeds it, but logs the truncation for visibility', async () => {
+    const incidents = Array.from({ length: 100 }, (_, i) => ({
+      lifecyclePresentation: 'Open', driverInputState: i === 0 ? 'requested' : 'not_requested',
+    }));
+    mocks.listDriverIncidents.mockResolvedValue({ incidents, total: 137, recentWindowDays: 90, historyWindowDays: 365 });
+
+    const res = await call();
+
+    expect(mocks.listDriverIncidents).toHaveBeenCalledWith(SESSION.staffId, expect.objectContaining({ limit: 100 }));
+    const fleetIncidents = (res.body as { data: { fleetIncidents: { activeCount: number; inputRequestedCount: number } } }).data.fleetIncidents;
+    expect(fleetIncidents).toEqual({ inputRequestedCount: 1, activeCount: 100 });
+    expect(mocks.logWarn).toHaveBeenCalledWith(
+      expect.stringContaining('truncated'),
+      expect.objectContaining({ staffId: SESSION.staffId, total: 137, countedIncidents: 100 }),
+    );
+  });
+
+  it('does not log a truncation warning when the returned page already covers the full total', async () => {
+    mocks.listDriverIncidents.mockResolvedValue({
+      incidents: [{ lifecyclePresentation: 'Open', driverInputState: 'requested' }],
+      total: 1, recentWindowDays: 90, historyWindowDays: 365,
+    });
+
+    await call();
+
+    expect(mocks.logWarn).not.toHaveBeenCalledWith(expect.stringContaining('truncated'), expect.anything());
   });
 });
