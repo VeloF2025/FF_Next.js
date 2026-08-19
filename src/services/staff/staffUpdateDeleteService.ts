@@ -71,6 +71,7 @@ interface UpdateFields {
   salary: unknown; hourlyRate: unknown; salaryGrade: unknown;
   skills: string | undefined; specializations: string | undefined;
   notes: unknown; bio: unknown;
+  nationality: unknown;
   saIdNumber: unknown; idNumber: unknown; passportNumber: unknown; passportCountry: unknown;
   passportExpiry: unknown; workPermitNumber: unknown; workPermitExpiry: unknown;
   emergencyContactJson: string | undefined; emergencyContactRelationship: unknown;
@@ -123,6 +124,7 @@ async function extractFields(updates: StaffUpdateInput, sql: ReturnType<typeof g
     salaryGrade: fv(updates, 'salaryGrade', 'salary_grade'),
     skills: jv(updates, 'skills'), specializations: jv(updates, 'specializations'),
     notes: fv(updates, 'notes'), bio: fv(updates, 'bio'),
+    nationality: fv(updates, 'nationality'),
     saIdNumber: fv(updates, 'saIdNumber', 'sa_id_number'),
     idNumber: fv(updates, 'idNumber', 'id_number'),
     passportNumber: fv(updates, 'passportNumber', 'passport_number'),
@@ -205,6 +207,7 @@ export async function updateStaff(staffId: string, updates: StaffUpdateInput): P
       specializations = CASE WHEN ${f.specializations !== undefined} THEN ${f.specializations}::jsonb ELSE specializations END,
       notes = CASE WHEN ${f.notes !== undefined} THEN ${f.notes} ELSE notes END,
       bio = CASE WHEN ${f.bio !== undefined} THEN ${f.bio} ELSE bio END,
+      nationality = CASE WHEN ${f.nationality !== undefined} THEN ${f.nationality} ELSE nationality END,
       sa_id_number = CASE WHEN ${f.saIdNumber !== undefined} THEN ${f.saIdNumber} ELSE sa_id_number END,
       id_number = CASE WHEN ${f.idNumber !== undefined} THEN ${f.idNumber} ELSE id_number END,
       passport_number = CASE WHEN ${f.passportNumber !== undefined} THEN ${f.passportNumber} ELSE passport_number END,

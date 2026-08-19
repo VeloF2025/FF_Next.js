@@ -116,10 +116,30 @@ interface TimestampLike {
 }
 
 
+/**
+ * Pull the human-readable message out of an error response.
+ *
+ * The staff endpoints answer in two shapes: the apiResponse envelope
+ * ({ error: { code, message } }) and a plainer { error: '<text>' }. Reading only
+ * a top-level `message` — as this used to — missed both, so every rejected save
+ * surfaced in the UI as a bare "HTTP 400"/"HTTP 500" with no cause.
+ */
+function errorMessageFrom(body: unknown): string | null {
+  if (!body || typeof body !== 'object') return null;
+  const { error, message } = body as { error?: unknown; message?: unknown };
+  if (typeof error === 'string' && error) return error;
+  if (error && typeof error === 'object') {
+    const nested = (error as { message?: unknown }).message;
+    if (typeof nested === 'string' && nested) return nested;
+  }
+  if (typeof message === 'string' && message) return message;
+  return null;
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || `HTTP ${response.status}`);
+    const body = await response.json().catch(() => null);
+    throw new Error(errorMessageFrom(body) ?? `HTTP ${response.status}`);
   }
 
   const data = await response.json();
@@ -342,6 +362,7 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
   if ('noticePeriod' in staff) result.noticePeriod = staff.noticePeriod;
   if ('noticePeriodDays' in staff) result.noticePeriodDays = staff.noticePeriodDays;
   if ('weeklyHours' in staff) result.weeklyHours = staff.weeklyHours;
+  if ('nationality' in staff) result.nationality = staff.nationality;
   if ('idNumber' in staff) result.idNumber = staff.idNumber;
   if ('workPermitNumber' in staff) result.workPermitNumber = staff.workPermitNumber;
   if ('workPermitExpiry' in staff) result.workPermitExpiry = toDateStringOrNull(staff.workPermitExpiry) ?? undefined;

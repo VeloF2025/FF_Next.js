@@ -119,6 +119,7 @@ export function StaffEditForm() {
       if (staff.bio) formUpdate.bio = staff.bio;
 
       // New HR fields
+      if (staff.nationality) formUpdate.nationality = staff.nationality;
       if (staff.saIdNumber) formUpdate.saIdNumber = staff.saIdNumber;
       if (staff.passportNumber) formUpdate.passportNumber = staff.passportNumber;
       if (staff.passportCountry) formUpdate.passportCountry = staff.passportCountry;

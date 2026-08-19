@@ -45,6 +45,7 @@ export interface StaffFormData {
   nextOfKinAddress?: string;
 
   // Identity Documents
+  nationality?: string;
   saIdNumber?: string;
   passportNumber?: string;
   passportCountry?: string;

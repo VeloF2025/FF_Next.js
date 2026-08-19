@@ -207,6 +207,7 @@ export default defineConfig({
       { find: '@/lib/geo', replacement: path.resolve(__dirname, './src/lib/geo') },
       { find: '@/lib/security', replacement: path.resolve(__dirname, './src/lib/security') },
       { find: '@/lib/apiResponse', replacement: path.resolve(__dirname, './src/lib/apiResponse') },
+      { find: '@/lib/saIdValidation', replacement: path.resolve(__dirname, './src/lib/saIdValidation') },
       { find: '@/lib/handleApiResponse', replacement: path.resolve(__dirname, './src/lib/handleApiResponse') },
       { find: '@/lib/authErrorHandler', replacement: path.resolve(__dirname, './src/lib/authErrorHandler') },
       // @/lib/auth-mock lives at root ./lib/ — the generic @/lib fallback
