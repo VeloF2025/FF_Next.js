@@ -2,7 +2,7 @@
  * /field — Field Workers admin portal.
  *
  * Renders inside the standard AppLayout (same as /staff/* pages).
- * Tabs: Approvals | Time (Time tab is added in Task 5).
+ * Tabs: Approvals | Time | By site.
  *
  * Auth: reads `hasAnyRole` from useAuth() to determine admin status.
  * Admin roles: SUPER_ADMIN, ADMIN.
@@ -14,12 +14,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/auth.types';
 import { ApprovalsTab } from '@/modules/field-workers/components/ApprovalsTab';
 import { TimeTab } from '@/modules/field-workers/components/TimeTab';
+import { BySiteTab } from '@/modules/field-workers/components/BySiteTab';
 
-type Tab = 'approvals' | 'time';
+type Tab = 'approvals' | 'time' | 'by-site';
 
 const TABS: readonly { key: Tab; label: string }[] = [
   { key: 'approvals', label: 'Approvals' },
   { key: 'time', label: 'Time' },
+  { key: 'by-site', label: 'By site' },
 ];
 
 const ADMIN_ROLES: UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
@@ -73,6 +75,12 @@ export default function FieldWorkersPage() {
         {activeTab === 'time' && (
           <div role="tabpanel" aria-label="Time">
             <TimeTab />
+          </div>
+        )}
+
+        {activeTab === 'by-site' && (
+          <div role="tabpanel" aria-label="By site">
+            <BySiteTab />
           </div>
         )}
       </div>

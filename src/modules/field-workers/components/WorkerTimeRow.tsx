@@ -2,6 +2,11 @@
  * WorkerTimeRow — one attendance entry in the Time tab table.
  *
  * Shows: date, clock-in, clock-out (or open/missing labels), hours, status badge.
+ * Each clock time carries a ProximityBadge beneath it — where that event
+ * happened relative to the nearest project site. The two are shown separately
+ * rather than summarised into one verdict because they genuinely differ:
+ * staff who travel to site after clocking in read as off-site at clock-in and
+ * on-site at clock-out, and collapsing that loses the whole signal.
  * "Fix time" opens AdjustTimeDialog for the entry.
  */
 
@@ -10,6 +15,7 @@ import { Pencil } from 'lucide-react';
 import { type FieldAttendanceRow } from '../api';
 import { safeFormatTime, safeFormatDate, formatHours } from '../timeHelpers';
 import { AdjustTimeDialog } from './AdjustTimeDialog';
+import { ProximityBadge } from './ProximityBadge';
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
@@ -59,11 +65,21 @@ export function WorkerTimeRow({ row, onAdjusted }: WorkerTimeRowProps) {
         {/* Clock in */}
         <td className={`px-3 py-2 tabular-nums whitespace-nowrap ${row.clock_in_at ? 'text-neutral-200' : 'text-neutral-500 italic'}`}>
           {clockInDisplay}
+          <ProximityBadge
+            event="Clock in"
+            projectName={row.clock_in_aoi_project}
+            distanceM={row.clock_in_aoi_distance_m}
+          />
         </td>
 
         {/* Clock out */}
         <td className={`px-3 py-2 tabular-nums whitespace-nowrap ${row.clock_out_at ? 'text-neutral-200' : 'text-neutral-500 italic'}`}>
           {clockOutDisplay}
+          <ProximityBadge
+            event="Clock out"
+            projectName={row.clock_out_aoi_project}
+            distanceM={row.clock_out_aoi_distance_m}
+          />
         </td>
 
         {/* Hours */}

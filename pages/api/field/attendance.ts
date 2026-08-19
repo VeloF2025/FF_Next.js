@@ -35,6 +35,13 @@ export interface FieldAttendanceRow {
   hours:            number | null;
   entry_updated_at: string;
   site_geofence_id: string | null;
+  /** Nearest project AOI at each clock event, recorded at write time. NULL
+   *  for entries not written by the portal clock path (manual admin entries,
+   *  and the auto-close cron, which has no clock-out fix to attribute). */
+  clock_in_aoi_project:    string | null;
+  clock_in_aoi_distance_m: number | null;
+  clock_out_aoi_project:    string | null;
+  clock_out_aoi_distance_m: number | null;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -99,6 +106,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           e.status                                                        AS entry_status,
           e.site_geofence_id,
           e.updated_at::text                                             AS entry_updated_at,
+          pin.project_name                                               AS clock_in_aoi_project,
+          e.clock_in_aoi_distance_m::float                               AS clock_in_aoi_distance_m,
+          pout.project_name                                              AS clock_out_aoi_project,
+          e.clock_out_aoi_distance_m::float                              AS clock_out_aoi_distance_m,
           CASE
             WHEN e.clock_out_at IS NULL THEN NULL
             ELSE ROUND(
@@ -108,6 +119,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           END                                                             AS hours
         FROM attendance_entries e
         JOIN staff s ON s.id = e.staff_id
+        LEFT JOIN projects pin  ON pin.id  = e.clock_in_aoi_project_id
+        LEFT JOIN projects pout ON pout.id = e.clock_out_aoi_project_id
         WHERE s.role IN ('technician', 'casual')
           AND LOWER(s.account_status) = 'pending'
           AND e.work_date BETWEEN ${from} AND ${to}
@@ -129,6 +142,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           e.status                                                        AS entry_status,
           e.site_geofence_id,
           e.updated_at::text                                             AS entry_updated_at,
+          pin.project_name                                               AS clock_in_aoi_project,
+          e.clock_in_aoi_distance_m::float                               AS clock_in_aoi_distance_m,
+          pout.project_name                                              AS clock_out_aoi_project,
+          e.clock_out_aoi_distance_m::float                              AS clock_out_aoi_distance_m,
           CASE
             WHEN e.clock_out_at IS NULL THEN NULL
             ELSE ROUND(
@@ -138,6 +155,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           END                                                             AS hours
         FROM attendance_entries e
         JOIN staff s ON s.id = e.staff_id
+        LEFT JOIN projects pin  ON pin.id  = e.clock_in_aoi_project_id
+        LEFT JOIN projects pout ON pout.id = e.clock_out_aoi_project_id
         WHERE s.role IN ('technician', 'casual')
           AND LOWER(s.account_status) = 'active'
           AND e.work_date BETWEEN ${from} AND ${to}
@@ -160,6 +179,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           e.status                                                        AS entry_status,
           e.site_geofence_id,
           e.updated_at::text                                             AS entry_updated_at,
+          pin.project_name                                               AS clock_in_aoi_project,
+          e.clock_in_aoi_distance_m::float                               AS clock_in_aoi_distance_m,
+          pout.project_name                                              AS clock_out_aoi_project,
+          e.clock_out_aoi_distance_m::float                              AS clock_out_aoi_distance_m,
           CASE
             WHEN e.clock_out_at IS NULL THEN NULL
             ELSE ROUND(
@@ -169,6 +192,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           END                                                             AS hours
         FROM attendance_entries e
         JOIN staff s ON s.id = e.staff_id
+        LEFT JOIN projects pin  ON pin.id  = e.clock_in_aoi_project_id
+        LEFT JOIN projects pout ON pout.id = e.clock_out_aoi_project_id
         WHERE s.role IN ('technician', 'casual')
           AND e.work_date BETWEEN ${from} AND ${to}
         ORDER BY s.first_name, s.last_name, e.work_date DESC

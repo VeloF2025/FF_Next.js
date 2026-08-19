@@ -97,6 +97,26 @@ export function getCurrentSastWeek(baseDate?: Date): { from: string; to: string 
   return { from: toYMD(mon), to: toYMD(sun) };
 }
 
+/**
+ * Today's date in Africa/Johannesburg as YYYY-MM-DD.
+ *
+ * Uses the SAST calendar parts rather than slicing toISOString(), which is UTC
+ * and reports yesterday for the first two hours of every SAST day — exactly the
+ * 00:00–02:00 window a night shift falls in.
+ */
+export function getSastToday(baseDate?: Date): string {
+  const parts = new Intl.DateTimeFormat('en-ZA', {
+    timeZone: SAST,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(baseDate ?? new Date());
+  const y = parts.find((p) => p.type === 'year')?.value ?? '';
+  const m = parts.find((p) => p.type === 'month')?.value ?? '';
+  const d = parts.find((p) => p.type === 'day')?.value ?? '';
+  return `${y}-${m}-${d}`;
+}
+
 function toYMD(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
