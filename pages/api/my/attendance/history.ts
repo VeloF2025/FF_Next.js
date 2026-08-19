@@ -16,6 +16,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import { listRecentEntries } from '@/modules/attendance/portal/clockUtils';
+import { mapOpenCorrectionsByEntry } from '@/modules/attendance/workflow/correctionEligibility';
 
 const DEFAULT_LIMIT = 14;
 const MAX_LIMIT = 60;
@@ -38,6 +39,13 @@ export default withMySession(async (req, res, session) => {
 
   try {
     const rows = await listRecentEntries({ staffId: session.staffId, limit });
+    // The correction form only accepts an exception-linked submission, so the
+    // history screen must know which entries actually have one open. Without
+    // it every "request correction" tap dead-ends on a 409.
+    const openCorrections = await mapOpenCorrectionsByEntry(
+      session.staffId,
+      rows.map((r) => r.id)
+    );
 
     const entries = rows.map((r) => ({
       entryId: r.id,
@@ -53,6 +61,7 @@ export default withMySession(async (req, res, session) => {
         r.clock_out_at != null
           ? new Date(r.clock_out_at).getTime() - new Date(r.clock_in_at).getTime()
           : null,
+      correctionExceptionId: openCorrections.get(r.id) ?? null,
     }));
 
     return apiResponse.success(res, { entries, limit });

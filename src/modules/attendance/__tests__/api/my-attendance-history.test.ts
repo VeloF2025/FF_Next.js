@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   verifySession: vi.fn(),
   listRecentEntries: vi.fn(),
+  mapOpenCorrectionsByEntry: vi.fn(),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -19,6 +20,9 @@ vi.mock('@/modules/attendance/portal/sessionUtils', () => ({
 }));
 vi.mock('@/modules/attendance/portal/clockUtils', () => ({
   listRecentEntries: mocks.listRecentEntries,
+}));
+vi.mock('@/modules/attendance/workflow/correctionEligibility', () => ({
+  mapOpenCorrectionsByEntry: mocks.mapOpenCorrectionsByEntry,
 }));
 
 import handler from '../../../../../pages/api/my/attendance/history';
@@ -54,7 +58,27 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.verifySession.mockResolvedValue({ valid: true, session: VALID_SESSION });
   mocks.listRecentEntries.mockResolvedValue([]);
+  mocks.mapOpenCorrectionsByEntry.mockResolvedValue(new Map());
 });
+
+function entryRow(id: string) {
+  return {
+    id,
+    work_date: '2026-08-11',
+    clock_in_at: '2026-08-11T05:52:00.000Z',
+    clock_out_at: null,
+    status: 'open',
+    site_geofence_id: null,
+    vehicle_assignment_id: null,
+    selfie_in_url: null,
+    selfie_out_url: null,
+  };
+}
+
+function entriesOf(captured: { body?: unknown }) {
+  return (captured.body as { data: { entries: { entryId: string; correctionExceptionId: string | null }[] } })
+    .data.entries;
+}
 
 describe('GET /api/my/attendance/history', () => {
   it('uses default 14 when no limit given', async () => {
@@ -95,5 +119,35 @@ describe('GET /api/my/attendance/history', () => {
     expect(mocks.listRecentEntries).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 30 })
     );
+  });
+});
+
+describe('GET /api/my/attendance/history — correction targets', () => {
+  it('exposes the open exception id for the entry that has one', async () => {
+    mocks.listRecentEntries.mockResolvedValue([entryRow('entry-1'), entryRow('entry-2')]);
+    mocks.mapOpenCorrectionsByEntry.mockResolvedValue(new Map([['entry-1', 'exception-1']]));
+
+    const { res, captured } = makeRes();
+    await handler(makeReq(), res);
+
+    // Scoped to the caller, and asked only for the entries being rendered.
+    expect(mocks.mapOpenCorrectionsByEntry).toHaveBeenCalledWith('staff-1', ['entry-1', 'entry-2']);
+    const entries = entriesOf(captured);
+    expect(entries.map((e) => [e.entryId, e.correctionExceptionId])).toEqual([
+      ['entry-1', 'exception-1'],
+      // Null, not undefined: the UI hides the correction button on this one
+      // rather than linking to a form the POST route would 409.
+      ['entry-2', null],
+    ]);
+  });
+
+  it('returns null for every entry when nothing is awaiting the worker', async () => {
+    mocks.listRecentEntries.mockResolvedValue([entryRow('entry-1')]);
+    mocks.mapOpenCorrectionsByEntry.mockResolvedValue(new Map());
+
+    const { res, captured } = makeRes();
+    await handler(makeReq(), res);
+
+    expect(entriesOf(captured)[0].correctionExceptionId).toBeNull();
   });
 });

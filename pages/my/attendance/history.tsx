@@ -1,7 +1,9 @@
 /**
  * /my/attendance/history — last 14 entries.
  *
- * Simple timeline. No edits from here — corrections UI lands in PR1c.
+ * Simple timeline. The correction affordance appears only on entries that
+ * carry an open day exception — the API retired generic corrections, so a
+ * link without an exception id would dead-end on a 409.
  */
 
 import React from 'react';
@@ -99,19 +101,22 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
                     {e.durationMs != null ? formatDuration(e.durationMs) : '—'}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      `/my/attendance/corrections/new?entry_id=${encodeURIComponent(e.entryId)}`
-                    )
-                  }
-                  aria-label="Request correction for this shift"
-                  title="Request correction"
-                  className="inline-flex items-center justify-center w-12 h-12 rounded-lg text-neutral-400 hover:text-blue-300 hover:bg-blue-900/30 transition"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
+                {e.correctionExceptionId && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(
+                        `/my/attendance/corrections/new?entry_id=${encodeURIComponent(e.entryId)}` +
+                        `&exception_id=${encodeURIComponent(e.correctionExceptionId as string)}`
+                      )
+                    }
+                    aria-label="Request correction for this shift"
+                    title="Request correction"
+                    className="inline-flex items-center justify-center w-12 h-12 rounded-lg text-neutral-400 hover:text-blue-300 hover:bg-blue-900/30 transition"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </li>
           ))}
