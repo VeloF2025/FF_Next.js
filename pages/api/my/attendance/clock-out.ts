@@ -21,6 +21,13 @@
  * can legitimately clock out from a slightly different spot (e.g. end of
  * day at the vehicle park vs morning at the site). Their device GPS is
  * still captured and stored for the record.
+ *
+ * It does, however, RECORD which project AOI the clock-out fix landed in
+ * (migration 501, resolved inside closeOpenEntry). Recording is not
+ * checking: nothing below rejects a clock-out on distance. Judging a shift
+ * by the clock-in fix alone misreads staff who travel to site after
+ * clocking in, and cannot see the reverse case at all, so both ends of the
+ * shift are measured before anything is ever gated on them.
  */
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
