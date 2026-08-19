@@ -95,7 +95,9 @@ describe('Activate stats date column', () => {
     // Any divergence in these re-opens the same class of card/table mismatch.
     for (const clause of [
       '(is_oes_only = FALSE OR is_oes_only IS NULL)',
-      'drop_number IN (SELECT drop_number FROM drops)',
+      // Eligibility: SOW row OR WhatsApp submission. See dropsSowGate.test.ts —
+      // this list only checks the two services agree, not that the gate is right.
+      'drop_number IN (SELECT drop_number FROM drops) OR EXISTS (SELECT 1 FROM qa_photo_reviews q WHERE q.drop_number = drop_number)',
       "COALESCE(project, '') NOT IN ('Marketing', 'Marketing Activations', 'Unknown')",
     ]) {
       expect(summarySql).toContain(clause);

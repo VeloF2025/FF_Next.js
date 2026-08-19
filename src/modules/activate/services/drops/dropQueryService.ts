@@ -10,6 +10,7 @@
 import pool from '@/lib/db';
 import { DropsFilters, PaginatedDropsResult, UnifiedDrop } from './types';
 import { transformDropRow } from './dropTransformService';
+import { unifiedEligibilityCondition } from './dropStatsService';
 
 // Only show installation/activation projects — exclude marketing & unknown
 const EXCLUDED_PROJECTS = ['Marketing', 'Marketing Activations', 'Unknown'];
@@ -27,7 +28,7 @@ function buildWhereConditions(filters?: DropsFilters): {
 
   // Base filters always applied to the paginated list
   conditions.push('(u.is_oes_only = FALSE OR u.is_oes_only IS NULL)');
-  conditions.push('u.drop_number IN (SELECT drop_number FROM drops)');
+  conditions.push(unifiedEligibilityCondition('u.drop_number'));
   conditions.push(`COALESCE(u.project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})`);
 
   if (filters?.search) {

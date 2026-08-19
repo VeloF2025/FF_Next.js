@@ -11,7 +11,14 @@
  * resolvable via drops.
  *
  * `drops` is the source of truth for a DR's project (oesUnifiedRecordsService
- * resolves it the same way), so the insert now reads it there.
+ * resolves it the same way), so the insert reads it there first.
+ *
+ * `drops` is not exhaustive, though — it is the SOW import, and a DR the import
+ * never loaded has no row in it at all. On 2026-08-19 five of Themb'elihle's
+ * fifteen WhatsApp activations (DR3022005, DR3022046, DR3022070, DR3022071,
+ * DR3022079) were exactly that, so they landed here with a NULL project and
+ * vanished from the per-project table. qa_photo_reviews records the project the
+ * field team submitted under, so the insert falls back to it.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -84,6 +91,25 @@ describe('ensure-data skeleton insert', () => {
     expect(insert).toMatch(/JOIN\s+projects/);
   });
 
+  it('falls back to the submission when the DR is not in the SOW import', async () => {
+    stubQueriesForNewRecord();
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: 'POST',
+      body: { dropNumber: DROP },
+    });
+
+    await (handler as unknown as (q: NextApiRequest, s: NextApiResponse) => Promise<void>)(req, res);
+
+    const insert = insertStatement() as string;
+
+    // Without this arm the five 2026-08-19 Themb'elihle DRs insert NULL and
+    // group under 'Unknown' — a bucket EXCLUDED_PROJECTS then discards.
+    expect(insert).toMatch(/FROM\s+qa_photo_reviews/);
+    // COALESCE, not a replacement: `drops` stays the first answer when it has one.
+    expect(insert).toMatch(/COALESCE\(/);
+    expect(insert.indexOf('FROM drops')).toBeLessThan(insert.indexOf('FROM qa_photo_reviews'));
+  });
+
   it('keeps the insert single-valued — drops is not unique on drop_number alone', async () => {
     stubQueriesForNewRecord();
     const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
@@ -95,9 +121,12 @@ describe('ensure-data skeleton insert', () => {
 
     const insert = insertStatement() as string;
 
-    // `drops` is UNIQUE on (project_id, drop_number). A bare join could match
-    // more than one row; the subquery must be bounded.
-    expect(insert).toContain('LIMIT 1');
+    // `drops` is UNIQUE on (project_id, drop_number) and qa_photo_reviews holds
+    // one row per submission, so a resubmitted DR has several. A bare join could
+    // match more than one row; both subqueries must be bounded.
+    expect(insert.match(/LIMIT 1/g)).toHaveLength(2);
+    // Deterministic, not merely single-valued — an unordered LIMIT 1 picks by plan.
+    expect(insert.match(/ORDER BY/g)).toHaveLength(2);
     // ON CONFLICT must survive — concurrent inserts race with dr-acknowledgment.
     expect(insert).toContain('ON CONFLICT (drop_number) DO NOTHING');
   });

@@ -27,6 +27,40 @@ const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
  */
 export const UNIFIED_DATE_COLUMN = 'COALESCE(submitted_date, created_at::DATE)';
 
+/**
+ * Eligibility predicate for a dr_photo_unified_reviews row.
+ *
+ * A row earns a place on the Activate dashboard if the DR is either
+ *   (a) in the SOW import (`drops`), or
+ *   (b) a real WhatsApp submission (`qa_photo_reviews` holds the message it
+ *       came from).
+ *
+ * The `drops` half alone was the whole test until 2026-08-19. It silently hid
+ * every WhatsApp submission for a DR the SOW import had never loaded: on
+ * 2026-08-19 the THEMBIES Activations group posted 15 activations for
+ * Themb'elihle and the dashboard showed 10, because DR3022005, DR3022046,
+ * DR3022070, DR3022071 and DR3022079 are absent from `drops`. Etwatwa (20 vs
+ * 18) and Thembisa POP 1 (51 vs 50) under-reported the same day for the same
+ * reason.
+ *
+ * The `drops` half is still load-bearing — it is what keeps ~200 unified rows
+ * with no submission behind them (Velo Test, Integration Test, Test Project,
+ * and pre-WhatsApp OneMap skeletons) off the dashboard. Only DRs a field team
+ * actually submitted are added by the second half.
+ *
+ * MUST be shared by every consumer that reads this table for the dashboard —
+ * the list, the summary card and the per-project breakdown diverging here is
+ * exactly how the 2026-08-19 undercount stayed invisible in the totals.
+ *
+ * @param dropNumberCol qualified column expression, e.g. 'u.drop_number'
+ */
+export function unifiedEligibilityCondition(dropNumberCol = 'drop_number'): string {
+  return (
+    `(${dropNumberCol} IN (SELECT drop_number FROM drops)` +
+    ` OR EXISTS (SELECT 1 FROM qa_photo_reviews q WHERE q.drop_number = ${dropNumberCol}))`
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -130,7 +164,7 @@ export async function calculateSummary(filters?: DropsFilters): Promise<Summary>
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'failed') as vlm_failed
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
-      AND drop_number IN (SELECT drop_number FROM drops)
+      AND ${unifiedEligibilityCondition()}
       AND COALESCE(project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})
   `;
 

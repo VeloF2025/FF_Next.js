@@ -99,30 +99,49 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
       // Create unified record and fetch data.
       //
-      // `project` is resolved from `drops` here, not left NULL. This skeleton
-      // insert was the only path that created a unified row without one, and a
-      // NULL project makes the row group under a literal "Unknown" bucket in
-      // the Activate per-project table (getProjectStats groups on this column).
-      // `drops` is the source of truth for a DR's project — oesUnifiedRecordsService
-      // resolves it the same way.
+      // `project` is resolved here, not left NULL. This skeleton insert was the
+      // only path that created a unified row without one, and a NULL project
+      // makes the row group under a literal "Unknown" bucket in the Activate
+      // per-project table (getProjectStats groups on this column) — a bucket
+      // that is itself in EXCLUDED_PROJECTS, so the row vanishes.
       //
-      // Correlated scalar subquery rather than a JOIN: `drops` is UNIQUE on
-      // (project_id, drop_number), NOT on drop_number alone, so a join could
-      // legally fan out. ORDER BY + LIMIT 1 keeps this single-valued AND
+      // `drops` is tried first: it is the source of truth for a DR's project,
+      // and oesUnifiedRecordsService resolves it the same way. It is not
+      // exhaustive, though — a DR the SOW import never loaded has no row there
+      // at all. On 2026-08-19 five of Themb'elihle's fifteen WhatsApp
+      // activations were such DRs, so they landed here with a NULL project.
+      // qa_photo_reviews carries the project the field team submitted under,
+      // which is the correct answer for exactly those rows.
+      //
+      // Correlated scalar subqueries rather than JOINs: `drops` is UNIQUE on
+      // (project_id, drop_number), NOT on drop_number alone, and
+      // qa_photo_reviews holds one row per submission, so either join could
+      // legally fan out. ORDER BY + LIMIT 1 keeps each single-valued AND
       // deterministic, so this insert and migration 473 resolve the same drop
       // to the same project if that data shape ever occurs.
-      // An unresolvable DR still inserts NULL — same as before, no regression.
+      //
+      // A DR in neither table still inserts NULL — same as before, no
+      // regression; syncMissingFromQaPhotoReviews repairs it if a submission
+      // arrives later.
       logger.info(`Creating unified record for ${dropNumber}`);
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (drop_number, project, created_at, updated_at)
          VALUES (
            $1,
-           (SELECT p.project_name
-              FROM drops d
-              JOIN projects p ON p.id = d.project_id
-             WHERE d.drop_number = $1
-             ORDER BY p.project_name
-             LIMIT 1),
+           COALESCE(
+             (SELECT p.project_name
+                FROM drops d
+                JOIN projects p ON p.id = d.project_id
+               WHERE d.drop_number = $1
+               ORDER BY p.project_name
+               LIMIT 1),
+             (SELECT qa.project
+                FROM qa_photo_reviews qa
+               WHERE qa.drop_number = $1
+                 AND qa.project IS NOT NULL
+               ORDER BY qa.created_at DESC
+               LIMIT 1)
+           ),
            NOW(), NOW()
          )
          ON CONFLICT (drop_number) DO NOTHING`,

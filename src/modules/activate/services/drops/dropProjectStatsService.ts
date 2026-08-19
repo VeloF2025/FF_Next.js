@@ -9,7 +9,11 @@
 
 import pool from '@/lib/db';
 import { DropsFilters, ProjectStats } from './types';
-import { buildUnifiedConditions, UNIFIED_DATE_COLUMN } from './dropStatsService';
+import {
+  buildUnifiedConditions,
+  UNIFIED_DATE_COLUMN,
+  unifiedEligibilityCondition,
+} from './dropStatsService';
 
 const EXCLUDED_PROJECTS = ['Marketing', 'Marketing Activations', 'Unknown'];
 const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
@@ -56,7 +60,7 @@ export async function getProjectStats(filters?: DropsFilters): Promise<ProjectSt
       COUNT(*) FILTER (WHERE feedback_sent = true) as reviewed
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
-      AND drop_number IN (SELECT drop_number FROM drops)
+      AND ${unifiedEligibilityCondition()}
       AND COALESCE(project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})
     GROUP BY COALESCE(project, 'Unknown')
   `;

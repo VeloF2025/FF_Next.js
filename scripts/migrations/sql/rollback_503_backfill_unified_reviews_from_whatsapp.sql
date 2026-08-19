@@ -1,0 +1,15 @@
+-- Rollback for migration 503.
+--
+-- 503 filled NULL `project` / `submitted_date` on dr_photo_unified_reviews rows
+-- from the qa_photo_reviews submission behind them. There is no record of which
+-- rows were NULL beforehand, so a faithful inverse is not expressible: blanking
+-- every row whose value happens to match its submission would also blank rows
+-- that were correct before 503 ever ran.
+--
+-- The forward migration is additive and non-destructive — it only ever turned
+-- NULL into a value that qa_photo_reviews already held. Leaving it in place is
+-- safe; the correct response to a bad backfill is to correct the specific rows,
+-- not to blank the column.
+--
+-- Intentionally a no-op.
+SELECT 'migration 503 is a non-destructive backfill; no rollback action' AS note;
