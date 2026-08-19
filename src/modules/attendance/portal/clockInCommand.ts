@@ -111,13 +111,18 @@ export async function executeClockInCommand(
     }
 
     stage = 'parallel_lookups';
-    const vehicleAssignment = await findActiveVehicleAssignment(args.staffId);
-    // Accuracy is passed in so a fix that is outside a hull by less than the
-    // device's own error margin is not counted as a mismatch.
-    const geofence = await matchGeofence({
-      device: { lat: args.lat, lon: args.lon },
-      accuracyM: args.accuracyM ?? null,
-    });
+    // Independent lookups — keep them parallel. A worker is standing there
+    // waiting, and the selfie upload is still to come.
+    //
+    // Accuracy is passed to matchGeofence so a fix outside a hull by less
+    // than the device's own error margin is not counted as a mismatch.
+    const [vehicleAssignment, geofence] = await Promise.all([
+      findActiveVehicleAssignment(args.staffId),
+      matchGeofence({
+        device: { lat: args.lat, lon: args.lon },
+        accuracyM: args.accuracyM ?? null,
+      }),
+    ]);
 
     stage = 'selfie_upload';
     const selfie = await storeSelfie({
@@ -206,6 +211,12 @@ export async function executeClockInCommand(
         entryId: entry.id,
         workDate: entry.work_date,
         clockInAt: String(entry.clock_in_at),
+        // NOTE: these two now carry PROJECT identity, not a
+        // fleet_authorized_locations id. The names are kept because the /my
+        // PWA reads them from a cached bundle (useClockSubmission renders
+        // "Clocked in at {siteName}"), and renaming would break that message
+        // for anyone on an old build. That message has in fact never
+        // displayed until now — insideSite was always false.
         siteId: geofence.projectId,
         siteName: geofence.projectName,
         insideSite: geofence.inside,

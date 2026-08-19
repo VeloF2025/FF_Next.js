@@ -8,6 +8,13 @@ UPDATE attendance_exceptions
    SET resolved_at = NULL, resolution_note = NULL
  WHERE resolution_note LIKE 'Auto-resolved by migration 500:%';
 
+-- ALL of them, not just the ones the forward migration relabelled. This
+-- looks over-broad and is not: the CHECK constraint restored below does not
+-- include 'low_accuracy', so any row left carrying that kind makes the
+-- ADD CONSTRAINT fail outright ("check constraint ... is violated by some
+-- row" — verified). It is also the correct target state: pre-500 code wrote
+-- low-accuracy warnings as 'geofence_mismatch', so that is what the database
+-- should look like once this migration is reversed.
 UPDATE attendance_exceptions
    SET exception_kind = 'geofence_mismatch'
  WHERE exception_kind = 'low_accuracy';
