@@ -11,7 +11,7 @@ import type { IncidentScopeFilter } from './reviewScope';
 import type {
   IncidentAction, IncidentActionType, IncidentDeliverySummary, IncidentDetail, IncidentEvidence,
   IncidentEvidenceType, IncidentListItem, IncidentListRequest, IncidentListResult, IncidentLifecycleStatus,
-  IncidentOutcome, IncidentSeverity, IncidentType, SanitizedIncidentMetadata,
+  IncidentOutcome, IncidentSeverity, IncidentType, IncidentVisibility, SanitizedIncidentMetadata,
 } from './types';
 
 function iso(value: string | Date): string { return value instanceof Date ? value.toISOString() : value; }
@@ -119,11 +119,12 @@ export async function getIncidentCore(incidentId: string): Promise<IncidentDetai
   return row ? mapDetailRow(row) : null;
 }
 
-const ACTION_COLUMNS = `id, action_type, actor_user_id, is_system_actor, occurred_at, note, before_lifecycle_status,
+const ACTION_COLUMNS = `id, action_type, actor_user_id, is_system_actor, occurred_at, note, visibility, before_lifecycle_status,
   after_lifecycle_status, before_escalation_level, after_escalation_level, metadata, request_correlation_id`;
 
 interface ActionRow extends Record<string, unknown> {
   id: string; action_type: IncidentActionType; actor_user_id: string | null; is_system_actor: boolean; occurred_at: string | Date; note: string | null;
+  visibility: IncidentVisibility;
   before_lifecycle_status: IncidentLifecycleStatus | null; after_lifecycle_status: IncidentLifecycleStatus | null;
   before_escalation_level: number | null; after_escalation_level: number | null; metadata: SanitizedIncidentMetadata; request_correlation_id: string | null;
 }
@@ -134,17 +135,17 @@ export async function getIncidentActions(incidentId: string): Promise<IncidentAc
   );
   return rows.map((row) => ({
     id: row.id, actionType: row.action_type, actorUserId: row.actor_user_id, isSystemActor: row.is_system_actor,
-    occurredAt: iso(row.occurred_at), note: row.note, beforeLifecycleStatus: row.before_lifecycle_status,
+    occurredAt: iso(row.occurred_at), note: row.note, visibility: row.visibility, beforeLifecycleStatus: row.before_lifecycle_status,
     afterLifecycleStatus: row.after_lifecycle_status, beforeEscalationLevel: row.before_escalation_level,
     afterEscalationLevel: row.after_escalation_level, metadata: row.metadata, requestCorrelationId: row.request_correlation_id,
   }));
 }
 
-const EVIDENCE_COLUMNS = `id, evidence_type, storage_url, storage_key, mime_type, original_filename, uploaded_by, description, created_at`;
+const EVIDENCE_COLUMNS = `id, evidence_type, storage_url, storage_key, mime_type, original_filename, uploaded_by, description, visibility, created_at`;
 
 interface EvidenceRow extends Record<string, unknown> {
   id: string; evidence_type: IncidentEvidenceType; storage_url: string; storage_key: string; mime_type: string | null;
-  original_filename: string | null; uploaded_by: string | null; description: string | null; created_at: string | Date;
+  original_filename: string | null; uploaded_by: string | null; description: string | null; visibility: IncidentVisibility; created_at: string | Date;
 }
 
 export async function getIncidentEvidence(incidentId: string): Promise<IncidentEvidence[]> {
@@ -154,7 +155,7 @@ export async function getIncidentEvidence(incidentId: string): Promise<IncidentE
   return rows.map((row) => ({
     id: row.id, evidenceType: row.evidence_type, storageUrl: row.storage_url, storageKey: row.storage_key,
     mimeType: row.mime_type, originalFilename: row.original_filename, uploadedBy: row.uploaded_by,
-    description: row.description, createdAt: iso(row.created_at),
+    description: row.description, visibility: row.visibility, createdAt: iso(row.created_at),
   }));
 }
 

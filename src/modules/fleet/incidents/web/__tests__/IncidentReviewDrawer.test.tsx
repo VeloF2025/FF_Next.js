@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncidentReviewDrawer } from '../IncidentReviewDrawer';
 import type { IncidentDetail } from '../../types';
@@ -14,8 +14,8 @@ function detail(overrides: Partial<IncidentDetail> = {}): IncidentDetail {
     reviewStartedAt: '2026-08-18T07:10:00.000Z', reviewStartedBy: 'user-9', resolvedAt: null, resolvedBy: null,
     outcome: null, resolutionNote: null, evidenceSnapshot: { arrival_dwell_minutes: 22, gps_freshness_seconds: 45 },
     sourceEventId: null, linkedHsReference: 'HS-77', linkedMaintenanceReference: null,
-    actions: [{ id: 'action-1', actionType: 'opened', actorUserId: null, isSystemActor: true, occurredAt: '2026-08-18T06:58:00.000Z', note: null, beforeLifecycleStatus: null, afterLifecycleStatus: 'open', beforeEscalationLevel: null, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null }],
-    evidence: [{ id: 'evidence-1', evidenceType: 'photo', storageUrl: '/storage/fleet/incidents/photo.jpg', storageKey: 'k', mimeType: 'image/jpeg', originalFilename: 'gate.jpg', uploadedBy: 'user-9', description: 'Gate photo', createdAt: '2026-08-18T07:12:00.000Z' }],
+    actions: [{ id: 'action-1', actionType: 'opened', actorUserId: null, isSystemActor: true, occurredAt: '2026-08-18T06:58:00.000Z', note: null, visibility: 'internal', beforeLifecycleStatus: null, afterLifecycleStatus: 'open', beforeEscalationLevel: null, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null }],
+    evidence: [{ id: 'evidence-1', evidenceType: 'photo', storageUrl: '/storage/fleet/incidents/photo.jpg', storageKey: 'k', mimeType: 'image/jpeg', originalFilename: 'gate.jpg', uploadedBy: 'user-9', description: 'Gate photo', visibility: 'internal', createdAt: '2026-08-18T07:12:00.000Z' }],
     delivery: { delivered: 2, suppressed: 0, failed: 0 },
     ...overrides,
   };
@@ -132,17 +132,18 @@ describe('IncidentReviewDrawer', () => {
   it('shows "Awaiting driver" once a manager requests input, and "Driver responded" once a submission follows the request', async () => {
     const opened = {
       id: 'action-1', actionType: 'opened' as const, actorUserId: null, isSystemActor: true,
-      occurredAt: '2026-08-18T06:58:00.000Z', note: null, beforeLifecycleStatus: null, afterLifecycleStatus: 'open' as const,
+      occurredAt: '2026-08-18T06:58:00.000Z', note: null, visibility: 'internal' as const, beforeLifecycleStatus: null, afterLifecycleStatus: 'open' as const,
       beforeEscalationLevel: null, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null,
     };
     const requested = {
       id: 'action-2', actionType: 'driver_input_requested' as const, actorUserId: 'user-9', isSystemActor: false,
-      occurredAt: '2026-08-18T07:00:00.000Z', note: 'Please explain the late start', beforeLifecycleStatus: 'open' as const,
+      occurredAt: '2026-08-18T07:00:00.000Z', note: 'Please explain the late start', visibility: 'shared_with_driver' as const, beforeLifecycleStatus: 'open' as const,
       afterLifecycleStatus: 'open' as const, beforeEscalationLevel: 0, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null,
     };
     const responded = {
       id: 'action-3', actionType: 'driver_response_received' as const, actorUserId: null, isSystemActor: false,
-      occurredAt: '2026-08-18T09:00:00.000Z', note: null, beforeLifecycleStatus: 'open' as const, afterLifecycleStatus: 'open' as const,
+      occurredAt: '2026-08-18T09:00:00.000Z', note: 'I was on site the whole time', visibility: 'driver_submitted' as const,
+      beforeLifecycleStatus: 'open' as const, afterLifecycleStatus: 'open' as const,
       beforeEscalationLevel: 0, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null,
     };
 
@@ -153,6 +154,9 @@ describe('IncidentReviewDrawer', () => {
     expect(screen.queryByText('Driver responded')).not.toBeInTheDocument();
     // Authorship is distinguishable in the activity history, not just a raw action-type label.
     expect(screen.getByText(/Requested driver input/)).toBeInTheDocument();
+    // Visibility is distinguishable per-row, not just per-badge: a manager-authored request
+    // shared with the driver reads differently from an internal-only row.
+    expect(within(screen.getByTestId('action-action-2')).getByText('[Shared with driver]')).toBeInTheDocument();
     unmount();
 
     fetchMock.mockResolvedValueOnce(ok(detail({ actions: [responded, requested, opened] })));
@@ -160,6 +164,11 @@ describe('IncidentReviewDrawer', () => {
     await flush();
     expect(screen.getByText('Driver responded')).toBeInTheDocument();
     expect(screen.queryByText('Awaiting driver')).not.toBeInTheDocument();
+    // Critical: the driver's own submitted words must be readable verbatim by the manager,
+    // not just a "Driver responded" badge with no content.
+    const respondedRow = screen.getByTestId('action-action-3');
+    expect(within(respondedRow).getByText(/I was on site the whole time/)).toBeInTheDocument();
+    expect(within(respondedRow).getByText('[Driver submitted]')).toBeInTheDocument();
   });
 
   it('shows no driver-input badge when input was never requested', async () => {
@@ -214,7 +223,14 @@ describe('IncidentReviewDrawer', () => {
     expect(screen.getByLabelText('Driver guidance')).toHaveValue('Please explain');
   });
 
-  it('does not render driver-input status or the request action when the incident cannot be loaded (cross-project PM)', async () => {
+  // NOTE: this only proves the drawer renders nothing when the detail fetch 403s — the
+  // whole drawer body is gated on `detail` being non-null regardless of driver-input content,
+  // so it does not exercise the manager project-scope boundary itself. That boundary (a PM
+  // cannot read another PM's incident, including its driver response) is enforced in
+  // `reviewService.ts#getIncidentDetailForViewer` and proven server-side in
+  // `reviewService.test.ts`, where `getIncidentActions` — the only place a driver's
+  // submitted explanation is read from — is asserted never called once scope denies access.
+  it('does not render driver-input status or the request action when the detail fetch is denied (403)', async () => {
     fetchMock.mockResolvedValue(fail(403, 'FORBIDDEN', 'You cannot view this incident'));
     render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
     await flush();

@@ -55,6 +55,41 @@ describe('getIncidentDetailForViewer', () => {
     await expect(getIncidentDetailForViewer(INCIDENT, viewer)).rejects.toBeInstanceOf(IncidentAccessDeniedError);
   });
 
+  /**
+   * A driver's submitted explanation is read from `getIncidentActions` (its `note` column —
+   * see `submissionService.ts` and `reviewQueries.ts#getIncidentActions`) exactly like any
+   * other action; there is no separate driver-response read path. So proving a PM cannot
+   * read another PM's incident's driver response *is* proving `getIncidentActions` is never
+   * reached once the project-ownership check denies access — this is that proof, not a
+   * restatement of the generic "denies a restricted scope" test above.
+   */
+  it('never reaches a driver\'s submitted explanation when a PM is scoped to a different project — access is denied before any action/evidence read', async () => {
+    scope.resolveIncidentScope.mockResolvedValue({ unrestricted: false, pmUserId: USER, pmStaffId: STAFF });
+    queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: 'another-pms-project' });
+    scope.isProjectOwnedByScope.mockResolvedValue(false);
+
+    await expect(getIncidentDetailForViewer(INCIDENT, viewer)).rejects.toBeInstanceOf(IncidentAccessDeniedError);
+
+    expect(scope.isProjectOwnedByScope).toHaveBeenCalledWith({ unrestricted: false, pmUserId: USER, pmStaffId: STAFF }, 'another-pms-project');
+    expect(queries.getIncidentActions).not.toHaveBeenCalled();
+    expect(queries.getIncidentEvidence).not.toHaveBeenCalled();
+  });
+
+  it('proves the negative case too: an authorized PM whose scope owns the project DOES receive the driver\'s submitted explanation, verbatim, via the action timeline', async () => {
+    scope.resolveIncidentScope.mockResolvedValue({ unrestricted: false, pmUserId: USER, pmStaffId: STAFF });
+    queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: 'this-pms-project' });
+    scope.isProjectOwnedByScope.mockResolvedValue(true);
+    queries.getIncidentActions.mockResolvedValue([{
+      id: 'a1', actionType: 'driver_response_received', note: 'I was on site at the time', visibility: 'driver_submitted',
+    }]);
+    queries.getIncidentEvidence.mockResolvedValue([]);
+    queries.getIncidentDeliverySummary.mockResolvedValue({ delivered: 0, suppressed: 0, failed: 0 });
+
+    const detail = await getIncidentDetailForViewer(INCIDENT, viewer);
+
+    expect(detail.actions).toEqual([expect.objectContaining({ note: 'I was on site at the time', visibility: 'driver_submitted' })]);
+  });
+
   it('composes core, actions, evidence, and delivery for an authorized viewer', async () => {
     scope.resolveIncidentScope.mockResolvedValue(unrestrictedScope);
     queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: null });

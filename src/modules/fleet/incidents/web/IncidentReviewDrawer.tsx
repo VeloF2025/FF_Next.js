@@ -21,7 +21,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { incidentApi, IncidentApiError, type EvidenceUploadBody } from './incidentApi';
 import { IncidentActionPanel } from './IncidentActionPanel';
-import type { IncidentAction, IncidentDetail } from '../types';
+import type { IncidentAction, IncidentDetail, IncidentVisibility } from '../types';
 
 function sast(value: string | null): string {
   return value ? new Date(value).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }) : 'Not recorded';
@@ -34,6 +34,16 @@ const DRIVER_INPUT_BADGE_LABELS: Record<DriverInputBadge, string> = {
 const DRIVER_ACTION_LABELS: Partial<Record<IncidentAction['actionType'], string>> = {
   driver_input_requested: 'Requested driver input', driver_response_received: 'Driver responded',
 };
+/** Migration 503's three-way classification (design §9) — rendered on every action/evidence
+ * row so a manager can never mistake an internal note for one the driver can see, or a
+ * manager-authored row for one the driver actually submitted. */
+const VISIBILITY_LABELS: Record<IncidentVisibility, string> = {
+  internal: 'Internal', shared_with_driver: 'Shared with driver', driver_submitted: 'Driver submitted',
+};
+
+function VisibilityBadge({ visibility }: { visibility: IncidentVisibility }) {
+  return <span className="ml-1 text-xs uppercase text-[var(--ff-text-tertiary)]">[{VISIBILITY_LABELS[visibility]}]</span>;
+}
 
 /** Latest-request-vs-latest-response ordering only — see this file's docstring for why
  * `expired`/`closed`/`response_overdue` are not derivable from the data available here. */
@@ -133,9 +143,10 @@ function DetailSections({ detail }: { detail: IncidentDetail }) {
           const driverLabel = DRIVER_ACTION_LABELS[action.actionType];
           const authorship = action.actionType === 'driver_response_received' ? 'Driver' : action.actionType === 'driver_input_requested' ? 'Sent to driver' : null;
           return (
-            <li key={action.id}>
+            <li key={action.id} data-testid={`action-${action.id}`}>
               {sast(action.occurredAt)} — {driverLabel ?? action.actionType.replaceAll('_', ' ')}
               {authorship && <span className="ml-1 text-xs uppercase text-[var(--ff-text-tertiary)]">({authorship})</span>}
+              <VisibilityBadge visibility={action.visibility} />
               {action.note ? `: ${action.note}` : ''}
             </li>
           );
@@ -144,7 +155,11 @@ function DetailSections({ detail }: { detail: IncidentDetail }) {
       <section aria-label="Attachments">
         <h4 className="font-medium text-[var(--ff-text-primary)]">Attachments</h4>
         {detail.evidence.length === 0 ? <p>No evidence attached yet.</p> : <ul>{detail.evidence.map((item) => (
-          <li key={item.id}><a href={item.storageUrl} target="_blank" rel="noreferrer" className="underline">{item.originalFilename ?? item.evidenceType}</a>{item.description ? ` — ${item.description}` : ''}</li>
+          <li key={item.id} data-testid={`evidence-${item.id}`}>
+            <a href={item.storageUrl} target="_blank" rel="noreferrer" className="underline">{item.originalFilename ?? item.evidenceType}</a>
+            {item.description ? ` — ${item.description}` : ''}
+            <VisibilityBadge visibility={item.visibility} />
+          </li>
         ))}</ul>}
       </section>
     </div>

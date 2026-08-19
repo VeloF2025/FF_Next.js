@@ -24,6 +24,14 @@ export type IncidentActionType =
   | 'condition_cleared' | 'resolved' | 'dismissed' | 'evidence_added' | 'recipient_changed'
   | 'driver_input_requested' | 'driver_response_received';
 export type IncidentEvidenceType = 'photo' | 'document' | 'manager_note' | 'external_reference';
+/**
+ * PR7 (migration 503) visibility classification on `fleet_operational_incident_actions`/
+ * `fleet_operational_incident_evidence`. `internal` is manager-only; `shared_with_driver` is
+ * manager-authored content also made visible to the linked driver; `driver_submitted` is
+ * content the driver itself submitted. Existing PR6 rows and any future manager-authored row
+ * default to `internal` so nothing is retroactively or accidentally disclosed to a driver.
+ */
+export type IncidentVisibility = 'internal' | 'shared_with_driver' | 'driver_submitted';
 export type MonitorRunKind = 'status_monitor' | 'escalation' | 'morning_summary';
 export type MonitorRunStatus = 'running' | 'succeeded' | 'partial_failure' | 'failed';
 export type IncidentProducerKind = 'scheduled_detection' | 'source_event';
@@ -205,6 +213,7 @@ export interface IncidentAction {
   isSystemActor: boolean;
   occurredAt: string;
   note: string | null;
+  visibility: IncidentVisibility;
   beforeLifecycleStatus: IncidentLifecycleStatus | null;
   afterLifecycleStatus: IncidentLifecycleStatus | null;
   beforeEscalationLevel: number | null;
@@ -222,6 +231,7 @@ export interface IncidentEvidence {
   originalFilename: string | null;
   uploadedBy: string | null;
   description: string | null;
+  visibility: IncidentVisibility;
   createdAt: string;
 }
 

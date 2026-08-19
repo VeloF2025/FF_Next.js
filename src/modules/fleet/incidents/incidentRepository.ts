@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import type { TxnClient } from '@/lib/db-pool';
 import type {
   IncidentAction, IncidentActionType, IncidentEvidence, IncidentEvidenceType,
-  IncidentLifecycleStatus, IncidentSeverity, IncidentType, SanitizedIncidentMetadata,
+  IncidentLifecycleStatus, IncidentSeverity, IncidentType, IncidentVisibility, SanitizedIncidentMetadata,
 } from './types';
 
 const NULL_ASSIGNMENT_SENTINEL = '00000000-0000-0000-0000-000000000000';
@@ -197,6 +197,7 @@ export interface InsertActionInput {
 
 interface ActionRow extends Record<string, unknown> {
   id: string; action_type: IncidentActionType; actor_user_id: string | null; is_system_actor: boolean; occurred_at: string | Date; note: string | null;
+  visibility: IncidentVisibility;
   before_lifecycle_status: IncidentLifecycleStatus | null; after_lifecycle_status: IncidentLifecycleStatus | null;
   before_escalation_level: number | null; after_escalation_level: number | null; metadata: SanitizedIncidentMetadata; request_correlation_id: string | null;
 }
@@ -204,19 +205,22 @@ interface ActionRow extends Record<string, unknown> {
 function mapAction(row: ActionRow): IncidentAction {
   return {
     id: row.id, actionType: row.action_type, actorUserId: row.actor_user_id, isSystemActor: row.is_system_actor,
-    occurredAt: iso(row.occurred_at), note: row.note, beforeLifecycleStatus: row.before_lifecycle_status,
+    occurredAt: iso(row.occurred_at), note: row.note, visibility: row.visibility, beforeLifecycleStatus: row.before_lifecycle_status,
     afterLifecycleStatus: row.after_lifecycle_status, beforeEscalationLevel: row.before_escalation_level,
     afterEscalationLevel: row.after_escalation_level, metadata: row.metadata, requestCorrelationId: row.request_correlation_id };
 }
 
-/** Append-only action history; no update/delete path is exposed here or granted at the database. */
+/** Append-only action history; no update/delete path is exposed here or granted at the
+ * database. Never writes `visibility` — every caller here is manager-authored, so migration
+ * 503's `DEFAULT 'internal'` is correct and is only read back; a driver-authored action
+ * (`driver/submissionService.ts`, `driver/requestInputService.ts`) writes directly instead. */
 export async function insertIncidentAction(input: InsertActionInput, txn: TxnClient): Promise<IncidentAction> {
   const created = await txn.queryOne<ActionRow>(
     `INSERT INTO fleet_operational_incident_actions
       (incident_id, action_type, actor_user_id, is_system_actor, note, before_lifecycle_status,
        after_lifecycle_status, before_escalation_level, after_escalation_level, metadata, request_correlation_id)
      VALUES ($1::uuid,$2,$3::uuid,$4,$5,$6,$7,$8,$9,$10::jsonb,$11)
-     RETURNING id, action_type, actor_user_id, is_system_actor, occurred_at, note, before_lifecycle_status,
+     RETURNING id, action_type, actor_user_id, is_system_actor, occurred_at, note, visibility, before_lifecycle_status,
        after_lifecycle_status, before_escalation_level, after_escalation_level, metadata, request_correlation_id`,
     [input.incidentId, input.actionType, input.actorUserId, input.isSystemActor, input.note,
       input.beforeLifecycleStatus, input.afterLifecycleStatus, input.beforeEscalationLevel,
@@ -234,23 +238,24 @@ export interface InsertEvidenceInput {
 interface EvidenceRow extends Record<string, unknown> {
   id: string; evidence_type: IncidentEvidenceType; storage_url: string; storage_key: string;
   mime_type: string | null; original_filename: string | null; uploaded_by: string | null;
-  description: string | null; created_at: string | Date;
+  description: string | null; visibility: IncidentVisibility; created_at: string | Date;
 }
 
 function mapEvidence(row: EvidenceRow): IncidentEvidence {
   return {
     id: row.id, evidenceType: row.evidence_type, storageUrl: row.storage_url, storageKey: row.storage_key,
     mimeType: row.mime_type, originalFilename: row.original_filename, uploadedBy: row.uploaded_by,
-    description: row.description, createdAt: iso(row.created_at) };
+    description: row.description, visibility: row.visibility, createdAt: iso(row.created_at) };
 }
 
-/** Append-only evidence records; deletion is never exposed (design §15). */
+/** Append-only evidence records; deletion is never exposed (design §15). Never writes
+ * `visibility` — same reasoning as `insertIncidentAction` immediately above. */
 export async function insertIncidentEvidence(input: InsertEvidenceInput, txn: TxnClient): Promise<IncidentEvidence> {
   const created = await txn.queryOne<EvidenceRow>(
     `INSERT INTO fleet_operational_incident_evidence
       (incident_id, evidence_type, storage_url, storage_key, mime_type, original_filename, uploaded_by, description)
      VALUES ($1::uuid,$2,$3,$4,$5,$6,$7::uuid,$8)
-     RETURNING id, evidence_type, storage_url, storage_key, mime_type, original_filename, uploaded_by, description, created_at`,
+     RETURNING id, evidence_type, storage_url, storage_key, mime_type, original_filename, uploaded_by, description, visibility, created_at`,
     [input.incidentId, input.evidenceType, input.storageUrl, input.storageKey, input.mimeType,
       input.originalFilename, input.uploadedBy, input.description],
   );

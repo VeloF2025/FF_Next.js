@@ -212,7 +212,15 @@ describe('submitDriverResponse — append-only audit row and immutability of inc
     expect(actionCall).toBeDefined();
     expect(actionCall?.[0]).toContain("'driver_submitted'");
     expect(actionCall?.[0]).toContain("'driver_response_received'");
-    expect(actionCall?.[1]).toEqual([INCIDENT, STAFF, 'open']);
+    expect(actionCall?.[1]).toEqual([INCIDENT, STAFF, 'I was on site at the time', 'open']);
+  });
+
+  it('records the driver\'s trimmed explanation verbatim as the action note — a manager reading the review timeline must see what the driver actually wrote, not NULL', async () => {
+    await submitDriverResponse({ ...command, explanation: '  Traffic on the N1 delayed arrival  ' }, STAFF);
+
+    const actionCall = db.txnQuery.mock.calls.find(([text]: [string]) => text.includes('fleet_operational_incident_actions'));
+    expect(actionCall?.[0]).toContain('note');
+    expect(actionCall?.[1]?.[2]).toBe('Traffic on the N1 delayed arrival');
   });
 
   it('records before/after lifecycle_status as unchanged — a submission never sets lifecycle, outcome, or acknowledgement', async () => {
@@ -221,7 +229,7 @@ describe('submitDriverResponse — append-only audit row and immutability of inc
     await submitDriverResponse(command, STAFF);
 
     const actionCall = db.txnQuery.mock.calls.find(([text]: [string]) => text.includes('fleet_operational_incident_actions'));
-    expect(actionCall?.[1]).toEqual([INCIDENT, STAFF, 'under_review']);
+    expect(actionCall?.[1]).toEqual([INCIDENT, STAFF, 'I was on site at the time', 'under_review']);
   });
 
   it('does not insert an action row on an idempotent duplicate replay', async () => {

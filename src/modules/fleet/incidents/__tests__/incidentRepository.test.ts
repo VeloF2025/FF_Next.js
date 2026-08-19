@@ -164,9 +164,9 @@ describe('append-only action and evidence writes', () => {
     const txn = fakeTxn();
     txn.queryOne.mockResolvedValue({
       id: 'act-1', action_type: 'commented', actor_user_id: USER, is_system_actor: false,
-      occurred_at: '2026-08-13T08:10:00.000Z', note: 'Checked in with the driver', before_lifecycle_status: 'acknowledged',
-      after_lifecycle_status: 'acknowledged', before_escalation_level: 0, after_escalation_level: 0,
-      metadata: {}, request_correlation_id: null,
+      occurred_at: '2026-08-13T08:10:00.000Z', note: 'Checked in with the driver', visibility: 'internal',
+      before_lifecycle_status: 'acknowledged', after_lifecycle_status: 'acknowledged',
+      before_escalation_level: 0, after_escalation_level: 0, metadata: {}, request_correlation_id: null,
     });
 
     const action = await insertIncidentAction({
@@ -181,12 +181,34 @@ describe('append-only action and evidence writes', () => {
     expect(text).not.toMatch(/UPDATE|DELETE/);
   });
 
+  it('never writes visibility for a manager-authored action — it relies on migration 503\'s column DEFAULT \'internal\' and reads back whatever the row carries', async () => {
+    const txn = fakeTxn();
+    txn.queryOne.mockResolvedValue({
+      id: 'act-2', action_type: 'commented', actor_user_id: USER, is_system_actor: false,
+      occurred_at: '2026-08-13T08:10:00.000Z', note: 'Checked in with the driver', visibility: 'internal',
+      before_lifecycle_status: 'acknowledged', after_lifecycle_status: 'acknowledged',
+      before_escalation_level: 0, after_escalation_level: 0, metadata: {}, request_correlation_id: null,
+    });
+
+    const action = await insertIncidentAction({
+      incidentId: INCIDENT, actionType: 'commented', actorUserId: USER, isSystemActor: false,
+      note: 'Checked in with the driver', beforeLifecycleStatus: 'acknowledged', afterLifecycleStatus: 'acknowledged',
+      beforeEscalationLevel: 0, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null,
+    }, txn);
+
+    const [insertText, insertParams] = txn.queryOne.mock.calls[0]!;
+    expect(insertText).not.toMatch(/\bvisibility\b\s*[,)]?\s*VALUES/i);
+    expect(insertText).toMatch(/RETURNING[\s\S]*\bvisibility\b/i);
+    expect(insertParams).not.toContain('internal');
+    expect(action.visibility).toBe('internal');
+  });
+
   it('inserts evidence with no update or delete statements', async () => {
     const txn = fakeTxn();
     txn.queryOne.mockResolvedValue({
       id: 'ev-1', evidence_type: 'photo', storage_url: 'https://app.fibreflow.app/storage/x',
       storage_key: 'fleet/incidents/x', mime_type: 'image/jpeg', original_filename: 'photo.jpg',
-      uploaded_by: USER, description: null, created_at: '2026-08-13T08:12:00.000Z',
+      uploaded_by: USER, description: null, visibility: 'internal', created_at: '2026-08-13T08:12:00.000Z',
     });
 
     const evidence = await insertIncidentEvidence({
@@ -199,6 +221,25 @@ describe('append-only action and evidence writes', () => {
     const [text] = txn.queryOne.mock.calls[0]!;
     expect(text).toContain('INSERT INTO fleet_operational_incident_evidence');
     expect(text).not.toMatch(/UPDATE|DELETE/);
+  });
+
+  it('reads back the evidence row\'s visibility (migration 503 default \'internal\')', async () => {
+    const txn = fakeTxn();
+    txn.queryOne.mockResolvedValue({
+      id: 'ev-2', evidence_type: 'photo', storage_url: 'https://app.fibreflow.app/storage/x',
+      storage_key: 'fleet/incidents/x', mime_type: 'image/jpeg', original_filename: 'photo.jpg',
+      uploaded_by: USER, description: null, visibility: 'internal', created_at: '2026-08-13T08:12:00.000Z',
+    });
+
+    const evidence = await insertIncidentEvidence({
+      incidentId: INCIDENT, evidenceType: 'photo', storageUrl: 'https://app.fibreflow.app/storage/x',
+      storageKey: 'fleet/incidents/x', mimeType: 'image/jpeg', originalFilename: 'photo.jpg',
+      uploadedBy: USER, description: null,
+    }, txn);
+
+    const [text] = txn.queryOne.mock.calls[0]!;
+    expect(text).toMatch(/RETURNING[\s\S]*\bvisibility\b/i);
+    expect(evidence.visibility).toBe('internal');
   });
 });
 

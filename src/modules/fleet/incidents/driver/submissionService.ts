@@ -100,13 +100,18 @@ async function runSubmissionTransaction(
     if (insertResult.created) {
       // A submission never sets lifecycle/outcome/acknowledgement/visibility
       // of the incident itself — before/after lifecycle_status are recorded
-      // unchanged, and there is no escalation-level change at all.
+      // unchanged, and there is no escalation-level change at all. `note`
+      // carries the driver's own explanation verbatim (never summarised or
+      // re-derived) so the manager review timeline — the only place a
+      // manager reads this table — shows what the driver actually wrote;
+      // see `reviewQueries.ts#getIncidentActions` and
+      // `IncidentReviewDrawer.tsx`'s activity-history section.
       await txn.query(
         `INSERT INTO fleet_operational_incident_actions
           (incident_id, action_type, actor_staff_id, is_system_actor, note, visibility,
            before_lifecycle_status, after_lifecycle_status, metadata)
-         VALUES ($1::uuid, 'driver_response_received', $2::uuid, false, NULL, 'driver_submitted', $3, $3, '{}'::jsonb)`,
-        [parsed.incidentId, sessionStaffId, locked.lifecycleStatus],
+         VALUES ($1::uuid, 'driver_response_received', $2::uuid, false, $3, 'driver_submitted', $4, $4, '{}'::jsonb)`,
+        [parsed.incidentId, sessionStaffId, parsed.explanation, locked.lifecycleStatus],
       );
     }
 

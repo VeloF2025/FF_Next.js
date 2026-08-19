@@ -103,7 +103,7 @@ describe('getIncidentActions and getIncidentEvidence', () => {
   it('map append-only action and evidence history', async () => {
     db.query.mockResolvedValueOnce([{
       id: 'a1', action_type: 'acknowledged', actor_user_id: USER, is_system_actor: false, occurred_at: '2026-08-13T08:05:00.000Z',
-      note: null, before_lifecycle_status: 'open', after_lifecycle_status: 'acknowledged',
+      note: null, visibility: 'internal', before_lifecycle_status: 'open', after_lifecycle_status: 'acknowledged',
       before_escalation_level: 0, after_escalation_level: 0, metadata: {}, request_correlation_id: null,
     }]);
     const actions = await getIncidentActions(INCIDENT);
@@ -111,10 +111,40 @@ describe('getIncidentActions and getIncidentEvidence', () => {
 
     db.query.mockResolvedValueOnce([{
       id: 'e1', evidence_type: 'photo', storage_url: 'https://app.fibreflow.app/storage/x', storage_key: 'x',
-      mime_type: 'image/jpeg', original_filename: 'photo.jpg', uploaded_by: USER, description: null, created_at: '2026-08-13T08:10:00.000Z',
+      mime_type: 'image/jpeg', original_filename: 'photo.jpg', uploaded_by: USER, description: null,
+      visibility: 'internal', created_at: '2026-08-13T08:10:00.000Z',
     }]);
     const evidence = await getIncidentEvidence(INCIDENT);
     expect(evidence).toEqual([expect.objectContaining({ id: 'e1', evidenceType: 'photo' })]);
+  });
+
+  it('selects visibility so a manager can distinguish internal notes from driver-shared/driver-submitted ones (migration 503)', async () => {
+    await getIncidentActions(INCIDENT);
+    const [actionsText] = db.query.mock.calls[0]!;
+    expect(actionsText).toMatch(/\bvisibility\b/);
+
+    await getIncidentEvidence(INCIDENT);
+    const [evidenceText] = db.query.mock.calls[1]!;
+    expect(evidenceText).toMatch(/\bvisibility\b/);
+  });
+
+  it('maps each visibility class verbatim onto the returned action/evidence, not just a default', async () => {
+    db.query.mockResolvedValueOnce([{
+      id: 'a-shared', action_type: 'driver_input_requested', actor_user_id: USER, is_system_actor: false,
+      occurred_at: '2026-08-13T08:05:00.000Z', note: 'Please explain', visibility: 'shared_with_driver',
+      before_lifecycle_status: 'open', after_lifecycle_status: 'open',
+      before_escalation_level: 0, after_escalation_level: 0, metadata: {}, request_correlation_id: null,
+    }]);
+    const [action] = await getIncidentActions(INCIDENT);
+    expect(action?.visibility).toBe('shared_with_driver');
+
+    db.query.mockResolvedValueOnce([{
+      id: 'e-driver', evidence_type: 'photo', storage_url: 'https://app.fibreflow.app/storage/y', storage_key: 'y',
+      mime_type: 'image/jpeg', original_filename: 'proof.jpg', uploaded_by: null, description: null,
+      visibility: 'driver_submitted', created_at: '2026-08-13T08:10:00.000Z',
+    }]);
+    const [evidence] = await getIncidentEvidence(INCIDENT);
+    expect(evidence?.visibility).toBe('driver_submitted');
   });
 });
 

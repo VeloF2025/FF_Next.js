@@ -22,14 +22,12 @@ import type {
   OversightMembership,
 } from '../types';
 import type {
-  AttendanceCorrectionState, DriverConcernCategory, DriverInputRequestResult, DriverInputSettings, DriverInputState,
+  DriverConcernCategory, DriverInputRequestResult, DriverInputSettings,
 } from '../driver/types';
 
 export type { ActiveUserOption };
 
 const LIFECYCLE_STATUSES: readonly IncidentLifecycleStatus[] = ['open', 'acknowledged', 'under_review', 'resolved', 'dismissed'];
-const DRIVER_INPUT_STATES: readonly DriverInputState[] = ['not_requested', 'requested', 'responded', 'expired', 'closed'];
-const ATTENDANCE_CORRECTION_STATES: readonly AttendanceCorrectionState[] = ['pending', 'approved', 'rejected', 'cancelled'];
 
 export interface IncidentQueueFilters {
   lifecycleStatus?: IncidentLifecycleStatus;
@@ -43,11 +41,6 @@ export interface IncidentQueueFilters {
   overdueOnly?: boolean;
   conditionState?: 'active' | 'cleared';
   evidenceState?: 'required' | 'present';
-  /** PR7 Task 8: not yet enforced server-side (`reviewQueries.ts`'s list query has no driver-input
-   * columns/predicates) — round-trips through the URL and outgoing request today so the client
-   * contract is ready once that query is extended. */
-  driverInputState?: DriverInputState;
-  attendanceCorrectionState?: AttendanceCorrectionState;
 }
 
 const STRING_FILTER_KEYS = ['projectId', 'managerUserId', 'staffId', 'fromDate', 'toDate'] as const;
@@ -70,12 +63,6 @@ export function parseIncidentQueueFilters(source: string | URLSearchParams): Inc
   if (conditionState === 'active' || conditionState === 'cleared') filters.conditionState = conditionState;
   const evidenceState = params.get('evidenceState');
   if (evidenceState === 'required' || evidenceState === 'present') filters.evidenceState = evidenceState;
-  const driverInputState = params.get('driverInputState');
-  if (driverInputState && DRIVER_INPUT_STATES.includes(driverInputState as DriverInputState)) filters.driverInputState = driverInputState as DriverInputState;
-  const attendanceCorrectionState = params.get('attendanceCorrectionState');
-  if (attendanceCorrectionState && ATTENDANCE_CORRECTION_STATES.includes(attendanceCorrectionState as AttendanceCorrectionState)) {
-    filters.attendanceCorrectionState = attendanceCorrectionState as AttendanceCorrectionState;
-  }
   if (params.get('overdueOnly') === 'true') filters.overdueOnly = true;
   return filters;
 }
@@ -88,8 +75,6 @@ export function serializeIncidentQueueFilters(filters: IncidentQueueFilters): st
   if (filters.severity) params.set('severity', filters.severity);
   if (filters.conditionState) params.set('conditionState', filters.conditionState);
   if (filters.evidenceState) params.set('evidenceState', filters.evidenceState);
-  if (filters.driverInputState) params.set('driverInputState', filters.driverInputState);
-  if (filters.attendanceCorrectionState) params.set('attendanceCorrectionState', filters.attendanceCorrectionState);
   if (filters.overdueOnly) params.set('overdueOnly', 'true');
   return params.toString();
 }
