@@ -137,6 +137,22 @@ describe('getAttendanceCorrectionEligibility', () => {
     });
   });
 
+  it('reports the unremediable reason when the period is locked AND the window has closed', async () => {
+    // A payroll unlock cannot reopen a closed Fleet response window, so reporting
+    // period_locked here would send the driver to their supervisor for an unlock that leaves
+    // them blocked anyway. No test previously exercised both conditions together, which is
+    // why the original precedence went unquestioned.
+    db.queryOne
+      .mockResolvedValueOnce(ownedIncidentRow())
+      .mockResolvedValueOnce(exceptionRow())
+      .mockResolvedValueOnce({ locked: true });
+    incidentService.computeResponseEligibility.mockReturnValue({ eligible: false, reason: 'expired' });
+
+    await expect(getAttendanceCorrectionEligibility(INCIDENT, STAFF)).resolves.toEqual({
+      eligible: false, reason: 'outside_response_window',
+    });
+  });
+
   it('is eligible with the matched exception/entry ids when every check passes', async () => {
     wireEligibilityHappyPath();
 

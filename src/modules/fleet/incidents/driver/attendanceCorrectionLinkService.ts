@@ -117,9 +117,13 @@ export async function getAttendanceCorrectionEligibility(
   const exception = await findRequiredExceptionForWorkDate(sessionStaffId, incident.workDate);
   if (!exception) return { eligible: false, reason: 'no_required_exception' };
 
-  if (await isPeriodLocked(incident.workDate as string)) {
-    return { eligible: false, reason: 'period_locked' };
-  }
+  // Evaluated here so the query order is unchanged, but REPORTED below the response-window
+  // check. `period_locked` reads as actionable — "contact your supervisor to request an
+  // unlock" — while a payroll unlock cannot reopen a closed Fleet response window. Reporting
+  // the lock first sent a driver whose window had also closed to their supervisor for an
+  // unlock that would leave them blocked anyway. Report the unremediable reason first; the
+  // design names the three reasons without an order, so this precedence is a ruling.
+  const periodLocked = await isPeriodLocked(incident.workDate as string);
 
   const now = new Date().toISOString();
   const settings = await getEffectiveDriverInputSettings(now);
@@ -131,6 +135,7 @@ export async function getAttendanceCorrectionEligibility(
     postClosureResponseWindowDays: settings.postClosureResponseWindowDays,
   });
   if (!responseEligibility.eligible) return { eligible: false, reason: 'outside_response_window' };
+  if (periodLocked) return { eligible: false, reason: 'period_locked' };
 
   return { eligible: true, exceptionId: exception.exception_id, entryId: exception.entry_id };
 }
