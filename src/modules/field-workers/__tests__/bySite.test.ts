@@ -74,6 +74,14 @@ describe('groupBySite', () => {
     expect(groups[groups.length - 1].workerCount).toBe(1);
   });
 
+  it('breaks a headcount tie alphabetically', () => {
+    // Inserted in reverse alphabetical order so passing cannot be an accident
+    // of insertion order: both sites have exactly one worker.
+    const groups = groupBySite([onSite('s2', 'Mamelodi', 'e2'), onSite('s1', 'Lawley', 'e1')]);
+    expect(groups.map((g) => g.siteName)).toEqual(['Lawley', 'Mamelodi']);
+    expect(groups.map((g) => g.workerCount)).toEqual([1, 1]);
+  });
+
   it('returns no groups for no rows', () => {
     expect(groupBySite([])).toEqual([]);
   });

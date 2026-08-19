@@ -16,14 +16,43 @@ import { log } from '@/lib/logger';
 import { getFieldAttendance, type FieldAttendanceRow } from '../api';
 import { getSastToday, safeFormatTime, safeFormatDate } from '../timeHelpers';
 import { groupBySite, type SiteGroup } from '../bySite';
-import { proximityLabel } from '../aoiProximity';
+import { formatDistance } from '../aoiProximity';
 
-function WorkerLine({ row, showDate }: { row: FieldAttendanceRow; showDate: boolean }) {
+/**
+ * How far off site they were, for the unattributed bucket. Prefers the
+ * clock-in fix and falls back to clock-out, so a shift whose only recorded
+ * fix is the clock-out still explains itself rather than showing nothing.
+ */
+function nearestFix(row: FieldAttendanceRow): { project: string; label: string } | null {
+  const candidates = [
+    { project: row.clock_in_aoi_project, distance: row.clock_in_aoi_distance_m },
+    { project: row.clock_out_aoi_project, distance: row.clock_out_aoi_distance_m },
+  ];
+  for (const c of candidates) {
+    // Not `!c.distance` — 0 is a real measurement, though a 0 cannot reach
+    // this bucket by construction.
+    if (c.distance == null || !Number.isFinite(c.distance)) continue;
+    return { project: c.project ?? 'site', label: formatDistance(c.distance) };
+  }
+  return null;
+}
+
+function WorkerLine({
+  row,
+  showDate,
+  showNearest,
+}: {
+  row: FieldAttendanceRow;
+  showDate: boolean;
+  /** Only the unattributed bucket. Under a named site heading this label would
+   *  name a DIFFERENT project — someone attributed by their clock-out can have
+   *  clocked in 30 km from something else — which reads as contradicting the
+   *  group they are correctly sitting in. */
+  showNearest: boolean;
+}) {
   const inTime = row.clock_in_at ? safeFormatTime(row.clock_in_at) : '— missing';
   const outTime = row.clock_out_at ? safeFormatTime(row.clock_out_at) : 'open';
-  // Only meaningful in the unattributed bucket, where the reader needs to see
-  // how far off they were; on a named site it would restate the heading.
-  const nearest = proximityLabel(row.clock_in_aoi_project, row.clock_in_aoi_distance_m);
+  const nearest = showNearest ? nearestFix(row) : null;
 
   return (
     <li className="flex items-center gap-3 px-3 py-1.5 border-t border-neutral-800 text-sm">
@@ -37,7 +66,9 @@ function WorkerLine({ row, showDate }: { row: FieldAttendanceRow; showDate: bool
         {inTime} → {outTime}
       </span>
       {nearest && (
-        <span className="text-rose-300 text-xs whitespace-nowrap">nearest {row.clock_in_aoi_project ?? 'site'} {nearest}</span>
+        <span className="text-rose-300 text-xs whitespace-nowrap">
+          nearest {nearest.project} {nearest.label}
+        </span>
       )}
     </li>
   );
@@ -60,7 +91,7 @@ function SiteCard({ group, showDate }: { group: SiteGroup; showDate: boolean }) 
       </div>
       <ul>
         {group.rows.map((row) => (
-          <WorkerLine key={row.entry_id} row={row} showDate={showDate} />
+          <WorkerLine key={row.entry_id} row={row} showDate={showDate} showNearest={unattributed} />
         ))}
       </ul>
     </div>
