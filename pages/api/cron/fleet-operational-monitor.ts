@@ -23,6 +23,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { cronSecretMatches } from '@/lib/cronAuth';
 import { log } from '@/lib/logger';
 import { runWithCronLock } from '@/modules/fleet/incidents/cronLock';
 import { runOperationalMonitor } from '@/modules/fleet/incidents/monitorService';
@@ -40,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     log.error('CRON_SECRET not configured', undefined, MODULE);
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Server misconfigured: CRON_SECRET not set');
   }
-  if (req.headers['x-cron-secret'] !== cronSecret) {
+  if (!cronSecretMatches(req.headers['x-cron-secret'], cronSecret)) {
     return apiResponse.unauthorized(res, 'Invalid or missing cron secret');
   }
 
