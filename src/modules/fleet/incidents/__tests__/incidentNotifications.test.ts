@@ -9,6 +9,9 @@ vi.mock('@/modules/notifications/services/notificationBus', () => bus);
 const wa = vi.hoisted(() => ({ deliverWhatsApp: vi.fn() }));
 vi.mock('@/modules/notifications/services/whatsappDelivery', () => wa);
 
+const idem = vi.hoisted(() => ({ claimNotification: vi.fn(), releaseNotificationClaim: vi.fn() }));
+vi.mock('@/modules/notifications/services/notificationIdempotency', () => idem);
+
 const recipients = vi.hoisted(() => ({ resolveIncidentRecipients: vi.fn() }));
 vi.mock('../recipientService', () => recipients);
 
@@ -46,6 +49,8 @@ beforeEach(() => {
   recipients.resolveIncidentRecipients.mockResolvedValue({ userIds: [PM, OVERSIGHT], failed: false });
   bus.notify.mockResolvedValue({ delivered: 2, suppressed: 0, failed: 0 });
   wa.deliverWhatsApp.mockResolvedValue(undefined);
+  idem.claimNotification.mockResolvedValue(true);
+  idem.releaseNotificationClaim.mockResolvedValue(undefined);
 });
 
 describe('idempotency keys', () => {
@@ -107,7 +112,45 @@ describe('sendIncidentOpenedNotification', () => {
     expect(wa.deliverWhatsApp).toHaveBeenCalledWith(OVERSIGHT, expect.anything(), null);
   });
 
-  it('never sends mandatory WhatsApp for a routine scheduled incident, even if critical', async () => {
+  it('claims each recipient under a whatsapp-suffixed event before sending', async () => {
+    // notify() has already claimed (user, event_type, key) for the in-app/email fan-out, so
+    // the WhatsApp leg must claim a distinct namespace or it would suppress itself entirely.
+    await sendIncidentOpenedNotification({
+      ...baseInput, producerKind: 'source_event', severity: 'critical', incidentType: 'accident_sos',
+      rule: rule({ incidentType: 'accident_sos', severity: 'critical' }),
+    });
+
+    const key = buildIncidentOpenedIdempotencyKey(baseInput.incidentId);
+    expect(idem.claimNotification).toHaveBeenCalledWith(PM, 'fleet.operational_incident_opened:whatsapp', key);
+    expect(idem.claimNotification).toHaveBeenCalledWith(OVERSIGHT, 'fleet.operational_incident_opened:whatsapp', key);
+  });
+
+  it('does not re-send mandatory WhatsApp to a recipient whose claim is already held', async () => {
+    idem.claimNotification.mockImplementation(async (userId: string) => userId !== PM);
+
+    await sendIncidentOpenedNotification({
+      ...baseInput, producerKind: 'source_event', severity: 'critical', incidentType: 'accident_sos',
+      rule: rule({ incidentType: 'accident_sos', severity: 'critical' }),
+    });
+
+    expect(wa.deliverWhatsApp).toHaveBeenCalledTimes(1);
+    expect(wa.deliverWhatsApp).toHaveBeenCalledWith(OVERSIGHT, expect.anything(), null);
+  });
+
+  it('releases the claim when a mandatory WhatsApp send fails so a retry can reach them', async () => {
+    // A transient bridge outage must not permanently silence the one channel a critical
+    // incident is guaranteed to reach.
+    wa.deliverWhatsApp.mockRejectedValueOnce(new Error('WA bridge down'));
+
+    await sendIncidentOpenedNotification({
+      ...baseInput, producerKind: 'source_event', severity: 'critical', incidentType: 'accident_sos',
+      rule: rule({ incidentType: 'accident_sos', severity: 'critical' }),
+    });
+
+    expect(idem.releaseNotificationClaim).toHaveBeenCalledWith(
+      PM, 'fleet.operational_incident_opened:whatsapp', buildIncidentOpenedIdempotencyKey(baseInput.incidentId));
+  });
+  it('never sends mandatory WhatsApp for a routine scheduled incident, even if critical', async () => {
     await sendIncidentOpenedNotification({
       ...baseInput, severity: 'critical', producerKind: 'scheduled_detection',
       rule: rule({ severity: 'critical' }),

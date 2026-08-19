@@ -29,6 +29,7 @@
  */
 import { log } from '@/lib/logger';
 import { notify } from '@/modules/notifications/services/notificationBus';
+import { claimNotification, releaseNotificationClaim } from '@/modules/notifications/services/notificationIdempotency';
 import { deliverWhatsApp } from '@/modules/notifications/services/whatsappDelivery';
 import type { NotifyPayload, NotifyResult } from '@/modules/notifications/types';
 import { resolveIncidentRecipients } from './recipientService';
@@ -88,11 +89,28 @@ function openedBody(input: OpenedNotificationInput): string {
   return `${who} — ${where} — ${reason}`;
 }
 
+/**
+ * The mandatory-WhatsApp bypass goes straight to deliverWhatsApp, which has no dedup of its
+ * own — it sends and logs. Without a claim, anything that re-invokes a notification for the
+ * same transition (a retried source-event webhook, an admin resend) would message a critical
+ * incident's recipients again every time.
+ *
+ * The claim namespace is deliberately `${eventType}:whatsapp`, not `eventType`. notify() has
+ * already claimed (userId, eventType, key) for the in-app/email fan-out by the time we get
+ * here, so reusing that exact triple would return false for every recipient and suppress the
+ * WhatsApp leg entirely rather than deduplicate it.
+ *
+ * A failed send releases its claim: a transient bridge outage must not permanently silence
+ * the one channel a critical incident is guaranteed to reach.
+ */
 async function sendMandatoryWhatsApp(
-  userIds: readonly string[], payload: Omit<NotifyPayload, 'recipient_user_ids'>, logContext: Record<string, unknown>,
+  userIds: readonly string[], payload: Omit<NotifyPayload, 'recipient_user_ids'>,
+  eventType: string, idempotencyKey: string, logContext: Record<string, unknown>,
 ): Promise<number> {
   let failed = 0;
+  const claimEvent = `${eventType}:whatsapp`;
   for (const userId of userIds) {
+    if (!await claimNotification(userId, claimEvent, idempotencyKey)) continue;
     try {
       await deliverWhatsApp(userId, { ...payload, recipient_user_ids: [userId] }, null);
     } catch (error) {
@@ -100,6 +118,13 @@ async function sendMandatoryWhatsApp(
       log.error('[fleet-incident-notifications] mandatory WhatsApp delivery failed', {
         ...logContext, userId, error: sanitizedMessage(error),
       }, MODULE);
+      try {
+        await releaseNotificationClaim(userId, claimEvent, idempotencyKey);
+      } catch (releaseError) {
+        log.error('[fleet-incident-notifications] could not release a WhatsApp claim after a failed send', {
+          ...logContext, userId, error: sanitizedMessage(releaseError),
+        }, MODULE);
+      }
     }
   }
   return failed;
@@ -115,6 +140,7 @@ export async function sendIncidentOpenedNotification(input: OpenedNotificationIn
   }
 
   const plan = resolveIncidentOpenedNotification(input.rule, input.severity, input.producerKind);
+  const openedIdempotencyKey = buildIncidentOpenedIdempotencyKey(input.incidentId);
   const payload: NotifyPayload = {
     event_type: 'fleet.operational_incident_opened',
     title: `Fleet incident opened: ${humanizeCode(input.incidentType)}`,
@@ -127,13 +153,14 @@ export async function sendIncidentOpenedNotification(input: OpenedNotificationIn
       detectedAt: input.detectedAt, reasonCodes: [...input.reasonCodes],
     },
     recipient_user_ids: recipients.userIds,
-    idempotency_key: buildIncidentOpenedIdempotencyKey(input.incidentId),
+    idempotency_key: openedIdempotencyKey,
   };
   const result = await safeNotify(payload, { incidentId: input.incidentId });
 
   if (plan.mandatoryChannels.includes('whatsapp')) {
     const { recipient_user_ids: _drop, idempotency_key: _drop2, ...waPayload } = payload;
-    const waFailed = await sendMandatoryWhatsApp(recipients.userIds, waPayload, { incidentId: input.incidentId });
+    const waFailed = await sendMandatoryWhatsApp(
+      recipients.userIds, waPayload, payload.event_type, openedIdempotencyKey, { incidentId: input.incidentId });
     result.failed += waFailed;
   }
 
@@ -163,6 +190,7 @@ export async function sendEscalationNotification(input: EscalationNotificationIn
   }
   const who = input.staffName ?? 'Unknown staff';
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
+  const escalatedIdempotencyKey = buildIncidentEscalatedIdempotencyKey(input.incidentId, input.escalationLevel);
   const payload: NotifyPayload = {
     event_type: 'fleet.operational_incident_escalated',
     title: `Fleet incident escalated (level ${input.escalationLevel}): ${humanizeCode(input.incidentType)}`,
@@ -175,13 +203,14 @@ export async function sendEscalationNotification(input: EscalationNotificationIn
       severity: input.severity, escalationLevel: input.escalationLevel,
     },
     recipient_user_ids: recipients.userIds,
-    idempotency_key: buildIncidentEscalatedIdempotencyKey(input.incidentId, input.escalationLevel),
+    idempotency_key: escalatedIdempotencyKey,
   };
   const result = await safeNotify(payload, { incidentId: input.incidentId });
 
   if (requiresMandatoryIncidentWhatsApp(input.severity, input.producerKind)) {
     const { recipient_user_ids: _drop, idempotency_key: _drop2, ...waPayload } = payload;
-    const waFailed = await sendMandatoryWhatsApp(recipients.userIds, waPayload, { incidentId: input.incidentId });
+    const waFailed = await sendMandatoryWhatsApp(
+      recipients.userIds, waPayload, payload.event_type, escalatedIdempotencyKey, { incidentId: input.incidentId });
     result.failed += waFailed;
   }
 
