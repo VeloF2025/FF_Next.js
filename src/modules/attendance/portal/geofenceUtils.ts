@@ -1,149 +1,112 @@
 /**
- * Match device GPS against site geofences for clock-in / clock-out.
+ * Match device GPS against project areas-of-interest for clock-in.
  *
- * Sources of truth:
- *   - `fleet_authorized_locations` — seeded with site (and accommodation)
- *     polygons, where `radius_km` defines an inclusion circle around
- *     (lat, lon). Re-used from the fleet module rather than duplicating
- *     a new `attendance_sites` table.
- *   - `staff.home_site_id` — optional default site for staff that work
- *     the same location every day (most field crews).
+ * Source of truth: `project_aois` — the convex hull of each project's
+ * surveyed poles, rebuilt nightly by `refresh_project_aois()` (migration
+ * 499). A clock-in is "inside" when the fix falls within a hull.
  *
- * Policy (Phase 1a):
- *   - If device is inside any active site's radius, return that site.
- *   - If not, and staff has a `home_site_id`, return that site anyway
- *     but flag the entry as a geofence mismatch for review.
- *   - If staff has no home_site_id, still allow the clock-in but with a
- *     null site_geofence_id and a mismatch exception.
+ * This used to read `fleet_authorized_locations`, with `staff.home_site_id`
+ * as a fallback. Both have been empty since the feature shipped — 0 rows and
+ * 0 staff respectively — so `matchGeofence` returned `inside: false` for
+ * every clock-in ever recorded and raised a `geofence_mismatch` on each one.
+ * That is 2,261 of the 2,497 exceptions in the queue: one bug, not a
+ * workload, and the reason nothing in that table has ever been resolved.
+ * Reading an empty table forever is the failure this replaces, so do not
+ * reintroduce a source that nobody populates.
  *
- * Geofence matching is never a hard block — missing a clock-in because
- * of a bad GPS reading or an unmapped site is a worse outcome than
- * letting the exception flow through to the supervisor queue.
+ * Policy is unchanged in one important respect: geofence matching is NEVER
+ * a hard block. Missing a clock-in over a bad GPS reading or an unsurveyed
+ * site is worse than letting the exception flow to the supervisor queue.
  */
 
 import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
-import { haversineDistanceM, isValidLatLon, type LatLon } from '@/lib/geo';
+import type { LatLon } from '@/lib/geo';
 
 export interface GeofenceMatch {
-  siteId: string | null;
-  siteName: string | null;
+  /** Nearest project AOI, or null when no AOI exists at all. */
+  projectId: string | null;
+  projectName: string | null;
+  /** Metres to that AOI. 0 means inside the hull. Null when unmatched. */
   distanceM: number | null;
-  /** true when the device GPS was inside a site's radius. */
+  /** Inside the hull. */
   inside: boolean;
-  /** true when the matched site came from `staff.home_site_id`
-   *  rather than a radius hit — UI can show a softer confirmation. */
-  fallback: boolean;
+  /**
+   * Outside, but by less than the device's own reported error — the fix
+   * cannot distinguish this from being inside, so it must not be treated as
+   * a mismatch. GPS accuracy on these entries averages 37 m and reaches
+   * 1,543 m; without this, bad receivers manufacture violations.
+   */
+  withinAccuracy: boolean;
 }
 
-interface SiteRow extends Record<string, unknown> {
-  id: string;
-  name: string;
-  lat: string | number;
-  lon: string | number;
-  radius_km: string | number;
+interface NearestRow extends Record<string, unknown> {
+  project_id: string;
+  project_name: string | null;
+  distance_m: string;
 }
+
+const UNMATCHED: GeofenceMatch = {
+  projectId: null, projectName: null, distanceM: null,
+  inside: false, withinAccuracy: false,
+};
 
 /**
- * Find the nearest active site whose geofence includes the device GPS.
- * Falls back to the staff's home site if no radius hit. Returns a
- * `GeofenceMatch` describing the outcome; never throws for "no match".
+ * Nearest project AOI to the device. Never throws for "no match" — an empty
+ * `project_aois` (a stalled refresh) yields an unmatched result rather than
+ * an error, because a clock-in must not fail on geofence infrastructure.
  */
 export async function matchGeofence(args: {
   device: LatLon;
-  homeSiteId: string | null;
+  accuracyM: number | null;
 }): Promise<GeofenceMatch> {
-  const { device, homeSiteId } = args;
+  const { device, accuracyM } = args;
 
-  // Pull the active, site-scoped geofences. `is_global=true` entries apply
-  // to any vehicle in the fleet model — we include them here too since the
-  // attendance portal isn't vehicle-scoped.
-  const sites = await sql<SiteRow>`
-    SELECT id, name, lat, lon, radius_km
-    FROM fleet_authorized_locations
-    WHERE is_active = true
-      AND location_type IN ('work_site', 'office', 'accommodation')
-  `;
+  try {
+    const rows = await sql.query<NearestRow>(
+      `SELECT a.project_id::text AS project_id,
+              pr.project_name,
+              ROUND(
+                ST_Distance(
+                  ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography,
+                  a.aoi
+                )::numeric, 2
+              )::text AS distance_m
+         FROM project_aois a
+         LEFT JOIN projects pr ON pr.id = a.project_id
+        ORDER BY 3 ASC
+        LIMIT 1`,
+      [device.lon, device.lat],
+    );
 
-  let bestHit: { siteId: string; siteName: string; distanceM: number; radiusM: number } | null = null;
-
-  for (const site of sites) {
-    const siteLat = Number(site.lat);
-    const siteLon = Number(site.lon);
-    const radiusKm = Number(site.radius_km);
-    if (!Number.isFinite(siteLat) || !Number.isFinite(siteLon) || !Number.isFinite(radiusKm) || radiusKm <= 0) {
-      log.warn('[geofence] skipping malformed site row', {
-        siteId: site.id,
-        lat: site.lat,
-        lon: site.lon,
-        radius_km: site.radius_km,
+    const row = rows[0];
+    if (!row) {
+      // No AOIs at all. Distinguish it in the log: this is a refresh
+      // failure, not a worker standing in the wrong place.
+      log.warn('[geofence] no project AOIs available — clock-in cannot be located', {
+        lat: device.lat, lon: device.lon,
       });
-      continue;
+      return UNMATCHED;
     }
-    const radiusM = radiusKm * 1000;
-    const siteCoord = { lat: siteLat, lon: siteLon };
-    if (!isValidLatLon(siteCoord)) continue;
-    const dM = haversineDistanceM(device, siteCoord);
 
-    if (dM <= radiusM) {
-      // Prefer the tightest enclosing geofence — a staff member standing in
-      // the intersection of "Lawley POP 1 (100m)" and "Lawley region (5km)"
-      // should clock into POP 1, not the region. Compare radius-to-radius
-      // (smaller enclosing circle wins); break ties on closer distance,
-      // then on site id for full determinism regardless of DB row order.
-      if (
-        bestHit == null ||
-        radiusM < bestHit.radiusM ||
-        (radiusM === bestHit.radiusM && dM < bestHit.distanceM) ||
-        (radiusM === bestHit.radiusM && dM === bestHit.distanceM && site.id < bestHit.siteId)
-      ) {
-        bestHit = { siteId: site.id, siteName: site.name, distanceM: dM, radiusM };
-      }
+    const distanceM = Number(row.distance_m);
+    if (!Number.isFinite(distanceM)) {
+      log.warn('[geofence] non-finite distance from project_aois', { distance: row.distance_m });
+      return UNMATCHED;
     }
-  }
 
-  if (bestHit) {
     return {
-      siteId: bestHit.siteId,
-      siteName: bestHit.siteName,
-      distanceM: bestHit.distanceM,
-      inside: true,
-      fallback: false,
+      projectId: row.project_id,
+      projectName: row.project_name,
+      distanceM,
+      inside: distanceM <= 0,
+      withinAccuracy: distanceM > 0 && accuracyM != null && distanceM <= accuracyM,
     };
+  } catch (err) {
+    // A geofence lookup failure must never cost someone their clock-in.
+    log.error('[geofence] lookup failed, treating as unmatched', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return UNMATCHED;
   }
-
-  // No radius hit. Fall back to the staff's home site if present — and
-  // if the home site's stored coordinates are actually valid.
-  if (homeSiteId) {
-    const homeRows = await sql<SiteRow>`
-      SELECT id, name, lat, lon, radius_km
-      FROM fleet_authorized_locations
-      WHERE id = ${homeSiteId} AND is_active = true
-      LIMIT 1
-    `;
-    const home = homeRows[0];
-    if (home) {
-      const homeCoord = { lat: Number(home.lat), lon: Number(home.lon) };
-      if (!isValidLatLon(homeCoord)) {
-        // Malformed home site — refuse to fall back to it. Better to flag
-        // the clock-in as a full mismatch than to silently emit NaN
-        // distances that downstream code coerces to null.
-        log.warn('[geofence] home site has invalid coordinates, not falling back', {
-          homeSiteId,
-          lat: home.lat,
-          lon: home.lon,
-        });
-      } else {
-        return {
-          siteId: home.id,
-          siteName: home.name,
-          distanceM: haversineDistanceM(device, homeCoord),
-          inside: false,
-          fallback: true,
-        };
-      }
-    }
-  }
-
-  return { siteId: null, siteName: null, distanceM: null, inside: false, fallback: false };
 }

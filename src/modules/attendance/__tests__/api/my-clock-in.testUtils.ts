@@ -124,11 +124,11 @@ export function resetClockInMocks(): void {
   mocks.findRequiredAttendanceAction.mockResolvedValue(null);
   mocks.findActiveVehicleAssignment.mockResolvedValue(null);
   mocks.matchGeofence.mockResolvedValue({
-    siteId: 'site-789',
-    siteName: 'Lawley POP 1',
-    distanceM: 42,
+    projectId: 'project-789',
+    projectName: 'Lawley',
+    distanceM: 0,
     inside: true,
-    fallback: false,
+    withinAccuracy: false,
   });
   mocks.storeSelfie.mockResolvedValue({
     url: '/storage/attendance/staff-456/2026-04-20/in.jpg',
@@ -150,7 +150,7 @@ export function resetClockInMocks(): void {
     selfie_in_url: '/storage/attendance/staff-456/2026-04-20/in.jpg',
     selfie_out_url: null,
     vehicle_assignment_id: null,
-    site_geofence_id: 'site-789',
+    site_geofence_id: null,
     status: 'open',
     notes: null,
   });

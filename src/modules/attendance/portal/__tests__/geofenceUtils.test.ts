@@ -1,131 +1,116 @@
 /**
- * Unit tests for matchGeofence — the nearest-site logic that decides
- * which geofence a clock-in is assigned to. A regression here would
- * silently misassign timesheet hours to the wrong site, which is the
- * kind of bug nobody notices until month-end billing.
+ * Unit tests for matchGeofence — decides whether a clock-in happened at a
+ * project site.
+ *
+ * The bug these exist to prevent: this used to read
+ * `fleet_authorized_locations`, which has always had 0 rows, so it returned
+ * inside:false for every clock-in ever recorded and raised 2,261 false
+ * exceptions. A silent constant-false is exactly the failure a unit test
+ * against a mocked table cannot see, so the source table itself is asserted.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ sql: vi.fn() }));
+const mocks = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
+vi.mock('@/lib/db-pool', () => ({ sql: { query: mocks.query } }));
 
 import { matchGeofence } from '../geofenceUtils';
 
-// Test coordinates: Lawley POP area (actual Blitz project location).
 const DEVICE = { lat: -26.3820, lon: 27.8180 };
-
-// Centre point ~10 m from DEVICE.
-const POP_CENTRE = { lat: -26.38205, lon: 27.81805 };
-// Centre point ~2 km from DEVICE (still inside a 5 km region geofence).
-const REGION_CENTRE = { lat: -26.3990, lon: 27.8200 };
-
-function site(id: string, name: string, centre: { lat: number; lon: number }, radiusKm: number) {
-  return { id, name, lat: centre.lat, lon: centre.lon, radius_km: radiusKm };
-}
+const row = (distanceM: number) => ([{
+  project_id: '4eb13426-b2a1-472d-9b3c-277082ae9b55',
+  project_name: 'Lawley',
+  distance_m: String(distanceM.toFixed(2)),
+}]);
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  mocks.query.mockReset();
+  mocks.query.mockResolvedValue(row(0));
 });
 
-describe('matchGeofence — tightest enclosing', () => {
-  it('picks the tightest radius when device is inside two nested fences', async () => {
-    // POP 1 (radius 0.1 km = 100 m, centre 10 m from device) AND
-    // Lawley region (radius 5 km, centre 2 km from device).
-    // Device is inside both. Expect POP 1 (the smaller radius).
-    mocks.sql.mockResolvedValueOnce([
-      site('pop-1',    'Lawley POP 1', POP_CENTRE, 0.1),
-      site('region',   'Lawley Region', REGION_CENTRE, 5),
-    ]);
-    const r = await matchGeofence({ device: DEVICE, homeSiteId: null });
-    expect(r.inside).toBe(true);
-    expect(r.siteId).toBe('pop-1');
-    expect(r.fallback).toBe(false);
+describe('matchGeofence', () => {
+  it('reads project_aois, never the empty fleet table', async () => {
+    await matchGeofence({ device: DEVICE, accuracyM: 10 });
+    const [text] = mocks.query.mock.calls[0] as [string, unknown[]];
+    expect(text).toContain('FROM project_aois');
+    // The regression that produced 2,261 false exceptions.
+    expect(text).not.toContain('fleet_authorized_locations');
+    expect(text).not.toContain('home_site_id');
   });
 
-  it('is deterministic regardless of DB row order (reverse order)', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      site('region', 'Lawley Region', REGION_CENTRE, 5),
-      site('pop-1',  'Lawley POP 1', POP_CENTRE, 0.1),
-    ]);
-    const r = await matchGeofence({ device: DEVICE, homeSiteId: null });
-    expect(r.siteId).toBe('pop-1');
+  it('binds longitude before latitude — ST_MakePoint takes (x, y)', async () => {
+    await matchGeofence({ device: DEVICE, accuracyM: 10 });
+    const [text, params] = mocks.query.mock.calls[0] as [string, unknown[]];
+    expect(text).toContain('ST_MakePoint($1::float8, $2::float8)');
+    // Swapped, this silently measures from a point in the wrong hemisphere
+    // and every clock-in reads as thousands of km away.
+    expect(params).toEqual([DEVICE.lon, DEVICE.lat]);
+    expect(params[0]).toBeGreaterThan(0);  // SA longitude is positive
+    expect(params[1]).toBeLessThan(0);     // SA latitude is negative
   });
 
-  it('breaks ties on site id when radius and distance both match', async () => {
-    // Two identical sites (shouldn't happen in prod but let's be honest).
-    mocks.sql.mockResolvedValueOnce([
-      site('zzz-dup', 'Dup Z', POP_CENTRE, 0.1),
-      site('aaa-dup', 'Dup A', POP_CENTRE, 0.1),
-    ]);
-    const r = await matchGeofence({ device: DEVICE, homeSiteId: null });
-    expect(r.siteId).toBe('aaa-dup');
+  it('reports inside when the fix falls in the hull', async () => {
+    mocks.query.mockResolvedValueOnce(row(0));
+    const r = await matchGeofence({ device: DEVICE, accuracyM: 12 });
+    expect(r).toMatchObject({
+      projectId: '4eb13426-b2a1-472d-9b3c-277082ae9b55',
+      projectName: 'Lawley', distanceM: 0, inside: true, withinAccuracy: false,
+    });
   });
-});
 
-describe('matchGeofence — fallback to home site', () => {
-  it('returns fallback when device is outside all radii and home site is valid', async () => {
-    // Main query: no sites match (device far from any of them).
-    mocks.sql.mockResolvedValueOnce([
-      site('far', 'Far Away', { lat: 0, lon: 0 }, 0.1),
-    ]);
-    // Home site lookup: valid coords.
-    mocks.sql.mockResolvedValueOnce([
-      site('home-site', 'Home Site', POP_CENTRE, 0.1),
-    ]);
-    const r = await matchGeofence({ device: DEVICE, homeSiteId: 'home-site' });
+  it('treats a miss smaller than the device error as within accuracy', async () => {
+    mocks.query.mockResolvedValueOnce(row(20));
+    const r = await matchGeofence({ device: DEVICE, accuracyM: 50 });
     expect(r.inside).toBe(false);
-    expect(r.fallback).toBe(true);
-    expect(r.siteId).toBe('home-site');
-    expect(r.distanceM).toBeLessThan(100);
+    // 20 m out on a fix accurate to ±50 m is indistinguishable from inside.
+    expect(r.withinAccuracy).toBe(true);
+    expect(r.distanceM).toBe(20);
   });
 
-  it('returns no-match when there is no home site and no radius hit', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      site('far', 'Far Away', { lat: 0, lon: 0 }, 0.1),
-    ]);
-    const r = await matchGeofence({ device: DEVICE, homeSiteId: null });
+  it('does not excuse a miss larger than the device error', async () => {
+    mocks.query.mockResolvedValueOnce(row(200));
+    const r = await matchGeofence({ device: DEVICE, accuracyM: 50 });
     expect(r.inside).toBe(false);
-    expect(r.fallback).toBe(false);
-    expect(r.siteId).toBeNull();
+    expect(r.withinAccuracy).toBe(false);
   });
 
-  it('refuses to fall back when the home site has invalid coordinates', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      site('far', 'Far Away', { lat: 0, lon: 0 }, 0.1),
-    ]);
-    // Home site row with NaN lat — treat as no-fallback.
-    mocks.sql.mockResolvedValueOnce([
-      { id: 'home-corrupt', name: 'Home Corrupt', lat: 'not-a-number', lon: 27.8, radius_km: 0.1 },
-    ]);
-    const r = await matchGeofence({ device: DEVICE, homeSiteId: 'home-corrupt' });
+  it('cannot claim within-accuracy when accuracy is unknown', async () => {
+    mocks.query.mockResolvedValueOnce(row(20));
+    const r = await matchGeofence({ device: DEVICE, accuracyM: null });
+    expect(r.withinAccuracy).toBe(false);
+  });
+
+  it('returns unmatched — not inside — when no AOIs exist at all', async () => {
+    mocks.query.mockResolvedValueOnce([]);
+    const r = await matchGeofence({ device: DEVICE, accuracyM: 10 });
+    expect(r).toEqual({
+      projectId: null, projectName: null, distanceM: null,
+      inside: false, withinAccuracy: false,
+    });
+  });
+
+  it('survives a database failure rather than costing someone their clock-in', async () => {
+    mocks.query.mockRejectedValueOnce(new Error('connection reset'));
+    await expect(matchGeofence({ device: DEVICE, accuracyM: 10 })).resolves.toEqual({
+      projectId: null, projectName: null, distanceM: null,
+      inside: false, withinAccuracy: false,
+    });
+  });
+
+  it('refuses a non-finite distance instead of propagating NaN', async () => {
+    mocks.query.mockResolvedValueOnce([{ project_id: 'x', project_name: 'y', distance_m: 'NaN' }]);
+    const r = await matchGeofence({ device: DEVICE, accuracyM: 10 });
+    expect(r.distanceM).toBeNull();
     expect(r.inside).toBe(false);
-    expect(r.fallback).toBe(false);
-    expect(r.siteId).toBeNull();
-  });
-});
-
-describe('matchGeofence — malformed row handling', () => {
-  it('skips rows with non-finite lat/lon without throwing', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      { id: 'bad', name: 'Bad Row', lat: NaN, lon: NaN, radius_km: 1 },
-      site('good', 'Good', POP_CENTRE, 0.1),
-    ]);
-    const r = await matchGeofence({ device: DEVICE, homeSiteId: null });
-    expect(r.siteId).toBe('good');
-    expect(r.inside).toBe(true);
   });
 
-  it('skips rows with non-positive radius', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      site('zero', 'Zero Radius', POP_CENTRE, 0),
-      site('negative', 'Negative', POP_CENTRE, -1),
-      site('good', 'Good', POP_CENTRE, 0.1),
-    ]);
-    const r = await matchGeofence({ device: DEVICE, homeSiteId: null });
-    expect(r.siteId).toBe('good');
+  it('takes only the nearest AOI', async () => {
+    await matchGeofence({ device: DEVICE, accuracyM: 10 });
+    const [text] = mocks.query.mock.calls[0] as [string];
+    expect(text).toContain('ORDER BY 3 ASC');
+    expect(text).toContain('LIMIT 1');
   });
 });

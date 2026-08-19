@@ -224,7 +224,8 @@ export async function insertException(args: {
     | 'manual_override'
     | 'duplicate_entry'
     | 'vehicle_gps_mismatch'
-    | 'forgotten_clock_out_retro';
+    | 'forgotten_clock_out_retro'
+    | 'low_accuracy';
   severity?: 'info' | 'warning' | 'critical';
   details?: Record<string, unknown>;
 }): Promise<void> {
