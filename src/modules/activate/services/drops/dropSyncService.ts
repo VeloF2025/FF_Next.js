@@ -2,7 +2,8 @@
  * Background synchronisation and self-healing for drop records.
  *
  * syncMissingFromQaPhotoReviews: throttled insert of any DRs in qa_photo_reviews
- *   that are missing from dr_photo_unified_reviews. Runs at most once per 5 minutes.
+ *   that are missing from dr_photo_unified_reviews, plus repair of rows another
+ *   writer created without a project. Runs at most once per 5 minutes.
  *
  * processOrphanedRecordsInBackground: fire-and-forget re-fetch of photos for
  *   recently inserted drops that have photo_count = 0.
@@ -11,6 +12,7 @@
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { fetchPhotosWithRetry } from '@/modules/activate/services/photoFetchService';
+import { unifiedEligibilityCondition } from './dropStatsService';
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -46,7 +48,6 @@ export async function syncMissingFromQaPhotoReviews(): Promise<number> {
         FALSE
       FROM qa_photo_reviews qa
       WHERE qa.created_at > NOW() - INTERVAL '30 days'
-        AND qa.drop_number IN (SELECT drop_number FROM drops)
         AND NOT EXISTS (
           SELECT 1 FROM dr_photo_unified_reviews u
           WHERE u.drop_number = qa.drop_number
@@ -61,12 +62,77 @@ export async function syncMissingFromQaPhotoReviews(): Promise<number> {
       }, 'DropsAPI');
     }
 
+    await repairProjectFromQaPhotoReviews();
+
     lastSyncTime = now;
     return result.rowCount ?? 0;
   } catch (error: unknown) {
     log.error('Error auto-syncing from qa_photo_reviews', { error }, 'DropsAPI');
     return 0;
   }
+}
+
+/**
+ * Fill `project` on rows another writer created without one, using the WhatsApp
+ * submission the DR actually came from.
+ *
+ * `pages/api/activate/ensure-data.ts` resolves a new row's project from `drops`.
+ * When it wins the race against the qa_photo_reviews insert — or when the DR is
+ * not in the SOW import at all — that resolves to NULL and stays NULL, because
+ * nothing else revisits the row. The row is not hidden by that — the exclusion
+ * filter reads LOWER(COALESCE(project,'')), and '' matches no entry — it is
+ * MISFILED: getProjectStats groups on COALESCE(project,'Unknown'), so the
+ * submission is counted against a project literally named 'Unknown' instead of
+ * the one the field team submitted under. Measured on the live database
+ * 2026-08-19: the five Themb'elihle DRs land in an 'Unknown' row of 5 while
+ * Themb'elihle reads 10 of its 15. Migration 473 corrected one batch of these by
+ * hand; this closes the loop so the next batch heals itself.
+ *
+ * Only ever turns NULL into a value — never overwrites a project that is
+ * already set, so a human correction on the unified row survives.
+ *
+ * Correlated subquery rather than UPDATE ... FROM: qa_photo_reviews holds one
+ * row per submission and a resubmitted DR legitimately has several, so the join
+ * form could match more than one and pick arbitrarily. ORDER BY created_at DESC
+ * + LIMIT 1 takes the latest submission, deterministically — the same rule
+ * migration 503 uses, so the two agree on any row they both touch.
+ *
+ * `qa.project IS NOT NULL` appears in both the EXISTS guard and the subquery.
+ * Without it in the guard, a row whose only submission carries no project would
+ * match every 5-minute pass and rewrite NULL over NULL forever.
+ *
+ * `submitted_date` is left alone: the read queries resolve it as
+ * COALESCE(submitted_date, created_at::DATE), and a unified row for a WhatsApp
+ * submission is created within seconds of the message, so the fallback already
+ * lands on the right day.
+ */
+async function repairProjectFromQaPhotoReviews(): Promise<number> {
+  const result = await pool.query(`
+    UPDATE dr_photo_unified_reviews u
+       SET project = (
+             SELECT qa.project
+               FROM qa_photo_reviews qa
+              WHERE qa.drop_number = u.drop_number
+                AND qa.project IS NOT NULL
+              ORDER BY qa.created_at DESC
+              LIMIT 1
+           ),
+           updated_at = NOW()
+     WHERE u.project IS NULL
+       AND u.created_at > NOW() - INTERVAL '30 days'
+       AND EXISTS (
+             SELECT 1
+               FROM qa_photo_reviews qa
+              WHERE qa.drop_number = u.drop_number
+                AND qa.project IS NOT NULL
+           )
+  `);
+
+  if (result.rowCount && result.rowCount > 0) {
+    log.info(`Repaired project on ${result.rowCount} unified rows`, {}, 'DropsAPI');
+  }
+
+  return result.rowCount ?? 0;
 }
 
 /**
@@ -85,7 +151,7 @@ export function processOrphanedRecordsInBackground(): void {
           AND (u.is_oes_only = FALSE OR u.is_oes_only IS NULL)
           AND u.wa_message_id IS NULL
           AND u.created_at > NOW() - INTERVAL '48 hours'
-          AND u.drop_number IN (SELECT drop_number FROM drops)
+          AND ${unifiedEligibilityCondition('u.drop_number')}
         ORDER BY u.created_at DESC
         LIMIT 5
       `);

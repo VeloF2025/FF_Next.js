@@ -10,8 +10,52 @@
 import pool from '@/lib/db';
 import { DropsFilters, Summary } from './types';
 
-const EXCLUDED_PROJECTS = ['Marketing', 'Marketing Activations', 'Unknown'];
+/**
+ * Projects that never belong on the Activate dashboard: marketing traffic, and
+ * the groups the team submits into deliberately to test the pipeline.
+ *
+ * Lower-case, and compared against LOWER(project) — the same names appear in the
+ * data under several casings ('Velo Test', 'test', 'Test Project'), and a
+ * case-sensitive NOT IN silently lets the variants through.
+ *
+ * The test entries matter more since 2026-08-19. Before that, a test submission
+ * for a DR absent from the SOW import never reached the dashboard at all: the
+ * `drops` membership gate stopped it. unifiedEligibilityCondition deliberately
+ * admits any DR with a real submission behind it, and 'Velo Test' submissions
+ * are real submissions — so this list is now the only thing holding them back.
+ * 67 rows on the live database qualify (Velo Test 65, Integration Test 1, Test
+ * Project 1); no genuine project name collides with any entry.
+ *
+ * Mirrors the client-side list in QaCentrePage.tsx.
+ */
+const EXCLUDED_PROJECTS = [
+  'marketing',
+  'marketing activations',
+  'unknown',
+  'test',
+  'velo test',
+  'integration test',
+  'test project',
+];
 const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
+
+/**
+ * Excludes marketing and test-pipeline traffic from a dashboard read.
+ *
+ * MUST be shared by every consumer that reads this table for the dashboard, for
+ * the same reason as unifiedEligibilityCondition — three copies of a list is
+ * three chances for one of them to drift.
+ *
+ * NULL coalesces to '', which is in no entry, so a row with no project passes
+ * this filter and surfaces under the literal 'Unknown' bucket getProjectStats
+ * groups by. That is intentional — a submission with an unresolved project is
+ * still a submission, and hiding it would repeat the bug this guards.
+ *
+ * @param projectCol qualified column expression, e.g. 'u.project'
+ */
+export function excludedProjectsCondition(projectCol = 'project'): string {
+  return `LOWER(COALESCE(${projectCol}, '')) NOT IN (${EXCLUDED_PROJECTS_SQL})`;
+}
 
 /**
  * Date expression for filtering dr_photo_unified_reviews.
@@ -26,6 +70,40 @@ const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
  * breakdown by exactly the number of NULL-submitted_date rows in range.
  */
 export const UNIFIED_DATE_COLUMN = 'COALESCE(submitted_date, created_at::DATE)';
+
+/**
+ * Eligibility predicate for a dr_photo_unified_reviews row.
+ *
+ * A row earns a place on the Activate dashboard if the DR is either
+ *   (a) in the SOW import (`drops`), or
+ *   (b) a real WhatsApp submission (`qa_photo_reviews` holds the message it
+ *       came from).
+ *
+ * The `drops` half alone was the whole test until 2026-08-19. It silently hid
+ * every WhatsApp submission for a DR the SOW import had never loaded: on
+ * 2026-08-19 the THEMBIES Activations group posted 15 activations for
+ * Themb'elihle and the dashboard showed 10, because DR3022005, DR3022046,
+ * DR3022070, DR3022071 and DR3022079 are absent from `drops`. Etwatwa (20 vs
+ * 18) and Thembisa POP 1 (51 vs 50) under-reported the same day for the same
+ * reason.
+ *
+ * The `drops` half is still load-bearing — it is what keeps ~200 unified rows
+ * with no submission behind them (Velo Test, Integration Test, Test Project,
+ * and pre-WhatsApp OneMap skeletons) off the dashboard. Only DRs a field team
+ * actually submitted are added by the second half.
+ *
+ * MUST be shared by every consumer that reads this table for the dashboard —
+ * the list, the summary card and the per-project breakdown diverging here is
+ * exactly how the 2026-08-19 undercount stayed invisible in the totals.
+ *
+ * @param dropNumberCol qualified column expression, e.g. 'u.drop_number'
+ */
+export function unifiedEligibilityCondition(dropNumberCol = 'drop_number'): string {
+  return (
+    `(${dropNumberCol} IN (SELECT drop_number FROM drops)` +
+    ` OR EXISTS (SELECT 1 FROM qa_photo_reviews q WHERE q.drop_number = ${dropNumberCol}))`
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -130,8 +208,8 @@ export async function calculateSummary(filters?: DropsFilters): Promise<Summary>
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'failed') as vlm_failed
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
-      AND drop_number IN (SELECT drop_number FROM drops)
-      AND COALESCE(project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})
+      AND ${unifiedEligibilityCondition()}
+      AND ${excludedProjectsCondition()}
   `;
 
   const activatedQuery = `
