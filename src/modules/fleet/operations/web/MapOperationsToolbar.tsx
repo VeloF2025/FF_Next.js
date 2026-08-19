@@ -70,7 +70,7 @@ export function MapOperationsToolbar({
 }: MapOperationsToolbarProps) {
   const statusValue = filters.status ? `status:${filters.status}` : filters.group ? `group:${filters.group}` : '';
   const changeStatus = (value: string) => {
-    const next = { ...filters, status: undefined, group: undefined };
+    const next: OperationFilters = { ...filters, status: undefined, group: undefined };
     if (value.startsWith('status:')) next.status = value.slice(7) as OperationalStatus;
     if (value.startsWith('group:')) next.group = value.slice(6) as OperationalStatusGroup;
     onChange(next);
