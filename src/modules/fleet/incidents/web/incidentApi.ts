@@ -76,9 +76,18 @@ export function serializeIncidentQueueFilters(filters: IncidentQueueFilters): st
   return params.toString();
 }
 
-/** True when at least one narrowing filter (beyond pagination) is active — distinguishes "no incidents" from "no filter results". */
+/**
+ * True when at least one narrowing filter (beyond pagination) is active — distinguishes
+ * "no incidents" from "no filter results".
+ *
+ * Checks values, not keys. FilterBar clears a field with
+ * `{ ...filters, [key]: event.target.value || undefined }`, and spreading an explicit
+ * `undefined` still leaves the key present, so `Object.keys().length` stays above zero
+ * once any field has ever been touched. Keying off that told a manager who had just reset
+ * every filter back to "Any" that results were still filtered.
+ */
 export function hasActiveIncidentFilters(filters: IncidentQueueFilters): boolean {
-  return Object.keys(filters).length > 0;
+  return Object.values(filters).some((value) => value !== undefined);
 }
 
 type ApiErrorKind = 'permission' | 'transient';
