@@ -119,6 +119,30 @@ function extractStorageKey(json: VfStorageUploadJson, url: string): string {
  * so a rejected request never reaches VF Storage — and rejects a returned
  * URL that isn't an approved VF Storage origin.
  */
+/**
+ * Byte signatures for the types this uploader accepts.
+ *
+ * The declared mimeType is attacker-controlled and load-bearing twice over: it passes the
+ * allowlist check and it picks the stored file extension. Checking the string alone lets a
+ * caller store arbitrary content under a .png key. Since evidence exists so that lower-
+ * privileged users can attach files for higher-privileged reviewers to open, a mismatch
+ * here is a privilege-escalation path, not a tidiness issue.
+ *
+ * Fail-closed: a type in the caller's allowlist with no signature registered is rejected,
+ * because an unverifiable type is exactly what this check exists to stop.
+ */
+const MIME_SIGNATURES: Readonly<Record<string, readonly (readonly number[])[]>> = {
+  'image/jpeg': [[0xff, 0xd8, 0xff]],
+  'image/png': [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
+  'application/pdf': [[0x25, 0x50, 0x44, 0x46, 0x2d]],
+};
+
+export function contentMatchesMimeType(buffer: Buffer, mimeType: string): boolean {
+  const signatures = MIME_SIGNATURES[mimeType];
+  if (!signatures) return false;
+  return signatures.some((signature) => signature.every((byte, index) => buffer[index] === byte));
+}
+
 export async function uploadCategorizedFile(request: VfStorageUploadRequest): Promise<VfStorageUploadResult> {
   if (!request.allowedMimeTypes.includes(request.mimeType)) {
     throw new VfStorageValidationError(`MIME type "${request.mimeType}" is not allowed`);
@@ -132,6 +156,9 @@ export async function uploadCategorizedFile(request: VfStorageUploadRequest): Pr
   }
   if (buffer.length > request.maxBytes) {
     throw new VfStorageValidationError(`File exceeds the maximum size of ${request.maxBytes} bytes`);
+  }
+  if (!contentMatchesMimeType(buffer, request.mimeType)) {
+    throw new VfStorageValidationError(`File content does not match the declared type "${request.mimeType}"`);
   }
 
   const json = await postToVfStorage(request.category, request.storageFilename, request.base64, request.mimeType);

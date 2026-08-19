@@ -68,7 +68,10 @@ describe('uploadToVfStorage', () => {
 });
 
 describe('uploadCategorizedFile', () => {
-  const validBase64 = 'aW1hZ2U=';
+  // Real JPEG magic bytes. The previous fixture was base64 'image', which the content check
+  // now correctly rejects — a declared image/jpeg whose bytes are not a JPEG is the exact
+  // case that check exists for.
+  const validBase64 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]).toString('base64');
 
   beforeEach(() => {
     vi.resetModules();
@@ -159,5 +162,50 @@ describe('uploadCategorizedFile', () => {
       category: 'fleet/incidents', storageFilename: 'x.jpg', base64: validBase64,
       mimeType: 'image/jpeg', allowedMimeTypes: ['image/jpeg'], maxBytes: 1_000_000,
     })).rejects.toThrow('HTTP 502');
+  });
+
+  it('rejects content whose bytes do not match the declared MIME type', async () => {
+    // A manager with evidence:edit on their own project declares image/png but sends an
+    // HTML document. Both the allowlist and the stored .png extension come from that same
+    // declared string, so without a content check it lands in storage as a .png for an
+    // admin reviewer to open later.
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const html = Buffer.from('<script>alert(1)</script>').toString('base64');
+
+    const { uploadCategorizedFile, VfStorageValidationError } = await import('../vfStorageUpload');
+
+    await expect(uploadCategorizedFile({
+      category: 'fleet/incidents', storageFilename: 'x.png', base64: html,
+      mimeType: 'image/png', allowedMimeTypes: ['image/jpeg', 'image/png'], maxBytes: 1_000_000,
+    })).rejects.toBeInstanceOf(VfStorageValidationError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an allowed MIME type that has no registered signature, rather than waving it through', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { uploadCategorizedFile, VfStorageValidationError } = await import('../vfStorageUpload');
+
+    await expect(uploadCategorizedFile({
+      category: 'fleet/incidents', storageFilename: 'x.svg', base64: Buffer.from('<svg/>').toString('base64'),
+      mimeType: 'image/svg+xml', allowedMimeTypes: ['image/svg+xml'], maxBytes: 1_000_000,
+    })).rejects.toBeInstanceOf(VfStorageValidationError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a PDF whose bytes really are a PDF', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ path: 'fleet/incidents/x.pdf' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const pdf = Buffer.concat([Buffer.from('%PDF-'), Buffer.from('1.7 body')]).toString('base64');
+
+    const { uploadCategorizedFile } = await import('../vfStorageUpload');
+    const result = await uploadCategorizedFile({
+      category: 'fleet/incidents', storageFilename: 'x.pdf', base64: pdf,
+      mimeType: 'application/pdf', allowedMimeTypes: ['application/pdf'], maxBytes: 1_000_000,
+    });
+
+    expect(result.key).toBe('fleet/incidents/x.pdf');
   });
 });
