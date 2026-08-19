@@ -13,10 +13,8 @@ import {
   buildUnifiedConditions,
   UNIFIED_DATE_COLUMN,
   unifiedEligibilityCondition,
+  excludedProjectsCondition,
 } from './dropStatsService';
-
-const EXCLUDED_PROJECTS = ['Marketing', 'Marketing Activations', 'Unknown'];
-const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
 
 /**
  * OPTIMIZED: Get per-project stats via parallel queries on unified reviews + OES.
@@ -61,7 +59,7 @@ export async function getProjectStats(filters?: DropsFilters): Promise<ProjectSt
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
       AND ${unifiedEligibilityCondition()}
-      AND COALESCE(project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})
+      AND ${excludedProjectsCondition()}
     GROUP BY COALESCE(project, 'Unknown')
   `;
 

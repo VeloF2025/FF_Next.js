@@ -10,11 +10,7 @@
 import pool from '@/lib/db';
 import { DropsFilters, PaginatedDropsResult, UnifiedDrop } from './types';
 import { transformDropRow } from './dropTransformService';
-import { unifiedEligibilityCondition } from './dropStatsService';
-
-// Only show installation/activation projects — exclude marketing & unknown
-const EXCLUDED_PROJECTS = ['Marketing', 'Marketing Activations', 'Unknown'];
-const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
+import { unifiedEligibilityCondition, excludedProjectsCondition } from './dropStatsService';
 
 /** Builds the WHERE conditions and param list from the shared filter shape. */
 function buildWhereConditions(filters?: DropsFilters): {
@@ -29,7 +25,7 @@ function buildWhereConditions(filters?: DropsFilters): {
   // Base filters always applied to the paginated list
   conditions.push('(u.is_oes_only = FALSE OR u.is_oes_only IS NULL)');
   conditions.push(unifiedEligibilityCondition('u.drop_number'));
-  conditions.push(`COALESCE(u.project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})`);
+  conditions.push(excludedProjectsCondition('u.project'));
 
   if (filters?.search) {
     conditions.push(`(u.drop_number ILIKE $${paramIndex} OR u.project ILIKE $${paramIndex})`);
@@ -274,14 +270,14 @@ export async function getActiveProjects(): Promise<string[]> {
       SELECT DISTINCT project as project_name
       FROM dr_photo_unified_reviews
       WHERE project IS NOT NULL AND project != ''
-        AND project NOT IN (${EXCLUDED_PROJECTS_SQL})
+        AND ${excludedProjectsCondition('project')}
 
       UNION
 
       SELECT project_name
       FROM projects
       WHERE project_name IS NOT NULL AND project_name != ''
-        AND project_name NOT IN (${EXCLUDED_PROJECTS_SQL})
+        AND ${excludedProjectsCondition('project_name')}
     ) combined
     ORDER BY project_name
   `);

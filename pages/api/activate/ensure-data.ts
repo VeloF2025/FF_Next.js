@@ -101,9 +101,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       //
       // `project` is resolved here, not left NULL. This skeleton insert was the
       // only path that created a unified row without one, and a NULL project
-      // makes the row group under a literal "Unknown" bucket in the Activate
-      // per-project table (getProjectStats groups on this column) — a bucket
-      // that is itself in EXCLUDED_PROJECTS, so the row vanishes.
+      // misfiles the row: getProjectStats groups on COALESCE(project,'Unknown'),
+      // so the submission is counted against a project literally named
+      // "Unknown" rather than the one the field team submitted under. It is not
+      // hidden — the exclusion filter reads LOWER(COALESCE(project,'')) and ''
+      // matches no entry — which is worse, because the total still looks right.
       //
       // `drops` is tried first: it is the source of truth for a DR's project,
       // and oesUnifiedRecordsService resolves it the same way. It is not

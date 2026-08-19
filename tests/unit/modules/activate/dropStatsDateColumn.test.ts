@@ -98,7 +98,7 @@ describe('Activate stats date column', () => {
       // Eligibility: SOW row OR WhatsApp submission. See dropsSowGate.test.ts —
       // this list only checks the two services agree, not that the gate is right.
       'drop_number IN (SELECT drop_number FROM drops) OR EXISTS (SELECT 1 FROM qa_photo_reviews q WHERE q.drop_number = drop_number)',
-      "COALESCE(project, '') NOT IN ('Marketing', 'Marketing Activations', 'Unknown')",
+      "LOWER(COALESCE(project, '')) NOT IN ('marketing', 'marketing activations', 'unknown', 'test', 'velo test', 'integration test', 'test project')",
     ]) {
       expect(summarySql).toContain(clause);
       expect(projectSql).toContain(clause);

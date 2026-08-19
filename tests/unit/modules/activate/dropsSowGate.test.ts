@@ -27,7 +27,10 @@ vi.mock('@/lib/db', () => ({
   default: { query: (...args: unknown[]) => queryMock(...args) },
 }));
 
-import { calculateSummary } from '@/modules/activate/services/drops/dropStatsService';
+import {
+  calculateSummary,
+  excludedProjectsCondition,
+} from '@/modules/activate/services/drops/dropStatsService';
 import { getProjectStats } from '@/modules/activate/services/drops/dropProjectStatsService';
 import { getPaginatedDrops } from '@/modules/activate/services/drops/dropQueryService';
 
@@ -85,6 +88,29 @@ describe('Activate SOW gate', () => {
     expect(sql).toMatch(/IN \(SELECT drop_number FROM drops\)/);
     // OR, not AND: an AND would leave the 2026-08-19 undercount exactly as it was.
     expect(sql).toMatch(/FROM drops\)\s*OR EXISTS/);
+  });
+
+  it.each(READ_PATHS)('%s keeps test-pipeline traffic out', async (_name, run) => {
+    await run();
+    const sql = unifiedQuery();
+
+    // Admitting a DR on its submission alone re-opened a door the `drops` gate
+    // had been holding shut: 'Velo Test' submissions are real submissions, and
+    // the group is used deliberately to test the pipeline. 65 such rows exist.
+    for (const excluded of ["'velo test'", "'integration test'", "'test project'"]) {
+      expect(sql).toContain(excluded);
+    }
+    // Case-insensitive: the same names appear as 'Velo Test', 'test', 'Test
+    // Project'. A case-sensitive NOT IN lets every variant through.
+    expect(sql).toMatch(/LOWER\(COALESCE\(\w*\.?project, ''\)\) NOT IN/);
+  });
+
+  it('does not hide a row whose project could not be resolved', async () => {
+    // '' matches no entry in the list, so a NULL project passes. That is
+    // deliberate — such a row is misfiled under 'Unknown' by getProjectStats,
+    // not hidden, and hiding it would recreate the bug this guards against.
+    expect(excludedProjectsCondition()).toContain("COALESCE(project, '')");
+    expect(excludedProjectsCondition()).not.toContain("'', ");
   });
 
   it('applies one identical gate across all three read paths', async () => {

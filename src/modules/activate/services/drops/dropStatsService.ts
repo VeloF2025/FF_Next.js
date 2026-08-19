@@ -10,8 +10,52 @@
 import pool from '@/lib/db';
 import { DropsFilters, Summary } from './types';
 
-const EXCLUDED_PROJECTS = ['Marketing', 'Marketing Activations', 'Unknown'];
+/**
+ * Projects that never belong on the Activate dashboard: marketing traffic, and
+ * the groups the team submits into deliberately to test the pipeline.
+ *
+ * Lower-case, and compared against LOWER(project) — the same names appear in the
+ * data under several casings ('Velo Test', 'test', 'Test Project'), and a
+ * case-sensitive NOT IN silently lets the variants through.
+ *
+ * The test entries matter more since 2026-08-19. Before that, a test submission
+ * for a DR absent from the SOW import never reached the dashboard at all: the
+ * `drops` membership gate stopped it. unifiedEligibilityCondition deliberately
+ * admits any DR with a real submission behind it, and 'Velo Test' submissions
+ * are real submissions — so this list is now the only thing holding them back.
+ * 67 rows on the live database qualify (Velo Test 65, Integration Test 1, Test
+ * Project 1); no genuine project name collides with any entry.
+ *
+ * Mirrors the client-side list in QaCentrePage.tsx.
+ */
+const EXCLUDED_PROJECTS = [
+  'marketing',
+  'marketing activations',
+  'unknown',
+  'test',
+  'velo test',
+  'integration test',
+  'test project',
+];
 const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map((p) => `'${p}'`).join(', ');
+
+/**
+ * Excludes marketing and test-pipeline traffic from a dashboard read.
+ *
+ * MUST be shared by every consumer that reads this table for the dashboard, for
+ * the same reason as unifiedEligibilityCondition — three copies of a list is
+ * three chances for one of them to drift.
+ *
+ * NULL coalesces to '', which is in no entry, so a row with no project passes
+ * this filter and surfaces under the literal 'Unknown' bucket getProjectStats
+ * groups by. That is intentional — a submission with an unresolved project is
+ * still a submission, and hiding it would repeat the bug this guards.
+ *
+ * @param projectCol qualified column expression, e.g. 'u.project'
+ */
+export function excludedProjectsCondition(projectCol = 'project'): string {
+  return `LOWER(COALESCE(${projectCol}, '')) NOT IN (${EXCLUDED_PROJECTS_SQL})`;
+}
 
 /**
  * Date expression for filtering dr_photo_unified_reviews.
@@ -165,7 +209,7 @@ export async function calculateSummary(filters?: DropsFilters): Promise<Summary>
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
       AND ${unifiedEligibilityCondition()}
-      AND COALESCE(project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})
+      AND ${excludedProjectsCondition()}
   `;
 
   const activatedQuery = `

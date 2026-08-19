@@ -28,10 +28,14 @@
 -- The read queries are fixed in the same PR to admit a DR that has a
 -- qa_photo_reviews row even when `drops` does not. That alone is not enough:
 -- these rows were created by ensure-data.ts, which resolved `project` from
--- `drops` only, so they carry NULL. getProjectStats groups on
--- COALESCE(project, 'Unknown') and 'Unknown' is in EXCLUDED_PROJECTS — an
--- admitted row with a NULL project is still discarded. This migration gives
--- the existing rows the project their submission already recorded.
+-- `drops` only, so they carry NULL. An admitted row with a NULL project is not
+-- discarded — the exclusion filter reads LOWER(COALESCE(project,'')) and ''
+-- matches no entry — it is MISFILED: getProjectStats groups on
+-- COALESCE(project,'Unknown'), so it lands under a project literally named
+-- 'Unknown'. Verified on the live database 2026-08-19: with the gate fixed and
+-- this migration NOT applied, Themb'elihle reads 10 and a separate 'Unknown'
+-- row reads 5. This migration gives those rows the project their submission
+-- already recorded, so the count lands where it belongs.
 --
 -- Measured on the live database 2026-08-19, before this migration:
 --   235 unified rows absent from `drops`
