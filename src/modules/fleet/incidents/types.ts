@@ -72,6 +72,13 @@ interface IncidentProducerBase {
 
 export interface ScheduledIncidentProducerRequest extends IncidentProducerBase {
   producerKind: 'scheduled_detection';
+  /**
+   * The `fleet_operational_monitor_runs` row this detection belongs to, persisted onto each
+   * observation so `WHERE monitor_run_id = $1` can retrieve everything one tick produced.
+   * Deliberately separate from `requestCorrelationId`: that is free-form TEXT for audit
+   * correlation, whereas this is a UUID foreign key and must stay one.
+   */
+  monitorRunId?: string | null;
   incidentType: ScheduledIncidentType;
   sourceEventId?: never;
   workDate: string;
@@ -261,11 +268,20 @@ export function requiresMandatoryIncidentWhatsApp(
   return severity === 'critical' && producerKind === 'source_event';
 }
 
+/**
+ * `severity` is the incident's RESOLVED severity, not `rule.severity`. produceIncident
+ * computes it as `request.severity ?? rule.severity`, so a source event may override the
+ * rule's default — and it is the override that has to decide mandatory WhatsApp. Reading
+ * `rule.severity` here would silently downgrade a critical override on a rule configured
+ * `high`, which is exactly the delivery guarantee this function exists to enforce.
+ * sendEscalationNotification already derives it this way from the persisted incident row.
+ */
 export function resolveIncidentOpenedNotification(
   rule: IncidentRule,
+  severity: IncidentSeverity,
   producerKind: IncidentProducerKind,
 ): IncidentNotificationPlan {
-  const requiresWhatsApp = requiresMandatoryIncidentWhatsApp(rule.severity, producerKind);
+  const requiresWhatsApp = requiresMandatoryIncidentWhatsApp(severity, producerKind);
 
   return {
     channels: {

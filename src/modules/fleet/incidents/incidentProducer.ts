@@ -116,7 +116,7 @@ async function recordScheduledObservation(
     observedAt: request.evaluation.observedAt, primaryStatus: request.evaluation.primaryStatus,
     flags: request.evaluation.flags, ruleId: request.rules.statusRuleId, ruleVersion: request.rules.statusRuleVersion,
     evidenceSnapshot: request.evidenceSnapshot ?? {}, reasonCodes: request.evaluation.reasonCodes,
-    monitorRunId: null, sourceEventId: null,
+    monitorRunId: request.monitorRunId ?? null, sourceEventId: null,
   }, txn);
 }
 

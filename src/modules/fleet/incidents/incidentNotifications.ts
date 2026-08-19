@@ -114,7 +114,7 @@ export async function sendIncidentOpenedNotification(input: OpenedNotificationIn
     return { ...NO_RECIPIENT_RESULT };
   }
 
-  const plan = resolveIncidentOpenedNotification(input.rule, input.producerKind);
+  const plan = resolveIncidentOpenedNotification(input.rule, input.severity, input.producerKind);
   const payload: NotifyPayload = {
     event_type: 'fleet.operational_incident_opened',
     title: `Fleet incident opened: ${humanizeCode(input.incidentType)}`,

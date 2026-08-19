@@ -139,7 +139,7 @@ function buildScheduledRequest(
   });
   return {
     producerKind: 'scheduled_detection', incidentType, workDate, severity: rule.severity,
-    requestCorrelationId,
+    requestCorrelationId, monitorRunId: requestCorrelationId,
     assignment: {
       staffId: item.staffId, vehicleId: null, projectId: item.projectId, operationalSiteId: item.operationalSiteId,
       operationalAssignmentId: null, staffNameSnapshot: item.staffName, projectNameSnapshot: item.projectName,
