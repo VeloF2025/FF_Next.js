@@ -65,9 +65,10 @@ const makeRes = (): MockRes => {
   return r;
 };
 
-const makeReq = (method: string): NextApiRequest =>
+const makeReq = (method: string, url = '/api/projects'): NextApiRequest =>
   ({
     method,
+    url,
     cookies: { ff_auth_token: 'a.b.c' },
     headers: {},
     query: {},
@@ -75,10 +76,11 @@ const makeReq = (method: string): NextApiRequest =>
 
 const run = async (
   wrapped: (req: NextApiRequest, res: NextApiResponse) => unknown,
-  method: string
+  method: string,
+  url?: string
 ) => {
   const res = makeRes();
-  await wrapped(makeReq(method), res as unknown as NextApiResponse);
+  await wrapped(makeReq(method, url), res as unknown as NextApiResponse);
   return res;
 };
 
@@ -119,6 +121,59 @@ describe('read-only gate wiring in the auth wrappers', () => {
       const res = await run((wrapper as any)(handler), 'POST');
       expect(res.statusCode).toBe(200);
       expect(handler).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+/**
+ * The denied-area gate, at the WRAPPER level.
+ *
+ * mcpDeniedAreas.test.ts covers the predicate. These cover the wiring, and one thing the
+ * predicate cannot: that `req.url` in a Pages API route is the PATH the predicate expects
+ * (`/api/staff/list`), not an absolute URL. If it were absolute, canonical() would reject
+ * every request and this gate would 403 the entire connector rather than one area — a
+ * guard failing closed into an outage. The allowed-path case below is what pins that.
+ */
+describe('denied-area gate wiring in the auth wrappers', () => {
+  let handler: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handler = vi.fn((_req: NextApiRequest, res: NextApiResponse) => res.status(200).json({ ok: true }));
+    verifyTokenMock.mockResolvedValue({ sub: 'u1', sessionId: 's1', email: 'a@x.co', role: 'viewer' });
+  });
+
+  describe.each([
+    ['withAuth', withAuth],
+    ['withFleetAuth', withFleetAuth],
+    ['withOptionalAuth', withOptionalAuth],
+  ] as const)('%s', (_name, wrapper) => {
+    it('refuses a denied area for an mcp session and never runs the handler', async () => {
+      sqlMock.mockResolvedValue(SESSION_ROW('mcp'));
+      const res = await run(wrapper(handler as never) as never, 'GET', '/api/staff/list');
+
+      expect(res.statusCode).toBe(403);
+      expect((res.body as { error?: { code?: string } })?.error?.code).toBe('MCP_AREA_DENIED');
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('ALLOWS a permitted area for the same mcp session', async () => {
+      // The mirror, and the req.url shape check: without it, a gate that refused every
+      // path would satisfy the case above while taking the whole connector down.
+      sqlMock.mockResolvedValue(SESSION_ROW('mcp'));
+      const res = await run(wrapper(handler as never) as never, 'GET', '/api/projects?limit=5');
+
+      expect(res.statusCode).toBe(200);
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('does not restrict a browser session in a denied area', async () => {
+      // Staff open payroll in the app every day.
+      sqlMock.mockResolvedValue(SESSION_ROW('session'));
+      const res = await run(wrapper(handler as never) as never, 'GET', '/api/staff/list');
+
+      expect(res.statusCode).toBe(200);
+      expect(handler).toHaveBeenCalled();
     });
   });
 });

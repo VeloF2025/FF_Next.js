@@ -12,6 +12,7 @@
  * file that changes on every build churns the repo.
  */
 
+import { MCP_DENIED_GROUPS, MCP_DENIED_PATHS } from '../src/lib/auth/mcpDeniedAreas';
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
 
@@ -23,48 +24,12 @@ import { join, resolve, relative } from 'node:path';
  * controls. Its job is to stop an agent wandering into payroll while answering a
  * question about drops.
  */
-export const DENIED_GROUPS = new Set([
-  'accounting',
-  'staff',
-  'my',
-  // The MCP edge proxies are TRANSPORT, not data. They forward any method and body to an
-  // internal service on 127.0.0.1 and are unauthenticated by design (the upstream issues
-  // its own OAuth challenge). An agent has no reason to call them, and cataloguing them
-  // invites exactly the wandering this list exists to prevent.
-  'cortex-remote-mcp',
-  'ff-remote-mcp',
-  // Added 2026-08-18 after an audit of the COMBINED tool surface. Each of these groups
-  // holds a route that reads the same rows as a sanctioned reporting tool, under a
-  // weaker gate — so an agent that wandered into them got around the narrowing the tool
-  // advertises. This list is blast-radius, not a boundary (see above): the routes below
-  // still need their own RBAC, tracked separately. What it does buy is that a model
-  // answering a question about drops cannot stumble into them.
-  //   meetings    — /api/meetings is withAuth-only and returns full summary JSONB,
-  //                 participants and user_notes; find_meetings requires people.meetings
-  //                 and deliberately returns an index with no summary text.
-  //   procurement — /api/procurement/purchase-orders and boq-spend-summary are
-  //                 withAuth-only and expose per-PO totals and BOQ spend, which
-  //                 get_procurement_summary withholds from callers lacking
-  //                 `procurement` view.
-  //
-  // `field` is deliberately NOT here. /api/field/attendance is the problem route, but
-  // isDeniedGroup below matches hyphenated siblings, so 'field' would also remove
-  // `field-stock` — the entire warehouse module — plus nine unrelated /api/field/*
-  // routes. It is denied by PATH instead, in DENIED_PATHS in apps/ff_mcp/tools.py.
-  // This list and that one must stay in step; test_catalogue.py checks the catalogue
-  // against the runtime guard, and test_guards.py pins field-stock as reachable.
-  'meetings',
-  'procurement',
-  // `action-items` rows carry meeting content — descriptions extracted verbatim from
-  // transcripts. FibreFlow gates meetings on ATTENDANCE (see
-  // pages/api/meetings/[id]/transcript.ts), but /api/action-items is withAuth-only with
-  // no participant filter and returns up to 500 full rows including description and
-  // meeting_id. Leaving the group catalogued would let an agent read through
-  // fibreflow_get exactly what /api/reporting/action-items withholds, making that
-  // route's attendance scope cosmetic. The scoped reporting route lives in the
-  // `reporting` group and is unaffected.
-  'action-items',
-]);
+// The list itself now lives in src/lib/auth/mcpDeniedAreas.ts, where it is ENFORCED for
+// every kind='mcp' session in withAuth. Withholding these from the catalogue is still
+// worth doing — it stops the model proposing a path it would only be refused, saving a
+// round-trip — but it is no longer the control. Importing rather than restating is the
+// point: the previous copy silently disagreed with the runtime guard for a week.
+export const DENIED_GROUPS = new Set(MCP_DENIED_GROUPS);
 
 /**
  * Matches a denied group OR any hyphenated sibling of one: `staff` also withholds
@@ -90,7 +55,7 @@ export const DENIED_GROUPS = new Set([
  * `/api/field/attendance` cannot be denied as a group: `field` would also match
  * `field-stock` (the warehouse module) and nine unrelated `/api/field/*` routes.
  */
-export const DENIED_PATHS = ['/api/field/attendance'];
+export const DENIED_PATHS = [...MCP_DENIED_PATHS];
 
 /** Exact match, or a prefix on a path-segment boundary. */
 export function isDeniedPath(routePath: string): string | undefined {

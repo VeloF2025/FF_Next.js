@@ -15,6 +15,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from './jwt';
 import { AUTH_COOKIE_NAME } from './middleware';
 import { isReadOnlyViolation, MCP_READ_ONLY_CODE, MCP_READ_ONLY_MESSAGE } from './readOnly';
+import {
+  isDeniedAreaViolation,
+  MCP_DENIED_AREA_CODE,
+  MCP_DENIED_AREA_MESSAGE,
+} from './mcpDeniedAreas';
 import { touchSessionUsage } from './sessionUsage';
 import type { AuthUser, SessionKind } from './types';
 import { pool } from '@/lib/db';
@@ -101,6 +106,18 @@ export async function requireAuth(
       null,
       NextResponse.json(
         { success: false, error: { code: MCP_READ_ONLY_CODE, message: MCP_READ_ONLY_MESSAGE } },
+        { status: 403 }
+      ),
+    ];
+  }
+  // The App Router half of the same gate. `req.nextUrl.pathname` rather than req.url,
+  // which here is an absolute URL — canonical() requires a path beginning /api/ and would
+  // refuse every request, turning the guard into an outage.
+  if (isDeniedAreaViolation(user, req.nextUrl?.pathname)) {
+    return [
+      null,
+      NextResponse.json(
+        { success: false, error: { code: MCP_DENIED_AREA_CODE, message: MCP_DENIED_AREA_MESSAGE } },
         { status: 403 }
       ),
     ];
