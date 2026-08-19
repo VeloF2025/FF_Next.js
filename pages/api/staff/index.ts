@@ -14,6 +14,7 @@ import { log } from '@/lib/logger';
 import { getStaffById, getStaffList } from '@/services/staff/staffGetService';
 import { createStaff, deleteStaffMember } from '@/services/staff/staffCreateService';
 import { updateStaff } from '@/services/staff/staffUpdateDeleteService';
+import { checkStaffSaId } from '@/services/staff/staffSaIdGuard';
 import { apiResponse } from '@/lib/apiResponse';
 import { STAFF_ROLES } from '@/modules/attendance/portal/types';
 import type { AuthRole } from '@/lib/auth/types';
@@ -53,6 +54,10 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
 
       // -----------------------------------------------------------------------
       case 'POST': {
+        const createSaIdRejection = await checkStaffSaId(null, req.body as Record<string, unknown>);
+        if (createSaIdRejection) {
+          return apiResponse.badRequest(res, createSaIdRejection.message);
+        }
         const result = await createStaff(req.body);
         if (!result.ok) {
           return res.status(result.error.status).json({
@@ -81,6 +86,10 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               `portalRole must be one of: ${STAFF_ROLES.join(', ')} (or null to clear)`
             );
           }
+        }
+        const saIdRejection = await checkStaffSaId(req.query.id as string, req.body as Record<string, unknown>);
+        if (saIdRejection) {
+          return apiResponse.badRequest(res, saIdRejection.message);
         }
         const result = await updateStaff(req.query.id as string, req.body);
         if (!result.ok) {
@@ -117,6 +126,14 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         error: `Cannot delete: This staff member is still referenced in ${table}. Please reassign or remove those references first.`,
         details: `Constraint: ${constraint}`,
       });
+    }
+
+    // String too long for the column — surface the field instead of a bare 500.
+    if (dbError.code === '22001') {
+      return apiResponse.badRequest(
+        res,
+        'A submitted value is too long for its field. Check the ID number (13 digits) and phone numbers.'
+      );
     }
 
     // Invalid input syntax (bad UUID, date, etc.)

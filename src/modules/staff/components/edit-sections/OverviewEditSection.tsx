@@ -1,6 +1,7 @@
 'use client';
 
 import { StaffFormData } from '@/types/staff.types';
+import { validateSaId } from '@/lib/saIdValidation';
 
 interface OverviewEditSectionProps {
   formData: StaffFormData;
@@ -11,6 +12,11 @@ const inputClasses = "w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff
 const labelClasses = "block text-sm font-medium text-[var(--ff-text-secondary)] mb-1";
 
 export function OverviewEditSection({ formData, handleInputChange }: OverviewEditSectionProps) {
+  // Warn rather than block: several legacy rows hold an SA ID that fails
+  // validation and can only be corrected against the physical document, so the
+  // form must stay saveable while flagging the problem.
+  const saIdErrors = formData.saIdNumber ? validateSaId(formData.saIdNumber).errors : [];
+
   return (
     <div className="space-y-8">
       {/* Personal Information */}
@@ -194,6 +200,19 @@ export function OverviewEditSection({ formData, handleInputChange }: OverviewEdi
       {/* Identity Documents */}
       <div>
         <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Identity Documents</h2>
+        <div className="mb-4">
+          <label className={labelClasses}>Nationality</label>
+          <input
+            type="text"
+            value={formData.nationality || ''}
+            onChange={(e) => handleInputChange('nationality', e.target.value)}
+            className={inputClasses}
+            placeholder="e.g. South African, Malawian, Zimbabwean"
+          />
+          <p className="mt-1 text-xs text-[var(--ff-text-muted)]">
+            Foreign nationals: leave SA ID blank and capture the passport details instead.
+          </p>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
             <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3">SA ID</h3>
@@ -207,6 +226,9 @@ export function OverviewEditSection({ formData, handleInputChange }: OverviewEdi
                 className={inputClasses}
                 placeholder="13-digit SA ID number"
               />
+              {saIdErrors.length > 0 && (
+                <p className="mt-1 text-xs text-amber-500">{saIdErrors.join('; ')}</p>
+              )}
             </div>
           </div>
 
