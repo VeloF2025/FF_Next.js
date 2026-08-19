@@ -29,8 +29,9 @@ function rollbackSql(): string {
 describe('fleet incident driver-input migration contract', () => {
   it('stays within the new-file size ratchet', () => {
     // A ratchet, not a budget: pinned to the file's current length so any
-    // growth has to be argued for, same convention as 502's contract test.
-    expect(migrationSql().split(/\r?\n/).length).toBeLessThanOrEqual(156);
+    // growth has to be argued for. 156 -> 172 for the review-mandated supersession,
+    // closure and delivery-summary columns the design requires on a request.
+    expect(migrationSql().split(/\r?\n/).length).toBeLessThanOrEqual(172);
   });
 
   it('creates the effective-dated settings table plus the three append-only tables', () => {
@@ -45,6 +46,59 @@ describe('fleet incident driver-input migration contract', () => {
     expect(sql).toMatch(/fleet_incident_driver_input_settings \(\(true\)\) WHERE effective_to IS NULL/i);
   });
 
+  it('carries the settings columns the design configures, not just an effective-dated shell', () => {
+    const sql = migrationSql();
+
+    for (const column of [
+      'response_window_workdays', 'post_closure_response_enabled', 'post_closure_response_window_days',
+      'recent_window_days', 'history_window_days', 'enabled_concern_categories',
+      'evidence_allowed_mime_types', 'evidence_max_bytes',
+    ]) {
+      expect(sql).toMatch(new RegExp(`\\b${column}\\b`, 'i'));
+    }
+  });
+
+  it('lets a request record why it stopped being open and whether it reached the driver', () => {
+    // Design 11.1 and 13: supersession/closure and delivery outcome are durable, queryable
+    // fields. A NotifyResult returned from one API call is not something a manager can go
+    // back and look at, and PR7 ships only this one migration to hold them.
+    const sql = migrationSql();
+
+    for (const column of [
+      'superseded_at', 'closed_at', 'closure_reason',
+      'delivery_attempted_count', 'delivery_accepted_count', 'delivery_failed_count',
+    ]) {
+      expect(sql).toMatch(new RegExp(`\\b${column}\\b`, 'i'));
+    }
+    expect(sql).toMatch(/fleet_incident_driver_input_requests_closure_pair_check/i);
+  });
+
+  it('rejects an empty settings array rather than letting array_length return NULL', () => {
+    // array_length(ARRAY[]::text[], 1) is NULL, and NULL > 0 is NULL, which a CHECK
+    // accepts. cardinality() returns 0 for an empty array and is actually rejected.
+    const sql = migrationSql();
+
+    expect(sql).toMatch(/cardinality\(enabled_concern_categories\) > 0/i);
+    expect(sql).toMatch(/cardinality\(evidence_allowed_mime_types\) > 0/i);
+    expect(sql).not.toMatch(/array_length\(enabled_concern_categories/i);
+    expect(sql).not.toMatch(/array_length\(evidence_allowed_mime_types/i);
+  });
+
+  it('clears the rows PR7 made legal before restoring PR6 CHECKs, so rollback survives use', () => {
+    // Re-adding the narrower PR6 CHECKs validates existing rows, and the whole rollback
+    // runs in one transaction. Without this delete, a single driver-authored action makes
+    // the migration permanently irreversible.
+    const sql = rollbackSql();
+    const deleteAt = sql.search(/DELETE FROM fleet_operational_incident_actions/i);
+    const readdAt = sql.search(/ADD CONSTRAINT fleet_operational_incident_actions_actor_check/i);
+
+    expect(deleteAt).toBeGreaterThan(-1);
+    expect(readdAt).toBeGreaterThan(-1);
+    expect(deleteAt).toBeLessThan(readdAt);
+    expect(sql).toMatch(/actor_staff_id IS NOT NULL/i);
+    expect(sql).toMatch(/driver_response_received/i);
+  });
+
   it('grants only workflow-required access: settings may be versioned, everything else is append-only', () => {
     const sql = migrationSql();
 
@@ -55,9 +109,19 @@ describe('fleet incident driver-input migration contract', () => {
     for (const table of appendOnlyTables) {
       expect(sql).toMatch(new RegExp(`GRANT SELECT, INSERT ON[\\s\\S]*?${table}[\\s\\S]*?TO fibreflow_user`, 'i'));
     }
-    // No update/delete application grant exists for requests/submissions/links.
-    const grantBlock = sql.match(/GRANT SELECT, INSERT ON[\s\S]*?TO fibreflow_user;/i)?.[0] ?? '';
-    expect(grantBlock).not.toMatch(/UPDATE|DELETE/i);
+    // Scan EVERY grant statement, not just the first. `.match()` without /g returns one
+    // match, so a second, separate `GRANT UPDATE ON ... TO fibreflow_user;` further down
+    // the file used to pass while defeating the append-only invariant outright.
+    const grants = sql.match(/GRANT[^;]*TO fibreflow_user;/gi) ?? [];
+    expect(grants.length).toBeGreaterThan(0);
+    for (const grant of grants) {
+      for (const appendOnly of appendOnlyTables) {
+        if (!grant.includes(appendOnly)) continue;
+        expect(grant).not.toMatch(/UPDATE/i);
+        expect(grant).not.toMatch(/DELETE/i);
+        expect(grant).not.toMatch(/TRUNCATE/i);
+      }
+    }
     expect(sql).not.toMatch(/GRANT[^;]*(?:DELETE|TRUNCATE)[^;]*TO fibreflow_user/i);
   });
 

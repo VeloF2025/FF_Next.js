@@ -6,6 +6,18 @@ DROP TABLE IF EXISTS fleet_incident_driver_submissions;
 DROP TABLE IF EXISTS fleet_incident_driver_input_requests;
 DROP TABLE IF EXISTS fleet_incident_driver_input_settings;
 
+-- Re-adding the narrower PR6 CHECKs validates every existing row (no NOT VALID),
+-- and run.ts wraps this whole file in one transaction. Any row this migration made
+-- legal — a driver-authored action carrying actor_staff_id instead of actor_user_id,
+-- or one of the two action types PR7 added — would fail that validation and abort the
+-- entire rollback, leaving the migration impossible to reverse once the feature had
+-- been used at all. Those rows are PR7 state by definition, so reverting PR7 means
+-- removing them. This is destructive of driver-authored actions and of nothing else:
+-- every PR6 row predates these columns and is untouched.
+DELETE FROM fleet_operational_incident_actions
+ WHERE actor_staff_id IS NOT NULL
+    OR action_type IN ('driver_input_requested', 'driver_response_received');
+
 ALTER TABLE fleet_operational_incident_actions
   DROP CONSTRAINT IF EXISTS fleet_operational_incident_actions_type_check;
 ALTER TABLE fleet_operational_incident_actions

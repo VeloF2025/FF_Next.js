@@ -47,9 +47,9 @@ CREATE TABLE IF NOT EXISTS fleet_incident_driver_input_settings (
   CONSTRAINT fleet_incident_driver_input_settings_history_covers_recent CHECK (history_window_days >= recent_window_days),
   CONSTRAINT fleet_incident_driver_input_settings_categories_check CHECK (
     enabled_concern_categories <@ ARRAY['assignment_error', 'site_error', 'vehicle_error', 'geofence_error', 'other']::text[]
-    AND array_length(enabled_concern_categories, 1) > 0
+    AND cardinality(enabled_concern_categories) > 0
   ),
-  CONSTRAINT fleet_incident_driver_input_settings_mime_nonempty CHECK (array_length(evidence_allowed_mime_types, 1) > 0),
+  CONSTRAINT fleet_incident_driver_input_settings_mime_nonempty CHECK (cardinality(evidence_allowed_mime_types) > 0),
   CONSTRAINT fleet_incident_driver_input_settings_bytes_positive CHECK (evidence_max_bytes > 0)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ux_fleet_incident_driver_input_settings_open ON fleet_incident_driver_input_settings ((true)) WHERE effective_to IS NULL;
@@ -62,10 +62,26 @@ CREATE TABLE IF NOT EXISTS fleet_incident_driver_input_requests (
   requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   respond_by TIMESTAMPTZ NOT NULL,
   idempotency_key TEXT NOT NULL,
+  -- Supersession/closure and delivery outcome are durable fields, not transient
+  -- return values: a manager has to be able to see later why a request stopped
+  -- being open and whether it ever reached the driver (design 11.1, 13).
+  superseded_at TIMESTAMPTZ,
+  closed_at TIMESTAMPTZ,
+  closure_reason TEXT,
+  delivery_attempted_count INTEGER NOT NULL DEFAULT 0,
+  delivery_accepted_count INTEGER NOT NULL DEFAULT 0,
+  delivery_failed_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT fleet_incident_driver_input_requests_guidance_nonblank CHECK (guidance IS NULL OR btrim(guidance) <> ''),
   CONSTRAINT fleet_incident_driver_input_requests_idempotency_nonblank CHECK (btrim(idempotency_key) <> ''),
   CONSTRAINT fleet_incident_driver_input_requests_respond_by_future CHECK (respond_by > requested_at),
+  CONSTRAINT fleet_incident_driver_input_requests_closure_pair_check CHECK (
+    (closed_at IS NULL AND closure_reason IS NULL)
+    OR (closed_at IS NOT NULL AND NULLIF(btrim(closure_reason), '') IS NOT NULL)
+  ),
+  CONSTRAINT fleet_incident_driver_input_requests_delivery_nonneg CHECK (
+    delivery_attempted_count >= 0 AND delivery_accepted_count >= 0 AND delivery_failed_count >= 0
+  ),
   CONSTRAINT fleet_incident_driver_input_requests_idempotency_unique UNIQUE (incident_id, idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS ix_fleet_incident_driver_input_requests_incident ON fleet_incident_driver_input_requests (incident_id, requested_at DESC);
