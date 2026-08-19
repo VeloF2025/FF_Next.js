@@ -28,6 +28,9 @@ describe('fleet operational incidents migration contract', () => {
     // own size rule (scripts/zero-tolerance-changed.sh) covers only .ts/.tsx - so squeezing
     // the SQL's formatting to fit a round number would cost readability for nothing.
     expect(migrationSql().split(/\r?\n/).length).toBeLessThanOrEqual(303);
+    // Pin the budget to what it was spent on, so the index cannot be deleted while the
+    // raised line count silently stays within budget.
+    expect(migrationSql()).toMatch(/CREATE INDEX IF NOT EXISTS ix_fleet_operational_incidents_opened_at/i);
   });
 
   it('creates the complete durable incident model', () => {
@@ -92,6 +95,11 @@ describe('fleet operational incidents migration contract', () => {
     for (const actor of ['acknowledged_by', 'review_started_by', 'resolved_by']) {
       expect(sql).toMatch(new RegExp(`${actor} UUID REFERENCES users\\(id\\) ON DELETE RESTRICT`, 'i'));
     }
+    // actor_user_id belongs in that set. SET NULL is unreachable here: the actor XOR check
+    // requires (actor_user_id IS NOT NULL) <> is_system_actor, so nulling a human-authored
+    // action's actor makes the implicit UPDATE violate it and aborts the whole DELETE on users.
+    expect(sql).toMatch(/actor_user_id UUID REFERENCES users\(id\) ON DELETE RESTRICT/i);
+    expect(sql).not.toMatch(/actor_user_id UUID REFERENCES users\(id\) ON DELETE SET NULL/i);
     expect(sql).toMatch(/fleet_operational_incidents_lifecycle_details_check/i);
     expect(sql).toMatch(/fleet_operational_incidents_terminal_outcome_check/i);
     expect(sql).toMatch(/outcome = 'duplicate' AND duplicate_incident_id IS NOT NULL AND duplicate_incident_id <> id/i);

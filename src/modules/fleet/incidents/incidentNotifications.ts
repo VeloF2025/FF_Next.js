@@ -100,8 +100,17 @@ function openedBody(input: OpenedNotificationInput): string {
  * here, so reusing that exact triple would return false for every recipient and suppress the
  * WhatsApp leg entirely rather than deduplicate it.
  *
- * A failed send releases its claim: a transient bridge outage must not permanently silence
- * the one channel a critical incident is guaranteed to reach.
+ * Both claim operations are fail-open, and deliberately so: for the one channel a critical
+ * incident is guaranteed to reach, delivering twice beats not delivering. A claim that throws
+ * is logged and the send proceeds — the alternative is letting a bookkeeping error suppress an
+ * accident/SOS notification, and this module's contract is that failures are counted in
+ * NotifyResult, never thrown at the caller. A failed send releases its claim so a transient
+ * bridge outage does not silence the recipient.
+ *
+ * Residual risk, accepted rather than hidden: if the send fails AND the release also fails —
+ * likely the same underlying outage — the claim is stranded and that recipient's retries stay
+ * suppressed. Clearing it needs a TTL or reconciliation on notification_idempotency_claims,
+ * which is a change to shared notification infrastructure and out of scope here.
  */
 async function sendMandatoryWhatsApp(
   userIds: readonly string[], payload: Omit<NotifyPayload, 'recipient_user_ids'>,
@@ -110,7 +119,13 @@ async function sendMandatoryWhatsApp(
   let failed = 0;
   const claimEvent = `${eventType}:whatsapp`;
   for (const userId of userIds) {
-    if (!await claimNotification(userId, claimEvent, idempotencyKey)) continue;
+    try {
+      if (!await claimNotification(userId, claimEvent, idempotencyKey)) continue;
+    } catch (claimError) {
+      log.error('[fleet-incident-notifications] WhatsApp claim failed; sending anyway', {
+        ...logContext, userId, error: sanitizedMessage(claimError),
+      }, MODULE);
+    }
     try {
       await deliverWhatsApp(userId, { ...payload, recipient_user_ids: [userId] }, null);
     } catch (error) {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { safeFilename } from '../vfStorageUpload';
+import { contentMatchesMimeType, safeFilename } from '../vfStorageUpload';
 
 describe('safeFilename', () => {
   it('passes a normal filename through unchanged', () => {
@@ -207,5 +207,20 @@ describe('uploadCategorizedFile', () => {
     });
 
     expect(result.key).toBe('fleet/incidents/x.pdf');
+  });
+
+  it('accepts a PDF whose header sits after a spec-legal preamble', () => {
+    // ISO 32000 has readers locate %PDF- within the first 1024 bytes; real generators and
+    // scanners do prepend a BOM or wrapper bytes. Requiring offset 0 would reject them, and
+    // fail-closed leaves the uploader no way around it.
+    const withBom = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('%PDF-1.7')]);
+
+    expect(contentMatchesMimeType(withBom, 'application/pdf')).toBe(true);
+  });
+
+  it('does not extend that tolerance to JPEG or PNG, whose signatures are fixed at byte 0', () => {
+    const shifted = Buffer.concat([Buffer.from([0x00]), Buffer.from([0xff, 0xd8, 0xff])]);
+
+    expect(contentMatchesMimeType(shifted, 'image/jpeg')).toBe(false);
   });
 });

@@ -37,7 +37,7 @@ import {
   type IncidentEvidenceViewer,
 } from '../evidenceService';
 import { IncidentNotFoundError } from '../incidentRepository';
-import { VfStorageOriginError, VfStorageValidationError } from '@/lib/vfStorageUpload';
+import { SIGNATURE_REGISTERED_TYPES, VfStorageOriginError, VfStorageValidationError } from '@/lib/vfStorageUpload';
 
 const INCIDENT = '11111111-1111-4111-8111-111111111111';
 const USER = '22222222-2222-4222-8222-222222222222';
@@ -222,5 +222,15 @@ describe('isolation from acknowledgement and emergency notification delivery', (
     expect(db.transaction).not.toHaveBeenCalled();
     expect(repo.insertIncidentAction).not.toHaveBeenCalled();
     expect(repo.insertIncidentEvidence).not.toHaveBeenCalled();
+  });
+
+  it('never allows a MIME type the uploader has no signature for', () => {
+    // ALLOWED_EVIDENCE_MIME_TYPES and the uploader's MIME_SIGNATURES are declared in different
+    // modules with nothing tying them together. Signature verification fails closed, so adding
+    // a type here without a matching signature would reject every upload of it at runtime and
+    // surface only as a confused user. This is that tie.
+    for (const mimeType of ALLOWED_EVIDENCE_MIME_TYPES) {
+      expect(SIGNATURE_REGISTERED_TYPES).toContain(mimeType);
+    }
   });
 });

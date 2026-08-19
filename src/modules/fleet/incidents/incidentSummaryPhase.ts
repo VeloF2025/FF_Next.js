@@ -78,19 +78,30 @@ async function sendSummaryForBucket(bucket: SummaryBucket, workDate: string, tot
   }
 }
 
-// True once a `morning_summary` run for this SAST work date actually got through its send
-// loop — `succeeded` or `partial_failure`. Deliberately NOT "a run exists, whatever its
-// outcome": a `failed` run sent nothing (the phase threw), and a `running` row can only be a
-// crashed run, because the cron's advisory lock already excludes a concurrent second
-// invocation. Counting either as done costs every project manager that day's summary with
-// nothing to surface it — runStatusMonitorHealthCheck only ever inspects `status_monitor`.
-// Retrying is safe: every summary carries the idempotency key
-// `fleet-morning-summary:{user}:{project}:{date}`, so claimNotification deduplicates a
-// recipient who was already reached instead of messaging them twice.
+// True only once a `morning_summary` run for this SAST work date delivered everything it set
+// out to. Nothing short of `succeeded` blocks a retry:
+//
+//   `failed`          — the phase threw; nothing was sent.
+//   `running`         — can only be a crashed run, since the cron's advisory lock already
+//                       excludes a concurrent second invocation.
+//   `partial_failure` — set whenever any bucket threw or any notify() came back failed. Those
+//                       are precisely the recipients still owed a summary, so skipping the
+//                       rest of the day is the bug this gate exists to prevent, not the
+//                       behaviour it wants.
+//
+// Retrying is safe because every summary carries the idempotency key
+// `fleet-morning-summary:{user}:{project}:{date}`, so claimNotification suppresses a recipient
+// already reached rather than messaging them twice.
+//
+// The cost is deliberate: a bucket that can never resolve a recipient — a project with no
+// manager assigned — keeps the day in `partial_failure` and re-runs the phase every tick,
+// logging each time. That is a configuration fault that should keep complaining. Silence for
+// the rest of the day is the worse failure, especially as runStatusMonitorHealthCheck only
+// ever inspects `status_monitor` runs and would never surface it.
 async function morningSummaryAlreadySentFor(workDate: string): Promise<boolean> {
   const latest = await findLatestMonitorRun('morning_summary');
   if (latest === null || sastDateString(new Date(latest.effectiveAt)) !== workDate) return false;
-  return latest.status === 'succeeded' || latest.status === 'partial_failure';
+  return latest.status === 'succeeded';
 }
 
 export async function runMorningSummaryPhase(request: IncidentActionRunnerRequest, totals: SummaryTotals): Promise<void> {

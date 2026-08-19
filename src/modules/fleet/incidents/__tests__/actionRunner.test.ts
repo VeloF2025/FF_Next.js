@@ -284,6 +284,20 @@ describe('morning summary phase', () => {
     expect(notifications.sendMorningSummaryNotification).toHaveBeenCalledTimes(1);
   });
 
+  it('retries after a partial_failure, because those recipients are the ones still owed one', async () => {
+    // partial_failure is set whenever any bucket threw or any notify() failed. Treating it as
+    // terminal skips the rest of the day for exactly the recipients who did not get theirs.
+    runs.findLatestMonitorRun.mockImplementation(async (kind: string) => (kind === 'morning_summary'
+      ? runRow({ runKind: 'morning_summary', status: 'partial_failure', effectiveAt: AFTER_0815.effectiveAt })
+      : runRow({ runKind: 'status_monitor', status: 'succeeded', startedAt: AFTER_0815.effectiveAt })));
+    monitor.loadMonitoredRoster.mockResolvedValue([staffItem()]);
+    settings.loadEffectiveIncidentRule.mockImplementation(async (type: string) => (type === 'unassigned' ? unassignedRule : null));
+
+    await runIncidentActions(AFTER_0815);
+
+    expect(notifications.sendMorningSummaryNotification).toHaveBeenCalledTimes(1);
+  });
+
   it('still treats a crashed `running` run as retryable, not as already sent', async () => {
     // The cron's advisory lock already excludes a concurrent second invocation, so a
     // `running` row for today can only be a run that died before finalizing.

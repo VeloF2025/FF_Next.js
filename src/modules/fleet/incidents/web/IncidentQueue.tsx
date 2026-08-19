@@ -81,6 +81,8 @@ export function IncidentQueue({ canEdit, canManageSettings }: IncidentQueueProps
   const [opener, setOpener] = useState<HTMLElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  // A partial batch is not a failure — it must not render in the error styling.
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const { data, error, loading, refresh } = useIncidentQueue(filters, page, PAGE_LIMIT);
 
@@ -90,7 +92,7 @@ export function IncidentQueue({ canEdit, canManageSettings }: IncidentQueueProps
 
   async function bulkAcknowledge(): Promise<void> {
     if (!selected.size) return;
-    setBulkSubmitting(true); setBulkError(null);
+    setBulkSubmitting(true); setBulkError(null); setBulkNotice(null); setBulkNotice(null);
     try {
       const outcome = await incidentApi.bulkAcknowledge([...selected]);
       setSelected(new Set());
@@ -98,7 +100,7 @@ export function IncidentQueue({ canEdit, canManageSettings }: IncidentQueueProps
       // A conflict no longer aborts the batch server-side, so the rest did commit. Say so
       // plainly rather than leaving the manager to guess which half went through.
       if (outcome.conflicts.length > 0) {
-        setBulkError(`Acknowledged ${outcome.results.length}. ${outcome.conflicts.length} `
+        setBulkNotice(`Acknowledged ${outcome.results.length}. ${outcome.conflicts.length} `
           + 'were already closed by someone else and were skipped.');
       }
     }
@@ -127,6 +129,7 @@ export function IncidentQueue({ canEdit, canManageSettings }: IncidentQueueProps
             {bulkSubmitting ? 'Acknowledging…' : `Acknowledge selected (${selected.size})`}
           </button>
           {bulkError && <p role="alert" className="text-sm text-red-700">{bulkError}</p>}
+          {bulkNotice && <p role="status" className="text-sm text-[var(--ff-text-secondary)]">{bulkNotice}</p>}
         </div>}
         <IncidentTable incidents={data.incidents} canEdit={canEdit} selected={selected} onToggleSelect={toggleSelect} onOpen={openIncident} />
         <div className="flex items-center gap-3 text-sm">

@@ -137,10 +137,32 @@ const MIME_SIGNATURES: Readonly<Record<string, readonly (readonly number[])[]>> 
   'application/pdf': [[0x25, 0x50, 0x44, 0x46, 0x2d]],
 };
 
+/**
+ * How far into the file a signature may legally start.
+ *
+ * JPEG and PNG are fixed at byte 0 by their specs. PDF is not: ISO 32000 has readers locate
+ * `%PDF-` within the first 1024 bytes, because real generators and scanners do prepend a
+ * preamble (a UTF-8 BOM, PDF/A//document-management wrapper bytes). Insisting on offset 0
+ * would reject spec-legal evidence, and fail-closed means the manager gets no way around it.
+ */
+const SIGNATURE_SEARCH_WINDOW: Readonly<Record<string, number>> = { 'application/pdf': 1024 };
+
+/** The MIME types with a registered signature. Exported so callers can assert their own
+ *  allowlist is a subset — an allowed type with no signature fails closed on every upload. */
+export const SIGNATURE_REGISTERED_TYPES: readonly string[] = Object.keys(MIME_SIGNATURES);
+
 export function contentMatchesMimeType(buffer: Buffer, mimeType: string): boolean {
   const signatures = MIME_SIGNATURES[mimeType];
   if (!signatures) return false;
-  return signatures.some((signature) => signature.every((byte, index) => buffer[index] === byte));
+  // Default 0 — signature must start at byte 0 unless the type is explicitly given slack.
+  const window = SIGNATURE_SEARCH_WINDOW[mimeType] ?? 0;
+  return signatures.some((signature) => {
+    const lastStart = Math.min(window, buffer.length - signature.length);
+    for (let start = 0; start <= lastStart; start += 1) {
+      if (signature.every((byte, index) => buffer[start + index] === byte)) return true;
+    }
+    return false;
+  });
 }
 
 export async function uploadCategorizedFile(request: VfStorageUploadRequest): Promise<VfStorageUploadResult> {
