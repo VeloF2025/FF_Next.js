@@ -78,6 +78,17 @@ describe('isDeniedAreaViolation', () => {
       expect(isDeniedAreaViolation(mcpUser, '/api/staff/list?q=100%25')).toBe(true);
     });
 
+    it('refuses a NEAR-MISS for a denied path', () => {
+      // MCP_DENIED_PATHS is matched byte-exactly, so a trailing byte stopped it being
+      // recognised once the tail became permissive. Nothing routes to these today; the
+      // guard should not be relying on that.
+      expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance;x=1')).toBe(true);
+      expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance~')).toBe(true);
+      expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance%20')).toBe(true);
+      // …while a genuinely different sibling route stays permitted.
+      expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance-policy')).toBe(false);
+    });
+
     it('allows real storage keys as path segments', () => {
       // Five catalogued catch-alls carry storage keys as PATH segments, and 20,999 of
       // 98,462 live keys contain spaces or parentheses. An over-strict shape rule here
@@ -117,6 +128,23 @@ describe('isDeniedAreaViolation', () => {
       expect(isDeniedAreaViolation(mcpUser, '/api/staff /list')).toBe(true);
       expect(isDeniedAreaViolation(mcpUser, '/api/staff./list')).toBe(true);
       expect(isDeniedAreaViolation(mcpUser, '/api/staff\u0000/list')).toBe(true);
+    });
+
+    it('refuses a control character or backslash ANYWHERE in the path', () => {
+      // This guard shipped with no test that failed when it was deleted — the NUL case
+      // above passes via the GROUP shape rule, not this check, so removing the whole
+      // clause left every assertion green. It is now the only thing constraining a
+      // permissive tail, and backslash genuinely matters: Next parses with the WHATWG
+      // URL parser, which folds "\\" to "/", so a backslash can change which route
+      // matches.
+      expect(isDeniedAreaViolation(mcpUser, '/api/uploads/a\u0001b.jpg')).toBe(true);
+      expect(isDeniedAreaViolation(mcpUser, '/api/uploads/a\u007fb.jpg')).toBe(true);
+      expect(isDeniedAreaViolation(mcpUser, '/api/uploads/a\nb.jpg')).toBe(true);
+      expect(isDeniedAreaViolation(mcpUser, '/api/uploads\\..\\staff/list')).toBe(true);
+      expect(isDeniedAreaViolation(mcpUser, '/api/reporting\\staff')).toBe(true);
+      // The mirror: an ordinary key with spaces and parens is still permitted, so this
+      // cannot be satisfied by refusing everything with a non-alphanumeric character.
+      expect(isDeniedAreaViolation(mcpUser, '/api/uploads/a b (1).jpg')).toBe(false);
     });
 
     it('refuses a traversal rather than resolving it', () => {

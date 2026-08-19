@@ -222,7 +222,8 @@ export function withAuth(handler: AuthenticatedHandler): NextApiHandler {
       }
 
       // Beside the read-only gate, for the same reason it lives here rather than in
-      // each route: every current and future endpoint inherits it and none can forget.
+      // each route: every route that AUTHENTICATES inherits it. It cannot reach a route
+            // that resolves no user — see the scope note in ./mcpDeniedAreas.
       if (isDeniedAreaViolation(user, req.url)) {
         return res.status(403).json({
           success: false,
@@ -381,7 +382,8 @@ export function withOptionalAuth(
             }
 
             // Beside the read-only gate, for the same reason it lives here rather than in
-            // each route: every current and future endpoint inherits it and none can forget.
+            // each route: every route that AUTHENTICATES inherits it. It cannot reach a route
+            // that resolves no user — see the scope note in ./mcpDeniedAreas.
             if (isDeniedAreaViolation(user, req.url)) {
               return res.status(403).json({
                 success: false,
@@ -469,7 +471,8 @@ export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: Nex
             }
 
             // Beside the read-only gate, for the same reason it lives here rather than in
-            // each route: every current and future endpoint inherits it and none can forget.
+            // each route: every route that AUTHENTICATES inherits it. It cannot reach a route
+            // that resolves no user — see the scope note in ./mcpDeniedAreas.
             if (isDeniedAreaViolation(user, req.url)) {
               return res.status(403).json({
                 success: false,

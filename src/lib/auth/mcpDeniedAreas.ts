@@ -75,6 +75,9 @@ export const MCP_DENIED_GROUPS: readonly string[] = [
  */
 export const MCP_DENIED_PATHS: readonly string[] = ['/api/field/attendance'];
 
+/** What a segment carrying a routing DECISION may contain. */
+const SEGMENT_SHAPE = /^[a-z0-9][a-z0-9._-]*$/;
+
 export const MCP_DENIED_AREA_CODE = 'MCP_AREA_DENIED';
 export const MCP_DENIED_AREA_MESSAGE =
   'This area is not available to read-only integration tokens.';
@@ -127,8 +130,29 @@ function canonical(rawPath: string | undefined): string | null {
   //
   // So: the GROUP segment is constrained tightly, and the tail is allowed anything
   // except the separators and control characters that could change which route matches.
-  const groupSegment = path.split('/')[2] ?? '';
-  if (!/^[a-z0-9][a-z0-9._-]*$/.test(groupSegment)) return null;
+  // The group segment is always strict: it is what every group decision is made on.
+  const rawSegments = path.split('/');
+  if (!SEGMENT_SHAPE.test(rawSegments[2] ?? '')) return null;
+
+  // And any path that is a NEAR-MISS for a denied path is refused rather than allowed.
+  //
+  // MCP_DENIED_PATHS is matched byte-exactly, so once the tail became permissive
+  // `/api/field/attendance;x=1` stopped being recognised as `/api/field/attendance` —
+  // the trailing-byte class the old whole-path rule closed, reopened for exactly the
+  // list designed to grow. Requiring strictness by DEPTH instead would refuse
+  // `/api/uploads/a b/c(1).jpg`, whose permissive content sits at the same depth, so the
+  // rule is scoped to candidates: same leading segments, last one merely prefixed.
+  for (const denied of MCP_DENIED_PATHS) {
+    const deniedSegments = denied.split('/');
+    const last = deniedSegments.length - 1;
+    if (rawSegments.length <= last) continue;
+    const leadingMatches = deniedSegments
+      .slice(1, last)
+      .every((segment, index) => rawSegments[index + 1] === segment);
+    if (!leadingMatches) continue;
+    const candidate = rawSegments[last]!;
+    if (candidate !== deniedSegments[last] && !SEGMENT_SHAPE.test(candidate)) return null;
+  }
   // eslint-disable-next-line no-control-regex -- control bytes are exactly what is refused
   if (/[\u0000-\u001f\u007f\\]/.test(path)) return null;
   // `..` is refused rather than resolved: resolving it would silently accept
