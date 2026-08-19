@@ -126,6 +126,103 @@ describe('IncidentReviewDrawer', () => {
     await flush();
     expect(screen.getByText(/You do not have permission to act on this incident/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'acknowledged' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Request driver input' })).not.toBeInTheDocument();
+  });
+
+  it('shows "Awaiting driver" once a manager requests input, and "Driver responded" once a submission follows the request', async () => {
+    const opened = {
+      id: 'action-1', actionType: 'opened' as const, actorUserId: null, isSystemActor: true,
+      occurredAt: '2026-08-18T06:58:00.000Z', note: null, beforeLifecycleStatus: null, afterLifecycleStatus: 'open' as const,
+      beforeEscalationLevel: null, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null,
+    };
+    const requested = {
+      id: 'action-2', actionType: 'driver_input_requested' as const, actorUserId: 'user-9', isSystemActor: false,
+      occurredAt: '2026-08-18T07:00:00.000Z', note: 'Please explain the late start', beforeLifecycleStatus: 'open' as const,
+      afterLifecycleStatus: 'open' as const, beforeEscalationLevel: 0, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null,
+    };
+    const responded = {
+      id: 'action-3', actionType: 'driver_response_received' as const, actorUserId: null, isSystemActor: false,
+      occurredAt: '2026-08-18T09:00:00.000Z', note: null, beforeLifecycleStatus: 'open' as const, afterLifecycleStatus: 'open' as const,
+      beforeEscalationLevel: 0, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null,
+    };
+
+    fetchMock.mockResolvedValueOnce(ok(detail({ actions: [requested, opened] })));
+    const { unmount } = render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.getByText('Awaiting driver')).toBeInTheDocument();
+    expect(screen.queryByText('Driver responded')).not.toBeInTheDocument();
+    // Authorship is distinguishable in the activity history, not just a raw action-type label.
+    expect(screen.getByText(/Requested driver input/)).toBeInTheDocument();
+    unmount();
+
+    fetchMock.mockResolvedValueOnce(ok(detail({ actions: [responded, requested, opened] })));
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.getByText('Driver responded')).toBeInTheDocument();
+    expect(screen.queryByText('Awaiting driver')).not.toBeInTheDocument();
+  });
+
+  it('shows no driver-input badge when input was never requested', async () => {
+    fetchMock.mockResolvedValue(ok(detail()));
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.queryByText('Awaiting driver')).not.toBeInTheDocument();
+    expect(screen.queryByText('Driver responded')).not.toBeInTheDocument();
+  });
+
+  it('lets an editor request driver input and confirms the response-due date only after the API confirms it', async () => {
+    const requestDeferred = deferred<Response>();
+    fetchMock.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.includes('/request-driver-input') && init?.method === 'POST') return requestDeferred.promise;
+      return Promise.resolve(ok(detail({ lifecycleStatus: 'open' })));
+    });
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+
+    fireEvent.change(screen.getByLabelText('Driver guidance'), { target: { value: 'Please explain the late start' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Request driver input' }));
+    await flush();
+
+    expect(screen.getByRole('button', { name: 'Requesting…' })).toBeInTheDocument();
+    expect(screen.queryByText(/Requested — response due/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      requestDeferred.resolve(ok({
+        inputRequestId: 'req-1', incidentId: 'incident-1', respondBy: '2026-08-20T21:59:59.999Z',
+        driverInputState: 'requested', notification: { delivered: 1, suppressed: 0, failed: 0 },
+      }));
+      await requestDeferred.promise;
+    });
+    await waitFor(() => expect(screen.getByText(/Requested — response due/)).toBeInTheDocument());
+  });
+
+  it('surfaces a request-driver-input failure without losing the entered guidance', async () => {
+    fetchMock.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.includes('/request-driver-input') && init?.method === 'POST') return Promise.resolve(fail(409, 'CONFLICT', 'Incident is closed and driver input can no longer be requested'));
+      return Promise.resolve(ok(detail({ lifecycleStatus: 'open' })));
+    });
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+
+    fireEvent.change(screen.getByLabelText('Driver guidance'), { target: { value: 'Please explain' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Request driver input' }));
+    await flush();
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Incident is closed and driver input can no longer be requested');
+    expect(screen.getByLabelText('Driver guidance')).toHaveValue('Please explain');
+  });
+
+  it('does not render driver-input status or the request action when the incident cannot be loaded (cross-project PM)', async () => {
+    fetchMock.mockResolvedValue(fail(403, 'FORBIDDEN', 'You cannot view this incident'));
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.getByText('You cannot view this incident.')).toBeInTheDocument();
+    expect(screen.queryByText('Awaiting driver')).not.toBeInTheDocument();
+    expect(screen.queryByText('Driver responded')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Request driver input' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Driver guidance')).not.toBeInTheDocument();
   });
 
   it('closes on Escape', async () => {

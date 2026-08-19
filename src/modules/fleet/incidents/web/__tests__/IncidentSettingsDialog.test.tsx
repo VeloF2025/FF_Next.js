@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncidentSettingsDialog } from '../IncidentSettingsDialog';
 import type { IncidentRule, OversightMembership } from '../../types';
@@ -24,6 +24,16 @@ const NAME_BY_USER_ID: Record<string, string> = {
   'user-found-1': 'Nomvula Khumalo',
 };
 
+const driverInputSettings = {
+  version: 1, effectiveFrom: '2026-08-01T00:00:00.000Z', effectiveTo: null,
+  responseWindowWorkdays: 2, postClosureResponseEnabled: false, postClosureResponseWindowDays: 0,
+  recentWindowDays: 90, historyWindowDays: 365,
+  enabledConcernCategories: ['assignment_error', 'site_error', 'vehicle_error', 'geofence_error', 'other'],
+  evidenceAllowedMimeTypes: ['image/jpeg', 'image/png', 'application/pdf'], evidenceMaxBytes: 15728640,
+  driverInputRequestedChannels: { inApp: true, email: true, whatsapp: false },
+  driverResponseReceivedChannels: { inApp: true, email: true, whatsapp: false },
+};
+
 function ok(data: unknown, status = 200): Response { return { ok: true, status, json: async () => ({ success: true, data }) } as Response; }
 function fail(status: number, code: string, message: string): Response { return { ok: false, status, json: async () => ({ success: false, error: { code, message } }) } as Response; }
 async function flush(): Promise<void> { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); }
@@ -38,11 +48,17 @@ const fetchMock = vi.fn<typeof fetch>();
  * exactly what "create a future/effective version" and "add only after the
  * API confirms it" need to prove.
  */
-function routeFetch(): { rules: IncidentRule[]; members: OversightMembership[] } {
-  const state = { rules: [currentRule, previousRule], members: [activeMember] };
+function routeFetch(): { rules: IncidentRule[]; members: OversightMembership[]; driverInput: typeof driverInputSettings } {
+  const state = { rules: [currentRule, previousRule], members: [activeMember], driverInput: { ...driverInputSettings } };
   fetchMock.mockImplementation((input, init) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
+    if (url.includes('/settings/driver-input') && method === 'GET') return Promise.resolve(ok(state.driverInput));
+    if (url.includes('/settings/driver-input') && method === 'POST') {
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      state.driverInput = { ...state.driverInput, ...body, version: state.driverInput.version + 1 } as typeof driverInputSettings;
+      return Promise.resolve(ok(state.driverInput, 201));
+    }
     if (url.includes('/settings/rules') && method === 'GET') return Promise.resolve(ok([...state.rules]));
     if (url.includes('/settings/rules') && method === 'POST') {
       state.rules = [createdRule, ...state.rules.map((rule) => (rule.id === currentRule.id ? { ...rule, effectiveTo: createdRule.effectiveFrom } : rule))];
@@ -163,6 +179,44 @@ describe('IncidentSettingsDialog', () => {
     await flush();
     await waitFor(() => expect(screen.getByText(/Kabelo Mokoena/)).toBeInTheDocument());
     expect(screen.queryByText(/user-ended-1/)).not.toBeInTheDocument();
+  });
+
+  it('shows the current driver-input settings for a view-only visitor, with no edit controls', async () => {
+    render(<IncidentSettingsDialog open onClose={vi.fn()} canEdit={false} />);
+    await flush();
+    expect(screen.getByText(/Version 1/)).toBeInTheDocument();
+    expect(screen.getByText(/2 working day/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Response window workdays')).not.toBeInTheDocument();
+  });
+
+  it('lets a settings-authorized user version the driver-input response window only after the API confirms it', async () => {
+    render(<IncidentSettingsDialog open onClose={vi.fn()} canEdit />);
+    await flush();
+    fireEvent.change(screen.getByLabelText('Response window workdays'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Driver input settings change reason'), { target: { value: 'Give drivers an extra day' } });
+    const submit = screen.getByRole('button', { name: 'Update driver input settings' });
+    fireEvent.click(submit);
+    await flush();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/fleet/incidents/settings/driver-input', expect.objectContaining({ method: 'POST' }));
+    await waitFor(() => expect(screen.getByText(/Version 2/)).toBeInTheDocument());
+  });
+
+  it('surfaces a driver-input settings update failure without silently discarding the draft', async () => {
+    fetchMock.mockImplementation((input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/settings/driver-input') && method === 'GET') return Promise.resolve(ok(driverInputSettings));
+      if (url.includes('/settings/driver-input') && method === 'POST') return Promise.resolve(fail(400, 'BAD_REQUEST', 'effectiveFrom must be after the current version activation'));
+      return Promise.resolve(fail(404, 'NOT_FOUND', `Unhandled request: ${url}`));
+    });
+    render(<IncidentSettingsDialog open onClose={vi.fn()} canEdit />);
+    await flush();
+    fireEvent.change(screen.getByLabelText('Driver input settings change reason'), { target: { value: 'Tune it' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update driver input settings' }));
+    await flush();
+    const section = screen.getByRole('region', { name: 'Driver input settings' });
+    expect(within(section).getByRole('alert')).toHaveTextContent('effectiveFrom must be after the current version activation');
   });
 
   it('keeps Tab inside the dialog instead of letting it walk into the page behind', () => {

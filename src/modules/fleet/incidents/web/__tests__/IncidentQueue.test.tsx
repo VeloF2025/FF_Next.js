@@ -141,6 +141,26 @@ describe('IncidentQueue', () => {
     expect(screen.queryByRole('button', { name: /dismiss selected/i })).not.toBeInTheDocument();
   });
 
+  it('round-trips driverInputState and attendanceCorrectionState filters through the URL and the outgoing request', async () => {
+    window.history.replaceState({}, '', '/fleet/incidents?driverInputState=requested&attendanceCorrectionState=pending');
+    fetchMock.mockResolvedValue(ok(listResult([])));
+    render(<IncidentQueue canEdit canManageSettings={false} />);
+    await flush();
+    const firstCall = String(fetchMock.mock.calls[0]![0]);
+    expect(firstCall).toContain('driverInputState=requested');
+    expect(firstCall).toContain('attendanceCorrectionState=pending');
+  });
+
+  it('ignores an unrecognized driverInputState/attendanceCorrectionState value from the URL rather than forwarding it', async () => {
+    window.history.replaceState({}, '', '/fleet/incidents?driverInputState=bogus&attendanceCorrectionState=bogus');
+    fetchMock.mockResolvedValue(ok(listResult([])));
+    render(<IncidentQueue canEdit canManageSettings={false} />);
+    await flush();
+    const firstCall = String(fetchMock.mock.calls[0]![0]);
+    expect(firstCall).not.toContain('driverInputState=');
+    expect(firstCall).not.toContain('attendanceCorrectionState=');
+  });
+
   it('hides the settings entry point unless the viewer is settings-authorized', async () => {
     fetchMock.mockResolvedValue(ok(listResult([])));
     const { rerender } = render(<IncidentQueue canEdit canManageSettings={false} />);

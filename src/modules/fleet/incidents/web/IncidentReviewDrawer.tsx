@@ -4,14 +4,53 @@
  * Escape closes, Tab loops inside the panel, focus returns to the opener.
  * Never renders coordinates — only the incident's own snapshot labels,
  * bounded evidence-snapshot key/value pairs, and VF Storage evidence links.
+ *
+ * PR7 Task 8 adds a driver-input status line derived purely from
+ * `detail.actions` (the `driver_input_requested`/`driver_response_received`
+ * entries PR7's driver-input domain already appends there — no new fetch).
+ * This only covers "awaiting driver" vs "driver responded": a true
+ * "response overdue" badge needs the request's `respond_by`, which is not
+ * currently carried on the action row (only `note`/`guidance` is), and
+ * "correction pending/completed/declined" needs a manager-facing read of
+ * `fleet_incident_attendance_correction_links` that does not exist yet
+ * (`attendanceCorrectionLinkService.ts` is staff-session-scoped, by
+ * design, to the driver's own incidents). Both are left as follow-up work
+ * rather than guessed at with unverifiable SQL — see this task's PR
+ * description for the full ruling.
  */
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { incidentApi, IncidentApiError, type EvidenceUploadBody } from './incidentApi';
 import { IncidentActionPanel } from './IncidentActionPanel';
-import type { IncidentDetail } from '../types';
+import type { IncidentAction, IncidentDetail } from '../types';
 
 function sast(value: string | null): string {
   return value ? new Date(value).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }) : 'Not recorded';
+}
+
+type DriverInputBadge = 'awaiting_driver' | 'driver_responded';
+const DRIVER_INPUT_BADGE_LABELS: Record<DriverInputBadge, string> = {
+  awaiting_driver: 'Awaiting driver', driver_responded: 'Driver responded',
+};
+const DRIVER_ACTION_LABELS: Partial<Record<IncidentAction['actionType'], string>> = {
+  driver_input_requested: 'Requested driver input', driver_response_received: 'Driver responded',
+};
+
+/** Latest-request-vs-latest-response ordering only — see this file's docstring for why
+ * `expired`/`closed`/`response_overdue` are not derivable from the data available here. */
+function deriveDriverInputBadge(actions: IncidentAction[]): DriverInputBadge | null {
+  const latestOf = (type: IncidentAction['actionType']): IncidentAction | undefined => actions
+    .filter((action) => action.actionType === type)
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
+  const latestRequest = latestOf('driver_input_requested');
+  if (!latestRequest) return null;
+  const latestResponse = latestOf('driver_response_received');
+  return latestResponse && latestResponse.occurredAt >= latestRequest.occurredAt ? 'driver_responded' : 'awaiting_driver';
+}
+
+function DriverInputStatus({ actions }: { actions: IncidentAction[] }) {
+  const badge = deriveDriverInputBadge(actions);
+  if (!badge) return null;
+  return <p role="status" className="text-sm font-medium text-[var(--ff-text-primary)]">{DRIVER_INPUT_BADGE_LABELS[badge]}</p>;
 }
 
 function readAsBase64(file: File): Promise<string> {
@@ -90,9 +129,17 @@ function DetailSections({ detail }: { detail: IncidentDetail }) {
       </section>}
       <section aria-label="Activity history">
         <h4 className="font-medium text-[var(--ff-text-primary)]">Activity history</h4>
-        {detail.actions.length === 0 ? <p>No recorded activity yet.</p> : <ul>{detail.actions.map((action) => (
-          <li key={action.id}>{sast(action.occurredAt)} — {action.actionType.replaceAll('_', ' ')}{action.note ? `: ${action.note}` : ''}</li>
-        ))}</ul>}
+        {detail.actions.length === 0 ? <p>No recorded activity yet.</p> : <ul>{detail.actions.map((action) => {
+          const driverLabel = DRIVER_ACTION_LABELS[action.actionType];
+          const authorship = action.actionType === 'driver_response_received' ? 'Driver' : action.actionType === 'driver_input_requested' ? 'Sent to driver' : null;
+          return (
+            <li key={action.id}>
+              {sast(action.occurredAt)} — {driverLabel ?? action.actionType.replaceAll('_', ' ')}
+              {authorship && <span className="ml-1 text-xs uppercase text-[var(--ff-text-tertiary)]">({authorship})</span>}
+              {action.note ? `: ${action.note}` : ''}
+            </li>
+          );
+        })}</ul>}
       </section>
       <section aria-label="Attachments">
         <h4 className="font-medium text-[var(--ff-text-primary)]">Attachments</h4>
@@ -154,6 +201,7 @@ export function IncidentReviewDrawer({ incidentId, canEdit, returnFocus, onClose
         {error && <p role="alert" className="mt-4 text-sm text-red-700">{error.kind === 'permission' ? 'You cannot view this incident.' : 'This incident could not be loaded.'}</p>}
         {!detail && !error && <p className="mt-4 text-[var(--ff-text-secondary)]">Loading incident…</p>}
         {detail && <div className="mt-4 space-y-5">
+          <DriverInputStatus actions={detail.actions} />
           <DetailSections detail={detail} />
           <IncidentActionPanel incident={detail} canEdit={canEdit} onSubmitted={refreshAfterChange} />
           <EvidenceUploadForm incidentId={detail.id} canEdit={canEdit} onUploaded={refreshAfterChange} />

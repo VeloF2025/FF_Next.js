@@ -11,9 +11,18 @@ export type IncidentLifecycleStatus = 'open' | 'acknowledged' | 'under_review' |
 export type IncidentOutcome =
   | 'confirmed' | 'valid_reason' | 'false_positive' | 'data_gap'
   | 'assignment_error' | 'geofence_error' | 'duplicate' | 'no_action_required';
+/**
+ * `driver_input_requested`/`driver_response_received` are written by PR7's
+ * driver-input domain (migration 503's `fleet_operational_incident_actions`
+ * type-check constraint) — added here so the manager queue (Task 8) can
+ * type-check timeline authorship without an unsound `as string` cast; the
+ * values themselves have flowed through `getIncidentActions` since PR7
+ * Task 3, this union just now names them.
+ */
 export type IncidentActionType =
   | 'opened' | 'acknowledged' | 'review_started' | 'commented' | 'escalated'
-  | 'condition_cleared' | 'resolved' | 'dismissed' | 'evidence_added' | 'recipient_changed';
+  | 'condition_cleared' | 'resolved' | 'dismissed' | 'evidence_added' | 'recipient_changed'
+  | 'driver_input_requested' | 'driver_response_received';
 export type IncidentEvidenceType = 'photo' | 'document' | 'manager_note' | 'external_reference';
 export type MonitorRunKind = 'status_monitor' | 'escalation' | 'morning_summary';
 export type MonitorRunStatus = 'running' | 'succeeded' | 'partial_failure' | 'failed';

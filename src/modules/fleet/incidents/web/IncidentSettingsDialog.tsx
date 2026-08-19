@@ -8,13 +8,104 @@
  * `userId` -> display-name resolution that keeps raw UUIDs out of the
  * visible UI — lives in `./OversightSection` (split out to stay under the
  * 200-line component cap once name resolution was added).
+ *
+ * `DriverInputSection` (PR7 Task 8) is deliberately compact per the plan's
+ * own wording: it edits the response-window/visibility-window numbers a
+ * manager is actually likely to tune, and passes the currently-loaded
+ * concern-category/evidence-MIME/channel values straight through unchanged
+ * on save (versioning requires the full settings shape) rather than
+ * exposing every one of them as its own control.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { OUTCOMES } from '../reviewValidation';
 import type { IncidentOutcome, IncidentRule, IncidentSeverity, IncidentType } from '../types';
-import { incidentApi, IncidentApiError } from './incidentApi';
+import { incidentApi, IncidentApiError, type DriverInputSettingsRequestBody } from './incidentApi';
 import { OversightSection } from './OversightSection';
+import type { DriverInputSettings } from '../driver/types';
+
+function driverInputRequestFrom(settings: DriverInputSettings, overrides: Partial<DriverInputSettingsRequestBody>): DriverInputSettingsRequestBody {
+  return {
+    responseWindowWorkdays: settings.responseWindowWorkdays, postClosureResponseEnabled: settings.postClosureResponseEnabled,
+    postClosureResponseWindowDays: settings.postClosureResponseWindowDays, recentWindowDays: settings.recentWindowDays,
+    historyWindowDays: settings.historyWindowDays, enabledConcernCategories: settings.enabledConcernCategories,
+    evidenceAllowedMimeTypes: settings.evidenceAllowedMimeTypes, evidenceMaxBytes: settings.evidenceMaxBytes,
+    driverInputRequestedChannels: settings.driverInputRequestedChannels, driverResponseReceivedChannels: settings.driverResponseReceivedChannels,
+    effectiveFrom: new Date(Date.now() + 5 * 60_000).toISOString(), changeReason: null,
+    ...overrides,
+  };
+}
+
+function DriverInputSection({ canEdit }: { canEdit: boolean }) {
+  const [settings, setSettings] = useState<DriverInputSettings | null>(null);
+  const [responseWindowWorkdays, setResponseWindowWorkdays] = useState('');
+  const [recentWindowDays, setRecentWindowDays] = useState('');
+  const [historyWindowDays, setHistoryWindowDays] = useState('');
+  const [changeReason, setChangeReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const current = await incidentApi.getDriverInputSettings();
+      setSettings(current);
+      setResponseWindowWorkdays(String(current.responseWindowWorkdays));
+      setRecentWindowDays(String(current.recentWindowDays));
+      setHistoryWindowDays(String(current.historyWindowDays));
+      setChangeReason('');
+      setError(null);
+    } catch (caught) { setError(caught instanceof IncidentApiError ? caught.message : 'Could not load driver-input settings'); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  const valid = Boolean(settings) && changeReason.trim().length > 0
+    && Number.isInteger(Number(responseWindowWorkdays)) && Number(responseWindowWorkdays) > 0
+    && Number.isInteger(Number(recentWindowDays)) && Number(recentWindowDays) > 0
+    && Number.isInteger(Number(historyWindowDays)) && Number(historyWindowDays) >= Number(recentWindowDays);
+
+  async function save(): Promise<void> {
+    if (!settings || !valid) return;
+    setSaving(true); setError(null);
+    try {
+      await incidentApi.versionDriverInputSettings(driverInputRequestFrom(settings, {
+        responseWindowWorkdays: Number(responseWindowWorkdays), recentWindowDays: Number(recentWindowDays),
+        historyWindowDays: Number(historyWindowDays), changeReason: changeReason.trim(),
+      }));
+      await load();
+    } catch (caught) { setError(caught instanceof IncidentApiError ? caught.message : 'Could not update driver-input settings'); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <section aria-label="Driver input settings" className="space-y-2">
+      <h3 className="font-semibold text-[var(--ff-text-primary)]">Driver input</h3>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {settings && <p className="text-sm text-[var(--ff-text-secondary)]">
+        Version {settings.version} — response window {settings.responseWindowWorkdays} working day(s), {settings.recentWindowDays}-day recent visibility, {settings.historyWindowDays}-day history.
+      </p>}
+      {settings && canEdit && <div className="space-y-2 rounded border p-3">
+        <label className="mr-3 inline-block text-sm">Response window workdays
+          <input aria-label="Response window workdays" type="number" min={1} value={responseWindowWorkdays}
+            onChange={(event) => setResponseWindowWorkdays(event.target.value)} className="ml-2 w-20 rounded border px-2 py-1" />
+        </label>
+        <label className="mr-3 inline-block text-sm">Recent visibility (days)
+          <input aria-label="Recent visibility days" type="number" min={1} value={recentWindowDays}
+            onChange={(event) => setRecentWindowDays(event.target.value)} className="ml-2 w-20 rounded border px-2 py-1" />
+        </label>
+        <label className="mr-3 inline-block text-sm">History visibility (days)
+          <input aria-label="History visibility days" type="number" min={1} value={historyWindowDays}
+            onChange={(event) => setHistoryWindowDays(event.target.value)} className="ml-2 w-20 rounded border px-2 py-1" />
+        </label>
+        <label className="block text-sm">Change reason
+          <textarea aria-label="Driver input settings change reason" value={changeReason} onChange={(event) => setChangeReason(event.target.value)} className="block w-full rounded border px-2 py-1" />
+        </label>
+        <button type="button" disabled={!valid || saving} onClick={() => void save()} className="rounded bg-[var(--ff-primary)] px-3 py-2 text-sm text-white disabled:opacity-50">
+          {saving ? 'Updating…' : 'Update driver input settings'}
+        </button>
+      </div>}
+    </section>
+  );
+}
 const RULED_TYPES: readonly IncidentType[] = ['late', 'wrong_site', 'evidence_mismatch', 'left_early'];
 const SEVERITIES: readonly IncidentSeverity[] = ['normal', 'high', 'critical'];
 type BooleanDraftKey = 'enabled' | 'createsIncident' | 'immediateNotification' | 'inApp' | 'email' | 'whatsapp' | 'includeInMorningSummary';
@@ -160,6 +251,7 @@ function SettingsDialogBody({ onClose, canEdit }: Omit<IncidentSettingsDialogPro
         </header>
         <RulesSection canEdit={canEdit} />
         <OversightSection canEdit={canEdit} />
+        <DriverInputSection canEdit={canEdit} />
       </div>
     </div>
   );

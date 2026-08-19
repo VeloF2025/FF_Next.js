@@ -21,10 +21,15 @@ import type {
   IncidentRule, IncidentRuleChangeRequest, IncidentSeverity, IncidentTransitionResult, IncidentType,
   OversightMembership,
 } from '../types';
+import type {
+  AttendanceCorrectionState, DriverConcernCategory, DriverInputRequestResult, DriverInputSettings, DriverInputState,
+} from '../driver/types';
 
 export type { ActiveUserOption };
 
 const LIFECYCLE_STATUSES: readonly IncidentLifecycleStatus[] = ['open', 'acknowledged', 'under_review', 'resolved', 'dismissed'];
+const DRIVER_INPUT_STATES: readonly DriverInputState[] = ['not_requested', 'requested', 'responded', 'expired', 'closed'];
+const ATTENDANCE_CORRECTION_STATES: readonly AttendanceCorrectionState[] = ['pending', 'approved', 'rejected', 'cancelled'];
 
 export interface IncidentQueueFilters {
   lifecycleStatus?: IncidentLifecycleStatus;
@@ -38,6 +43,11 @@ export interface IncidentQueueFilters {
   overdueOnly?: boolean;
   conditionState?: 'active' | 'cleared';
   evidenceState?: 'required' | 'present';
+  /** PR7 Task 8: not yet enforced server-side (`reviewQueries.ts`'s list query has no driver-input
+   * columns/predicates) — round-trips through the URL and outgoing request today so the client
+   * contract is ready once that query is extended. */
+  driverInputState?: DriverInputState;
+  attendanceCorrectionState?: AttendanceCorrectionState;
 }
 
 const STRING_FILTER_KEYS = ['projectId', 'managerUserId', 'staffId', 'fromDate', 'toDate'] as const;
@@ -60,6 +70,12 @@ export function parseIncidentQueueFilters(source: string | URLSearchParams): Inc
   if (conditionState === 'active' || conditionState === 'cleared') filters.conditionState = conditionState;
   const evidenceState = params.get('evidenceState');
   if (evidenceState === 'required' || evidenceState === 'present') filters.evidenceState = evidenceState;
+  const driverInputState = params.get('driverInputState');
+  if (driverInputState && DRIVER_INPUT_STATES.includes(driverInputState as DriverInputState)) filters.driverInputState = driverInputState as DriverInputState;
+  const attendanceCorrectionState = params.get('attendanceCorrectionState');
+  if (attendanceCorrectionState && ATTENDANCE_CORRECTION_STATES.includes(attendanceCorrectionState as AttendanceCorrectionState)) {
+    filters.attendanceCorrectionState = attendanceCorrectionState as AttendanceCorrectionState;
+  }
   if (params.get('overdueOnly') === 'true') filters.overdueOnly = true;
   return filters;
 }
@@ -72,6 +88,8 @@ export function serializeIncidentQueueFilters(filters: IncidentQueueFilters): st
   if (filters.severity) params.set('severity', filters.severity);
   if (filters.conditionState) params.set('conditionState', filters.conditionState);
   if (filters.evidenceState) params.set('evidenceState', filters.evidenceState);
+  if (filters.driverInputState) params.set('driverInputState', filters.driverInputState);
+  if (filters.attendanceCorrectionState) params.set('attendanceCorrectionState', filters.attendanceCorrectionState);
   if (filters.overdueOnly) params.set('overdueOnly', 'true');
   return params.toString();
 }
@@ -154,6 +172,24 @@ export interface BulkAcknowledgeConflict { incidentId: string; lifecycleStatus: 
 export interface BulkAcknowledgeResult { results: BulkAcknowledgeItemResult[]; conflicts: BulkAcknowledgeConflict[] }
 export interface IncidentEvidenceUploadResult { evidence: IncidentEvidence; actionId: string }
 interface UserSearchResponse { users: ActiveUserOption[] }
+export interface DriverInputRequestBody { guidance?: string | null; respondBy?: string | null; idempotencyKey: string }
+/** Mirrors `settingsRepository.ts`'s `DriverInputSettingsChangeRequest` field-for-field —
+ * declared locally rather than imported so this client module never pulls in that
+ * server-only file's `@/lib/db-pool` dependency, even transitively via a bare `import type`. */
+export interface DriverInputSettingsRequestBody {
+  responseWindowWorkdays: number;
+  postClosureResponseEnabled: boolean;
+  postClosureResponseWindowDays: number;
+  recentWindowDays: number;
+  historyWindowDays: number;
+  enabledConcernCategories: DriverConcernCategory[];
+  evidenceAllowedMimeTypes: string[];
+  evidenceMaxBytes: number;
+  driverInputRequestedChannels: { inApp: boolean; email: boolean; whatsapp: boolean };
+  driverResponseReceivedChannels: { inApp: boolean; email: boolean; whatsapp: boolean };
+  effectiveFrom: string;
+  changeReason?: string | null;
+}
 
 export const incidentApi = {
   list(filters: IncidentQueueFilters, page: { page: number; limit: number }, signal?: AbortSignal): Promise<IncidentListResult> {
@@ -173,6 +209,15 @@ export const incidentApi = {
   },
   uploadEvidence(incidentId: string, body: EvidenceUploadBody): Promise<IncidentEvidenceUploadResult> {
     return request(`/api/fleet/incidents/${encodeURIComponent(incidentId)}/evidence`, { method: 'POST', body: JSON.stringify(body) });
+  },
+  requestDriverInput(incidentId: string, body: DriverInputRequestBody): Promise<DriverInputRequestResult> {
+    return request(`/api/fleet/incidents/${encodeURIComponent(incidentId)}/request-driver-input`, { method: 'POST', body: JSON.stringify(body) });
+  },
+  getDriverInputSettings(signal?: AbortSignal): Promise<DriverInputSettings> {
+    return request('/api/fleet/incidents/settings/driver-input', { signal });
+  },
+  versionDriverInputSettings(body: DriverInputSettingsRequestBody): Promise<DriverInputSettings> {
+    return request('/api/fleet/incidents/settings/driver-input', { method: 'POST', body: JSON.stringify(body) });
   },
   listRules(incidentType: IncidentType, signal?: AbortSignal): Promise<IncidentRule[]> {
     return request(`/api/fleet/incidents/settings/rules?incidentType=${encodeURIComponent(incidentType)}`, { signal });
