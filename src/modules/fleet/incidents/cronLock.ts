@@ -4,14 +4,19 @@
  *
  * Mirrors the proven discipline in `pages/api/cron/appeals-vlm.ts`:
  * `pool.connect()` pins one physical connection, `pg_try_advisory_lock`
- * takes a non-blocking session-level lock on it, the caller's work runs on
- * that same connection while the lock is held, and `pg_advisory_unlock`
+ * takes a non-blocking session-level lock on it, the caller's work runs while
+ * that lock is held, and `pg_advisory_unlock`
  * releases it before the connection returns to the pool. If the unlock
  * query itself fails (most likely a dead connection), the connection is
  * destroyed via `client.release(true)` rather than returned — handing back
  * a connection that still thinks it holds the lock would otherwise leak
  * that lock for the life of the pool and wedge every future tick into the
  * skip path.
+ *
+ * The pinned client is handed to `work` but neither current endpoint uses it: both go
+ * through the shared pool instead. That is fine — exclusion comes from the lock living on
+ * this connection, not from the callback's queries sharing it — but do not read the
+ * signature as a promise that the work is transactionally tied to the lock.
  *
  * Extracted from the endpoint (rather than left inline as in appeals-vlm)
  * so every PR6 cron endpoint shares one tested implementation instead of

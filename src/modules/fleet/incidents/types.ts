@@ -1,4 +1,4 @@
-import type { ChannelPreferences, NotificationChannel, NotifyResult } from '@/modules/notifications/types';
+import type { NotificationChannel, NotifyResult } from '@/modules/notifications/types';
 
 export type IncidentType =
   | 'late' | 'wrong_site' | 'evidence_mismatch' | 'left_early'
@@ -250,8 +250,13 @@ export interface IncidentRule {
   evidenceRequiredOutcomes: IncidentOutcome[];
 }
 
+/**
+ * Only the mandatory bypass. Ordinary channel selection is notify()'s job — it resolves
+ * per-user preferences against the registry — so a `channels` field here was computed and
+ * never read. Carrying it invited exactly the misreading that let the mandatory-WhatsApp
+ * decision key off the wrong severity: a reader could reasonably assume it governed delivery.
+ */
 export interface IncidentNotificationPlan {
-  channels: ChannelPreferences;
   mandatoryChannels: NotificationChannel[];
 }
 
@@ -283,14 +288,7 @@ export function resolveIncidentOpenedNotification(
 ): IncidentNotificationPlan {
   const requiresWhatsApp = requiresMandatoryIncidentWhatsApp(severity, producerKind);
 
-  return {
-    channels: {
-      in_app: rule.channels.inApp,
-      email: rule.channels.email,
-      whatsapp: requiresWhatsApp || rule.channels.whatsapp,
-    },
-    mandatoryChannels: requiresWhatsApp ? ['whatsapp'] : [],
-  };
+  return { mandatoryChannels: requiresWhatsApp ? ['whatsapp'] : [] };
 }
 
 export interface IncidentRuleChangeRequest extends Omit<IncidentRule, 'id' | 'version' | 'effectiveTo'> {

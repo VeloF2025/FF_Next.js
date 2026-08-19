@@ -56,7 +56,12 @@ interface AttentionListProps {
 export function AttentionList({ rows, filters, onOpenEvidence }: AttentionListProps) {
   return (
     <div className="divide-y divide-[var(--ff-border-light)]">
-      {rows.map((row) => (
+      {rows.map((row) => {
+        // Computed once and reused, matching MapAttentionPanel. Calling it twice forced a
+        // non-null assertion on the second call, because TypeScript cannot narrow one call's
+        // result from another's truthiness check.
+        const incidentsLink = incidentsHref(row, filters);
+        return (
         <article
           key={row.staffId}
           data-testid={`attention-row-${row.status}`}
@@ -81,12 +86,13 @@ export function AttentionList({ rows, filters, onOpenEvidence }: AttentionListPr
           <div className="flex flex-wrap gap-2">
             <Link href={mapHref(row, filters)} className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">View on map</Link>
             <Link href={assignmentHref(row, filters)} className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">Manage assignment</Link>
-            {incidentsHref(row, filters) && (
-              <Link href={incidentsHref(row, filters)!} className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">View incidents</Link>
+            {incidentsLink && (
+              <Link href={incidentsLink} className="rounded border border-[var(--ff-border-light)] px-3 py-2 text-sm">View incidents</Link>
             )}
           </div>
         </article>
-      ))}
+        );
+      })}
     </div>
   );
 }

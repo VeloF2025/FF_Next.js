@@ -21,15 +21,12 @@ const routineHighRule: IncidentRule = {
 describe('incident notification channel plan', () => {
   it('requires WhatsApp only for critical explicit-source incidents', () => {
     expect(resolveIncidentOpenedNotification(criticalSourceRule, 'critical', 'source_event')).toEqual({
-      channels: { in_app: true, email: true, whatsapp: true },
       mandatoryChannels: ['whatsapp'],
     });
     expect(resolveIncidentOpenedNotification(criticalSourceRule, 'critical', 'scheduled_detection')).toEqual({
-      channels: { in_app: true, email: true, whatsapp: false },
       mandatoryChannels: [],
     });
     expect(resolveIncidentOpenedNotification(routineHighRule, 'high', 'scheduled_detection')).toEqual({
-      channels: { in_app: true, email: true, whatsapp: false },
       mandatoryChannels: [],
     });
   });
@@ -39,7 +36,6 @@ describe('incident notification channel plan', () => {
     // event can raise a `high` rule to critical. Keying the decision off rule.severity
     // silently dropped the mandatory WhatsApp for exactly the incidents that need it most.
     expect(resolveIncidentOpenedNotification(routineHighRule, 'critical', 'source_event')).toEqual({
-      channels: { in_app: true, email: true, whatsapp: true },
       mandatoryChannels: ['whatsapp'],
     });
   });
@@ -48,7 +44,6 @@ describe('incident notification channel plan', () => {
     // The mirror case: a critical-by-default rule whose incident resolved to high must not
     // inherit the rule's severity and escalate a routine incident onto WhatsApp.
     expect(resolveIncidentOpenedNotification(criticalSourceRule, 'high', 'source_event')).toEqual({
-      channels: { in_app: true, email: true, whatsapp: false },
       mandatoryChannels: [],
     });
   });
