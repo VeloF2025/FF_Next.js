@@ -21,6 +21,17 @@
  * These tests run the real script against a real remote of exactly that awkward
  * shape, because that is the case the fallback exists for and the one a
  * URL-based test could never reach.
+ *
+ * KNOWN GAP: the second fallback — a filtered fetch that SUCCEEDS followed by a
+ * failing `show`, and the SHA re-check guarding it — is not covered here. Every
+ * remote shape a test can build resolves through the first fallback instead: a
+ * path remote fails the fetch outright, and a remote ignoring the filter already
+ * holds the blob locally. Driving it would need a promisor-capable HTTP remote
+ * that serves the pack but not the lazy blob.
+ *
+ * A `git` shim on PATH does NOT work and must not be attempted: deploy-local.sh
+ * resets PATH to a fixed list at line 17 as a hardening measure, so the shim is
+ * never invoked and the test passes while exercising nothing.
  */
 
 import { execFileSync } from 'node:child_process';
