@@ -1,5 +1,7 @@
 import React from 'react';
 
+import { log } from '@/lib/logger';
+
 import { ApiError, submitMyCorrection } from '../api';
 import type { CorrectionHints, CorrectionKind } from '../api';
 import { localSastDateTimeToIso } from '../attendanceDateTime';
@@ -53,8 +55,14 @@ export function useCorrectionForm(args: {
         setConfirmed(true);
         try {
           await args.onRequiredSuccess?.(result.adjustmentId);
-        } catch {
-          // Swallowed deliberately — see this hook's `onRequiredSuccess` doc.
+        } catch (error) {
+          // Not rethrown — see this hook's `onRequiredSuccess` doc: the Attendance
+          // submission is already committed and must not be reported as failed. Logged
+          // rather than discarded, so a link that never happened is still observable;
+          // an empty catch would make it invisible to everyone including the driver.
+          log.warn('onRequiredSuccess hook failed after a committed attendance correction', {
+            error: error instanceof Error ? error.message : String(error),
+          }, 'AttendancePortalCorrection');
         }
       } else {
         await submitMyCorrection({
