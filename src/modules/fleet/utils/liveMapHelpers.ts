@@ -168,3 +168,77 @@ export function notPlottedReason(v: LiveVehicle): string {
   if (v.trackingState === 'awaiting_data') return 'awaiting data';
   return 'no position data';
 }
+
+/**
+ * How close two vehicles must be before the map treats them as one dot.
+ *
+ * A marker is 16px across, so anything inside roughly a marker's width of
+ * ground reads as a single vehicle no matter how far you zoom in. 30m covers
+ * the case this exists for: a yard, a depot bay, two bakkies parked outside
+ * the same house. On 2026-08-19 that was HW50KNGP and its neighbour in
+ * Clayville, ~10m apart and rendering as one purple dot — the second vehicle
+ * was invisible and unclickable, so its driver could not be identified at all.
+ */
+export const CO_LOCATED_WITHIN_METERS = 30;
+
+/** Metres per degree of latitude. Close enough to constant anywhere on Earth. */
+const METERS_PER_DEGREE_LAT = 111_320;
+
+/** Great-circle distance is overkill at 30m; a flat local approximation is exact enough. */
+function metersBetween(a: PlottedVehicle, b: PlottedVehicle): number {
+  const midLatRad = (((a.lat + b.lat) / 2) * Math.PI) / 180;
+  const dy = (a.lat - b.lat) * METERS_PER_DEGREE_LAT;
+  const dx = (a.lon - b.lon) * METERS_PER_DEGREE_LAT * Math.cos(midLatRad);
+  return Math.hypot(dx, dy);
+}
+
+/**
+ * Bucket vehicles that sit on top of each other, so the map can fan them out.
+ *
+ * Single-link grouping: a vehicle joins a group if it is within the threshold
+ * of ANY member, not of the group's centre. A row of vehicles down a depot
+ * fence should fan out as one ring rather than as overlapping pairs.
+ *
+ * Groups come back sorted by `vehicleId`, and so do their members — the ring
+ * offsets below are derived from member order, so an unstable order would make
+ * markers swap places on every 30-second refresh.
+ */
+export function groupCoLocated(
+  plotted: PlottedVehicle[],
+  withinMeters: number = CO_LOCATED_WITHIN_METERS,
+): PlottedVehicle[][] {
+  const sorted = [...plotted].sort((a, b) => a.vehicleId.localeCompare(b.vehicleId));
+  const groups: PlottedVehicle[][] = [];
+  for (const v of sorted) {
+    const group = groups.find((g) => g.some((m) => metersBetween(m, v) <= withinMeters));
+    if (group) group.push(v);
+    else groups.push([v]);
+  }
+  return groups;
+}
+
+/**
+ * Screen-space nudge for one member of a co-located group.
+ *
+ * Deliberately in PIXELS, not metres: the whole problem is markers colliding
+ * on screen, and how much ground a pixel covers changes with every zoom level.
+ * A metre-based offset that separates two bakkies at zoom 18 is invisible at
+ * zoom 10, which is exactly the zoom the map opens at.
+ *
+ * The single-member case returns no offset at all, so a vehicle that is not
+ * colliding with anything is drawn where it actually is. For a group, every
+ * member moves onto a ring around the true position — nobody keeps the real
+ * spot, because leaving one marker unmoved would silently promote whichever
+ * vehicle happened to sort first into "the accurate one".
+ */
+export function ringOffsetPx(
+  index: number,
+  count: number,
+  radiusPx = 14,
+): { dx: number; dy: number } {
+  if (count <= 1) return { dx: 0, dy: 0 };
+  // Start at 12 o'clock and go clockwise, so a pair reads as one above the
+  // other rather than as an arbitrary diagonal.
+  const angle = (2 * Math.PI * index) / count - Math.PI / 2;
+  return { dx: radiusPx * Math.cos(angle), dy: radiusPx * Math.sin(angle) };
+}

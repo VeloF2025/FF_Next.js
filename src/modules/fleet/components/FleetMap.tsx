@@ -9,11 +9,27 @@
  */
 'use client';
 
-import { useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Popup,
+  Tooltip,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
-import { STATUS_STYLE, ageLabel, partitionVehicles, statusFor } from '../utils/liveMapHelpers';
+import {
+  STATUS_STYLE,
+  ageLabel,
+  groupCoLocated,
+  partitionVehicles,
+  ringOffsetPx,
+  statusFor,
+} from '../utils/liveMapHelpers';
+import type { PlottedVehicle } from '../utils/liveMapHelpers';
 
 export type { LiveVehicle };
 
@@ -52,6 +68,90 @@ function InvalidateSizeOnContainerResize() {
   return null;
 }
 
+/**
+ * The vehicle markers, fanned out where several vehicles share a spot.
+ *
+ * Lives inside MapContainer rather than beside it because the fan-out is done
+ * in screen space: converting a pixel offset to a position needs the live map
+ * instance, which only children of MapContainer can reach.
+ */
+function VehicleMarkers({ plotted }: { plotted: PlottedVehicle[] }) {
+  const map = useMap();
+  // A pixel covers a different amount of ground at every zoom level, so the
+  // offset positions have to be recomputed whenever the zoom changes.
+  const [zoom, setZoom] = useState(() => map.getZoom());
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+
+  const groups = useMemo(() => groupCoLocated(plotted), [plotted]);
+
+  const markers = useMemo(
+    () =>
+      groups.flatMap((group) =>
+        group.map((v, index) => {
+          const style = STATUS_STYLE[statusFor(v)];
+          const { dx, dy } = ringOffsetPx(index, group.length);
+          const center =
+            dx === 0 && dy === 0
+              ? ([v.lat, v.lon] as [number, number])
+              : map.unproject(map.project([v.lat, v.lon], zoom).add([dx, dy]), zoom);
+          const driver = v.driverName ?? 'No driver assigned';
+          return (
+            <CircleMarker
+              key={v.vehicleId}
+              center={center}
+              radius={8}
+              // White stroke, not a tinted one: on the pale OSM basemap the halo is
+              // what makes a marker findable at a glance, the fill only says which
+              // kind it is.
+              pathOptions={{
+                color: '#ffffff',
+                weight: 2,
+                opacity: 1,
+                dashArray: style.dash,
+                fillColor: style.fill,
+                fillOpacity: style.fillOpacity,
+              }}
+            >
+              {/* Registration and driver on hover: without it the map answers
+                  "where are my vehicles" but not "whose is that one" without a
+                  click per marker. */}
+              <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                <strong>{v.registration}</strong> · {driver}
+              </Tooltip>
+              <Popup>
+                <strong>{v.registration}</strong>
+                <br />
+                {driver}
+                <br />
+                {style.label}
+                {v.speedKph !== null ? ` · ${Math.round(v.speedKph)} km/h` : ''}
+                {v.isSpeeding ? ' · SPEEDING' : ''}
+                <br />
+                Last fix: {ageLabel(v.ageSeconds)}
+                {v.isStale ? ' (stale)' : ''}
+                <br />
+                <small>via {v.provider ?? 'unknown'}</small>
+                {group.length > 1 ? (
+                  <>
+                    <br />
+                    {/* Say it, rather than let a nudged marker pass as a fix. */}
+                    <small>
+                      Marker nudged apart · {group.length} vehicles within{' '}
+                      {Math.round(map.distance([v.lat, v.lon], center))}m of this spot
+                    </small>
+                  </>
+                ) : null}
+              </Popup>
+            </CircleMarker>
+          );
+        }),
+      ),
+    [groups, map, zoom],
+  );
+
+  return <>{markers}</>;
+}
+
 export default function FleetMap({ vehicles }: { vehicles: LiveVehicle[] }) {
   const { plotted } = partitionVehicles(vehicles);
   return (
@@ -63,49 +163,7 @@ export default function FleetMap({ vehicles }: { vehicles: LiveVehicle[] }) {
         maxZoom={18}
         detectRetina
       />
-      {plotted.map((v) => {
-        const style = STATUS_STYLE[statusFor(v)];
-        return (
-          <CircleMarker
-            key={v.vehicleId}
-            center={[v.lat, v.lon]}
-            radius={8}
-            // White stroke, not a tinted one: on the pale OSM basemap the halo is
-            // what makes a marker findable at a glance, the fill only says which
-            // kind it is.
-            pathOptions={{
-              color: '#ffffff',
-              weight: 2,
-              opacity: 1,
-              dashArray: style.dash,
-              fillColor: style.fill,
-              fillOpacity: style.fillOpacity,
-            }}
-          >
-            <Popup>
-              <strong>{v.registration}</strong>
-              <br />
-              {v.driverName ?? 'No driver assigned'}
-              <br />
-              {style.label}
-              {v.speedKph !== null ? ` · ${Math.round(v.speedKph)} km/h` : ''}
-              {v.isSpeeding ? ' · SPEEDING' : ''}
-              <br />
-              {/*
-                No "(stale)" suffix: `style.label` above already conveys
-                freshness, and on a parked vehicle the suffix contradicted it.
-                The reasoning lives in statusFor's docblock (liveMapHelpers) and
-                is deliberately NOT restated here, so the two cannot drift.
-                `isStale` is still load-bearing there — it gates `speeding` and
-                drives `lostContact`; only this echo of it is gone.
-              */}
-              Last fix: {ageLabel(v.ageSeconds)}
-              <br />
-              <small>via {v.provider ?? 'unknown'}</small>
-            </Popup>
-          </CircleMarker>
-        );
-      })}
+      <VehicleMarkers plotted={plotted} />
     </MapContainer>
   );
 }
