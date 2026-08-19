@@ -41,6 +41,11 @@ export async function systemCloseEntry(
   return transaction(async (tx) => {
     await acquireAttendanceStaffGateLock(tx, row.staff_id);
     await guardReconciliationDay(tx, row.staff_id, row.work_date);
+    // Deliberately leaves clock_out_aoi_project_id / clock_out_aoi_distance_m
+    // NULL, unlike the portal's closeOpenEntry (migration 501). This closure
+    // happens because clock-out evidence is ABSENT — there is no device fix to
+    // attribute to a site, and inventing one from the clock-in position would
+    // fabricate the very evidence the note says is missing.
     const updated = await tx.query<IdRow>(`
       UPDATE attendance_entries
       SET status = 'auto_closed',
