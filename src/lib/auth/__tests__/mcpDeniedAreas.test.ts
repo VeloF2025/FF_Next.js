@@ -66,6 +66,32 @@ describe('isDeniedAreaViolation', () => {
       expect(isDeniedAreaViolation(mcpUser, '/api/accounting/ledger?year=2026')).toBe(true);
     });
 
+    it('ignores a query string containing an ENCODED PERCENT', () => {
+      // The first version decoded the whole URL before splitting on "?", so
+      // `?search=80%25` became `?search=80%`, and the next decode iteration hit a bare
+      // "%" and threw — refusing a permitted route because a user typed a percent sign
+      // into a search box. The original "ignores the query string" case above passed
+      // only because its query had nothing left to decode.
+      expect(isDeniedAreaViolation(mcpUser, '/api/reporting/meetings?search=80%25')).toBe(false);
+      expect(isDeniedAreaViolation(mcpUser, '/api/reporting/meetings?q=a%2Bb%26c')).toBe(false);
+      // …and a denied area stays denied however odd its query is.
+      expect(isDeniedAreaViolation(mcpUser, '/api/staff/list?q=100%25')).toBe(true);
+    });
+
+    it('allows real storage keys as path segments', () => {
+      // Five catalogued catch-alls carry storage keys as PATH segments, and 20,999 of
+      // 98,462 live keys contain spaces or parentheses. An over-strict shape rule here
+      // is an outage, not a hole: it would 403 a fifth of the photo library on a
+      // permitted route.
+      expect(isDeniedAreaViolation(
+        mcpUser,
+        '/api/activate/photo/mamelodi/MAM.P.B416/WhatsApp%20Image%202026-03-18%20at%203.17.46%20PM%20(1).jpeg',
+      )).toBe(false);
+      expect(isDeniedAreaViolation(mcpUser, '/api/uploads/a b/c(1).jpg')).toBe(false);
+      // The group segment stays strict — that is the part the decision is made on.
+      expect(isDeniedAreaViolation(mcpUser, '/api/staff /list')).toBe(true);
+    });
+
     it('is case-insensitive', () => {
       // Next.js route matching is case-sensitive, so /api/Accounting 404s today — but the
       // guard must not depend on that staying true.
@@ -114,6 +140,16 @@ describe('isDeniedAreaViolation', () => {
   });
 
   describe('deniedAreaFor names what was refused', () => {
+    it('distinguishes UNPARSEABLE from permitted', () => {
+      // It fails OPEN where isDeniedAreaViolation fails closed: both return a falsy
+      // "nothing matched" for a path that cannot be parsed. It has no production caller
+      // today, but the obvious next use — naming the area in the 403 body, or the
+      // catalogue generator adopting it — would silently allow.
+      expect(deniedAreaFor('not-a-path')).toBe('unparseable');
+      expect(deniedAreaFor('')).toBe('unparseable');
+      expect(deniedAreaFor('/api/reporting/meetings')).toBeUndefined();
+    });
+
     it('returns the group or path that matched', () => {
       expect(deniedAreaFor('/api/accounting/ledger')).toBe('accounting');
       expect(deniedAreaFor('/api/staff-documents/1')).toBe('staff');

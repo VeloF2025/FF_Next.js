@@ -43,8 +43,8 @@ function userRow(kind: string) {
   };
 }
 
-function req(method: string): NextRequest {
-  return new NextRequest('https://app.fibreflow.app/api/anything', {
+function req(method: string, path = '/api/anything'): NextRequest {
+  return new NextRequest(`https://app.fibreflow.app${path}`, {
     method,
     headers: { authorization: `Bearer ${TOKEN}` },
   });
@@ -137,5 +137,62 @@ describe('getUserFromRequest — resolves kind from the session row', () => {
     // If this ever comes back undefined the gate silently passes everything:
     // isReadOnlyViolation returns false when sessionKind !== 'mcp'.
     expect(user?.sessionKind).toBe('mcp');
+  });
+});
+
+/**
+ * The denied-area gate on the App Router side.
+ *
+ * `mcpDeniedAreas.test.ts` pins the predicate; `middleware.readOnly.test.ts` pins the
+ * Pages Router wiring against a hand-built request object. Neither reaches the one
+ * assumption this side rests on: that `req.nextUrl.pathname` on a REAL NextRequest is the
+ * bare path the predicate expects.
+ *
+ * That assumption is load-bearing in the dangerous direction. `req.url` here is the
+ * absolute URL, and canonical() refuses anything not starting `/api/` — so swapping the
+ * two would not open a hole, it would 403 EVERY MCP request and take the whole connector
+ * down. The allow case below is what makes that visible rather than silent.
+ */
+describe('requireAuth / requirePermission — denied-area gate', () => {
+  it('refuses a denied area for an mcp session', async () => {
+    givenSession('mcp');
+
+    const [user, denial] = await requireAuth(req('GET', '/api/staff/list'));
+
+    expect(user).toBeNull();
+    expect(denial?.status).toBe(403);
+    expect((await denial!.json()).error.code).toBe('MCP_AREA_DENIED');
+  });
+
+  it('ALLOWS a permitted area for the same session', async () => {
+    // The req.nextUrl.pathname shape check. If this side ever read req.url instead, the
+    // absolute URL would fail canonical() and this test would fail — which is the point.
+    givenSession('mcp');
+
+    const [user, denial] = await requireAuth(req('GET', '/api/projects?limit=5'));
+
+    expect(denial).toBeNull();
+    expect(user).not.toBeNull();
+  });
+
+  it('refuses a denied area through requirePermission too', async () => {
+    // requirePermission composes on requireAuth, so it must inherit the gate. If someone
+    // reimplements it independently, this fails.
+    givenSession('mcp');
+
+    const [user, denial] = await requirePermission(req('GET', '/api/my/payslips'), 'projects', 'view');
+
+    expect(user).toBeNull();
+    expect(denial?.status).toBe(403);
+    expect((await denial!.json()).error.code).toBe('MCP_AREA_DENIED');
+  });
+
+  it('does not restrict a browser session in a denied area', async () => {
+    givenSession('session');
+
+    const [user, denial] = await requireAuth(req('GET', '/api/staff/list'));
+
+    expect(denial).toBeNull();
+    expect(user).not.toBeNull();
   });
 });
