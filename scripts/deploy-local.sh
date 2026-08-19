@@ -121,9 +121,34 @@ export GIT_CONFIG_NOSYSTEM=1
 
 git init --bare --quiet --template="$template_dir" "$control_git"
 
-if ! git --git-dir="$control_git" fetch --quiet --depth=1 "$origin" master; then
-  echo "ERROR: cannot refresh deploy control from origin/master; refusing stale orchestration" >&2
-  exit 1
+# --filter=blob:none: this repo exists to read exactly one file —
+# scripts/deploy-local-main.sh, ~31 KB. Without the filter the fetch pulls every
+# blob in master's tree, several hundred MB of a 1.57 GiB repository, all but one
+# of which is discarded when $control_git is deleted at the end of the run.
+#
+# On a healthy link that waste is invisible. On 2026-08-19 it stopped deploys
+# entirely: three consecutive runs died mid-transfer ("early EOF", "curl 92
+# HTTP/2 stream CANCEL", "curl 18 transfer closed") after 40, 7 and 24 minutes.
+# Forcing HTTP/1.1 changed the error and nothing else — the transfer was simply
+# too large for the link to hold. The same fetch with this filter completed in
+# 12 seconds.
+#
+# The trust boundary is unchanged: same remote, same ref, same commit, and the
+# `git show` below still materialises the identical blob (verified byte-for-byte
+# against origin/master, sha256 a2a3e5e0…). A filtered clone records the origin
+# as a promisor, so that show lazily fetches the one blob it needs.
+# The filter is an optimisation, and it does not hold for every origin shape:
+# Git refuses to register a remote whose name begins with '/' as a promisor, so
+# a path-style origin that advertises filter support fails the fetch outright
+# ("missing blob object"). A remote that does not advertise the capability is
+# fine — it silently sends everything. Try the cheap fetch, fall back to the
+# original one, and only give up if both fail.
+if ! git --git-dir="$control_git" fetch --quiet --depth=1 \
+  --filter=blob:none "$origin" master 2>/dev/null; then
+  if ! git --git-dir="$control_git" fetch --quiet --depth=1 "$origin" master; then
+    echo "ERROR: cannot refresh deploy control from origin/master; refusing stale orchestration" >&2
+    exit 1
+  fi
 fi
 
 control_sha=$(git --git-dir="$control_git" rev-parse FETCH_HEAD)
@@ -135,11 +160,37 @@ expected_blob=$(git --git-dir="$control_git" \
 control_script="$control_dir/deploy-local-main-${control_sha}.sh"
 temp_script=$(mktemp "$control_dir/.deploy-local-main-${control_sha}.XXXXXX")
 
+# The filtered fetch above leaves this blob on the server; `show` pulls it back
+# through the promisor. That works for the https origin every real deploy uses,
+# and was verified against it. It does NOT work for a path-style origin — Git
+# refuses to register a remote whose name begins with '/' as a promisor, and the
+# lazy fetch then fails with "missing blob object". A remote that does not
+# advertise filter support is fine either way: it silently sends everything, so
+# the blob is already local.
+#
+# Rather than depend on the origin's shape, fall back to a full fetch of the
+# same commit. The SHA is re-checked because master may have moved between the
+# two fetches, and materialising a different commit than the one already
+# verified is exactly the stale orchestration this file refuses to run.
 if ! git --git-dir="$control_git" \
-  show "${control_sha}:scripts/deploy-local-main.sh" > "$temp_script"; then
-  rm -f -- "$temp_script"
-  echo "ERROR: cannot materialize deployment control from origin/master" >&2
-  exit 1
+  show "${control_sha}:scripts/deploy-local-main.sh" > "$temp_script" 2>/dev/null; then
+  if ! git --git-dir="$control_git" fetch --quiet --depth=1 "$origin" master; then
+    rm -f -- "$temp_script"
+    echo "ERROR: cannot materialize deployment control from origin/master" >&2
+    exit 1
+  fi
+  refetched_sha=$(git --git-dir="$control_git" rev-parse FETCH_HEAD)
+  if [[ "$refetched_sha" != "$control_sha" ]]; then
+    rm -f -- "$temp_script"
+    echo "ERROR: origin/master moved during deploy control refresh; refusing" >&2
+    exit 1
+  fi
+  if ! git --git-dir="$control_git" \
+    show "${control_sha}:scripts/deploy-local-main.sh" > "$temp_script"; then
+    rm -f -- "$temp_script"
+    echo "ERROR: cannot materialize deployment control from origin/master" >&2
+    exit 1
+  fi
 fi
 actual_blob=$(git hash-object "$temp_script")
 if [[ "$actual_blob" != "$expected_blob" ]]; then
