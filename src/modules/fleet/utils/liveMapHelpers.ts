@@ -169,17 +169,8 @@ export function notPlottedReason(v: LiveVehicle): string {
   return 'no position data';
 }
 
-/**
- * How close two vehicles must be before the map treats them as one dot.
- *
- * A marker is 16px across, so anything inside roughly a marker's width of
- * ground reads as a single vehicle no matter how far you zoom in. 30m covers
- * the case this exists for: a yard, a depot bay, two bakkies parked outside
- * the same house. On 2026-08-19 that was HW50KNGP and its neighbour in
- * Clayville, ~10m apart and rendering as one purple dot — the second vehicle
- * was invisible and unclickable, so its driver could not be identified at all.
- */
-export const CO_LOCATED_WITHIN_METERS = 30;
+/** A vehicle's position projected to screen pixels at a given zoom. */
+export type PositionedVehicle = { vehicle: PlottedVehicle; x: number; y: number };
 
 /** Metres per degree of latitude. Close enough to constant anywhere on Earth. */
 const METERS_PER_DEGREE_LAT = 111_320;
@@ -198,28 +189,77 @@ function metersBetween(a: PlottedVehicle, b: PlottedVehicle): number {
 }
 
 /**
- * Bucket vehicles that sit on top of each other, so the map can fan them out.
+ * Closest two marker centres may sit before they read as one blob: an 8px
+ * radius plus a 2px stroke each, and a 2px gap so the ring between them is
+ * visible rather than merely tangent.
+ */
+const MIN_MARKER_SPACING_PX = 22;
+
+/**
+ * Bucket markers that collide on screen, so the map can fan them out.
  *
- * Single-link grouping: a vehicle joins a group if it is within the threshold
- * of ANY member, not of the group's centre. A row of vehicles down a depot
- * fence should fan out as one ring rather than as overlapping pairs.
+ * Overlap is a screen-space fact, so grouping is decided in pixels rather than
+ * in metres. A 30m ground threshold — the first version of this — only caught
+ * vehicles parked in the same yard; at the zoom the map opens at a pixel is
+ * about 136m of Gauteng, so two vehicles 200m apart sat 1.4px apart and still
+ * drew as one dot. Measured on dev on 2026-08-19: pairs 1.4px, 3.2px and
+ * 4.5px apart, none of them close enough on the ground to be grouped.
+ *
+ * A marker joins a group only when it is within the threshold of EVERY member
+ * of that group, which pins the group's diameter to the threshold itself. The
+ * two weaker rules both let a group creep: chaining off the nearest member
+ * (single-link) puts a and d 66px apart for a-b-c-d each 22px along, growing
+ * without limit down a row; joining on distance to the group's CENTRE only
+ * slows that to a harmonic crawl, since each member drags the centre t/(n+1)
+ * further and the sum diverges — about 62px of drift by the 25th member, not
+ * the bound it looks like. Since the fan-out ring grows with member count, a
+ * crept group would be drawn around a centre most of its members are nowhere
+ * near, landing markers on vehicles that were never in the group.
+ *
+ * The trade-off is fragmentation: a row that does not collectively fit inside
+ * one threshold-wide disk has to split, even where consecutive markers are
+ * well inside collision distance. a(0,0) b(15,0) c(22,5) groups as {a,b} and
+ * {c}, because c is 22.6px from a — and c, being alone, is drawn where it
+ * really is, 17px from where b lands on the ring. Close markers can therefore
+ * still touch across a group boundary. It is the smaller of the two evils: the
+ * alternative rules let a group creep across the screen and drop markers on
+ * vehicles nowhere near it, while this one only ever fails to separate a pair
+ * it already drew close together.
  *
  * Groups come back sorted by `vehicleId`, and so do their members — the ring
  * offsets below are derived from member order, so an unstable order would make
  * markers swap places on every 30-second refresh.
  */
-export function groupCoLocated(
-  plotted: PlottedVehicle[],
-  withinMeters: number = CO_LOCATED_WITHIN_METERS,
-): PlottedVehicle[][] {
-  const sorted = [...plotted].sort((a, b) => a.vehicleId.localeCompare(b.vehicleId));
-  const groups: PlottedVehicle[][] = [];
-  for (const v of sorted) {
-    const group = groups.find((g) => g.some((m) => metersBetween(m, v) <= withinMeters));
-    if (group) group.push(v);
-    else groups.push([v]);
+export function groupOverlapping(
+  positioned: PositionedVehicle[],
+  withinPx: number = MIN_MARKER_SPACING_PX,
+): PositionedVehicle[][] {
+  const sorted = [...positioned].sort((a, b) =>
+    a.vehicle.vehicleId.localeCompare(b.vehicle.vehicleId),
+  );
+  const groups: PositionedVehicle[][] = [];
+  for (const p of sorted) {
+    const group = groups.find((g) =>
+      g.every((m) => Math.hypot(m.x - p.x, m.y - p.y) <= withinPx),
+    );
+    if (group) group.push(p);
+    else groups.push([p]);
   }
   return groups;
+}
+
+/**
+ * Where a group's ring is centred: the mean of its members' real positions.
+ *
+ * A group is no longer necessarily one spot — at a wide zoom its members can
+ * be hundreds of metres apart — so each marker fans out from the group's
+ * centre rather than from its own position. Offsetting each marker from its
+ * own point would leave two markers 3px apart still 3px apart.
+ */
+export function groupCentrePx(group: PositionedVehicle[]): { x: number; y: number } {
+  const x = group.reduce((t, p) => t + p.x, 0) / group.length;
+  const y = group.reduce((t, p) => t + p.y, 0) / group.length;
+  return { x, y };
 }
 
 /**
@@ -233,24 +273,22 @@ export function groupCoLocated(
  */
 export function nearestNeighbourMeters(
   vehicle: PlottedVehicle,
-  group: PlottedVehicle[],
+  group: PositionedVehicle[],
 ): number | null {
-  const others = group.filter((v) => v.vehicleId !== vehicle.vehicleId);
+  const others = group.filter((p) => p.vehicle.vehicleId !== vehicle.vehicleId);
   if (others.length === 0) return null;
-  return Math.min(...others.map((other) => metersBetween(vehicle, other)));
+  return Math.min(...others.map((other) => metersBetween(vehicle, other.vehicle)));
 }
 
 /**
  * Screen-space nudge for one member of a co-located group.
  *
- * Deliberately in PIXELS, not metres: the whole problem is markers colliding
- * on screen, and how much ground a pixel covers changes with every zoom level.
- * A metre-based offset that separates two bakkies at zoom 18 is invisible at
- * zoom 10, which is exactly the zoom the map opens at.
+ * In PIXELS, like the grouping: the whole problem is markers colliding on
+ * screen, and how much ground a pixel covers changes with every zoom level.
  *
  * The single-member case returns no offset at all, so a vehicle that is not
  * colliding with anything is drawn where it actually is. For a group, every
- * member moves onto a ring around the true position — nobody keeps the real
+ * member moves onto a ring around the group's centre — nobody keeps their own
  * spot, because leaving one marker unmoved would silently promote whichever
  * vehicle happened to sort first into "the accurate one".
  */
@@ -268,11 +306,17 @@ export function ringOffsetPx(
 }
 
 /**
- * Closest two marker centres may sit before they read as one blob: an 8px
- * radius plus a 2px stroke each, and a 2px gap so the ring between them is
- * visible rather than merely tangent.
+ * How far a marker may be moved from its group's centre.
+ *
+ * The spacing formula has no ceiling — 25 markers want an 88px ring — but a
+ * group's own members sit inside a MIN_MARKER_SPACING_PX-wide blob, so past
+ * this point the ring is mostly empty screen between markers and starts
+ * reaching over unrelated vehicles nearby. The ceiling first binds at 13
+ * markers in one spot; beyond that the honest statement is that they cannot
+ * all be drawn apart at this zoom, and the densest clusters overlap again —
+ * a cue to zoom in rather than a number to keep inflating.
  */
-const MIN_MARKER_SPACING_PX = 22;
+const MAX_RING_RADIUS_PX = 44;
 
 /**
  * Radius of the fan-out ring, grown so a big group does not re-collide.
@@ -285,6 +329,17 @@ const MIN_MARKER_SPACING_PX = 22;
  */
 export function ringRadiusPx(count: number, minRadiusPx = 14): number {
   if (count <= 1) return 0;
-  return Math.max(minRadiusPx, MIN_MARKER_SPACING_PX / (2 * Math.sin(Math.PI / count)));
+  const needed = MIN_MARKER_SPACING_PX / (2 * Math.sin(Math.PI / count));
+  return Math.min(MAX_RING_RADIUS_PX, Math.max(minRadiusPx, needed));
 }
 
+
+/**
+ * The distance to the nearest other vehicle, as the popup should read it.
+ *
+ * At a wide zoom "these markers overlap" can be true of vehicles hundreds of
+ * kilometres apart, and `743216m away` is a number nobody parses.
+ */
+export function distanceLabel(meters: number): string {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`;
+}

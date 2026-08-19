@@ -24,7 +24,9 @@ import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 import {
   STATUS_STYLE,
   ageLabel,
-  groupCoLocated,
+  distanceLabel,
+  groupCentrePx,
+  groupOverlapping,
   nearestNeighbourMeters,
   partitionVehicles,
   ringOffsetPx,
@@ -89,19 +91,29 @@ function VehicleMarkers({ plotted }: { plotted: PlottedVehicle[] }) {
     zoomend: () => setZoom(map.getZoom()),
   });
 
-  const groups = useMemo(() => groupCoLocated(plotted), [plotted]);
+  // Project once per zoom: grouping and the fan-out are both screen-space, and
+  // `project` is pure maths on the zoom level, independent of pan or container
+  // size.
+  const positioned = useMemo(
+    () => plotted.map((v) => ({ vehicle: v, ...map.project([v.lat, v.lon], zoom) })),
+    [plotted, map, zoom],
+  );
+
+  const groups = useMemo(() => groupOverlapping(positioned), [positioned]);
 
   const markers = useMemo(
     () =>
-      groups.flatMap((group) =>
-        group.map((v, index) => {
+      groups.flatMap((group) => {
+        const centre = groupCentrePx(group);
+        return group.map(({ vehicle: v }, index) => {
           const style = STATUS_STYLE[statusFor(v)];
           const { dx, dy } = ringOffsetPx(index, group.length);
           const center =
-            dx === 0 && dy === 0
+            group.length === 1
               ? ([v.lat, v.lon] as [number, number])
-              : map.unproject(map.project([v.lat, v.lon], zoom).add([dx, dy]), zoom);
+              : map.unproject([centre.x + dx, centre.y + dy], zoom);
           const driver = v.driverName ?? 'No driver assigned';
+          const nearestMeters = nearestNeighbourMeters(v, group);
           return (
             <CircleMarker
               key={v.vehicleId}
@@ -138,23 +150,23 @@ function VehicleMarkers({ plotted }: { plotted: PlottedVehicle[] }) {
                 {v.isStale ? ' (stale)' : ''}
                 <br />
                 <small>via {v.provider ?? 'unknown'}</small>
-                {group.length > 1 ? (
+                {nearestMeters !== null ? (
                   <>
                     <br />
                     {/* Say it, rather than let a nudged marker pass as a fix.
                         The distance is between the VEHICLES, never between the
                         markers — the gap you see is a drawing decision. */}
                     <small>
-                      Marker nudged apart · {group.length} vehicles here, nearest{' '}
-                      {Math.round(nearestNeighbourMeters(v, group) ?? 0)}m away
+                      Marker nudged apart · {group.length} markers overlap here, nearest
+                      vehicle {distanceLabel(nearestMeters)} away
                     </small>
                   </>
                 ) : null}
               </Popup>
             </CircleMarker>
           );
-        }),
-      ),
+        });
+      }),
     [groups, map, zoom],
   );
 
