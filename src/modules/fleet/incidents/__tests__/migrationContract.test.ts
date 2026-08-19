@@ -21,7 +21,13 @@ function migrationSql(): string {
 
 describe('fleet operational incidents migration contract', () => {
   it('stays within the new-file size ratchet', () => {
-    expect(migrationSql().split(/\r?\n/).length).toBeLessThanOrEqual(300);
+    // A ratchet, not a budget: pinned to the file's exact current length so any growth has
+    // to be argued for. Raised 300 -> 303 for the review-mandated
+    // ix_fleet_operational_incidents_opened_at, which the unfiltered queue needs so the
+    // default no-filter page stops seq-scanning. This bound is self-imposed - the repo's
+    // own size rule (scripts/zero-tolerance-changed.sh) covers only .ts/.tsx - so squeezing
+    // the SQL's formatting to fit a round number would cost readability for nothing.
+    expect(migrationSql().split(/\r?\n/).length).toBeLessThanOrEqual(303);
   });
 
   it('creates the complete durable incident model', () => {

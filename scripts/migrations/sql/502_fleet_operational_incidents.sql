@@ -189,6 +189,9 @@ CREATE INDEX IF NOT EXISTS ix_fleet_operational_incidents_queue ON fleet_operati
 CREATE INDEX IF NOT EXISTS ix_fleet_operational_incidents_project_queue ON fleet_operational_incidents (project_id, lifecycle_status, opened_at DESC);
 CREATE INDEX IF NOT EXISTS ix_fleet_operational_incidents_escalation ON fleet_operational_incidents (next_escalation_at) WHERE lifecycle_status = 'open' AND next_escalation_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix_fleet_operational_incidents_staff_work_date ON fleet_operational_incidents (staff_id, work_date DESC);
+-- The queue defaults to no filters, so listIncidents issues a bare COUNT(*) plus
+-- `ORDER BY opened_at DESC`; every composite index above leads with another column.
+CREATE INDEX IF NOT EXISTS ix_fleet_operational_incidents_opened_at ON fleet_operational_incidents (opened_at DESC);
 CREATE TABLE IF NOT EXISTS fleet_operational_incident_observations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   incident_id UUID NOT NULL REFERENCES fleet_operational_incidents(id) ON DELETE RESTRICT,
@@ -213,7 +216,7 @@ CREATE TABLE IF NOT EXISTS fleet_operational_incident_actions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   incident_id UUID NOT NULL REFERENCES fleet_operational_incidents(id) ON DELETE RESTRICT,
   action_type TEXT NOT NULL,
-  actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_user_id UUID REFERENCES users(id) ON DELETE RESTRICT,
   is_system_actor BOOLEAN NOT NULL DEFAULT false,
   occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   note TEXT,
