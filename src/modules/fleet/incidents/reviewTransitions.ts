@@ -175,7 +175,8 @@ export async function runIncidentTransition(request: IncidentTransitionRequest):
 }
 
 export interface BulkAcknowledgeItemResult { incidentId: string; lifecycleStatus: IncidentLifecycleStatus; actionId: string }
-export interface BulkAcknowledgeOutcome { results: BulkAcknowledgeItemResult[] }
+export interface BulkAcknowledgeConflict { incidentId: string; lifecycleStatus: IncidentLifecycleStatus }
+export interface BulkAcknowledgeOutcome { results: BulkAcknowledgeItemResult[]; conflicts: BulkAcknowledgeConflict[] }
 
 interface BulkCandidateRow extends Record<string, unknown> { id: string; lifecycle_status: IncidentLifecycleStatus; project_id: string | null }
 
@@ -199,18 +200,20 @@ export async function runBulkAcknowledge(
     if (!await isProjectOwnedByScope(scope, row.project_id)) throw new IncidentTransitionForbiddenError(`Incident ${id} is not in your scope`);
   }
   const results: BulkAcknowledgeItemResult[] = [];
+  const conflicts: BulkAcknowledgeConflict[] = [];
   for (const id of incidentIds) {
     const outcome = await transaction((txn) => acknowledgeIncident(id, actorUserId, null, requestCorrelationId, txn));
-    // The validation SELECT above is unlocked, so another manager can still resolve/dismiss
-    // this incident between validation and this incident's own row-locked transaction.
-    // acknowledgeIncident correctly detects that race and returns terminal_conflict without
-    // mutating — abort the batch here rather than folding an untouched incident into a
-    // uniform success list, matching the single-incident path (runAcknowledged) which
-    // throws the same error for the same outcome.
+    // The validation SELECT above is unlocked, so another manager can still resolve or
+    // dismiss this incident between validation and its own row-locked transaction.
+    // acknowledgeIncident detects that race and returns terminal_conflict without mutating.
+    // Collect it rather than throwing: earlier ids in the batch have already committed, so
+    // aborting here would report a partial success as a total failure and leave the manager
+    // believing nothing happened while some incidents were in fact acknowledged.
     if (outcome.outcome === 'terminal_conflict') {
-      throw new IncidentTransitionConflictError(`Incident ${id} is already closed`, outcome.lifecycleStatus);
+      conflicts.push({ incidentId: id, lifecycleStatus: outcome.lifecycleStatus });
+      continue;
     }
     results.push({ incidentId: id, lifecycleStatus: outcome.lifecycleStatus, actionId: outcome.actionId ?? '' });
   }
-  return { results };
+  return { results, conflicts };
 }

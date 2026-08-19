@@ -91,7 +91,17 @@ export function IncidentQueue({ canEdit, canManageSettings }: IncidentQueueProps
   async function bulkAcknowledge(): Promise<void> {
     if (!selected.size) return;
     setBulkSubmitting(true); setBulkError(null);
-    try { await incidentApi.bulkAcknowledge([...selected]); setSelected(new Set()); await refresh(); }
+    try {
+      const outcome = await incidentApi.bulkAcknowledge([...selected]);
+      setSelected(new Set());
+      await refresh();
+      // A conflict no longer aborts the batch server-side, so the rest did commit. Say so
+      // plainly rather than leaving the manager to guess which half went through.
+      if (outcome.conflicts.length > 0) {
+        setBulkError(`Acknowledged ${outcome.results.length}. ${outcome.conflicts.length} `
+          + 'were already closed by someone else and were skipped.');
+      }
+    }
     catch (caught) { setBulkError(caught instanceof IncidentApiError ? caught.message : 'Could not acknowledge the selected incidents'); }
     finally { setBulkSubmitting(false); }
   }

@@ -149,7 +149,9 @@ export interface EvidenceUploadBody {
   description?: string | null;
 }
 export interface BulkAcknowledgeItemResult { incidentId: string; lifecycleStatus: IncidentLifecycleStatus; actionId: string }
-export interface BulkAcknowledgeResult { results: BulkAcknowledgeItemResult[] }
+export interface BulkAcknowledgeConflict { incidentId: string; lifecycleStatus: IncidentLifecycleStatus }
+/** `conflicts` holds ids another manager closed between validation and this call's own row lock. The rest still committed — the batch is never all-or-nothing once it starts mutating. */
+export interface BulkAcknowledgeResult { results: BulkAcknowledgeItemResult[]; conflicts: BulkAcknowledgeConflict[] }
 export interface IncidentEvidenceUploadResult { evidence: IncidentEvidence; actionId: string }
 interface UserSearchResponse { users: ActiveUserOption[] }
 

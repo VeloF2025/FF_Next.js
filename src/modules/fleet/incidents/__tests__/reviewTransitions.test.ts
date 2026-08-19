@@ -227,15 +227,17 @@ describe('runBulkAcknowledge', () => {
       { incidentId: INCIDENT, lifecycleStatus: 'acknowledged', actionId: 'a1' },
       { incidentId: OTHER_INCIDENT, lifecycleStatus: 'acknowledged', actionId: 'a2' },
     ]);
+    expect(outcome.conflicts).toEqual([]);
     expect(db.transaction).toHaveBeenCalledTimes(2);
   });
 
-  // Race: the one unlocked validation SELECT sees both as 'open', but between
-  // validation and this incident's own per-item transaction another manager
-  // resolves it — acknowledgeIncident (row-locked) correctly detects that and
-  // returns 'terminal_conflict' without mutating. The batch must surface that
-  // distinctly, never fold the untouched incident into a uniform success list.
-  it('surfaces a per-item terminal_conflict race instead of reporting it as succeeded', async () => {
+  // Race: the one unlocked validation SELECT sees both as 'open', but between validation
+  // and this incident's own per-item transaction another manager resolves it —
+  // acknowledgeIncident (row-locked) detects that and returns 'terminal_conflict' without
+  // mutating. It must be reported distinctly, and NOT by throwing: the earlier ids in the
+  // batch have already committed, so an exception would report a partial success as a
+  // total failure.
+  it('reports a per-item terminal_conflict without discarding what already committed', async () => {
     db.query.mockResolvedValue([
       { id: INCIDENT, lifecycle_status: 'open', project_id: null },
       { id: OTHER_INCIDENT, lifecycle_status: 'open', project_id: null },
@@ -244,7 +246,27 @@ describe('runBulkAcknowledge', () => {
       .mockResolvedValueOnce({ outcome: 'acknowledged', lifecycleStatus: 'acknowledged', actionId: 'a1' })
       .mockResolvedValueOnce({ outcome: 'terminal_conflict', lifecycleStatus: 'resolved', actionId: null });
 
-    await expect(runBulkAcknowledge([INCIDENT, OTHER_INCIDENT], USER, unrestrictedScope, null))
-      .rejects.toBeInstanceOf(IncidentTransitionConflictError);
+    const outcome = await runBulkAcknowledge([INCIDENT, OTHER_INCIDENT], USER, unrestrictedScope, null);
+
+    expect(outcome.results).toEqual([{ incidentId: INCIDENT, lifecycleStatus: 'acknowledged', actionId: 'a1' }]);
+    expect(outcome.conflicts).toEqual([{ incidentId: OTHER_INCIDENT, lifecycleStatus: 'resolved' }]);
+  });
+
+  it('still acknowledges ids that follow a conflicting one', async () => {
+    const THIRD_INCIDENT = '77777777-7777-4777-8777-777777777777';
+    db.query.mockResolvedValue([
+      { id: INCIDENT, lifecycle_status: 'open', project_id: null },
+      { id: OTHER_INCIDENT, lifecycle_status: 'open', project_id: null },
+      { id: THIRD_INCIDENT, lifecycle_status: 'open', project_id: null },
+    ]);
+    repo.acknowledgeIncident
+      .mockResolvedValueOnce({ outcome: 'acknowledged', lifecycleStatus: 'acknowledged', actionId: 'a1' })
+      .mockResolvedValueOnce({ outcome: 'terminal_conflict', lifecycleStatus: 'resolved', actionId: null })
+      .mockResolvedValueOnce({ outcome: 'acknowledged', lifecycleStatus: 'acknowledged', actionId: 'a3' });
+
+    const outcome = await runBulkAcknowledge([INCIDENT, OTHER_INCIDENT, THIRD_INCIDENT], USER, unrestrictedScope, null);
+
+    expect(outcome.results.map((r) => r.incidentId)).toEqual([INCIDENT, THIRD_INCIDENT]);
+    expect(outcome.conflicts).toHaveLength(1);
   });
 });
