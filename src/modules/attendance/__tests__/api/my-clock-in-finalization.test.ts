@@ -46,18 +46,55 @@ describe('POST /api/my/attendance/clock-in finalization', () => {
     expect(mocks.insertClockIn).toHaveBeenCalled();
     const body = captured.body as { success: true; data: { entryId: string; siteId: string; insideSite: boolean } };
     expect(body.data.entryId).toBe('entry-999');
-    expect(body.data.siteId).toBe('site-789');
+    expect(body.data.siteId).toBe('project-789');
     expect(body.data.insideSite).toBe(true);
     expect(mocks.insertException).not.toHaveBeenCalled();
   });
 
+  it('does NOT flag a miss smaller than the device error', async () => {
+    // A fix 20 m outside a hull on a receiver accurate to +/-50 m is
+    // indistinguishable from being inside. Flagging it manufactures a
+    // violation the data cannot support — GPS accuracy on these entries
+    // averages 37 m and reaches 1,543 m.
+    mocks.matchGeofence.mockResolvedValue({
+      projectId: 'project-789', projectName: 'Lawley',
+      distanceM: 20, inside: false, withinAccuracy: true,
+    });
+    const { res, captured } = makeRes();
+    await handler(makeReq({
+      lat: -26.27, lon: 27.95, accuracy_m: 50,
+      client_occurred_at: nowIso(), selfie_base64: FAKE_SELFIE,
+    }), res);
+    expect(captured.statusCode).toBe(200);
+    const kinds = mocks.insertException.mock.calls.map((c) => (c[0] as { kind: string }).kind);
+    expect(kinds).not.toContain('geofence_mismatch');
+  });
+
+  it('files a low-accuracy fix under its own kind, not geofence_mismatch', async () => {
+    // 236 of the 2,497 queued exceptions were low-accuracy warnings wearing
+    // the geofence label, which is why the queue could not be triaged.
+    mocks.matchGeofence.mockResolvedValue({
+      projectId: 'project-789', projectName: 'Lawley',
+      distanceM: 0, inside: true, withinAccuracy: false,
+    });
+    const { res, captured } = makeRes();
+    await handler(makeReq({
+      lat: -26.27, lon: 27.95, accuracy_m: 900,
+      client_occurred_at: nowIso(), selfie_base64: FAKE_SELFIE,
+    }), res);
+    expect(captured.statusCode).toBe(200);
+    const kinds = mocks.insertException.mock.calls.map((c) => (c[0] as { kind: string }).kind);
+    expect(kinds).toContain('low_accuracy');
+    expect(kinds).not.toContain('geofence_mismatch');
+  });
+
   it('logs geofence_mismatch when GPS is outside any radius', async () => {
     mocks.matchGeofence.mockResolvedValue({
-      siteId: null,
-      siteName: null,
+      projectId: null,
+      projectName: null,
       distanceM: null,
       inside: false,
-      fallback: false,
+      withinAccuracy: false,
     });
     mocks.insertClockIn.mockResolvedValue({
       id: 'entry-nomatch',

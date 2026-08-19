@@ -1,4 +1,3 @@
-import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { VFStorageService } from '@/services/vfStorageAdapter';
 import { syncStaffProfilePhotoFromSelfie } from '@/services/staff/profilePhotoFromSelfie';
@@ -112,14 +111,18 @@ export async function executeClockInCommand(
     }
 
     stage = 'parallel_lookups';
-    const [homeSiteId, vehicleAssignment] = await Promise.all([
-      getHomeSiteId(args.staffId),
+    // Independent lookups — keep them parallel. A worker is standing there
+    // waiting, and the selfie upload is still to come.
+    //
+    // Accuracy is passed to matchGeofence so a fix outside a hull by less
+    // than the device's own error margin is not counted as a mismatch.
+    const [vehicleAssignment, geofence] = await Promise.all([
       findActiveVehicleAssignment(args.staffId),
+      matchGeofence({
+        device: { lat: args.lat, lon: args.lon },
+        accuracyM: args.accuracyM ?? null,
+      }),
     ]);
-    const geofence = await matchGeofence({
-      device: { lat: args.lat, lon: args.lon },
-      homeSiteId,
-    });
 
     stage = 'selfie_upload';
     const selfie = await storeSelfie({
@@ -141,7 +144,7 @@ export async function executeClockInCommand(
       accuracyM: args.accuracyM,
       selfieInUrl: selfie.url,
       vehicleAssignmentId: vehicleAssignment?.id ?? null,
-      siteGeofenceId: geofence.siteId,
+      siteGeofenceId: null,
       deviceFingerprint: args.deviceFingerprint,
       deviceUserAgent: args.deviceUserAgent,
     });
@@ -164,7 +167,10 @@ export async function executeClockInCommand(
     await syncProfilePhoto(args.staffId, entry.id, selfie.url);
 
     stage = 'post_insert_exceptions';
-    if (!geofence.inside) {
+    // Only a real miss. `withinAccuracy` covers a fix outside the hull by
+    // less than the device's reported error — indistinguishable from inside,
+    // so flagging it would manufacture a violation the data cannot support.
+    if (!geofence.inside && !geofence.withinAccuracy) {
       await insertException({
         entryId: entry.id,
         kind: 'geofence_mismatch',
@@ -172,16 +178,20 @@ export async function executeClockInCommand(
         details: {
           lat: args.lat,
           lon: args.lon,
-          matched_site_id: geofence.siteId,
-          fallback_to_home: geofence.fallback,
+          nearest_project_id: geofence.projectId,
+          nearest_project_name: geofence.projectName,
           distance_m: geofence.distanceM,
+          accuracy_m: args.accuracyM ?? null,
+          // Distinguishes "no AOIs loaded" (a refresh failure) from
+          // "genuinely far from every site".
+          no_aoi_available: geofence.projectId === null,
         },
       });
     }
     if (args.accuracyM != null && args.accuracyM > LOW_ACCURACY_M) {
       await insertException({
         entryId: entry.id,
-        kind: 'geofence_mismatch',
+        kind: 'low_accuracy',
         severity: 'info',
         details: { reason: 'low_accuracy', accuracy_m: args.accuracyM },
       });
@@ -191,7 +201,7 @@ export async function executeClockInCommand(
       staffId: args.staffId,
       entryId: entry.id,
       workDate,
-      siteId: geofence.siteId,
+      siteId: geofence.projectId,
       insideSite: geofence.inside,
       hasVehicle: vehicleAssignment != null,
     });
@@ -201,8 +211,14 @@ export async function executeClockInCommand(
         entryId: entry.id,
         workDate: entry.work_date,
         clockInAt: String(entry.clock_in_at),
-        siteId: geofence.siteId,
-        siteName: geofence.siteName,
+        // NOTE: these two now carry PROJECT identity, not a
+        // fleet_authorized_locations id. The names are kept because the /my
+        // PWA reads them from a cached bundle (useClockSubmission renders
+        // "Clocked in at {siteName}"), and renaming would break that message
+        // for anyone on an old build. That message has in fact never
+        // displayed until now — insideSite was always false.
+        siteId: geofence.projectId,
+        siteName: geofence.projectName,
         insideSite: geofence.inside,
         vehicleAssignmentId: vehicleAssignment?.id ?? null,
         selfieUrl: selfie.url,
@@ -267,12 +283,6 @@ async function cleanupOrphanSelfie(staffId: string, fullPath: string): Promise<v
   }
 }
 
-async function getHomeSiteId(staffId: string): Promise<string | null> {
-  const rows = await sql<{ home_site_id: string | null }>`
-    SELECT home_site_id FROM staff WHERE id = ${staffId} LIMIT 1
-  `;
-  return rows[0]?.home_site_id ?? null;
-}
 
 function logUnexpected(
   error: unknown,
