@@ -92,6 +92,20 @@ beforeAll(async () => {
   // scratch schema ties its lifetime to this file's DROP SCHEMA CASCADE and
   // breaks whichever sibling migration test runs next in the shared container.
   await admin.query('CREATE EXTENSION IF NOT EXISTS btree_gist SCHEMA public');
+  // 502 ends with GRANT/REVOKE against fibreflow_user. That role exists on the
+  // real database but not in a fresh cluster, and unlike 496/497/498 this
+  // migration is the only one in the oversight stack that references it. The
+  // role is only present here if 475's test happens to have run first in the
+  // shared container, so without this guard the suite passes or fails on file
+  // ordering. Roles are cluster-global, so this creates it once and
+  // deliberately does not drop it — same approach as
+  // 475_attendance_policy_workflow.test.ts.
+  await admin.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fibreflow_user') THEN
+        CREATE ROLE fibreflow_user NOLOGIN;
+      END IF;
+    END $$;`);
   await db.query(PREREQUISITES);
   await db.query(FORWARD);
 });
