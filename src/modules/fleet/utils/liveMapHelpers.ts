@@ -216,6 +216,16 @@ const MIN_MARKER_SPACING_PX = 22;
  * crept group would be drawn around a centre most of its members are nowhere
  * near, landing markers on vehicles that were never in the group.
  *
+ * The trade-off is fragmentation: a row that does not collectively fit inside
+ * one threshold-wide disk has to split, even where consecutive markers are
+ * well inside collision distance. a(0,0) b(15,0) c(22,5) groups as {a,b} and
+ * {c}, because c is 22.6px from a — and c, being alone, is drawn where it
+ * really is, 17px from where b lands on the ring. Close markers can therefore
+ * still touch across a group boundary. It is the smaller of the two evils: the
+ * alternative rules let a group creep across the screen and drop markers on
+ * vehicles nowhere near it, while this one only ever fails to separate a pair
+ * it already drew close together.
+ *
  * Groups come back sorted by `vehicleId`, and so do their members — the ring
  * offsets below are derived from member order, so an unstable order would make
  * markers swap places on every 30-second refresh.

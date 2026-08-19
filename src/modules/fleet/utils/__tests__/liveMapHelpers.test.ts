@@ -379,6 +379,28 @@ describe('groupOverlapping', () => {
     }
   });
 
+  it('fractures a row that does not fit one disk, and can leave a pair touching', () => {
+    // The documented limitation of requiring every pair to overlap. c is 8.6px
+    // from b — plainly the same blob — but 22.6px from a, so it cannot join
+    // {a, b} and is drawn unfanned at its own spot, while b moves onto the
+    // ring. They end up 17px apart: still inside the spacing the ring exists
+    // to guarantee. Pinned so the limitation is verified rather than assumed.
+    const a = at('a', 0, 0);
+    const b = at('b', 15, 0);
+    const c = at('c', 22, 5);
+    const groups = groupOverlapping([a, b, c]);
+    expect(groups.map((g) => g.map((p) => p.vehicle.vehicleId))).toEqual([['a', 'b'], ['c']]);
+
+    const centre = groupCentrePx(groups[0]);
+    const drawn = groups[0].map((p, i) => {
+      const { dx, dy } = ringOffsetPx(i, groups[0].length);
+      return { x: centre.x + dx, y: centre.y + dy };
+    });
+    const closestToC = Math.min(...drawn.map((d) => Math.hypot(d.x - c.x, d.y - c.y)));
+    expect(closestToC).toBeCloseTo(17.0, 0);
+    expect(closestToC).toBeLessThan(22);
+  });
+
   it('keeps every marker exactly once across the groups it returns', () => {
     const walk = Array.from({ length: 40 }, (_, i) =>
       at(`v${String(i).padStart(2, '0')}`, 100 + i * 6, 100),
