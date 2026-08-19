@@ -69,6 +69,13 @@ export interface FieldAttendanceRow {
   hours:            number | null;
   entry_updated_at: string;
   site_geofence_id: string | null;
+  /** Nearest project AOI at each clock event, recorded at write time. NULL
+   *  for entries not written by the portal clock path (manual admin entries,
+   *  and the auto-close cron, which has no clock-out fix to attribute). */
+  clock_in_aoi_project:    string | null;
+  clock_in_aoi_distance_m: number | null;
+  clock_out_aoi_project:    string | null;
+  clock_out_aoi_distance_m: number | null;
 }
 
 // Payload types for write endpoints (used by Task 5 / TimeTab)
