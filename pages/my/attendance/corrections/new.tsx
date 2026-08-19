@@ -8,6 +8,14 @@ import { CorrectionForm } from '@/modules/attendance/portal/client/correction/Co
 import { RequiredCorrectionSuccess } from '@/modules/attendance/portal/client/correction/RequiredCorrectionSuccess';
 import { useCorrectionForm } from '@/modules/attendance/portal/client/correction/useCorrectionForm';
 import { useCorrectionPageData } from '@/modules/attendance/portal/client/correction/useCorrectionPageData';
+import { linkAttendanceCorrection } from '@/modules/fleet/incidents/driver/web/AttendanceCorrectionLink';
+
+// `incident_id` is optional Fleet context (design §8): safe to parse from the
+// URL because it is only ever a Fleet incident id, never staff identity or
+// mutable incident state — a malformed value is simply treated as absent.
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type LinkStatus = 'idle' | 'linking' | 'linked' | 'failed';
 
 const NewCorrectionPage: NextPage & {
   getLayout?: (page: React.ReactElement) => React.ReactElement;
@@ -15,13 +23,32 @@ const NewCorrectionPage: NextPage & {
   const router = useRouter();
   const requestedEntryId = typeof router.query.entry_id === 'string' ? router.query.entry_id : '';
   const exceptionId = typeof router.query.exception_id === 'string' ? router.query.exception_id : '';
+  const rawIncidentId = typeof router.query.incident_id === 'string' ? router.query.incident_id : '';
+  const incidentId = UUID_REGEX.test(rawIncidentId) ? rawIncidentId : '';
   const data = useCorrectionPageData(router, requestedEntryId, exceptionId);
   const entryId = data.entryId;
+
+  const [linkStatus, setLinkStatus] = React.useState<LinkStatus>('idle');
+  const [pendingAdjustmentId, setPendingAdjustmentId] = React.useState<string | null>(null);
+
+  const attemptLink = React.useCallback(async (adjustmentId: string) => {
+    if (!incidentId) return;
+    setPendingAdjustmentId(adjustmentId);
+    setLinkStatus('linking');
+    try {
+      await linkAttendanceCorrection(incidentId, adjustmentId);
+      setLinkStatus('linked');
+    } catch {
+      setLinkStatus('failed');
+    }
+  }, [incidentId]);
+
   const form = useCorrectionForm({
     entryId,
     exceptionId,
     hints: data.hints,
     onGenericSuccess: () => router.replace('/my/attendance/corrections?from=submit'),
+    onRequiredSuccess: incidentId ? attemptLink : undefined,
   });
 
   return (
@@ -52,6 +79,27 @@ const NewCorrectionPage: NextPage & {
         <div className="flex items-center justify-center py-16 text-sm text-neutral-400">Loading…</div>
       )}
       {form.confirmed && <RequiredCorrectionSuccess />}
+      {form.confirmed && incidentId && linkStatus !== 'idle' && (
+        <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-sm">
+          {linkStatus === 'linking' && <p className="text-neutral-400">Linking to the Fleet incident…</p>}
+          {linkStatus === 'linked' && <p className="text-emerald-300">Linked to the Fleet incident.</p>}
+          {linkStatus === 'failed' && (
+            <div role="alert" className="space-y-2 text-amber-200">
+              <p>
+                Your attendance correction was submitted successfully, but it could not be linked to the
+                Fleet incident. You can retry the link.
+              </p>
+              <button
+                type="button"
+                onClick={() => pendingAdjustmentId && attemptLink(pendingAdjustmentId)}
+                className="touch-manipulation rounded-lg border border-amber-700 px-3 py-1.5 text-sm font-semibold text-amber-200 hover:bg-amber-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+              >
+                Retry link
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {data.session && entryId && !form.confirmed && (
         <CorrectionForm entry={data.entry} entryId={entryId} hints={data.hints} form={form} />
       )}
