@@ -8,16 +8,16 @@
 import { describe, expect, it } from 'vitest';
 import type { LiveVehicle, TrackingState } from '@/pages/api/fleet/positions/live';
 import {
-  CO_LOCATED_WITHIN_METERS,
   PARKED_SILENT_AFTER_SECONDS,
   STATUS_STYLE,
   swatchBackground,
   type VehicleStatus,
   ageLabel,
-  groupCoLocated,
+  groupOverlapping,
   nearestNeighbourMeters,
   notPlottedReason,
   partitionVehicles,
+  groupCentrePx,
   ringOffsetPx,
   ringRadiusPx,
   statusFor,
@@ -330,47 +330,88 @@ describe('idling — the HW50KNGP bug: ignition on at 0 km/h used to render "Mov
   });
 });
 
-/** A plotted vehicle at an explicit spot — the grouping input. */
-function at(vehicleId: string, lat: number, lon: number) {
-  return { ...vehicle({ vehicleId }), lat, lon };
+/** A vehicle at an explicit spot, projected to explicit screen pixels. */
+function at(vehicleId: string, x: number, y: number, lat = -25.974, lon = 28.2) {
+  return { vehicle: { ...vehicle({ vehicleId }), lat, lon }, x, y };
 }
 
-describe('groupCoLocated', () => {
-  it('leaves vehicles that are far apart in their own groups', () => {
-    const groups = groupCoLocated([at('a', -26.1, 28.05), at('b', -26.2, 28.15)]);
-    expect(groups.map((g) => g.map((v) => v.vehicleId))).toEqual([['a'], ['b']]);
+describe('groupOverlapping', () => {
+  it('leaves markers that are far apart on screen in their own groups', () => {
+    const groups = groupOverlapping([at('a', 100, 100), at('b', 400, 400)]);
+    expect(groups.map((g) => g.map((p) => p.vehicle.vehicleId))).toEqual([['a'], ['b']]);
   });
 
-  it('groups two vehicles ~10m apart — the case that rendered as one dot', () => {
-    // HW50KNGP and its neighbour in Clayville on 2026-08-19.
-    const groups = groupCoLocated([at('a', -25.974028, 28.214844), at('b', -25.974018, 28.214865)]);
+  it('groups markers 1.4px apart — the overlap a 30m ground threshold missed', () => {
+    // Measured on dev 2026-08-19: two vehicles ~200m apart, so never within
+    // any sane metre threshold, yet 1.4px apart at the zoom the map opens at.
+    const groups = groupOverlapping([at('a', 500, 300), at('b', 501, 301)]);
     expect(groups).toHaveLength(1);
-    expect(groups[0].map((v) => v.vehicleId)).toEqual(['a', 'b']);
+    expect(groups[0].map((p) => p.vehicle.vehicleId)).toEqual(['a', 'b']);
   });
 
-  it('does not group vehicles just beyond the threshold', () => {
-    // ~45m north, comfortably past the 30m default.
-    const groups = groupCoLocated([at('a', -25.974028, 28.2), at('b', -25.9736, 28.2)]);
+  it('does not group markers just beyond the spacing threshold', () => {
+    const groups = groupOverlapping([at('a', 100, 100), at('b', 100, 123)]);
     expect(groups).toHaveLength(2);
   });
 
-  it('chains through a middle vehicle rather than splitting a row into pairs', () => {
-    // a-b and b-c are each ~22m; a-c is ~44m, so only single-link grouping
-    // keeps the row together.
-    const groups = groupCoLocated([
-      at('a', -25.974, 28.2),
-      at('b', -25.9738, 28.2),
-      at('c', -25.9736, 28.2),
+  it('chains through a middle marker rather than splitting a row into pairs', () => {
+    const groups = groupOverlapping([
+      at('a', 100, 100),
+      at('b', 100, 118),
+      at('c', 100, 136),
     ]);
     expect(groups).toHaveLength(1);
     expect(groups[0]).toHaveLength(3);
   });
 
   it('orders groups and members deterministically, so markers do not swap on refresh', () => {
-    const forwards = groupCoLocated([at('b', -26.1, 28.05), at('a', -26.1, 28.05)]);
-    const backwards = groupCoLocated([at('a', -26.1, 28.05), at('b', -26.1, 28.05)]);
-    expect(forwards[0].map((v) => v.vehicleId)).toEqual(['a', 'b']);
-    expect(backwards[0].map((v) => v.vehicleId)).toEqual(['a', 'b']);
+    const forwards = groupOverlapping([at('b', 200, 200), at('a', 200, 200)]);
+    const backwards = groupOverlapping([at('a', 200, 200), at('b', 200, 200)]);
+    expect(forwards[0].map((p) => p.vehicle.vehicleId)).toEqual(['a', 'b']);
+    expect(backwards[0].map((p) => p.vehicle.vehicleId)).toEqual(['a', 'b']);
+  });
+
+  it('does not mutate the array it is given', () => {
+    const input = [at('b', 200, 200), at('a', 200, 200)];
+    groupOverlapping(input);
+    expect(input.map((p) => p.vehicle.vehicleId)).toEqual(['b', 'a']);
+  });
+});
+
+describe('groupCentrePx', () => {
+  it('centres the ring on the mean of the members, not on the first member', () => {
+    expect(groupCentrePx([at('a', 100, 100), at('b', 120, 140)])).toEqual({ x: 110, y: 120 });
+  });
+
+  it('leaves a lone marker at its own point', () => {
+    expect(groupCentrePx([at('a', 42, 77)])).toEqual({ x: 42, y: 77 });
+  });
+});
+
+describe('ringRadiusPx', () => {
+  /** Neighbours on a ring of radius r sit this far apart. */
+  function neighbourSpacing(count: number): number {
+    const a = ringOffsetPx(0, count);
+    const b = ringOffsetPx(1, count);
+    return Math.hypot(a.dx - b.dx, a.dy - b.dy);
+  }
+
+  it('keeps a small group on the minimum radius', () => {
+    expect(ringRadiusPx(2)).toBe(14);
+  });
+
+  it('grows the ring so a depot-sized cluster does not re-collide', () => {
+    // A fixed 14px radius puts 8 markers 10.7px apart — inside their own
+    // diameter. Every size must clear the 22px spacing the markers need.
+    for (let count = 2; count <= 25; count += 1) {
+      expect(neighbourSpacing(count)).toBeGreaterThanOrEqual(21.9);
+    }
+  });
+
+  it('never shrinks below the minimum radius', () => {
+    for (let count = 2; count <= 25; count += 1) {
+      expect(ringRadiusPx(count)).toBeGreaterThanOrEqual(14);
+    }
   });
 });
 
@@ -391,7 +432,7 @@ describe('ringOffsetPx', () => {
     expect(Math.hypot(a.dx - b.dx, a.dy - b.dy)).toBeCloseTo(28, 5);
   });
 
-  it('spreads a group evenly around the true position', () => {
+  it('spreads a group evenly around the group centre', () => {
     const count = 4;
     const radius = ringRadiusPx(count);
     const offsets = Array.from({ length: count }, (_, i) => ringOffsetPx(i, count));
@@ -404,55 +445,24 @@ describe('ringOffsetPx', () => {
   });
 });
 
-describe('ringRadiusPx', () => {
-  /** Neighbours on a ring of radius r sit this far apart. */
-  function neighbourSpacing(count: number): number {
-    const a = ringOffsetPx(0, count);
-    const b = ringOffsetPx(1, count);
-    return Math.hypot(a.dx - b.dx, a.dy - b.dy);
-  }
-
-  it('keeps a small group on the minimum radius', () => {
-    expect(ringRadiusPx(2)).toBe(14);
-  });
-
-  it('grows the ring so a depot-sized cluster does not re-collide', () => {
-    // A fixed 14px radius puts 8 markers 10.7px apart — inside their own
-    // diameter. Every size must clear the 22px spacing the markers need.
-    for (let count = 2; count <= 12; count += 1) {
-      expect(neighbourSpacing(count)).toBeGreaterThanOrEqual(21.9);
-    }
-  });
-
-  it('never shrinks below the minimum radius', () => {
-    for (let count = 2; count <= 12; count += 1) {
-      expect(ringRadiusPx(count)).toBeGreaterThanOrEqual(14);
-    }
-  });
-});
-
 describe('nearestNeighbourMeters', () => {
   it('reports no neighbour for a vehicle on its own', () => {
-    const solo = at('a', -26.1, 28.05);
-    expect(nearestNeighbourMeters(solo, [solo])).toBeNull();
+    const solo = at('a', 100, 100);
+    expect(nearestNeighbourMeters(solo.vehicle, [solo])).toBeNull();
   });
 
-  it('measures between the VEHICLES, not the nudged markers', () => {
-    // ~10m apart, the Clayville pair. The marker gap is a pixel offset that
-    // lands ~1.9km away at zoom 10 — this must not report that.
-    const a = at('a', -25.974028, 28.214844);
-    const b = at('b', -25.974018, 28.214865);
-    const metres = nearestNeighbourMeters(a, [a, b]);
-    expect(metres).not.toBeNull();
-    expect(metres!).toBeGreaterThan(1);
-    expect(metres!).toBeLessThan(CO_LOCATED_WITHIN_METERS);
+  it('measures between the VEHICLES, not the overlapping markers', () => {
+    // 1px apart on screen, ~11m apart on the ground. The marker gap says
+    // nothing about the vehicles; only the coordinates do.
+    const a = at('a', 500, 300, -25.974, 28.2);
+    const b = at('b', 501, 300, -25.9739, 28.2);
+    expect(nearestNeighbourMeters(a.vehicle, [a, b])!).toBeCloseTo(11.132, 1);
   });
 
   it('picks the closest of several neighbours', () => {
-    const a = at('a', -25.974, 28.2);
-    const near = at('b', -25.9739, 28.2); // ~11m
-    const far = at('c', -25.9738, 28.2); // ~22m
-    const metres = nearestNeighbourMeters(a, [a, near, far])!;
-    expect(metres).toBeCloseTo(11.132, 1);
+    const a = at('a', 100, 100, -25.974, 28.2);
+    const near = at('b', 105, 100, -25.9739, 28.2); // ~11m
+    const far = at('c', 110, 100, -25.9738, 28.2); // ~22m
+    expect(nearestNeighbourMeters(a.vehicle, [a, near, far])!).toBeCloseTo(11.132, 1);
   });
 });

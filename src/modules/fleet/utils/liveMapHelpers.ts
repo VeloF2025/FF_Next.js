@@ -170,16 +170,16 @@ export function notPlottedReason(v: LiveVehicle): string {
 }
 
 /**
- * How close two vehicles must be before the map treats them as one dot.
+ * A vehicle's position projected to screen pixels at the current zoom.
  *
- * A marker is 16px across, so anything inside roughly a marker's width of
- * ground reads as a single vehicle no matter how far you zoom in. 30m covers
- * the case this exists for: a yard, a depot bay, two bakkies parked outside
- * the same house. On 2026-08-19 that was HW50KNGP and its neighbour in
- * Clayville, ~10m apart and rendering as one purple dot — the second vehicle
- * was invisible and unclickable, so its driver could not be identified at all.
+ * Overlap is a screen-space fact, so grouping is decided here rather than in
+ * metres. A 30m ground threshold — the first version of this — only caught
+ * vehicles parked in the same yard; at the zoom the map opens at, a pixel is
+ * about 136m of Gauteng, so two vehicles 200m apart sat 1.4px apart and still
+ * drew as one dot. Measured on dev on 2026-08-19: pairs 1.4px, 3.2px and
+ * 4.5px apart, none of them close enough on the ground to be grouped.
  */
-export const CO_LOCATED_WITHIN_METERS = 30;
+export type PositionedVehicle = { vehicle: PlottedVehicle; x: number; y: number };
 
 /** Metres per degree of latitude. Close enough to constant anywhere on Earth. */
 const METERS_PER_DEGREE_LAT = 111_320;
@@ -198,9 +198,16 @@ function metersBetween(a: PlottedVehicle, b: PlottedVehicle): number {
 }
 
 /**
- * Bucket vehicles that sit on top of each other, so the map can fan them out.
+ * Closest two marker centres may sit before they read as one blob: an 8px
+ * radius plus a 2px stroke each, and a 2px gap so the ring between them is
+ * visible rather than merely tangent.
+ */
+const MIN_MARKER_SPACING_PX = 22;
+
+/**
+ * Bucket markers that collide on screen, so the map can fan them out.
  *
- * Single-link grouping: a vehicle joins a group if it is within the threshold
+ * Single-link grouping: a marker joins a group if it is within the threshold
  * of ANY member, not of the group's centre. A row of vehicles down a depot
  * fence should fan out as one ring rather than as overlapping pairs.
  *
@@ -208,18 +215,36 @@ function metersBetween(a: PlottedVehicle, b: PlottedVehicle): number {
  * offsets below are derived from member order, so an unstable order would make
  * markers swap places on every 30-second refresh.
  */
-export function groupCoLocated(
-  plotted: PlottedVehicle[],
-  withinMeters: number = CO_LOCATED_WITHIN_METERS,
-): PlottedVehicle[][] {
-  const sorted = [...plotted].sort((a, b) => a.vehicleId.localeCompare(b.vehicleId));
-  const groups: PlottedVehicle[][] = [];
-  for (const v of sorted) {
-    const group = groups.find((g) => g.some((m) => metersBetween(m, v) <= withinMeters));
-    if (group) group.push(v);
-    else groups.push([v]);
+export function groupOverlapping(
+  positioned: PositionedVehicle[],
+  withinPx: number = MIN_MARKER_SPACING_PX,
+): PositionedVehicle[][] {
+  const sorted = [...positioned].sort((a, b) =>
+    a.vehicle.vehicleId.localeCompare(b.vehicle.vehicleId),
+  );
+  const groups: PositionedVehicle[][] = [];
+  for (const p of sorted) {
+    const group = groups.find((g) =>
+      g.some((m) => Math.hypot(m.x - p.x, m.y - p.y) <= withinPx),
+    );
+    if (group) group.push(p);
+    else groups.push([p]);
   }
   return groups;
+}
+
+/**
+ * Where a group's ring is centred: the mean of its members' real positions.
+ *
+ * A group is no longer necessarily one spot — at a wide zoom its members can
+ * be hundreds of metres apart — so each marker fans out from the group's
+ * centre rather than from its own position. Offsetting each marker from its
+ * own point would leave two markers 3px apart still 3px apart.
+ */
+export function groupCentrePx(group: PositionedVehicle[]): { x: number; y: number } {
+  const x = group.reduce((t, p) => t + p.x, 0) / group.length;
+  const y = group.reduce((t, p) => t + p.y, 0) / group.length;
+  return { x, y };
 }
 
 /**
@@ -233,24 +258,22 @@ export function groupCoLocated(
  */
 export function nearestNeighbourMeters(
   vehicle: PlottedVehicle,
-  group: PlottedVehicle[],
+  group: PositionedVehicle[],
 ): number | null {
-  const others = group.filter((v) => v.vehicleId !== vehicle.vehicleId);
+  const others = group.filter((p) => p.vehicle.vehicleId !== vehicle.vehicleId);
   if (others.length === 0) return null;
-  return Math.min(...others.map((other) => metersBetween(vehicle, other)));
+  return Math.min(...others.map((other) => metersBetween(vehicle, other.vehicle)));
 }
 
 /**
  * Screen-space nudge for one member of a co-located group.
  *
- * Deliberately in PIXELS, not metres: the whole problem is markers colliding
- * on screen, and how much ground a pixel covers changes with every zoom level.
- * A metre-based offset that separates two bakkies at zoom 18 is invisible at
- * zoom 10, which is exactly the zoom the map opens at.
+ * In PIXELS, like the grouping: the whole problem is markers colliding on
+ * screen, and how much ground a pixel covers changes with every zoom level.
  *
  * The single-member case returns no offset at all, so a vehicle that is not
  * colliding with anything is drawn where it actually is. For a group, every
- * member moves onto a ring around the true position — nobody keeps the real
+ * member moves onto a ring around the group's centre — nobody keeps their own
  * spot, because leaving one marker unmoved would silently promote whichever
  * vehicle happened to sort first into "the accurate one".
  */
@@ -266,13 +289,6 @@ export function ringOffsetPx(
   const radiusPx = ringRadiusPx(count, minRadiusPx);
   return { dx: radiusPx * Math.cos(angle), dy: radiusPx * Math.sin(angle) };
 }
-
-/**
- * Closest two marker centres may sit before they read as one blob: an 8px
- * radius plus a 2px stroke each, and a 2px gap so the ring between them is
- * visible rather than merely tangent.
- */
-const MIN_MARKER_SPACING_PX = 22;
 
 /**
  * Radius of the fan-out ring, grown so a big group does not re-collide.
