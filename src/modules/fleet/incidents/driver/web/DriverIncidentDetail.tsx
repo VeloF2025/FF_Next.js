@@ -17,6 +17,7 @@
  * that survives navigating away (and even closing the app), using the
  * same `linkMyAttendanceCorrection` call that page already uses.
  */
+import { log } from '@/lib/logger';
 import React from 'react';
 import type { DriverIncidentDetail as DriverIncidentDetailDto } from '../types';
 import { AttendanceCorrectionLink } from './AttendanceCorrectionLink';
@@ -39,7 +40,17 @@ function readPendingCorrectionId(incidentId: string): string | null {
 }
 
 function clearPendingCorrectionId(incidentId: string): void {
-  try { window.localStorage.removeItem(pendingCorrectionStorageKey(incidentId)); } catch { /* best-effort cleanup only */ }
+  try {
+    window.localStorage.removeItem(pendingCorrectionStorageKey(incidentId));
+  } catch (error) {
+    // Not rethrown: the link itself already succeeded, so failing to tidy the marker must not
+    // present as a failed retry. Logged rather than discarded because the consequence is
+    // visible — a stale marker keeps offering "Retry linking correction" for a correction
+    // that is already linked, and an empty catch would leave nobody able to explain why.
+    log.warn('could not clear the pending correction-link marker', {
+      incidentId, error: error instanceof Error ? error.message : String(error),
+    }, 'DriverIncidentDetail');
+  }
 }
 
 type LoadState =
