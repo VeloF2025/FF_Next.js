@@ -205,13 +205,16 @@ const MIN_MARKER_SPACING_PX = 22;
  * drew as one dot. Measured on dev on 2026-08-19: pairs 1.4px, 3.2px and
  * 4.5px apart, none of them close enough on the ground to be grouped.
  *
- * A marker joins a group when it is within the threshold of that group's
- * CENTRE, not merely of some member. Chaining off the nearest member instead
- * (single-link) has no bound: a-b, b-c, c-d each 22px apart puts a and d 66px
- * apart and grows without limit down a row, and since the fan-out ring grows
- * with member count, the ring would then be drawn far from where most of its
- * members actually are — landing markers on top of vehicles that were never in
- * the group. Centre distance caps a group's own spread at 2x the threshold.
+ * A marker joins a group only when it is within the threshold of EVERY member
+ * of that group, which pins the group's diameter to the threshold itself. The
+ * two weaker rules both let a group creep: chaining off the nearest member
+ * (single-link) puts a and d 66px apart for a-b-c-d each 22px along, growing
+ * without limit down a row; joining on distance to the group's CENTRE only
+ * slows that to a harmonic crawl, since each member drags the centre t/(n+1)
+ * further and the sum diverges — about 62px of drift by the 25th member, not
+ * the bound it looks like. Since the fan-out ring grows with member count, a
+ * crept group would be drawn around a centre most of its members are nowhere
+ * near, landing markers on vehicles that were never in the group.
  *
  * Groups come back sorted by `vehicleId`, and so do their members — the ring
  * offsets below are derived from member order, so an unstable order would make
@@ -226,10 +229,9 @@ export function groupOverlapping(
   );
   const groups: PositionedVehicle[][] = [];
   for (const p of sorted) {
-    const group = groups.find((g) => {
-      const centre = groupCentrePx(g);
-      return Math.hypot(centre.x - p.x, centre.y - p.y) <= withinPx;
-    });
+    const group = groups.find((g) =>
+      g.every((m) => Math.hypot(m.x - p.x, m.y - p.y) <= withinPx),
+    );
     if (group) group.push(p);
     else groups.push([p]);
   }
@@ -297,12 +299,12 @@ export function ringOffsetPx(
  * How far a marker may be moved from its group's centre.
  *
  * The spacing formula has no ceiling — 25 markers want an 88px ring — but a
- * group's own members sit within 2x MIN_MARKER_SPACING_PX of its centre, so
- * past this point the ring is mostly empty screen between markers and starts
- * reaching over unrelated vehicles nearby. Beyond about 7 markers in one spot
- * the honest statement is that they cannot all be drawn apart at this zoom:
- * the ring stops growing and the densest clusters overlap again, which is a
- * cue to zoom in rather than a number to keep inflating.
+ * group's own members sit inside a MIN_MARKER_SPACING_PX-wide blob, so past
+ * this point the ring is mostly empty screen between markers and starts
+ * reaching over unrelated vehicles nearby. The ceiling first binds at 13
+ * markers in one spot; beyond that the honest statement is that they cannot
+ * all be drawn apart at this zoom, and the densest clusters overlap again —
+ * a cue to zoom in rather than a number to keep inflating.
  */
 const MAX_RING_RADIUS_PX = 44;
 

@@ -355,28 +355,37 @@ describe('groupOverlapping', () => {
     expect(groups).toHaveLength(2);
   });
 
-  it('grows a group only while its members stay near the centre', () => {
-    // a and b are 18px apart, so b joins; their centre is then 9px along, and
-    // c at 136px is far outside the threshold from it.
+  it('admits a marker only when it overlaps every member, not just the nearest', () => {
+    // a and b are 18px apart, so b joins. c is 18px from b but 36px from a,
+    // so it does not — under single-link it would have chained on.
     const groups = groupOverlapping([at('a', 100, 100), at('b', 100, 118), at('c', 100, 136)]);
     expect(groups.map((g) => g.map((p) => p.vehicle.vehicleId))).toEqual([['a', 'b'], ['c']]);
   });
 
-  it('caps a group\'s own spread, so a long row cannot chain into one huge group', () => {
-    // Twelve markers 20px apart. Single-link chaining puts them all in one
-    // group spanning 220px, whose ring would then be drawn 44px from a centre
-    // most of its members are nowhere near.
-    const row = Array.from({ length: 12 }, (_, i) =>
-      at(`v${String(i).padStart(2, '0')}`, 100 + i * 20, 100),
+  it('holds a group\'s DIAMETER to the threshold, however many markers arrive', () => {
+    // 40 markers walking 6px at a time across the screen. Single-link chains
+    // them into one 234px group; joining on distance to the centre lets the
+    // centre creep harmonically (~62px by the 25th member). Neither bound
+    // survives this input; requiring every pair to overlap does.
+    const walk = Array.from({ length: 40 }, (_, i) =>
+      at(`v${String(i).padStart(2, '0')}`, 100 + i * 6, 100),
     );
-    const groups = groupOverlapping(row);
-    expect(groups.length).toBeGreaterThan(1);
-    for (const group of groups) {
-      const centre = groupCentrePx(group);
-      for (const p of group) {
-        expect(Math.hypot(p.x - centre.x, p.y - centre.y)).toBeLessThanOrEqual(22);
+    for (const group of groupOverlapping(walk)) {
+      for (const a of group) {
+        for (const b of group) {
+          expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeLessThanOrEqual(22);
+        }
       }
     }
+  });
+
+  it('keeps every marker exactly once across the groups it returns', () => {
+    const walk = Array.from({ length: 40 }, (_, i) =>
+      at(`v${String(i).padStart(2, '0')}`, 100 + i * 6, 100),
+    );
+    const ids = groupOverlapping(walk).flatMap((g) => g.map((p) => p.vehicle.vehicleId));
+    expect(new Set(ids).size).toBe(40);
+    expect(ids).toHaveLength(40);
   });
 
   it('orders groups and members deterministically, so markers do not swap on refresh', () => {
@@ -483,20 +492,36 @@ describe('nearestNeighbourMeters', () => {
 });
 
 describe('ring radius ceiling', () => {
-  it('stops growing the ring once it would reach past unrelated markers', () => {
-    // The spacing formula alone wants 88px for 25 markers.
+  function neighbourSpacing(count: number): number {
+    const a = ringOffsetPx(0, count);
+    const b = ringOffsetPx(1, count);
+    return Math.hypot(a.dx - b.dx, a.dy - b.dy);
+  }
+
+  it('does not bind until the ring would reach past unrelated markers', () => {
+    // 12 markers want 42.5px, inside the ceiling; 13 want 45.9px and are the
+    // first to be clipped. The comment in the source names 13 — pin it.
+    expect(ringRadiusPx(12)).toBeLessThan(44);
+    expect(ringRadiusPx(13)).toBe(44);
     expect(ringRadiusPx(25)).toBe(44);
-    expect(ringRadiusPx(4)).toBeLessThan(44);
   });
 
-  it('still separates every group size the spread cap allows', () => {
-    // A group's members sit within 22px of its centre, so it takes an
-    // improbably dense cluster to exceed the ceiling at all.
-    for (let count = 2; count <= 7; count += 1) {
-      const a = ringOffsetPx(0, count);
-      const b = ringOffsetPx(1, count);
-      expect(Math.hypot(a.dx - b.dx, a.dy - b.dy)).toBeGreaterThanOrEqual(21.9);
+  it('separates every group size below the ceiling', () => {
+    for (let count = 2; count <= 12; count += 1) {
+      expect(neighbourSpacing(count)).toBeGreaterThanOrEqual(21.9);
     }
+  });
+
+  it('degrades predictably above it rather than breaking', () => {
+    // Above the ceiling markers do overlap again — that is the accepted
+    // trade-off, so pin the actual numbers instead of leaving the range
+    // untested. 25 markers land ~11px apart, and nothing goes NaN or negative.
+    for (let count = 13; count <= 25; count += 1) {
+      const spacing = neighbourSpacing(count);
+      expect(spacing).toBeCloseTo(2 * 44 * Math.sin(Math.PI / count), 5);
+      expect(spacing).toBeGreaterThan(0);
+    }
+    expect(neighbourSpacing(25)).toBeCloseTo(11.03, 1);
   });
 });
 
