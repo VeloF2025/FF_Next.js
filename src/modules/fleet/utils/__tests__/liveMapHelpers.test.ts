@@ -8,15 +8,18 @@
 import { describe, expect, it } from 'vitest';
 import type { LiveVehicle, TrackingState } from '@/pages/api/fleet/positions/live';
 import {
+  CO_LOCATED_WITHIN_METERS,
   PARKED_SILENT_AFTER_SECONDS,
   STATUS_STYLE,
   swatchBackground,
   type VehicleStatus,
   ageLabel,
   groupCoLocated,
+  nearestNeighbourMeters,
   notPlottedReason,
   partitionVehicles,
   ringOffsetPx,
+  ringRadiusPx,
   statusFor,
 } from '../liveMapHelpers';
 
@@ -390,12 +393,66 @@ describe('ringOffsetPx', () => {
 
   it('spreads a group evenly around the true position', () => {
     const count = 4;
-    const offsets = Array.from({ length: count }, (_, i) => ringOffsetPx(i, count, 14));
+    const radius = ringRadiusPx(count);
+    const offsets = Array.from({ length: count }, (_, i) => ringOffsetPx(i, count));
     for (const { dx, dy } of offsets) {
-      expect(Math.hypot(dx, dy)).toBeCloseTo(14, 5);
+      expect(Math.hypot(dx, dy)).toBeCloseTo(radius, 5);
     }
     // Evenly spaced points on a circle cancel out.
     expect(offsets.reduce((t, o) => t + o.dx, 0)).toBeCloseTo(0, 5);
     expect(offsets.reduce((t, o) => t + o.dy, 0)).toBeCloseTo(0, 5);
+  });
+});
+
+describe('ringRadiusPx', () => {
+  /** Neighbours on a ring of radius r sit this far apart. */
+  function neighbourSpacing(count: number): number {
+    const a = ringOffsetPx(0, count);
+    const b = ringOffsetPx(1, count);
+    return Math.hypot(a.dx - b.dx, a.dy - b.dy);
+  }
+
+  it('keeps a small group on the minimum radius', () => {
+    expect(ringRadiusPx(2)).toBe(14);
+  });
+
+  it('grows the ring so a depot-sized cluster does not re-collide', () => {
+    // A fixed 14px radius puts 8 markers 10.7px apart — inside their own
+    // diameter. Every size must clear the 22px spacing the markers need.
+    for (let count = 2; count <= 12; count += 1) {
+      expect(neighbourSpacing(count)).toBeGreaterThanOrEqual(21.9);
+    }
+  });
+
+  it('never shrinks below the minimum radius', () => {
+    for (let count = 2; count <= 12; count += 1) {
+      expect(ringRadiusPx(count)).toBeGreaterThanOrEqual(14);
+    }
+  });
+});
+
+describe('nearestNeighbourMeters', () => {
+  it('reports no neighbour for a vehicle on its own', () => {
+    const solo = at('a', -26.1, 28.05);
+    expect(nearestNeighbourMeters(solo, [solo])).toBeNull();
+  });
+
+  it('measures between the VEHICLES, not the nudged markers', () => {
+    // ~10m apart, the Clayville pair. The marker gap is a pixel offset that
+    // lands ~1.9km away at zoom 10 — this must not report that.
+    const a = at('a', -25.974028, 28.214844);
+    const b = at('b', -25.974018, 28.214865);
+    const metres = nearestNeighbourMeters(a, [a, b]);
+    expect(metres).not.toBeNull();
+    expect(metres!).toBeGreaterThan(1);
+    expect(metres!).toBeLessThan(CO_LOCATED_WITHIN_METERS);
+  });
+
+  it('picks the closest of several neighbours', () => {
+    const a = at('a', -25.974, 28.2);
+    const near = at('b', -25.9739, 28.2); // ~11m
+    const far = at('c', -25.9738, 28.2); // ~22m
+    const metres = nearestNeighbourMeters(a, [a, near, far])!;
+    expect(metres).toBeCloseTo(11.132, 1);
   });
 });

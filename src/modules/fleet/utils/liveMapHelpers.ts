@@ -184,7 +184,12 @@ export const CO_LOCATED_WITHIN_METERS = 30;
 /** Metres per degree of latitude. Close enough to constant anywhere on Earth. */
 const METERS_PER_DEGREE_LAT = 111_320;
 
-/** Great-circle distance is overkill at 30m; a flat local approximation is exact enough. */
+/**
+ * Great-circle distance is overkill at 30m; a flat local approximation is
+ * exact enough. Web Mercator and this approximation both degrade near the
+ * poles and neither wraps at the antimeridian — fine for a South African
+ * fleet, not for reuse elsewhere.
+ */
 function metersBetween(a: PlottedVehicle, b: PlottedVehicle): number {
   const midLatRad = (((a.lat + b.lat) / 2) * Math.PI) / 180;
   const dy = (a.lat - b.lat) * METERS_PER_DEGREE_LAT;
@@ -218,6 +223,24 @@ export function groupCoLocated(
 }
 
 /**
+ * How far the nearest OTHER vehicle in the group actually is, in metres.
+ *
+ * The popup needs this because the marker it is attached to has been moved:
+ * measuring from the marker would report how far the pixel nudge happens to
+ * land on the ground at the current zoom (about 1.9km at zoom 10 for a 14px
+ * offset), which says nothing about the vehicles and everything about the
+ * rendering. Real positions only.
+ */
+export function nearestNeighbourMeters(
+  vehicle: PlottedVehicle,
+  group: PlottedVehicle[],
+): number | null {
+  const others = group.filter((v) => v.vehicleId !== vehicle.vehicleId);
+  if (others.length === 0) return null;
+  return Math.min(...others.map((other) => metersBetween(vehicle, other)));
+}
+
+/**
  * Screen-space nudge for one member of a co-located group.
  *
  * Deliberately in PIXELS, not metres: the whole problem is markers colliding
@@ -234,11 +257,34 @@ export function groupCoLocated(
 export function ringOffsetPx(
   index: number,
   count: number,
-  radiusPx = 14,
+  minRadiusPx = 14,
 ): { dx: number; dy: number } {
   if (count <= 1) return { dx: 0, dy: 0 };
   // Start at 12 o'clock and go clockwise, so a pair reads as one above the
   // other rather than as an arbitrary diagonal.
   const angle = (2 * Math.PI * index) / count - Math.PI / 2;
+  const radiusPx = ringRadiusPx(count, minRadiusPx);
   return { dx: radiusPx * Math.cos(angle), dy: radiusPx * Math.sin(angle) };
 }
+
+/**
+ * Closest two marker centres may sit before they read as one blob: an 8px
+ * radius plus a 2px stroke each, and a 2px gap so the ring between them is
+ * visible rather than merely tangent.
+ */
+const MIN_MARKER_SPACING_PX = 22;
+
+/**
+ * Radius of the fan-out ring, grown so a big group does not re-collide.
+ *
+ * Neighbours on a ring of radius r sit `2r·sin(π/n)` apart, which SHRINKS as
+ * the group grows: at a fixed 14px radius six markers are 14px apart and eight
+ * are 10.7px — inside MIN_MARKER_SPACING_PX, so a depot-sized cluster would
+ * fan out and then overlap again. Solving that spacing for r is what keeps the
+ * ring honest at any group size.
+ */
+export function ringRadiusPx(count: number, minRadiusPx = 14): number {
+  if (count <= 1) return 0;
+  return Math.max(minRadiusPx, MIN_MARKER_SPACING_PX / (2 * Math.sin(Math.PI / count)));
+}
+

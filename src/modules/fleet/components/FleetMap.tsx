@@ -25,6 +25,7 @@ import {
   STATUS_STYLE,
   ageLabel,
   groupCoLocated,
+  nearestNeighbourMeters,
   partitionVehicles,
   ringOffsetPx,
   statusFor,
@@ -78,9 +79,15 @@ function InvalidateSizeOnContainerResize() {
 function VehicleMarkers({ plotted }: { plotted: PlottedVehicle[] }) {
   const map = useMap();
   // A pixel covers a different amount of ground at every zoom level, so the
-  // offset positions have to be recomputed whenever the zoom changes.
+  // offset positions have to be recomputed whenever the zoom changes. `zoom`
+  // fires throughout a pinch or scroll animation and `zoomend` only at the
+  // end: without the former the fan-out is drawn at the pre-zoom scale for the
+  // whole animation and visibly snaps when it lands.
   const [zoom, setZoom] = useState(() => map.getZoom());
-  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  useMapEvents({
+    zoom: () => setZoom(map.getZoom()),
+    zoomend: () => setZoom(map.getZoom()),
+  });
 
   const groups = useMemo(() => groupCoLocated(plotted), [plotted]);
 
@@ -134,10 +141,12 @@ function VehicleMarkers({ plotted }: { plotted: PlottedVehicle[] }) {
                 {group.length > 1 ? (
                   <>
                     <br />
-                    {/* Say it, rather than let a nudged marker pass as a fix. */}
+                    {/* Say it, rather than let a nudged marker pass as a fix.
+                        The distance is between the VEHICLES, never between the
+                        markers — the gap you see is a drawing decision. */}
                     <small>
-                      Marker nudged apart · {group.length} vehicles within{' '}
-                      {Math.round(map.distance([v.lat, v.lon], center))}m of this spot
+                      Marker nudged apart · {group.length} vehicles here, nearest{' '}
+                      {Math.round(nearestNeighbourMeters(v, group) ?? 0)}m away
                     </small>
                   </>
                 ) : null}
