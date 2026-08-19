@@ -22,6 +22,7 @@ import {
   findRequiredAttendanceAction,
   type RequiredAttendanceAction,
 } from '@/modules/attendance/workflow/requiredActionQueries';
+import { listDriverIncidents } from '@/modules/fleet/incidents/driver/driverIncidentService';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4kb' } },
@@ -55,6 +56,12 @@ export interface HubSummary {
   pendingCorrectionsCount: number;
   recentEntryCount: number;
   requiredAttendanceAction: RequiredAttendanceAction | null;
+  fleetIncidents: FleetIncidentHubCounts;
+}
+
+export interface FleetIncidentHubCounts {
+  inputRequestedCount: number;
+  activeCount: number;
 }
 
 interface VehicleCheckReminderRow extends Record<string, unknown> {
@@ -113,6 +120,28 @@ async function findVehicleCheckReminder(
   }
 }
 
+/**
+ * Bounded to the driver's currently-visible (recent-window) incidents —
+ * `listDriverIncidents` already applies the effective-dated settings/window
+ * filtering (design §4/§12), so this reuses that instead of a second,
+ * possibly-drifting SQL predicate. The 100-item page is generous for a hub
+ * badge; never throws — a badge count unavailable is not worth failing the
+ * whole hub for (matches `findVehicleCheckReminder`'s own fail-open shape
+ * above).
+ */
+async function loadFleetIncidentHubCounts(staffId: string): Promise<FleetIncidentHubCounts> {
+  try {
+    const { incidents } = await listDriverIncidents(staffId, { limit: 100 });
+    return {
+      inputRequestedCount: incidents.filter((incident) => incident.driverInputState === 'requested').length,
+      activeCount: incidents.filter((incident) => incident.lifecyclePresentation !== 'Closed').length,
+    };
+  } catch (error) {
+    log.warn('[my/hub-summary] fleet incident counts unavailable', { error, staffId });
+    return { inputRequestedCount: 0, activeCount: 0 };
+  }
+}
+
 export default withMySession(async (req, res, session) => {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
@@ -128,6 +157,7 @@ export default withMySession(async (req, res, session) => {
       latestPayslip,
       latestReceipt,
       requiredAttendanceAction,
+      fleetIncidents,
     ] = await Promise.all([
       findOpenEntry(session.staffId),
       findActiveVehicleAssignment(session.staffId),
@@ -141,6 +171,7 @@ export default withMySession(async (req, res, session) => {
       findLatestPayslipForStaff(session.staffId),
       findLatestReceiptForStaff(session.staffId),
       findRequiredAttendanceAction(session.staffId, today),
+      loadFleetIncidentHubCounts(session.staffId),
     ]);
     const vehicleReminder = await findVehicleCheckReminder(
       vehicle?.vehicle_registration ?? null
@@ -171,6 +202,7 @@ export default withMySession(async (req, res, session) => {
       pendingCorrectionsCount: correctionCounts.pending,
       recentEntryCount: Number(recentRows[0]?.count ?? '0'),
       requiredAttendanceAction,
+      fleetIncidents,
     };
 
     return apiResponse.success(res, summary);

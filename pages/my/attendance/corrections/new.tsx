@@ -9,6 +9,7 @@ import { RequiredCorrectionSuccess } from '@/modules/attendance/portal/client/co
 import { useCorrectionForm } from '@/modules/attendance/portal/client/correction/useCorrectionForm';
 import { useCorrectionPageData } from '@/modules/attendance/portal/client/correction/useCorrectionPageData';
 import { linkAttendanceCorrection } from '@/modules/fleet/incidents/driver/web/AttendanceCorrectionLink';
+import { pendingCorrectionStorageKey } from '@/modules/fleet/incidents/driver/web/driverPortalLabels';
 
 // `incident_id` is optional Fleet context (design §8): safe to parse from the
 // URL because it is only ever a Fleet incident id, never staff identity or
@@ -38,8 +39,19 @@ const NewCorrectionPage: NextPage & {
     try {
       await linkAttendanceCorrection(incidentId, adjustmentId);
       setLinkStatus('linked');
+      // Clears any stale flag from an earlier failed attempt for this
+      // incident — see the write below for why this exists at all.
+      try { window.localStorage.removeItem(pendingCorrectionStorageKey(incidentId)); } catch { /* best-effort */ }
     } catch {
       setLinkStatus('failed');
+      // Closes a real gap: the "Retry link" button below only lives in
+      // this page's own React state, so a driver who navigates away
+      // before retrying previously had no way back to it at all. Record
+      // the correction id the incident detail page (Task 7) can read on
+      // its own — durable across navigation, and even closing the app,
+      // unlike this component's state. Best-effort: private-mode/storage
+      // failures here must never mask the Attendance success message.
+      try { window.localStorage.setItem(pendingCorrectionStorageKey(incidentId), adjustmentId); } catch { /* best-effort */ }
     }
   }, [incidentId]);
 

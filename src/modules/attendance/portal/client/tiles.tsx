@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Users,
   MapPin,
+  Truck,
 } from 'lucide-react';
 
 import type { HubSummaryResponse } from './api';
@@ -109,6 +110,42 @@ export function ParkingTile({
       iconClass="bg-indigo-500/15 text-indigo-300"
       title="Vehicle parking"
       subtitle="Where you park overnight"
+    />
+  );
+}
+
+/**
+ * Fleet incidents (PR7 Task 7, design §15) — one open/input-request tile,
+ * never a second dashboard. Leads with the requested count over the active
+ * count in its subtitle: a driver who owes a response should see that
+ * before a generic "N open" count that needs no action from them.
+ */
+export function FleetIncidentsTile({
+  summary,
+  onClick,
+}: {
+  summary: HubSummary | null;
+  onClick: () => void;
+}) {
+  const counts = summary?.fleetIncidents;
+  const requested = counts?.inputRequestedCount ?? 0;
+  const active = counts?.activeCount ?? 0;
+  const subtitle = summary === null
+    ? 'Loading…'
+    : requested > 0
+      ? `${requested} input requested · ${active} open`
+      : active > 0
+        ? `${active} open`
+        : 'No open incidents';
+  return (
+    <Tile
+      onClick={onClick}
+      icon={<Truck className="w-5 h-5" />}
+      iconClass={requested > 0 ? 'bg-orange-500/15 text-orange-300' : 'bg-blue-500/15 text-blue-300'}
+      title="Fleet incidents"
+      subtitle={subtitle}
+      badge={requested > 0 ? String(requested) : null}
+      badgeClass="bg-orange-500/15 text-orange-300 border-orange-500/30"
     />
   );
 }

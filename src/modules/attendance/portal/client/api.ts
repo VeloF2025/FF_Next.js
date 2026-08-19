@@ -197,6 +197,10 @@ export interface HubSummaryResponse {
   } | null;
   pendingCorrectionsCount: number;
   recentEntryCount: number;
+  fleetIncidents: {
+    inputRequestedCount: number;
+    activeCount: number;
+  };
 }
 
 export function getHubSummary(): Promise<HubSummaryResponse> {
