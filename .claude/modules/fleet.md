@@ -196,7 +196,7 @@ bounded by `MAX_COMPLETE_ROSTER_ROWS` (2000; beyond that both endpoints return 4
 never a silent truncation) and it is correct, but a project near that bound is measurably slower
 than a single-page selection. Worth collapsing to one evidence pass in a follow-up.
 
-## Operational Incidents (migration 499, PR 6)
+## Operational Incidents (migration 502, PR 6)
 
 PR 6 turns four of PR 4's read-time statuses into durable, reviewable incidents and
 adds a separate escalation/summary/health cron. Implementation lives in
@@ -394,7 +394,7 @@ directly against these two keys (it is parameterized on permission key and
 action, already called with a non-default key at
 `pages/api/fleet/operations/rules.ts`), rather than duplicating its "base
 permission AND (admin role OR an active per-user override grant)" idiom.
-Migration 499 grants base `fleet.incidents` to `manager`/`project_manager` —
+Migration 502 grants base `fleet.incidents` to `manager`/`project_manager` —
 NOT `fleet.incidents-settings`, which is `admin`/`super_admin` only. So a
 plain `manager` role never gains cross-project or projectless `fleet.incidents`
 reach without an explicit `admin`/`super_admin` role or an active override

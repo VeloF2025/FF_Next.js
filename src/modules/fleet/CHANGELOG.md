@@ -10,7 +10,7 @@ Format: `## [Commit Hash] - YYYY-MM-DD - Author - Type`
 
 **feat(fleet): operational incidents, escalation, and manager review queue**
 
-Migration 499 (unapplied pending deployment approval) adds durable,
+Migration 502 (unapplied pending deployment approval) adds durable,
 deduplicated incidents for four PR 4 operational statuses (`late`,
 `wrong_site`, `evidence_mismatch`, `left_early`), a 5-minute detection cron
 (`fleet-operational-monitor`), an escalation/08:15-SAST-summary/health cron
@@ -27,7 +27,7 @@ action. See `.claude/modules/fleet.md` (Operational Incidents section) and
 **Files:** `src/modules/fleet/incidents/**`, `pages/api/fleet/incidents/**`,
 `pages/api/cron/fleet-operational-monitor.ts`,
 `pages/api/cron/fleet-incident-actions.ts`, `pages/fleet/incidents.tsx`,
-`scripts/migrations/sql/499_fleet_operational_incidents.sql`,
+`scripts/migrations/sql/502_fleet_operational_incidents.sql`,
 `src/lib/vfStorageUpload.ts` (extended, SiteCam path unchanged),
 `src/modules/notifications/constants/index.ts` (5 new events).
 

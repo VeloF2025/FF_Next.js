@@ -147,7 +147,7 @@ npm test -- tests/unit/modules/fleet/gpsParser.test.ts
 - Migration: `scripts/migrations/039_fleet_module.sql`
 - Test Specs: `tests/specs/fleet-module.spec.md`
 
-## Operational Incidents (migration 499, PR 6)
+## Operational Incidents (migration 502, PR 6)
 
 `src/modules/fleet/incidents/` turns four PR 4 operational statuses (`late`,
 `wrong_site`, `evidence_mismatch`, `left_early`) into durable, reviewable

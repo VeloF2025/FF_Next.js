@@ -53,7 +53,7 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - `fleet_portal_sessions` — sessionless portal tokens
 - `fleet_photo_vlm_results` — cached VLM results per photo
 - `fleet_audit_log` — audit trail
-- `fleet_operational_incidents` / `..._rules` / `..._observations` / `..._actions` / `..._evidence` / `..._oversight_members` / `..._monitor_runs` — operational incidents (mig 499, PR 6); see `.claude/modules/fleet.md`
+- `fleet_operational_incidents` / `..._rules` / `..._observations` / `..._actions` / `..._evidence` / `..._oversight_members` / `..._monitor_runs` — operational incidents (mig 502, PR 6); see `.claude/modules/fleet.md`
 
 ## Critical Rules
 - First-time check-in REQUIRES calibration modal — never skip
@@ -70,7 +70,7 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - Approving re-checks the driver still holds the vehicle; rejecting deliberately does not
 - Operational incidents (`src/modules/fleet/incidents/`, PR 6) auto-detect only `late`/`wrong_site`/`evidence_mismatch`/`left_early`; safety/telematics types need an explicit source event
 - Incident condition-clearing requires `attendance_confirmed`/`on_site_dual` AND zero evaluation flags — stale/missing evidence never clears
-- Migration 499 and its cron entries are unapplied/unscheduled until a separate deployment approval; see `.claude/modules/fleet.md`
+- Migration 502 and its cron entries are unapplied/unscheduled until a separate deployment approval; see `.claude/modules/fleet.md`
 
 ## Common Issues
 | Issue | Fix |
