@@ -24,6 +24,7 @@ import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
 import {
   STATUS_STYLE,
   ageLabel,
+  distanceLabel,
   groupCentrePx,
   groupOverlapping,
   nearestNeighbourMeters,
@@ -157,7 +158,7 @@ function VehicleMarkers({ plotted }: { plotted: PlottedVehicle[] }) {
                         markers — the gap you see is a drawing decision. */}
                     <small>
                       Marker nudged apart · {group.length} markers overlap here, nearest
-                      vehicle {Math.round(nearestMeters)}m away
+                      vehicle {distanceLabel(nearestMeters)} away
                     </small>
                   </>
                 ) : null}

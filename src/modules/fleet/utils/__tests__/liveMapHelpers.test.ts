@@ -17,6 +17,7 @@ import {
   nearestNeighbourMeters,
   notPlottedReason,
   partitionVehicles,
+  distanceLabel,
   groupCentrePx,
   ringOffsetPx,
   ringRadiusPx,
@@ -354,14 +355,28 @@ describe('groupOverlapping', () => {
     expect(groups).toHaveLength(2);
   });
 
-  it('chains through a middle marker rather than splitting a row into pairs', () => {
-    const groups = groupOverlapping([
-      at('a', 100, 100),
-      at('b', 100, 118),
-      at('c', 100, 136),
-    ]);
-    expect(groups).toHaveLength(1);
-    expect(groups[0]).toHaveLength(3);
+  it('grows a group only while its members stay near the centre', () => {
+    // a and b are 18px apart, so b joins; their centre is then 9px along, and
+    // c at 136px is far outside the threshold from it.
+    const groups = groupOverlapping([at('a', 100, 100), at('b', 100, 118), at('c', 100, 136)]);
+    expect(groups.map((g) => g.map((p) => p.vehicle.vehicleId))).toEqual([['a', 'b'], ['c']]);
+  });
+
+  it('caps a group\'s own spread, so a long row cannot chain into one huge group', () => {
+    // Twelve markers 20px apart. Single-link chaining puts them all in one
+    // group spanning 220px, whose ring would then be drawn 44px from a centre
+    // most of its members are nowhere near.
+    const row = Array.from({ length: 12 }, (_, i) =>
+      at(`v${String(i).padStart(2, '0')}`, 100 + i * 20, 100),
+    );
+    const groups = groupOverlapping(row);
+    expect(groups.length).toBeGreaterThan(1);
+    for (const group of groups) {
+      const centre = groupCentrePx(group);
+      for (const p of group) {
+        expect(Math.hypot(p.x - centre.x, p.y - centre.y)).toBeLessThanOrEqual(22);
+      }
+    }
   });
 
   it('orders groups and members deterministically, so markers do not swap on refresh', () => {
@@ -403,7 +418,7 @@ describe('ringRadiusPx', () => {
   it('grows the ring so a depot-sized cluster does not re-collide', () => {
     // A fixed 14px radius puts 8 markers 10.7px apart — inside their own
     // diameter. Every size must clear the 22px spacing the markers need.
-    for (let count = 2; count <= 25; count += 1) {
+    for (let count = 2; count <= 7; count += 1) {
       expect(neighbourSpacing(count)).toBeGreaterThanOrEqual(21.9);
     }
   });
@@ -464,5 +479,35 @@ describe('nearestNeighbourMeters', () => {
     const near = at('b', 105, 100, -25.9739, 28.2); // ~11m
     const far = at('c', 110, 100, -25.9738, 28.2); // ~22m
     expect(nearestNeighbourMeters(a.vehicle, [a, near, far])!).toBeCloseTo(11.132, 1);
+  });
+});
+
+describe('ring radius ceiling', () => {
+  it('stops growing the ring once it would reach past unrelated markers', () => {
+    // The spacing formula alone wants 88px for 25 markers.
+    expect(ringRadiusPx(25)).toBe(44);
+    expect(ringRadiusPx(4)).toBeLessThan(44);
+  });
+
+  it('still separates every group size the spread cap allows', () => {
+    // A group's members sit within 22px of its centre, so it takes an
+    // improbably dense cluster to exceed the ceiling at all.
+    for (let count = 2; count <= 7; count += 1) {
+      const a = ringOffsetPx(0, count);
+      const b = ringOffsetPx(1, count);
+      expect(Math.hypot(a.dx - b.dx, a.dy - b.dy)).toBeGreaterThanOrEqual(21.9);
+    }
+  });
+});
+
+describe('distanceLabel', () => {
+  it('reads in metres up close', () => {
+    expect(distanceLabel(11.4)).toBe('11m');
+    expect(distanceLabel(999)).toBe('999m');
+  });
+
+  it('switches to km rather than printing six digits of metres', () => {
+    expect(distanceLabel(1000)).toBe('1.0km');
+    expect(distanceLabel(743216)).toBe('743.2km');
   });
 });
