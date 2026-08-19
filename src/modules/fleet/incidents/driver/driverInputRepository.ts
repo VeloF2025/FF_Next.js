@@ -75,8 +75,8 @@ export async function findCurrentInputRequest(incidentId: string, executor: Quer
   return row ? mapRequest(row) : null;
 }
 
-/** Factual, non-disciplinary wording for the driver experience (design §4) — never the internal `incident_type` code or accusatory terms such as "theft"/"fraud"/"misconduct". */
-const NEUTRAL_INCIDENT_LABELS: Record<string, string> = {
+/** Factual, non-disciplinary wording for the driver experience (design §4) — never the internal `incident_type` code or accusatory terms such as "theft"/"fraud"/"misconduct". Exported so other driver-input surfaces (e.g. `./requestInputService.ts`'s notification payload) share this one mapping rather than re-deriving their own. */
+export const NEUTRAL_INCIDENT_LABELS: Record<string, string> = {
   late: 'Attendance timing needs review', left_early: 'Attendance timing needs review',
   wrong_site: 'Site assignment needs review', unassigned: 'Assignment record needs review',
   evidence_mismatch: 'Attendance or location record needs review', unverifiable: 'Attendance or location record needs review',
@@ -86,6 +86,12 @@ const NEUTRAL_INCIDENT_LABELS: Record<string, string> = {
   theft_after_hours_movement: 'Vehicle movement needs review', severe_driving: 'Driving behaviour needs review',
   prolonged_unauthorized_stop: 'Route record needs review', lost_contact_moving: 'Vehicle tracking needs review',
 };
+const NEUTRAL_INCIDENT_LABEL_FALLBACK = 'Vehicle or attendance record needs review';
+
+/** The one neutral-label lookup (with fallback) — used both by the list/detail mapper below and by `./requestInputService.ts`. */
+export function neutralIncidentLabel(incidentType: string): string {
+  return NEUTRAL_INCIDENT_LABELS[incidentType] ?? NEUTRAL_INCIDENT_LABEL_FALLBACK;
+}
 const LIFECYCLE_PRESENTATION: Record<string, string> = {
   open: 'Open', acknowledged: 'Being reviewed', under_review: 'Being reviewed', resolved: 'Closed', dismissed: 'Closed',
 };
@@ -125,7 +131,7 @@ function mapListRow(row: ListRow, options: MapRowOptions): DriverIncidentListIte
   return {
     id: row.id, incidentReference: row.incident_reference, incidentType: row.incident_type as DriverIncidentListItem['incidentType'],
     severity: row.severity as DriverIncidentListItem['severity'],
-    neutralLabel: NEUTRAL_INCIDENT_LABELS[row.incident_type] ?? 'Vehicle or attendance record needs review',
+    neutralLabel: neutralIncidentLabel(row.incident_type),
     projectLabel: row.project_name_snapshot, siteLabel: row.operational_site_name_snapshot,
     detectedAt: iso(row.detected_at), conditionState: row.condition_cleared_at ? 'cleared' : 'active',
     lifecyclePresentation: LIFECYCLE_PRESENTATION[row.lifecycle_status] ?? 'Open',
