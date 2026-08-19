@@ -45,8 +45,10 @@ export interface DriverIncidentTimelineEntry {
 export interface DriverIncidentListItem {
   id: string;
   incidentReference: string;
-  incidentType: IncidentType;
-  severity: IncidentSeverity;
+  // Deliberately NO raw incidentType or severity. The design's driver-facing summary is an
+  // inclusion list and names the *neutral type label*, not the internal enum: shipping
+  // `theft_after_hours_movement` or `accident_sos` to a driver is the accusatory-language
+  // leak the design forbids, and it would leak server-side regardless of what the UI renders.
   neutralLabel: string;
   projectLabel: string | null;
   siteLabel: string | null;

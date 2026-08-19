@@ -218,7 +218,8 @@ describe('insertAttendanceCorrectionLink', () => {
 
 describe('findDriverIncidents', () => {
   const baseParams = {
-    terminalWindowDays: 90, postClosureResponseEnabled: false, postClosureResponseWindowDays: 0,
+    terminalWindowDays: 90, recentWindowDays: 90, historyWindowDays: 365,
+    postClosureResponseEnabled: false, postClosureResponseWindowDays: 0,
     limit: 20, offset: 0, now: '2026-08-13T00:00:00.000Z',
   };
 
@@ -256,11 +257,17 @@ describe('findDriverIncidents', () => {
 
     expect(result.total).toBe(1);
     expect(result.incidents[0]).toMatchObject({
-      id: INCIDENT, incidentType: 'late', conditionState: 'active', driverInputState: 'requested',
+      id: INCIDENT, conditionState: 'active', driverInputState: 'requested',
       currentRequest: { id: REQUEST_ID, guidance: 'Please explain the late start', respondBy: '2026-08-12T21:59:59.999Z' },
     });
     expect(result.incidents[0]!.neutralLabel.length).toBeGreaterThan(0);
     expect(result.incidents[0]!.neutralLabel).not.toMatch(/theft|fraud|misconduct/i);
+    // The raw internal enum must be absent, not merely unrendered: this DTO is serialized
+    // straight over /api/my/..., so a driver would read `theft_after_hours_movement` in a
+    // network tab no matter what the UI chose to display. severity is internal for the
+    // same reason — neutralLabel is the only type-ish field a driver may see.
+    expect(result.incidents[0]).not.toHaveProperty('incidentType');
+    expect(result.incidents[0]).not.toHaveProperty('severity');
   });
 
   it('uses the caller-supplied terminal window for the recent/history distinction', async () => {
@@ -334,5 +341,33 @@ describe('listVisibleTimeline', () => {
     const [text, params] = db.query.mock.calls[0]!;
     expect(text).toContain("visibility <> 'internal'");
     expect(params).toEqual([INCIDENT]);
+  });
+
+  it('delegates chronological ordering to SQL, and says so in the query', async () => {
+    // The assertion above cannot prove ordering: the mock is handed to the function already
+    // newest-first and nothing re-sorts in JS, so deleting the ORDER BY — or reversing it to
+    // ASC — would leave it green. Ordering is a real guarantee of the driver timeline, so it
+    // has to be asserted where it actually lives, in the SQL text.
+    db.query.mockResolvedValue([]);
+
+    await listVisibleTimeline(INCIDENT);
+
+    const [text] = db.query.mock.calls[0]!;
+    expect(text).toMatch(/ORDER BY\s+occurred_at\s+DESC/i);
+    expect(text).not.toMatch(/ORDER BY\s+occurred_at\s+ASC/i);
+  });
+
+  it('returns rows in the order SQL gave them, without re-sorting in JS', async () => {
+    // The mirror of the above: hand the function deliberately OUT-of-order rows and confirm
+    // they come back untouched. If someone ever adds a JS sort, this fails — which is the
+    // point, because a JS sort would silently mask a broken ORDER BY.
+    db.query.mockResolvedValue([
+      { id: 'old', source: 'action', type_key: 'driver_input_requested', visibility: 'shared_with_driver', occurred_at: '2026-08-01T08:00:00.000Z', note: 'first' },
+      { id: 'new', source: 'action', type_key: 'driver_response_received', visibility: 'driver_submitted', occurred_at: '2026-08-10T09:00:00.000Z', note: 'later' },
+    ]);
+
+    const timeline = await listVisibleTimeline(INCIDENT);
+
+    expect(timeline.map((entry) => entry.id)).toEqual(['old', 'new']);
   });
 });

@@ -129,8 +129,7 @@ function mapListRow(row: ListRow, options: MapRowOptions): DriverIncidentListIte
     postClosureResponseEnabled: options.postClosureResponseEnabled, postClosureResponseWindowDays: options.postClosureResponseWindowDays,
   });
   return {
-    id: row.id, incidentReference: row.incident_reference, incidentType: row.incident_type as DriverIncidentListItem['incidentType'],
-    severity: row.severity as DriverIncidentListItem['severity'],
+    id: row.id, incidentReference: row.incident_reference,
     neutralLabel: neutralIncidentLabel(row.incident_type),
     projectLabel: row.project_name_snapshot, siteLabel: row.operational_site_name_snapshot,
     detectedAt: iso(row.detected_at), conditionState: row.condition_cleared_at ? 'cleared' : 'active',
@@ -142,6 +141,15 @@ function mapListRow(row: ListRow, options: MapRowOptions): DriverIncidentListIte
 export interface DriverIncidentListParams {
   /** Include a terminal incident only if `resolved_at` is within this many days of `now` — caller resolves recent(90d)/history(365d) into one number. */
   terminalWindowDays: number;
+  /**
+   * The configured recent and maximum-history windows, reported back to the caller unchanged.
+   * Both are needed: `terminalWindowDays` is whichever ONE the caller filtered by, so deriving
+   * the response from it made whichever window the caller did not ask for wrong — a client
+   * gating a "View history" control on historyWindowDays > recentWindowDays would never
+   * enable it.
+   */
+  recentWindowDays: number;
+  historyWindowDays: number;
   postClosureResponseEnabled: boolean; postClosureResponseWindowDays: number;
   fromDate?: string | null; toDate?: string | null;
   limit: number; offset: number; now: string;
@@ -172,7 +180,7 @@ export async function findDriverIncidents(staffId: string, params: DriverInciden
   return {
     incidents: rows.map((row) => mapListRow(row, options)),
     total: countRow ? Number(countRow.count) : 0,
-    recentWindowDays: params.terminalWindowDays, historyWindowDays: params.terminalWindowDays,
+    recentWindowDays: params.recentWindowDays, historyWindowDays: params.historyWindowDays,
   };
 }
 
