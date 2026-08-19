@@ -31,7 +31,7 @@ describe('fleet incident driver-input migration contract', () => {
     // A ratchet, not a budget: pinned to the file's current length so any
     // growth has to be argued for. 156 -> 172 for the review-mandated supersession,
     // closure and delivery-summary columns the design requires on a request.
-    expect(migrationSql().split(/\r?\n/).length).toBeLessThanOrEqual(172);
+    expect(migrationSql().split(/\r?\n/).length).toBeLessThanOrEqual(180);
   });
 
   it('creates the effective-dated settings table plus the three append-only tables', () => {
@@ -114,12 +114,27 @@ describe('fleet incident driver-input migration contract', () => {
     // the file used to pass while defeating the append-only invariant outright.
     const grants = sql.match(/GRANT[^;]*TO fibreflow_user;/gi) ?? [];
     expect(grants.length).toBeGreaterThan(0);
+    // Bookkeeping columns a request's lifecycle legitimately mutates. Everything else on an
+    // append-only table stays immutable: a blanket UPDATE would also permit rewriting the
+    // guidance a manager sent, or moving a request to a different incident.
+    const MUTABLE_REQUEST_COLUMNS = [
+      'superseded_at', 'closed_at', 'closure_reason',
+      'delivery_attempted_count', 'delivery_accepted_count', 'delivery_failed_count',
+    ];
     for (const grant of grants) {
       for (const appendOnly of appendOnlyTables) {
         if (!grant.includes(appendOnly)) continue;
-        expect(grant).not.toMatch(/UPDATE/i);
-        expect(grant).not.toMatch(/DELETE/i);
-        expect(grant).not.toMatch(/TRUNCATE/i);
+        expect(grant).not.toMatch(/\bDELETE\b/i);
+        expect(grant).not.toMatch(/\bTRUNCATE\b/i);
+        const columnScoped = grant.match(/UPDATE\s*\(([^)]*)\)/i);
+        if (!columnScoped) {
+          // No column list means a table-wide UPDATE, which is never allowed here.
+          expect(grant).not.toMatch(/\bUPDATE\b/i);
+          continue;
+        }
+        for (const column of columnScoped[1]!.split(',').map((entry) => entry.trim())) {
+          expect(MUTABLE_REQUEST_COLUMNS).toContain(column);
+        }
       }
     }
     expect(sql).not.toMatch(/GRANT[^;]*(?:DELETE|TRUNCATE)[^;]*TO fibreflow_user/i);

@@ -166,6 +166,14 @@ REVOKE ALL ON fleet_incident_driver_input_settings, fleet_incident_driver_input_
 GRANT SELECT, INSERT, UPDATE ON fleet_incident_driver_input_settings TO fibreflow_user;
 GRANT SELECT, INSERT ON fleet_incident_driver_input_requests, fleet_incident_driver_submissions,
   fleet_incident_attendance_correction_links TO fibreflow_user;
+-- A request's CONTENT stays append-only — incident_id, requested_by, guidance, requested_at,
+-- respond_by and idempotency_key can never be rewritten. Its lifecycle bookkeeping must be
+-- writable, because supersession, closure and delivery outcome are durable fields a manager
+-- reads back later (design 11.1, 13), not transient return values. A column-level grant is
+-- exactly that distinction; a blanket UPDATE would also let the request itself be rewritten.
+GRANT UPDATE (superseded_at, closed_at, closure_reason, delivery_attempted_count,
+  delivery_accepted_count, delivery_failed_count) ON fleet_incident_driver_input_requests
+  TO fibreflow_user;
 INSERT INTO fleet_incident_driver_input_settings (version, effective_from)
 VALUES (1, now())
 ON CONFLICT (version) DO NOTHING;
