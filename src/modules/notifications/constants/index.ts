@@ -62,6 +62,10 @@ export const DEFAULT_CHANNEL_PREFERENCES: Record<string, ChannelPreferences> = {
   'fleet.operational_incident_resolved': { in_app: true, email: true, whatsapp: false },
   'fleet.operational_morning_summary': { in_app: true, email: true, whatsapp: false },
   'fleet.operational_monitor_failed': { in_app: true, email: true, whatsapp: true },
+  // Driver input is optional (design §2/§6) and never mandatory-WhatsApp: a
+  // manager request or a driver response is routine, not an emergency.
+  'fleet.driver_input_requested': { in_app: true, email: true, whatsapp: false },
+  'fleet.driver_response_received': { in_app: true, email: true, whatsapp: false },
 
   // -- Attendance --
   'attendance.clockout_due':        { in_app: true, email: false, whatsapp: false },
@@ -118,6 +122,8 @@ export const EVENT_ICONS: Record<string, string> = {
   'fleet.operational_incident_resolved': 'circle-check',
   'fleet.operational_morning_summary': 'clipboard-list',
   'fleet.operational_monitor_failed': 'circle-x',
+  'fleet.driver_input_requested': 'message-square',
+  'fleet.driver_response_received': 'reply',
   'attendance.clockout_due':        'clock',
   'attendance.correction_required': 'alert-circle',
   'attendance.supervisor_digest':   'clipboard-list',
@@ -169,6 +175,8 @@ export const EVENT_SEVERITY: Record<string, NotificationSeverity> = {
   'fleet.operational_incident_resolved': 'success',
   'fleet.operational_morning_summary': 'info',
   'fleet.operational_monitor_failed': 'error',
+  'fleet.driver_input_requested': 'info',
+  'fleet.driver_response_received': 'info',
   'attendance.clockout_due':        'warning',
   'attendance.correction_required': 'warning',
   'attendance.supervisor_digest':   'warning',
@@ -220,6 +228,8 @@ export const EVENT_LABELS: Record<string, string> = {
   'fleet.operational_incident_resolved': 'Operational Incident Resolved',
   'fleet.operational_morning_summary': 'Operational Morning Summary',
   'fleet.operational_monitor_failed': 'Operational Monitor Failed',
+  'fleet.driver_input_requested': 'Driver Input Requested',
+  'fleet.driver_response_received': 'Driver Response Received',
   'attendance.clockout_due':        'Clock-out Required',
   'attendance.correction_required': 'Attendance Correction Required',
   'attendance.supervisor_digest':   'Supervisor Attendance Digest',
@@ -271,6 +281,8 @@ export const EVENT_GROUPS: Record<string, string> = {
   'fleet.operational_incident_resolved': 'Fleet',
   'fleet.operational_morning_summary': 'Fleet',
   'fleet.operational_monitor_failed': 'Fleet',
+  'fleet.driver_input_requested': 'Fleet',
+  'fleet.driver_response_received': 'Fleet',
   'attendance.clockout_due':        'Attendance',
   'attendance.correction_required': 'Attendance',
   'attendance.supervisor_digest':   'Attendance',

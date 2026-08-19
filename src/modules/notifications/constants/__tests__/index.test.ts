@@ -15,6 +15,16 @@ const fleetOperationalEvents = [
   'fleet.operational_monitor_failed',
 ] as const;
 
+const fleetDriverInputEvents = [
+  'fleet.driver_input_requested',
+  'fleet.driver_response_received',
+] as const;
+
+// Words that would turn a neutral driver-facing notification into an
+// accusatory one (design §4: "Labels such as fraud, misconduct, or
+// violation are not used in the driver experience").
+const DISCIPLINARY_WORDS = /fraud|misconduct|violation|accusation/i;
+
 describe('Fleet operational notification registrations', () => {
   it.each(fleetOperationalEvents)('%s is present in every live event map', (eventType) => {
     expect(DEFAULT_CHANNEL_PREFERENCES[eventType]).toBeDefined();
@@ -53,6 +63,34 @@ describe('Fleet operational notification registrations', () => {
         email: true,
         whatsapp: false,
       });
+    }
+  });
+});
+
+describe('Fleet driver-input notification registrations', () => {
+  it.each(fleetDriverInputEvents)('%s is present in every live event map', (eventType) => {
+    expect(DEFAULT_CHANNEL_PREFERENCES[eventType]).toBeDefined();
+    expect(EVENT_ICONS[eventType]).toBeTruthy();
+    expect(EVENT_SEVERITY[eventType]).toBeTruthy();
+    expect(EVENT_LABELS[eventType]).toBeTruthy();
+    expect(EVENT_GROUPS[eventType]).toBe('Fleet');
+  });
+
+  // Driver input is optional and never a critical/mandatory channel — a
+  // manager request or a driver response is routine, not an emergency.
+  it('keeps driver-input notifications off WhatsApp by default', () => {
+    for (const eventType of fleetDriverInputEvents) {
+      expect(DEFAULT_CHANNEL_PREFERENCES[eventType]).toEqual({
+        in_app: true,
+        email: true,
+        whatsapp: false,
+      });
+    }
+  });
+
+  it('uses neutral, non-disciplinary labels for driver-input events', () => {
+    for (const eventType of fleetDriverInputEvents) {
+      expect(EVENT_LABELS[eventType]).not.toMatch(DISCIPLINARY_WORDS);
     }
   });
 });
