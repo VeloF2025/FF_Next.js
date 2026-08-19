@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({ transaction: vi.fn() }));
@@ -153,8 +155,18 @@ describe('configured MIME/byte limits', () => {
     expect(insertTxn.queryOne).not.toHaveBeenCalled();
   });
 
-  it('every mime type this settings default allows has a registered content-signature — otherwise every upload of it would fail closed at runtime', () => {
-    for (const mimeType of DEFAULT_EVIDENCE_MIME_TYPES) {
+  it('every mime type the MIGRATION seeds has a registered content-signature — otherwise every upload of it fails closed at runtime', () => {
+    // Read the seeded default out of the migration itself rather than asserting against the
+    // fixture above. A hardcoded copy only proves the copy is consistent: adding image/heic
+    // to the migration's DEFAULT would leave this green while every HEIC upload was rejected
+    // by the fail-closed signature check, surfacing only as a confused driver.
+    const migration = readFileSync(
+      resolve(process.cwd(), 'scripts/migrations/sql/503_fleet_incident_driver_input.sql'), 'utf8');
+    const seeded = migration.match(/evidence_allowed_mime_types TEXT\[\] NOT NULL DEFAULT ARRAY\[([^\]]*)\]/i);
+    expect(seeded).not.toBeNull();
+    const types = seeded![1]!.split(',').map((entry) => entry.trim().replace(/^'|'$/g, '')).filter(Boolean);
+    expect(types.length).toBeGreaterThan(0);
+    for (const mimeType of types) {
       expect(SIGNATURE_REGISTERED_TYPES).toContain(mimeType);
     }
   });
