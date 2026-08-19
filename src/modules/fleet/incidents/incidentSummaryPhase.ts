@@ -71,10 +71,16 @@ async function sendSummaryForBucket(bucket: SummaryBucket, workDate: string, tot
   }
   const items = [...bucket.counts.entries()].map(([incidentType, count]) => ({ incidentType, count }));
   for (const recipientUserId of recipients.userIds) {
-    applyDelivery(totals, await sendMorningSummaryNotification({
+    const delivery = await sendMorningSummaryNotification({
       recipientUserId, projectId: bucket.projectId, projectName: bucket.projectName, workDate, items,
-    }));
-    totals.sent += 1;
+    });
+    applyDelivery(totals, delivery);
+    // Count deliveries, not attempts. The phase is retryable within the day, and a retry
+    // re-walks every bucket including the ones that already succeeded — notify() suppresses
+    // those by idempotency key, so incrementing unconditionally would report a summary as
+    // freshly sent on every tick for the rest of the day. summaries_sent_count is stored as
+    // a delivery count, so it has to be one.
+    if (delivery.delivered > 0) totals.sent += 1;
   }
 }
 

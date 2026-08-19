@@ -145,6 +145,7 @@ const MIME_SIGNATURES: Readonly<Record<string, readonly (readonly number[])[]>> 
  * preamble (a UTF-8 BOM, PDF/A//document-management wrapper bytes). Insisting on offset 0
  * would reject spec-legal evidence, and fail-closed means the manager gets no way around it.
  */
+/** Bytes from the start of the file within which the WHOLE signature must fall. */
 const SIGNATURE_SEARCH_WINDOW: Readonly<Record<string, number>> = { 'application/pdf': 1024 };
 
 /** The MIME types with a registered signature. Exported so callers can assert their own
@@ -154,10 +155,12 @@ export const SIGNATURE_REGISTERED_TYPES: readonly string[] = Object.keys(MIME_SI
 export function contentMatchesMimeType(buffer: Buffer, mimeType: string): boolean {
   const signatures = MIME_SIGNATURES[mimeType];
   if (!signatures) return false;
-  // Default 0 — signature must start at byte 0 unless the type is explicitly given slack.
-  const window = SIGNATURE_SEARCH_WINDOW[mimeType] ?? 0;
   return signatures.some((signature) => {
-    const lastStart = Math.min(window, buffer.length - signature.length);
+    // Default scan window is the signature itself, i.e. byte 0 only. `window` counts bytes the
+    // signature must fit inside, so the last legal start is window - signature.length: with a
+    // 1024-byte window a 5-byte %PDF- may start at 1019, not 1024.
+    const window = SIGNATURE_SEARCH_WINDOW[mimeType] ?? signature.length;
+    const lastStart = Math.min(window - signature.length, buffer.length - signature.length);
     for (let start = 0; start <= lastStart; start += 1) {
       if (signature.every((byte, index) => buffer[start + index] === byte)) return true;
     }

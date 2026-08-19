@@ -137,6 +137,21 @@ describe('sendIncidentOpenedNotification', () => {
     expect(wa.deliverWhatsApp).toHaveBeenCalledWith(OVERSIGHT, expect.anything(), null);
   });
 
+  it('still sends when the claim itself throws, rather than letting bookkeeping suppress a critical alert', async () => {
+    // This module's contract is that failures are counted in NotifyResult, never thrown. A
+    // claim error must not propagate out, and must not cost the recipient the one channel a
+    // critical incident is guaranteed to reach — delivering twice beats not delivering.
+    idem.claimNotification.mockRejectedValueOnce(new Error('claims table unavailable'));
+
+    const result = await sendIncidentOpenedNotification({
+      ...baseInput, producerKind: 'source_event', severity: 'critical', incidentType: 'accident_sos',
+      rule: rule({ incidentType: 'accident_sos', severity: 'critical' }),
+    });
+
+    expect(wa.deliverWhatsApp).toHaveBeenCalledWith(PM, expect.anything(), null);
+    expect(result).toEqual(expect.objectContaining({ failed: expect.any(Number) }));
+  });
+
   it('releases the claim when a mandatory WhatsApp send fails so a retry can reach them', async () => {
     // A transient bridge outage must not permanently silence the one channel a critical
     // incident is guaranteed to reach.
