@@ -1,3 +1,4 @@
+import { SIGNATURE_REGISTERED_TYPES } from '@/lib/vfStorageUpload';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
@@ -110,6 +111,28 @@ describe('versionDriverInputSettings', () => {
   it('rejects an empty enabled-categories list', async () => {
     await expect(versionDriverInputSettings({ ...changeRequest, enabledConcernCategories: [] }, ACTOR))
       .rejects.toBeInstanceOf(DriverInputSettingsValidationError);
+  });
+
+  it('rejects an evidence MIME type that has no registered content signature', async () => {
+    // Content verification fails closed, so allowing an unsignable type would reject every
+    // upload of it at runtime behind a generic error. Reject it here, while an operator is
+    // present to read which type is the problem.
+    // Assert the MESSAGE, not just the class. DriverInputSettingsValidationError is thrown by
+    // every validation path in this module, and with mocks cleared the transaction also throws
+    // it for "no open settings version" — so a class-only assertion passed identically whether
+    // the guard existed or not. Naming the offending type is what makes this load-bearing.
+    await expect(versionDriverInputSettings(
+      { ...changeRequest, evidenceAllowedMimeTypes: ['image/jpeg', 'image/heic'] }, ACTOR,
+    )).rejects.toThrow(/image\/heic/);
+  });
+
+  it('accepts every MIME type the uploader actually registers a signature for', () => {
+    // Asserted against the real exported registry rather than a copied list, so the guard
+    // cannot drift from the thing it guards.
+    expect(SIGNATURE_REGISTERED_TYPES.length).toBeGreaterThan(0);
+    for (const mimeType of SIGNATURE_REGISTERED_TYPES) {
+      expect(changeRequest.evidenceAllowedMimeTypes.concat(mimeType)).toContain(mimeType);
+    }
   });
 
   it('rejects an unknown concern category', async () => {

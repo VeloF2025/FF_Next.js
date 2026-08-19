@@ -9,6 +9,7 @@
  * `ux_fleet_incident_driver_input_settings_open` partial unique index is
  * the concurrency backstop for "only one open version at a time".
  */
+import { SIGNATURE_REGISTERED_TYPES } from '@/lib/vfStorageUpload';
 import { queryOne, transaction } from '@/lib/db-pool';
 import { parseStrictIsoInstant } from '../../operations/instantValidation';
 import type { DriverConcernCategory, DriverInputSettings } from './types';
@@ -107,6 +108,17 @@ function validateChangeRequest(request: DriverInputSettingsChangeRequest): { eff
   }
   if (request.evidenceAllowedMimeTypes.length === 0) {
     throw new DriverInputSettingsValidationError('evidenceAllowedMimeTypes must not be empty');
+  }
+  // Content verification fails closed: uploadCategorizedFile rejects any MIME type it has no
+  // byte signature for. Allowing a type here without a registered signature would therefore
+  // break every upload of it at runtime, with nothing tying the generic 'content does not
+  // match the declared type' error back to the misconfiguration. Reject it at the point of
+  // change instead, while an operator is present to read the message.
+  const unverifiable = request.evidenceAllowedMimeTypes.filter((mimeType) => !SIGNATURE_REGISTERED_TYPES.includes(mimeType));
+  if (unverifiable.length > 0) {
+    throw new DriverInputSettingsValidationError(
+      `evidenceAllowedMimeTypes contains types with no content signature, so uploads of them would always be rejected: ${unverifiable.join(', ')}`,
+    );
   }
   if (!Number.isInteger(request.evidenceMaxBytes) || request.evidenceMaxBytes <= 0) {
     throw new DriverInputSettingsValidationError('evidenceMaxBytes must be a positive integer');
