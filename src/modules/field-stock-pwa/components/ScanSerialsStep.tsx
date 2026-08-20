@@ -20,7 +20,10 @@ import { Camera, CameraOff, Loader2, ChevronDown } from 'lucide-react';
 import { useBarcodeScanner } from '@/modules/barcode-scanner/hooks/useBarcodeScanner';
 import { useScanSerial } from '@/modules/field-stock-pwa/hooks/useScanSerial';
 import { SerialChip } from '@/modules/field-stock-pwa/components/SerialChip';
+import { BoxGroupChip } from '@/modules/field-stock-pwa/components/BoxGroupChip';
+import { ScanNoticeBanner } from '@/modules/field-stock-pwa/components/ScanNoticeBanner';
 import { PhotoSerialFallback } from '@/modules/field-stock-pwa/components/PhotoSerialFallback';
+import { buildScanRows } from '@/modules/field-stock-pwa/lib/scanRows';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
 const SCANNER_ELEMENT_ID = 'serial-scanner-reader';
@@ -46,8 +49,10 @@ export function ScanSerialsStep({
   const [manualInput, setManualInput] = useState('');
   const [fallbackHint, setFallbackHint] = useState<string | null>(null);
 
-  const { handleRawSerial, handleRemove } = useScanSerial({ stockItem, scanned, onChange, sourceLocation });
+  const { handleRawSerial, handleRemove, handleRemoveGroup, scanNotice, clearScanNotice } =
+    useScanSerial({ stockItem, scanned, onChange, sourceLocation });
 
+  const renderRows = buildScanRows(scanned);
   const validCount = scanned.filter((s) => s.state === 'valid').length;
   const hasPending = scanned.some((s) => s.state === 'pending-validation');
   const canDone = validCount > 0 && !hasPending;
@@ -174,12 +179,26 @@ export function ScanSerialsStep({
         )}
       </div>
 
-      {/* Scanned list */}
+      {/* Wrong code scanned, short read, oversized box, or ledger drift */}
+      {scanNotice && <ScanNoticeBanner notice={scanNotice} onDismiss={clearScanNotice} />}
+
+      {/* Scanned list — cartons collapse to one row, loose units render as before */}
       {scanned.length > 0 && (
         <ul className="space-y-1.5">
-          {[...scanned].reverse().map((row) => (
-            <SerialChip key={row.serialNumber} serial={row} onRemove={handleRemove} />
-          ))}
+          {renderRows.map((row) =>
+            row.type === 'group' ? (
+              <BoxGroupChip
+                key={row.groupId}
+                groupId={row.groupId}
+                label={row.label}
+                members={row.members}
+                onRemoveGroup={handleRemoveGroup}
+                onRemoveMember={handleRemove}
+              />
+            ) : (
+              <SerialChip key={row.serial.serialNumber} serial={row.serial} onRemove={handleRemove} />
+            ),
+          )}
         </ul>
       )}
 
