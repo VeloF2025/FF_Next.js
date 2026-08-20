@@ -165,7 +165,8 @@ describe('sendIncidentOpenedNotification', () => {
     expect(idem.releaseNotificationClaim).toHaveBeenCalledWith(
       PM, 'fleet.operational_incident_opened:whatsapp', buildIncidentOpenedIdempotencyKey(baseInput.incidentId));
   });
-  it('never sends mandatory WhatsApp for a routine scheduled incident, even if critical', async () => {
+
+  it('never sends mandatory WhatsApp for a routine scheduled incident, even if critical', async () => {
     await sendIncidentOpenedNotification({
       ...baseInput, severity: 'critical', producerKind: 'scheduled_detection',
       rule: rule({ severity: 'critical' }),
