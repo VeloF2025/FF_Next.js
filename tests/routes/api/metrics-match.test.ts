@@ -1,0 +1,193 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { handler } from '@/pages/api/metrics-match';
+import { userHasPermission } from '@/lib/permissions';
+
+vi.mock('@/lib/permissions', () => ({
+  userHasPermission: vi.fn(),
+}));
+
+// Give zone_uptake a permission of its own. Every real metric declares
+// `analytics.reports`, so without this no allow/deny combination could separate
+// "filtered before matching" from "matched then discarded".
+//
+// zone_uptake rather than pp_open_balance: the hidden metric's alias must outrank a
+// permitted one, and 'open pre-provisions' cannot serve because 'pre-provisions' (the
+// event-count metric) is a substring of it — a question carrying the long alias always
+// carries the short one too, so neither ordering can be isolated.
+vi.mock('@/modules/metrics/registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/metrics/registry')>();
+  return {
+    ...actual,
+    METRICS: actual.METRICS.map((m) =>
+      m.key === 'zone_uptake' ? { ...m, permission: 'hidden.permission' } : m,
+    ),
+  };
+});
+
+function mockRes() {
+  const res: Record<string, unknown> = {};
+  res.status = vi.fn().mockReturnValue(res);
+  res.json = vi.fn().mockReturnValue(res);
+  res.setHeader = vi.fn().mockReturnValue(res);
+  return res as {
+    status: ReturnType<typeof vi.fn>;
+    json: ReturnType<typeof vi.fn>;
+    setHeader: ReturnType<typeof vi.fn>;
+  };
+}
+
+function payload(res: ReturnType<typeof mockRes>) {
+  const body = res.json.mock.calls.at(-1)?.[0] as { data?: Record<string, unknown> } | undefined;
+  return body?.data ?? {};
+}
+
+const PP_QUESTION = 'how many open pre-provisions';
+// `user` defaults via ?? rather than a default parameter: a default parameter
+// fires on `undefined`, so passing undefined to mean "no session" would silently
+// hand the handler a real user and the 401 case would never be exercised.
+const req = (query: Record<string, unknown>, user?: unknown) =>
+  ({ method: 'GET', query, user: user ?? undefined }) as never;
+const AS_MANAGER = { id: 'u1', role: 'manager' };
+
+beforeEach(() => {
+  vi.mocked(userHasPermission).mockReset();
+  vi.mocked(userHasPermission).mockResolvedValue(true);
+});
+
+describe('GET /api/metrics-match', () => {
+  it('rejects POST — MCP tokens are GET-only', async () => {
+    const res = mockRes();
+    await handler({ method: 'POST', query: {} } as never, res as never);
+    expect(res.status).toHaveBeenCalledWith(405);
+  });
+
+  it('rejects a missing question with 400', async () => {
+    const res = mockRes();
+    await handler(req({}, AS_MANAGER), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects a blank question with 400 rather than matching nothing', async () => {
+    const res = mockRes();
+    await handler(req({ q: '   ' }, AS_MANAGER), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects a duplicated q parameter', async () => {
+    const res = mockRes();
+    await handler(req({ q: ['a', 'b'] }, AS_MANAGER), res as never);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('returns 401 when req.user is absent rather than matching anyway', async () => {
+    const res = mockRes();
+    await handler(req({ q: PP_QUESTION }), res as never);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(userHasPermission).not.toHaveBeenCalled();
+  });
+
+  it('resolves a question to a metric key', async () => {
+    const res = mockRes();
+    await handler(req({ q: PP_QUESTION }, AS_MANAGER), res as never);
+    const data = payload(res) as { kind: string; metric?: { key: string } };
+    expect(data.kind).toBe('exact');
+    expect(data.metric?.key).toBe('pp_open_balance');
+  });
+
+  it('returns additivity, so a client can size its date window before querying', async () => {
+    // Without this a caller cannot tell a level from an event count until AFTER it has
+    // committed to a window — by which point the window is what produced the number.
+    // pp_open_balance is a nightly stock, so it must report as semi-additive.
+    const res = mockRes();
+    await handler(req({ q: PP_QUESTION }, AS_MANAGER), res as never);
+    const data = payload(res) as { metric?: { additivity?: string } };
+    expect(data.metric?.additivity).toBe('semi-additive');
+  });
+
+  it('reports the additive class too, not just the semi-additive one', async () => {
+    // Asserting only one class would pass against a handler that hard-coded it. The two
+    // classes are the whole point of the field — a client picks opposite date windows for
+    // them — so both must be shown to round-trip from the registry.
+    const res = mockRes();
+    await handler(req({ q: 'how many installed not activated' }, AS_MANAGER), res as never);
+    const data = payload(res) as { kind: string; metric?: { key: string; additivity?: string } };
+    expect(data.kind).toBe('exact');
+    expect(data.metric?.key).toBe('install_activation_gap');
+    expect(data.metric?.additivity).toBe('additive');
+  });
+
+  it('does not match a metric the caller may not read', async () => {
+    vi.mocked(userHasPermission).mockResolvedValue(false);
+    const res = mockRes();
+    await handler(req({ q: PP_QUESTION }, { id: 'u1', role: 'viewer' }), res as never);
+    expect((payload(res) as { kind: string }).kind).toBe('none');
+  });
+
+  it('filters BEFORE matching, so a hidden metric cannot mask a permitted one', async () => {
+    // ⚠️ Denying everything and expecting 'none' does NOT distinguish the two
+    // orderings — match-then-discard produces 'none' too. The question must contain a
+    // DENIED alias that outranks a PERMITTED one, so that only filter-first can return
+    // an answer:
+    //   filter first        -> open_snags, an answer the caller may have
+    //   match then discard  -> 'none', a false dead end
+    // The registry is mocked because the real metrics share one permission key, so no
+    // allow/deny combination on the real registry could separate them.
+    //
+    // The pair is deliberately NOT the pre-provision one used elsewhere in this file.
+    // 'pre-provisions' (the event count) is a substring of 'open pre-provisions' (the
+    // balance), so hiding one and asking about the other cannot isolate the ordering —
+    // any question containing the longer alias contains the shorter one too. 'zone
+    // uptake' (11) and 'open snags' (10) share no stem, so the ranking is unambiguous.
+    vi.mocked(userHasPermission).mockImplementation(
+      async (_userId: string, permission: string) => permission !== 'hidden.permission',
+    );
+    const res = mockRes();
+    await handler(
+      req({ q: 'zone uptake versus open snags' }, AS_MANAGER),
+      res as never,
+    );
+    const data = payload(res) as { kind: string; metric?: { key: string } };
+    expect(data.kind).toBe('exact');
+    expect(data.metric?.key).toBe('open_snags');
+  });
+
+  it('skips the permission lookup entirely for a super admin', async () => {
+    const res = mockRes();
+    await handler(req({ q: PP_QUESTION }, { id: 'u1', role: 'super_admin' }), res as never);
+    expect(userHasPermission).not.toHaveBeenCalled();
+    expect((payload(res) as { kind: string }).kind).toBe('exact');
+  });
+
+  it('returns a structured 500 when the RBAC lookup fails, not a framework error', async () => {
+    // withAuth returns the handler promise rather than awaiting it, so an
+    // unhandled rejection here would escape into Next's default error path with
+    // no log line and no response envelope.
+    vi.mocked(userHasPermission).mockRejectedValue(new Error('db down'));
+    const res = mockRes();
+    await handler(req({ q: PP_QUESTION }, AS_MANAGER), res as never);
+    expect(res.status).toHaveBeenCalledWith(500);
+    // The status alone would still pass against a bare `res.status(500)` with no
+    // body, which is exactly the framework-level failure this guards against — so
+    // assert the envelope the repo's contract promises.
+    const body = res.json.mock.calls.at(-1)?.[0] as {
+      success?: boolean;
+      error?: { code?: string; message?: string };
+    };
+    expect(body?.success).toBe(false);
+    expect(body?.error?.code).toBeTruthy();
+    // ...and it must not leak the underlying database error to the caller.
+    expect(JSON.stringify(body)).not.toContain('db down');
+  });
+
+  it('reports no match so the caller can fall back to RAG', async () => {
+    const res = mockRes();
+    await handler(req({ q: 'what did we discuss about splicing' }, AS_MANAGER), res as never);
+    expect((payload(res) as { kind: string }).kind).toBe('none');
+  });
+
+  it('never leaks the citation string, which names internal tables', async () => {
+    const res = mockRes();
+    await handler(req({ q: PP_QUESTION }, AS_MANAGER), res as never);
+    expect(JSON.stringify(payload(res))).not.toContain('metric_snapshots');
+  });
+});

@@ -39,9 +39,9 @@ export default defineConfig({
       // any test executes, so they cannot be skipped gracefully.
       // Excluding them stops six files failing collection on every unit run;
       // set TEST_DATABASE_URL and target them directly to run them.
-      'pages/api/snags/__tests__/reports-scope.test.ts',
-      'pages/api/snags/__tests__/reports-scope-xlsx.test.ts',
-      'pages/api/snags/__tests__/reports-source-filter.test.ts',
+      'tests/routes/api/snags/reports-scope.test.ts',
+      'tests/routes/api/snags/reports-scope-xlsx.test.ts',
+      'tests/routes/api/snags/reports-source-filter.test.ts',
       'src/modules/construction-qa/services/reportNumberGenerator.test.ts',
       'tests/migrations/358_snag_reports_scope.test.ts',
       'tests/migrations/378_rbac_field_stock_force_correct.test.ts',
