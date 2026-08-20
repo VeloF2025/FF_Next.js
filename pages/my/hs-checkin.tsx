@@ -49,6 +49,7 @@ const HsCheckinPage: NextPage & { getLayout?: (p: React.ReactElement) => React.R
   const [medicalStatus, setMedicalStatus] = React.useState<string | null>(null);
   const [alreadyDone, setAlreadyDone] = React.useState(false);
 
+  const [location, setLocation] = React.useState<'site' | 'office' | null>(null);
   const [projectId, setProjectId] = React.useState('');
   const [fit, setFit] = React.useState<boolean | null>(null);
   const [ppe, setPpe] = React.useState<boolean | null>(null);
@@ -69,7 +70,14 @@ const HsCheckinPage: NextPage & { getLayout?: (p: React.ReactElement) => React.R
         setProjects(d.projects ?? []);
         setActivities(d.activities ?? []);
         setMedicalStatus(d.medical_status ?? null);
-        setProjectId(d.default_project_id ?? '');
+        // Sticky default from the last self declaration. An office day carries
+        // no project, so the location has to be honoured on its own.
+        if (d.default_work_location === 'office') {
+          setLocation('office');
+        } else if (d.default_project_id) {
+          setProjectId(d.default_project_id);
+          setLocation('site');
+        }
         if (d.completed) setAlreadyDone(true);
       })
       .catch(() => setError('Could not load the check-in. Check your signal and try again.'))
@@ -80,11 +88,13 @@ const HsCheckinPage: NextPage & { getLayout?: (p: React.ReactElement) => React.R
     (s) => activities.find((a) => a.value === s)?.requires_medical
   );
 
+  const isOffice = location === 'office';
+
   async function submit() {
     setError(null);
-    if (!projectId) return setError('Choose which project you are on today.');
+    if (!location) return setError('Choose where you are working today.');
     if (fit === null) return setError('Answer whether you are fit for duty.');
-    if (ppe === null) return setError('Answer whether you have your PPE.');
+    if (location === 'site' && ppe === null) return setError('Answer whether you have your PPE.');
 
     setSaving(true);
     try {
@@ -93,11 +103,12 @@ const HsCheckinPage: NextPage & { getLayout?: (p: React.ReactElement) => React.R
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          project_id: projectId,
+          work_location: location,
+          ...(isOffice
+            ? {}
+            : { project_id: projectId, ppe_complete: ppe, declared_activities: selected }),
           fit_for_duty: fit,
-          ppe_complete: ppe,
-          declared_activities: selected,
-          hazard_reported: hazard.trim() || undefined,
+          hazard_reported: isOffice ? undefined : hazard.trim() || undefined,
         }),
       });
       const json = await res.json();
@@ -159,9 +170,24 @@ const HsCheckinPage: NextPage & { getLayout?: (p: React.ReactElement) => React.R
         )}
 
         <div className={cardCls}>
-          <label className={labelCls} htmlFor="project">Which project are you on today?</label>
-          <select id="project" className={inputCls} value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-            <option value="">Choose a project…</option>
+          <label className={labelCls} htmlFor="project">Where are you working today?</label>
+          <select
+            id="project"
+            className={inputCls}
+            value={isOffice ? 'office' : projectId}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === 'office') {
+                setLocation('office');
+                setProjectId('');
+              } else {
+                setLocation(v ? 'site' : null);
+                setProjectId(v);
+              }
+            }}
+          >
+            <option value="">Choose…</option>
+            <option value="office">Office</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>{p.project_name}</option>
             ))}
@@ -179,56 +205,60 @@ const HsCheckinPage: NextPage & { getLayout?: (p: React.ReactElement) => React.R
           )}
         </div>
 
-        <div className={cardCls}>
-          <span className={labelCls}>Do you have all the PPE you need for today?</span>
-          <YesNo value={ppe} onChange={setPpe} noLabel="No, something is missing" yesLabel="Yes, all of it" />
-        </div>
+        {location === 'site' && (
+          <>
+            <div className={cardCls}>
+              <span className={labelCls}>Do you have all the PPE you need for today?</span>
+              <YesNo value={ppe} onChange={setPpe} noLabel="No, something is missing" yesLabel="Yes, all of it" />
+            </div>
 
-        <div className={cardCls}>
-          <span className={labelCls}>Will you do any of these today?</span>
-          <p className="text-xs text-neutral-400 mb-3">Leave them all unticked if none apply.</p>
-          <div className="space-y-2">
-            {activities.map((a) => (
-              <label key={a.value} className="flex items-center gap-3 text-sm text-neutral-200">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4"
-                  checked={selected.includes(a.value)}
-                  onChange={(e) =>
-                    setSelected((prev) =>
-                      e.target.checked ? [...prev, a.value] : prev.filter((v) => v !== a.value)
-                    )
-                  }
-                />
-                {a.label}
-                {a.requires_medical && (
-                  <span className="text-xs text-neutral-500">needs a medical</span>
-                )}
-              </label>
-            ))}
-          </div>
-          {medicalGated && medicalStatus && medicalStatus !== 'current' && (
-            <p className="mt-3 text-sm text-red-300">
-              Our records show no current Certificate of Fitness for you. If you select this work you
-              will not be cleared to do it — speak to the H&S officer.
-            </p>
-          )}
-        </div>
+            <div className={cardCls}>
+              <span className={labelCls}>Will you do any of these today?</span>
+              <p className="text-xs text-neutral-400 mb-3">Leave them all unticked if none apply.</p>
+              <div className="space-y-2">
+                {activities.map((a) => (
+                  <label key={a.value} className="flex items-center gap-3 text-sm text-neutral-200">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4"
+                      checked={selected.includes(a.value)}
+                      onChange={(e) =>
+                        setSelected((prev) =>
+                          e.target.checked ? [...prev, a.value] : prev.filter((v) => v !== a.value)
+                        )
+                      }
+                    />
+                    {a.label}
+                    {a.requires_medical && (
+                      <span className="text-xs text-neutral-500">needs a medical</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+              {medicalGated && medicalStatus && medicalStatus !== 'current' && (
+                <p className="mt-3 text-sm text-red-300">
+                  Our records show no current Certificate of Fitness for you. If you select this work you
+                  will not be cleared to do it — speak to the H&S officer.
+                </p>
+              )}
+            </div>
 
-        <div className={cardCls}>
-          <label className={labelCls} htmlFor="hazard">Seen anything unsafe? (optional)</label>
-          <textarea
-            id="hazard"
-            className={inputCls}
-            rows={3}
-            placeholder="e.g. open trench with no barrier near the gate"
-            value={hazard}
-            onChange={(e) => setHazard(e.target.value)}
-          />
-          <p className="mt-2 text-xs text-neutral-400">
-            This goes straight to the risk register. Reporting a hazard never counts against you.
-          </p>
-        </div>
+            <div className={cardCls}>
+              <label className={labelCls} htmlFor="hazard">Seen anything unsafe? (optional)</label>
+              <textarea
+                id="hazard"
+                className={inputCls}
+                rows={3}
+                placeholder="e.g. open trench with no barrier near the gate"
+                value={hazard}
+                onChange={(e) => setHazard(e.target.value)}
+              />
+              <p className="mt-2 text-xs text-neutral-400">
+                This goes straight to the risk register. Reporting a hazard never counts against you.
+              </p>
+            </div>
+          </>
+        )}
 
         <button
           onClick={submit}

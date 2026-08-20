@@ -207,6 +207,7 @@ export default withMySession(async (req, res, session) => {
         ? await lookupMedicalStatus({ teamMemberId: member.team_member_id }, today)
         : 'current';
       const decision = deriveClearance({
+        work_location: 'site',
         fit_for_duty: member.fit_for_duty,
         ppe_complete: body.ppe_complete,
         declared_activities: activities,

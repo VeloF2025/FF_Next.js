@@ -29,7 +29,7 @@ import {
   createCheckin,
   raiseHazardToRiskRegister,
 } from '@/modules/health-safety/services/checkinWrite';
-import { CHECKIN_ACTIVITIES } from '@/modules/health-safety/types/checkin.types';
+import { CHECKIN_ACTIVITIES, type CheckinWorkLocation } from '@/modules/health-safety/types/checkin.types';
 
 export const config = { api: { bodyParser: { sizeLimit: '16kb' } } };
 
@@ -68,11 +68,18 @@ export default withMySession(async (req, res, session) => {
         WHERE p.status IN ('active', 'in_progress')
         ORDER BY p.project_name
       `;
-      const lastPick = await sql<{ project_id: string }>`
-        SELECT project_id FROM hs_daily_checkins
+      // work_location travels WITH project_id: an office day carries no project,
+      // so returning the project alone would let one office day silently wipe a
+      // site worker's sticky default (and offer a site worker no default at all
+      // on the day after they sat in the office).
+      const lastPick = await sql<{ project_id: string | null; work_location: string | null }>`
+        SELECT project_id, work_location FROM hs_daily_checkins
         WHERE staff_id = ${session.staffId} AND capture_mode = 'self'
         ORDER BY checkin_date DESC LIMIT 1
       `;
+      const lastLocation = lastPick[0]?.work_location;
+      const defaultWorkLocation: CheckinWorkLocation | null =
+        lastLocation === 'site' || lastLocation === 'office' ? lastLocation : null;
       const medicalStatus = await lookupMedicalStatus({ staffId: session.staffId }, today);
 
       return apiResponse.success(res, {
@@ -81,6 +88,9 @@ export default withMySession(async (req, res, session) => {
         checkin: existing,
         projects,
         default_project_id: lastPick[0]?.project_id ?? null,
+        // Additive: the standalone page ignores an office default and keeps
+        // using default_project_id, which is unchanged.
+        default_work_location: defaultWorkLocation,
         activities: Object.values(CHECKIN_ACTIVITIES),
         // Surfaced so the worker learns about an expiring certificate at the
         // moment it matters, rather than discovering it when blocked.
@@ -93,14 +103,30 @@ export default withMySession(async (req, res, session) => {
     }
 
     const body = req.body ?? {};
+
+    const rawLocation = body.work_location ?? 'site';
+    if (rawLocation !== 'site' && rawLocation !== 'office') {
+      return apiResponse.badRequest(res, "work_location must be 'site' or 'office'");
+    }
+    const workLocation: CheckinWorkLocation = rawLocation;
+    const isOffice = workLocation === 'office';
+
+    // A site declaration is unattributable without a project; an office one has
+    // no project to give.
     const projectId = typeof body.project_id === 'string' ? body.project_id : '';
-    if (!UUID_RE.test(projectId)) {
+    if (!isOffice && !UUID_RE.test(projectId)) {
       return apiResponse.badRequest(res, 'project_id must be a uuid');
     }
-    if (typeof body.fit_for_duty !== 'boolean' || typeof body.ppe_complete !== 'boolean') {
-      return apiResponse.badRequest(res, 'fit_for_duty and ppe_complete are required booleans');
+    if (typeof body.fit_for_duty !== 'boolean') {
+      return apiResponse.badRequest(res, 'fit_for_duty is a required boolean');
     }
-    const activities = parseActivities(body.declared_activities);
+    // PPE and activities are site-only questions. Coercing them here rather
+    // than demanding them keeps the office body to the one question it asks.
+    const ppeComplete = isOffice ? true : body.ppe_complete;
+    if (typeof ppeComplete !== 'boolean') {
+      return apiResponse.badRequest(res, 'ppe_complete is a required boolean');
+    }
+    const activities = isOffice ? [] : parseActivities(body.declared_activities);
     if (activities === null) {
       return apiResponse.badRequest(
         res,
@@ -119,14 +145,17 @@ export default withMySession(async (req, res, session) => {
       return apiResponse.success(res, { checkin: existing, already_completed: true });
     }
 
-    const medicalStatus = requiresMedical(activities)
+    const medicalStatus = !isOffice && requiresMedical(activities)
       ? await lookupMedicalStatus({ staffId: session.staffId }, today)
       : 'current';
-    const withoutPermit = await findActivitiesWithoutPermit(projectId, activities, today);
+    const withoutPermit = isOffice
+      ? []
+      : await findActivitiesWithoutPermit(projectId, activities, today);
 
     const decision = deriveClearance({
+      work_location: workLocation,
       fit_for_duty: body.fit_for_duty,
-      ppe_complete: body.ppe_complete,
+      ppe_complete: ppeComplete,
       declared_activities: activities,
       medical_status: medicalStatus,
       hazard_reported: hazard,
@@ -134,20 +163,25 @@ export default withMySession(async (req, res, session) => {
     });
 
     const workerName = session.staffName?.trim() || 'Unknown worker';
-    const riskRegisterId = hazard
-      ? await raiseHazardToRiskRegister({
-          projectId,
-          hazard,
-          reportedBy: workerName,
-          createdBy: null,
-        })
-      : null;
+    // An office declaration has no project, so a reported hazard cannot open a
+    // project risk. It is still recorded on the check-in row itself (below) —
+    // nothing is lost, it just does not reach the risk register.
+    const riskRegisterId =
+      hazard && !isOffice
+        ? await raiseHazardToRiskRegister({
+            projectId,
+            hazard,
+            reportedBy: workerName,
+            createdBy: null,
+          })
+        : null;
 
     let checkin;
     try {
       checkin = await createCheckin({
         checkinDate: today,
-        projectId,
+        projectId: isOffice ? null : projectId,
+        workLocation,
         contractorId: null, // Velocity-internal; crew submissions carry theirs
         staffId: session.staffId,
         teamMemberId: null,
@@ -157,7 +191,7 @@ export default withMySession(async (req, res, session) => {
         submittedByStaffId: session.staffId,
         signatureName: workerName,
         fitForDuty: body.fit_for_duty,
-        ppeComplete: body.ppe_complete,
+        ppeComplete,
         declaredActivities: activities,
         hazardReported: hazard,
         clearance: decision.clearance,

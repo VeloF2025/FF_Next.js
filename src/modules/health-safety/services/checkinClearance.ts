@@ -5,11 +5,15 @@
  * decides whether a person is cleared to work, so it must be readable and
  * exhaustively testable on its own, without mocking a query layer.
  *
- * The graduated model (Hein, 2026-07-27):
+ * The graduated model (Hein, 2026-07-27) applies to SITE declarations:
  *   BLOCK  — self-declared unfit; no current medical WHEN height/plant work is
  *            declared. Both are unambiguous and hard to argue with.
  *   WARN   — PPE gaps, hazards, an unverifiable medical, an activity with no
  *            matching permit. Recorded and alerted, never blocking.
+ *
+ * An OFFICE declaration answers one question — fit for duty? — so it blocks
+ * only on self-declared unfitness. It never warns: PPE, hazards and permits
+ * are not asked, so their default values are not findings.
  *
  * Nothing here can stop a clock-in; the caller writes the check-in only after
  * attendance has already been recorded.
@@ -22,6 +26,7 @@ import {
   type CheckinBlockReason,
   type CheckinClearance,
   type CheckinWarning,
+  type CheckinWorkLocation,
 } from '../types/checkin.types';
 
 /**
@@ -36,6 +41,7 @@ import {
 export type CheckinMedicalStatus = 'current' | 'expired' | 'missing' | 'unverifiable';
 
 export interface ClearanceInput {
+  work_location: CheckinWorkLocation;
   fit_for_duty: boolean;
   ppe_complete: boolean;
   declared_activities: CheckinActivity[];
@@ -68,6 +74,17 @@ export function deriveClearance(input: ClearanceInput): ClearanceResult {
   // A person saying they are not fit is the one signal we never second-guess.
   if (!input.fit_for_duty) {
     blocked_reasons.push('self_declared_unfit');
+  }
+
+  // An office declaration answers one question, so it can produce exactly one
+  // outcome. Evaluating the site rules here would judge fields the office path
+  // never asked — a false PPE warning on every desk worker, every day.
+  if (input.work_location === 'office') {
+    return {
+      clearance: blocked_reasons.length > 0 ? 'blocked' : 'cleared',
+      blocked_reasons,
+      warnings: [],
+    };
   }
 
   // The medical gate fires only for declared height/plant work — not for

@@ -13,13 +13,16 @@ import type {
   CheckinBlockReason,
   CheckinCaptureMode,
   CheckinClearance,
+  CheckinWorkLocation,
 } from '../types/checkin.types';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export interface CreateCheckinInput {
   checkinDate: string;
-  projectId: string;
+  /** Null only for an office declaration; the CHECK constraint enforces this. */
+  projectId: string | null;
+  workLocation: CheckinWorkLocation;
   contractorId: string | null;
   staffId: string | null;
   teamMemberId: string | null;
@@ -45,7 +48,7 @@ export interface CreateCheckinInput {
 export async function createCheckin(input: CreateCheckinInput) {
   const rows = await sql`
     INSERT INTO hs_daily_checkins (
-      checkin_date, project_id, contractor_id,
+      checkin_date, project_id, work_location, contractor_id,
       staff_id, team_member_id, worker_name,
       capture_mode, submission_id, submitted_by_staff_id,
       signature_name, signed_at,
@@ -55,6 +58,7 @@ export async function createCheckin(input: CreateCheckinInput) {
     ) VALUES (
       ${input.checkinDate}::date,
       ${input.projectId}::uuid,
+      ${input.workLocation},
       ${input.contractorId}::uuid,
       ${input.staffId}::uuid,
       ${input.teamMemberId}::uuid,

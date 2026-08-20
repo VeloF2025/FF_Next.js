@@ -28,6 +28,7 @@ export function useClockSubmission(args: {
   const [error, setError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
   const [queuedEventId, setQueuedEventId] = React.useState<string | null>(null);
+  const [entryId, setEntryId] = React.useState<string | null>(null);
 
   const doSubmit = async (): Promise<void> => {
     if (!args.selfieFile) {
@@ -68,6 +69,7 @@ export function useClockSubmission(args: {
     );
 
     if (result.kind === 'submitted_in') {
+      setEntryId(result.response.entryId);
       setSuccessMessage(
         result.response.insideSite && result.response.siteName
           ? `Clocked in at ${result.response.siteName}.`
@@ -111,9 +113,10 @@ export function useClockSubmission(args: {
     error,
     successMessage,
     queuedEventId,
+    entryId,
     doSubmit,
     grantConsent,
-    reset: () => { setError(null); setQueuedEventId(null); setState('idle'); },
+    reset: () => { setError(null); setQueuedEventId(null); setEntryId(null); setState('idle'); },
     cancelConsent: () => {
       setQueuedEventId(null);
       setState('idle');

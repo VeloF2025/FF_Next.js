@@ -133,7 +133,11 @@ export function MyHub({ profile }: MyHubProps) {
       </TileGroup>
 
       <TileGroup title="Health &amp; safety">
-        <HsCheckinTile status={data.hsCheckin} onClick={() => router.push('/my/hs-checkin')} />
+        <HsCheckinTile
+          status={data.hsCheckin}
+          clockedIn={data.summary?.openEntry != null}
+          onClick={() => router.push('/my/hs-checkin')}
+        />
         {showCrewCheckin && (
           <HsCrewCheckinTile
             recordedToday={data.crewRecordedToday}
