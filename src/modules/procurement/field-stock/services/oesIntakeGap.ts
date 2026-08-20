@@ -19,6 +19,19 @@
  * uses the mig-393 `in_stock → activated` transition and is idempotent. It is
  * NOT fabricating activation state: OES is the system of record saying these
  * are active, and this is the same helper the OES import itself calls.
+ *
+ * The promotion set is deliberately NOT "the rows this run received". It is
+ * every OES-active serial currently sitting `in_stock`, recomputed after the
+ * receive. Two reasons, both real:
+ *
+ *   1. Self-healing. If a previous run received rows and then failed to promote
+ *      them, those serials now HAVE stock rows, so the receive query can never
+ *      see them again — promoting only what this run created would strand them
+ *      as location-less issuable stock forever.
+ *   2. It cleans up intake from other sources. The SharePoint workbook lists
+ *      units as warehouse stock that OES already reports live at a customer
+ *      (460 such serials at Tembelihle on 2026-08-20, straight from a sheet
+ *      import). Those are phantom shelf stock until something reconciles them.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -58,6 +71,20 @@ interface GapRow {
   drop_number: string;
 }
 
+/**
+ * Every OES-active serial currently sitting `in_stock`, whatever put it there.
+ * Recomputed AFTER the receive so it includes rows this run just created.
+ */
+const PROMOTABLE_SQL = `
+  SELECT DISTINCT ON (ss.serial_number)
+         ss.serial_number,
+         oa.drop_number
+    FROM stock_serials ss
+    JOIN oes_activations oa
+      ON upper(trim(oa.serial_number)) = ss.serial_number
+   WHERE ss.status = 'in_stock'
+   ORDER BY ss.serial_number, oa.activation_date DESC NULLS LAST`;
+
 export async function closeOesIntakeGap(
   db: GapQuerier,
   deps: GapDeps,
@@ -78,7 +105,9 @@ export async function closeOesIntakeGap(
   );
 
   if (rows.length === 0) {
-    return { candidates: 0, received: 0, skipped: 0, promoted: 0 };
+    // Nothing new to receive, but earlier runs or a sheet import may have left
+    // OES-active serials sitting in_stock — still worth a promotion pass.
+    return { candidates: 0, received: 0, skipped: 0, ...(await promoteInStock(db, deps)) };
   }
 
   const items: SerialIntakeItem[] = rows.map((r) => ({
@@ -97,20 +126,28 @@ export async function closeOesIntakeGap(
     payload: { source: 'oes_intake_gap', kind: 'ont' },
   });
 
-  // Promote whether or not this run created the rows: a serial left in_stock by
-  // an earlier partial run still needs moving off the shelf.
+  return { candidates: rows.length, ...intake, ...(await promoteInStock(db, deps)) };
+}
+
+/** Promote every OES-active serial left sitting in_stock, whatever created it. */
+async function promoteInStock(
+  db: GapQuerier,
+  deps: GapDeps,
+): Promise<{ promoted: number; promotionFailed?: boolean }> {
+  const { rows } = await db.query<GapRow>(PROMOTABLE_SQL);
+  if (rows.length === 0) return { promoted: 0 };
+
   try {
     await deps.promote(rows);
+    return { promoted: rows.length };
   } catch (error) {
     log.error(
-      'OES intake gap: receive succeeded but promotion failed — serials may sit in_stock',
-      { error, candidates: rows.length },
+      'OES intake gap: promotion failed — OES-active serials remain in_stock',
+      { error, promotable: rows.length },
       'oes-intake-gap',
     );
-    return { candidates: rows.length, ...intake, promoted: 0, promotionFailed: true };
+    return { promoted: 0, promotionFailed: true };
   }
-
-  return { candidates: rows.length, ...intake, promoted: rows.length };
 }
 
 /** Production wiring: the real intake and the real activation cascade. */
