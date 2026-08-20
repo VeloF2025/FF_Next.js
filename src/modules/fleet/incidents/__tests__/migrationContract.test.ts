@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const migrationPath = resolve(process.cwd(), 'scripts/migrations/sql/506_fleet_operational_incidents.sql');
-const rollbackPath = resolve(process.cwd(), 'scripts/migrations/sql/rollback_506_fleet_operational_incidents.sql');
+const migrationPath = resolve(process.cwd(), 'scripts/migrations/sql/510_fleet_operational_incidents.sql');
+const rollbackPath = resolve(process.cwd(), 'scripts/migrations/sql/rollback_510_fleet_operational_incidents.sql');
 
 const tables = [
   'fleet_operational_incidents',
@@ -154,7 +154,7 @@ describe('fleet operational incidents migration contract', () => {
 
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
-    expect(sql).toContain("filename = '506_fleet_operational_incidents.sql'");
+    expect(sql).toContain("filename = '510_fleet_operational_incidents.sql'");
     expect(sql).not.toMatch(/DROP TABLE IF EXISTS (?!fleet_operational_)/i);
     expect(sql).toContain("permission_key IN ('fleet.incidents', 'fleet.incidents-settings')");
     expect(sql).toContain("key IN ('fleet.incidents', 'fleet.incidents-settings')");

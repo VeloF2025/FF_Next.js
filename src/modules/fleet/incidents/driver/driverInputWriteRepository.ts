@@ -1,5 +1,5 @@
 /**
- * Append-only driver-input writes (migration 507): requests, submissions,
+ * Append-only driver-input writes (migration 511): requests, submissions,
  * and Attendance correction links. Paired with `./driverInputRepository.ts`
  * (locking/reads) — split out once the combined file passed the 300-line
  * new-file ratchet, mirroring `../incidentRepository.ts`'s own

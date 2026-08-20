@@ -1,7 +1,7 @@
 /**
  * Deterministic, bounded fingerprint of "what's materially true about this
  * observation" — backs the unique `(incident_id, observation_fingerprint)`
- * constraint on `fleet_operational_incident_observations` (migration 506)
+ * constraint on `fleet_operational_incident_observations` (migration 510)
  * that lets `incidentProducer` insert an observation on every evaluation
  * cycle and rely on the database to silently no-op when nothing material
  * changed, instead of reimplementing that comparison here.

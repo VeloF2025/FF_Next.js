@@ -1,5 +1,5 @@
 /**
- * Real-Postgres contract for migration 506 (Fleet operational incidents).
+ * Real-Postgres contract for migration 510 (Fleet operational incidents).
  * Mirrors 497/498's pattern: apply the real migration SQL into a disposable
  * schema, exercise its constraints against a live Postgres, then roll back.
  *
@@ -20,12 +20,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool } from 'pg';
 
-const SCHEMA = 'mig506_fleet_operational_incidents_scratch';
+const SCHEMA = 'mig510_fleet_operational_incidents_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
 const SCOPED_URL = `${BASE_URL}${BASE_URL.includes('?') ? '&' : '?'}options=${encodeURIComponent(`-c search_path=${SCHEMA}`)}`;
 const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
-const FORWARD = readFileSync(join(SQL_DIR, '506_fleet_operational_incidents.sql'), 'utf8');
-const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_506_fleet_operational_incidents.sql'), 'utf8');
+const FORWARD = readFileSync(join(SQL_DIR, '510_fleet_operational_incidents.sql'), 'utf8');
+const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_510_fleet_operational_incidents.sql'), 'utf8');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
@@ -121,7 +121,7 @@ beforeEach(async () => {
     fleet_operational_incident_observations, fleet_operational_incidents`);
 });
 
-describe('migration 506 identifier lengths', () => {
+describe('migration 510 identifier lengths', () => {
   // The direct regression check: both constraints this fix shortened must
   // exist under their new, exact names — if either were still 64/67 bytes,
   // Postgres would have silently truncated it and this equality would fail.
@@ -139,7 +139,7 @@ describe('migration 506 identifier lengths', () => {
   });
 });
 
-describe('migration 506 fleet_operational_incidents invariants', () => {
+describe('migration 510 fleet_operational_incidents invariants', () => {
   it('enforces the lifecycle_details_check pairing status with its actor/time fields', async () => {
     await expect(insertIncident()).resolves.toBeDefined(); // open, no actor fields: allowed
     await expect(db.query(
@@ -204,7 +204,7 @@ describe('migration 506 fleet_operational_incidents invariants', () => {
   });
 });
 
-describe('migration 506 child-table invariants', () => {
+describe('migration 510 child-table invariants', () => {
   it('enforces the observations fingerprint_unique constraint per incident (the renamed constraint)', async () => {
     const incidentId = await insertIncident();
     await db.query(`INSERT INTO fleet_operational_incident_observations (incident_id, observation_fingerprint, observed_at)
@@ -242,7 +242,7 @@ describe('migration 506 child-table invariants', () => {
   });
 });
 
-describe('migration 506 seed data and permissions', () => {
+describe('migration 510 seed data and permissions', () => {
   it('seeds exactly the 14 approved incident types at version 1', async () => {
     const { rows } = await db.query<{ incident_type: string; severity: string }>(
       `SELECT incident_type, severity FROM fleet_operational_incident_rules WHERE version = 1 ORDER BY incident_type`,
@@ -267,9 +267,9 @@ describe('migration 506 seed data and permissions', () => {
   });
 });
 
-describe('migration 506 rollback', () => {
+describe('migration 510 rollback', () => {
   it('removes only its tables and permission rows', async () => {
-    await db.query(`INSERT INTO schema_migrations (filename) VALUES ('506_fleet_operational_incidents.sql')`);
+    await db.query(`INSERT INTO schema_migrations (filename) VALUES ('510_fleet_operational_incidents.sql')`);
     await db.query(`INSERT INTO user_permission_overrides (user_id, permission_key, override_type, actions)
       VALUES ($1, 'fleet.incidents', 'grant', '{"view":true,"edit":true}')`, [USER]);
     await db.query(ROLLBACK);

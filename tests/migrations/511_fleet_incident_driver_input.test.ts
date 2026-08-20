@@ -1,5 +1,5 @@
 /**
- * Real-Postgres contract for migration 507 (Fleet incident driver input).
+ * Real-Postgres contract for migration 511 (Fleet incident driver input).
  * Mirrors 506's harness: apply the real migration SQL into a disposable
  * schema, exercise it against a live Postgres, then roll back.
  *
@@ -19,13 +19,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool } from 'pg';
 
-const SCHEMA = 'mig507_fleet_incident_driver_input_scratch';
+const SCHEMA = 'mig511_fleet_incident_driver_input_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
 const SCOPED_URL = `${BASE_URL}${BASE_URL.includes('?') ? '&' : '?'}options=${encodeURIComponent(`-c search_path=${SCHEMA}`)}`;
 const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
-const FORWARD_506 = readFileSync(join(SQL_DIR, '506_fleet_operational_incidents.sql'), 'utf8');
-const FORWARD = readFileSync(join(SQL_DIR, '507_fleet_incident_driver_input.sql'), 'utf8');
-const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_507_fleet_incident_driver_input.sql'), 'utf8');
+const FORWARD_506 = readFileSync(join(SQL_DIR, '510_fleet_operational_incidents.sql'), 'utf8');
+const FORWARD = readFileSync(join(SQL_DIR, '511_fleet_incident_driver_input.sql'), 'utf8');
+const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_511_fleet_incident_driver_input.sql'), 'utf8');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
@@ -127,7 +127,7 @@ afterAll(async () => {
   await admin.end();
 });
 
-describe('migration 507 identifier lengths', () => {
+describe('migration 511 identifier lengths', () => {
   it('keeps every constraint name under 63 bytes, unshortened by Postgres', async () => {
     const { rows } = await db.query<{ conname: string }>(
       `SELECT conname FROM pg_constraint
@@ -145,7 +145,7 @@ describe('migration 507 identifier lengths', () => {
   });
 });
 
-describe('migration 507 request table is append-only except its bookkeeping', () => {
+describe('migration 511 request table is append-only except its bookkeeping', () => {
   it('grants UPDATE on exactly the six lifecycle columns and no others', async () => {
     const { rows } = await db.query<{ column_name: string; updatable: boolean }>(
       `SELECT column_name,
@@ -181,7 +181,7 @@ describe('migration 507 request table is append-only except its bookkeeping', ()
   });
 });
 
-describe('migration 507 visibility', () => {
+describe('migration 511 visibility', () => {
   it('leaves rows written before it was applied internal', async () => {
     const { rows } = await db.query<{ visibility: string }>(
       'SELECT visibility FROM fleet_operational_incident_actions WHERE id = $1',
@@ -201,7 +201,7 @@ describe('migration 507 visibility', () => {
   });
 });
 
-describe('migration 507 driver response action', () => {
+describe('migration 511 driver response action', () => {
   it('accepts a driver response exactly as submissionService writes it', async () => {
     // The end-to-end proof of the defect the product-level review found: the
     // driver's own words are stored verbatim on an action row, attributed to a
@@ -231,7 +231,7 @@ describe('migration 507 driver response action', () => {
   });
 });
 
-describe('migration 507 rollback', () => {
+describe('migration 511 rollback', () => {
   it('removes its tables and restores the narrower action-type constraint', async () => {
     await db.query(ROLLBACK);
     const { rows } = await db.query<{ present: boolean }>(

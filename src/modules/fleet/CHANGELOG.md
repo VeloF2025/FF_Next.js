@@ -10,7 +10,7 @@ Format: `## [Commit Hash] - YYYY-MM-DD - Author - Type`
 
 **feat(fleet): optional driver incident responses and Attendance correction linking**
 
-Migration 507 (unapplied pending deployment approval) gives a driver
+Migration 511 (unapplied pending deployment approval) gives a driver
 transparent, optional access to their own PR 6 operational incidents via
 `/my/fleet/incidents`, plus append-only explanations, follow-ups, evidence
 uploads, structured source-data concerns, and links to an existing Attendance
@@ -36,7 +36,7 @@ implemented (dead client plumbing for it was removed); `MAX_EXPLANATION_LENGTH
 **Files:** `src/modules/fleet/incidents/driver/**`,
 `pages/api/my/fleet/incidents/**`,
 `pages/api/fleet/incidents/[incidentId]/request-driver-input.ts`,
-`scripts/migrations/sql/507_fleet_incident_driver_input.sql`,
+`scripts/migrations/sql/511_fleet_incident_driver_input.sql`,
 `src/modules/attendance/portal/client/**` (hub tile, correction-form
 callback), `src/modules/notifications/constants/index.ts` (2 new events).
 
@@ -46,7 +46,7 @@ callback), `src/modules/notifications/constants/index.ts` (2 new events).
 
 **feat(fleet): operational incidents, escalation, and manager review queue**
 
-Migration 506 (unapplied pending deployment approval) adds durable,
+Migration 510 (unapplied pending deployment approval) adds durable,
 deduplicated incidents for four PR 4 operational statuses (`late`,
 `wrong_site`, `evidence_mismatch`, `left_early`), a 5-minute detection cron
 (`fleet-operational-monitor`), an escalation/08:15-SAST-summary/health cron
@@ -63,7 +63,7 @@ action. See `.claude/modules/fleet.md` (Operational Incidents section) and
 **Files:** `src/modules/fleet/incidents/**`, `pages/api/fleet/incidents/**`,
 `pages/api/cron/fleet-operational-monitor.ts`,
 `pages/api/cron/fleet-incident-actions.ts`, `pages/fleet/incidents.tsx`,
-`scripts/migrations/sql/506_fleet_operational_incidents.sql`,
+`scripts/migrations/sql/510_fleet_operational_incidents.sql`,
 `src/lib/vfStorageUpload.ts` (extended, SiteCam path unchanged),
 `src/modules/notifications/constants/index.ts` (5 new events).
 

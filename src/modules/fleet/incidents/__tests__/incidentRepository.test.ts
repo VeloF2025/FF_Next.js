@@ -181,7 +181,7 @@ describe('append-only action and evidence writes', () => {
     expect(text).not.toMatch(/UPDATE|DELETE/);
   });
 
-  it('never writes visibility for a manager-authored action — it relies on migration 507\'s column DEFAULT \'internal\' and reads back whatever the row carries', async () => {
+  it('never writes visibility for a manager-authored action — it relies on migration 511\'s column DEFAULT \'internal\' and reads back whatever the row carries', async () => {
     const txn = fakeTxn();
     txn.queryOne.mockResolvedValue({
       id: 'act-2', action_type: 'commented', actor_user_id: USER, is_system_actor: false,
@@ -223,7 +223,7 @@ describe('append-only action and evidence writes', () => {
     expect(text).not.toMatch(/UPDATE|DELETE/);
   });
 
-  it('reads back the evidence row\'s visibility (migration 507 default \'internal\')', async () => {
+  it('reads back the evidence row\'s visibility (migration 511 default \'internal\')', async () => {
     const txn = fakeTxn();
     txn.queryOne.mockResolvedValue({
       id: 'ev-2', evidence_type: 'photo', storage_url: 'https://app.fibreflow.app/storage/x',

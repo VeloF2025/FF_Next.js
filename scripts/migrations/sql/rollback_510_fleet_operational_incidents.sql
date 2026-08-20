@@ -16,4 +16,4 @@ DROP TABLE IF EXISTS fleet_operational_incident_rules;
 DELETE FROM access_permissions
  WHERE key IN ('fleet.incidents', 'fleet.incidents-settings');
 DELETE FROM schema_migrations
- WHERE filename = '506_fleet_operational_incidents.sql';
+ WHERE filename = '510_fleet_operational_incidents.sql';

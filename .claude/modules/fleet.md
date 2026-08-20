@@ -196,7 +196,7 @@ bounded by `MAX_COMPLETE_ROSTER_ROWS` (2000; beyond that both endpoints return 4
 never a silent truncation) and it is correct, but a project near that bound is measurably slower
 than a single-page selection. Worth collapsing to one evidence pass in a follow-up.
 
-## Operational Incidents (migration 506, PR 6)
+## Operational Incidents (migration 510, PR 6)
 
 PR 6 turns four of PR 4's read-time statuses into durable, reviewable incidents and
 adds a separate escalation/summary/health cron. Implementation lives in
@@ -394,7 +394,7 @@ directly against these two keys (it is parameterized on permission key and
 action, already called with a non-default key at
 `pages/api/fleet/operations/rules.ts`), rather than duplicating its "base
 permission AND (admin role OR an active per-user override grant)" idiom.
-Migration 506 grants base `fleet.incidents` to `manager`/`project_manager` —
+Migration 510 grants base `fleet.incidents` to `manager`/`project_manager` —
 NOT `fleet.incidents-settings`, which is `admin`/`super_admin` only. So a
 plain `manager` role never gains cross-project or projectless `fleet.incidents`
 reach without an explicit `admin`/`super_admin` role or an active override
@@ -431,7 +431,7 @@ and gets no link. The link carries `incidentType`, `projectId`, and `staffId` in
 `/fleet/incidents?...` so the queue opens pre-filtered. No new dashboard tab or
 replacement page exists; the existing Dashboard and Map are unmodified otherwise.
 
-## Driver Incident Input (migration 507, PR 7)
+## Driver Incident Input (migration 511, PR 7)
 
 PR 7 gives a driver optional, transparent access to their own PR 6 incidents and
 append-only ways to explain, attach evidence, report a source-data concern, and
@@ -440,7 +440,7 @@ portal. Implementation lives in `src/modules/fleet/incidents/driver/`; driver AP
 are under `/api/my/fleet/incidents`; the one manager-side addition is
 `POST /api/fleet/incidents/[incidentId]/request-driver-input`.
 
-**Migration 507 is unapplied — merging this code creates no table, sends no
+**Migration 511 is unapplied — merging this code creates no table, sends no
 notification, and applies no policy.** PR 7 requires no driver action: monitoring,
 incident creation, escalation, and manager review all work exactly as PR 6 without
 a single response. **Migration numbering moved while this PR was in flight** —

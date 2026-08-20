@@ -4,9 +4,9 @@ PR 6 (`feat/fleet-oversight-pr6-incidents-review`) turns four PR 4 operational
 statuses into durable, reviewable incidents, adds a two-cron escalation/summary/
 health pipeline, and adds a manager review queue at `/fleet/incidents`. Full
 behavioural reference: `.claude/modules/fleet.md` → "Operational Incidents
-(migration 506, PR 6)".
+(migration 510, PR 6)".
 
-**Merging this code does nothing by itself.** Migration 506 is unapplied, and
+**Merging this code does nothing by itself.** Migration 510 is unapplied, and
 neither cron entry is in any environment's crontab. Both are deployment actions
 requiring separate approval — this document does not authorize either.
 
@@ -28,7 +28,7 @@ record a reason, comment, or evidence against an incident.
 
 ## Deployment sequence (not part of this PR — record approval for each step)
 
-1. **Approve and apply migration 506** (`scripts/migrations/sql/506_fleet_operational_incidents.sql`) against the shared database. Confirm readback: `SELECT filename FROM schema_migrations WHERE filename = '506_fleet_operational_incidents.sql'`.
+1. **Approve and apply migration 510** (`scripts/migrations/sql/510_fleet_operational_incidents.sql`) against the shared database. Confirm readback: `SELECT filename FROM schema_migrations WHERE filename = '510_fleet_operational_incidents.sql'`.
 2. **Approve and set `CRON_SECRET`** in the target environment's env file if not already present (both new cron endpoints reuse the existing repo-wide secret — no new secret is introduced).
 3. **Approve and install both crontab lines**, mirroring the existing Fleet cron pattern (`scripts/cron-fleet-parking-check.sh` as precedent):
    ```cron
@@ -59,7 +59,7 @@ non-admin oversight user added through the settings dialog).
 
 ## Rollback
 
-`scripts/migrations/sql/rollback_506_fleet_operational_incidents.sql` drops all
+`scripts/migrations/sql/rollback_510_fleet_operational_incidents.sql` drops all
 seven tables and the two `fleet.incidents*` permissions. **This deletes incident
 and audit evidence — execute only with the same approval level as the forward
 migration**, and only after removing both crontab lines first (a still-scheduled
@@ -82,7 +82,7 @@ remove the schedule anyway before rolling back).
 
 ## Outstanding gates (not completed by this PR)
 
-- [ ] **Migration 506 applied** to the shared database.
+- [ ] **Migration 510 applied** to the shared database.
 - [ ] **Both cron entries installed** in a target environment's crontab.
 - [ ] **External host/scheduler monitoring registered** for a total outage of
       both endpoints.
@@ -97,7 +97,7 @@ remove the schedule anyway before rolling back).
 
 ## Browser verification checklist (to be executed by a human before merge)
 
-Run `PORT=3004 npm run dev` against a database that has migration 506 applied
+Run `PORT=3004 npm run dev` against a database that has migration 510 applied
 and at least one active project, one project manager account, and one Fleet
 oversight override grant, with `CRON_SECRET` set so the two cron endpoints can
 be invoked manually with `curl -H "Authorization: Bearer $CRON_SECRET"` (do
@@ -152,7 +152,7 @@ to a shared distribution list during this pass — use test accounts.
    in step 3.
 
 Record screenshots or a trace for each scenario. Do not invoke production cron,
-install scheduler entries, send real notifications, or apply migration 506
+install scheduler entries, send real notifications, or apply migration 510
 during this pass.
 
 ---
@@ -163,9 +163,9 @@ PR 7 (`feat/fleet-oversight-pr7-driver-input`) extends the PR 6 incident domain
 with optional, driver-transparent access to a driver's own incidents at
 `/my/fleet/incidents`, append-only explanations/evidence/concerns, and links to
 existing Attendance corrections. Full behavioural reference:
-`.claude/modules/fleet.md` → "Driver Incident Input (migration 507, PR 7)".
+`.claude/modules/fleet.md` → "Driver Incident Input (migration 511, PR 7)".
 
-**Merging this code does nothing by itself.** Migration 507 is unapplied. **PR 7
+**Merging this code does nothing by itself.** Migration 511 is unapplied. **PR 7
 requires no driver action** — monitoring, incident creation, escalation, and
 manager review all continue exactly as PR 6 without a single driver response.
 
@@ -184,10 +184,10 @@ manager review all continue exactly as PR 6 without a single driver response.
 
 ## Deployment sequence (not part of this PR — record approval for each step)
 
-1. **Approve and apply migration 507**
-   (`scripts/migrations/sql/507_fleet_incident_driver_input.sql`) against the
+1. **Approve and apply migration 511**
+   (`scripts/migrations/sql/511_fleet_incident_driver_input.sql`) against the
    shared database. Confirm readback:
-   `SELECT filename FROM schema_migrations WHERE filename = '507_fleet_incident_driver_input.sql'`.
+   `SELECT filename FROM schema_migrations WHERE filename = '511_fleet_incident_driver_input.sql'`.
 2. **Re-verify the next free migration number before any further Fleet
    migration.** This PR's number moved 490 → 496 → 499 → 503 while in
    flight, as master consumed intervening numbers for unrelated work — do not
@@ -218,7 +218,7 @@ SELECT visibility, count(*) FROM fleet_operational_incident_actions GROUP BY vis
 
 ## Rollback
 
-`scripts/migrations/sql/rollback_507_fleet_incident_driver_input.sql` drops the
+`scripts/migrations/sql/rollback_511_fleet_incident_driver_input.sql` drops the
 four new tables and reverts the PR 6 evidence/action column additions. **This
 deletes any driver-submitted explanations, evidence references, and correction
 links captured since deployment — execute only with the same approval level as
@@ -237,7 +237,7 @@ the forward migration.**
 
 ## Outstanding gates (not completed by this PR)
 
-- [ ] **Migration 507 applied** to the shared database.
+- [ ] **Migration 511 applied** to the shared database.
 - [ ] **`npm run ci:quick` run on the GitHub Actions self-hosted runner** — the
       local Windows workstation used for this task cannot run it directly (its
       `bash` step is unavailable on this box). Pending the GHA run on the PR.
@@ -290,5 +290,5 @@ distribution list during this pass — use test accounts.
 10. **No driver action required.** Confirm monitoring, incident creation, and
     manager workflows all function with zero driver responses.
 
-Record screenshots or a trace for each scenario. Do not apply migration 507,
+Record screenshots or a trace for each scenario. Do not apply migration 511,
 send production notifications, or deploy during this pass.

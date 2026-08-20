@@ -39,7 +39,7 @@ interface DueEscalationRow extends Record<string, unknown> {
 
 // The table has no producer_kind column: a non-null source_event_id is how a
 // source-event-produced incident is distinguished from a scheduled-detection
-// one (see incidentRepository.ts / migration 506's fleet_operational_incidents).
+// one (see incidentRepository.ts / migration 510's fleet_operational_incidents).
 function producerKindOf(row: DueEscalationRow): IncidentProducerKind {
   return row.source_event_id !== null ? 'source_event' : 'scheduled_detection';
 }

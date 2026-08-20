@@ -48,4 +48,4 @@ ALTER TABLE fleet_operational_incident_evidence
   DROP COLUMN IF EXISTS visibility;
 
 DELETE FROM schema_migrations
- WHERE filename = '507_fleet_incident_driver_input.sql';
+ WHERE filename = '511_fleet_incident_driver_input.sql';

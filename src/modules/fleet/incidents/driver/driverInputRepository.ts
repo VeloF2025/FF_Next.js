@@ -1,5 +1,5 @@
 /**
- * Driver-input reads (migration 507): incident locking, the current open
+ * Driver-input reads (migration 511): incident locking, the current open
  * request, staff-scoped incident list/detail, and the driver-visible
  * timeline. Append-only writes (requests/submissions/correction links) live
  * in `./driverInputWriteRepository.ts` — this file stayed the CRUD/read

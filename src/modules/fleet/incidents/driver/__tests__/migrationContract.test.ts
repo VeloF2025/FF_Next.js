@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const migrationPath = resolve(process.cwd(), 'scripts/migrations/sql/507_fleet_incident_driver_input.sql');
-const rollbackPath = resolve(process.cwd(), 'scripts/migrations/sql/rollback_507_fleet_incident_driver_input.sql');
+const migrationPath = resolve(process.cwd(), 'scripts/migrations/sql/511_fleet_incident_driver_input.sql');
+const rollbackPath = resolve(process.cwd(), 'scripts/migrations/sql/rollback_511_fleet_incident_driver_input.sql');
 
 const newTables = [
   'fleet_incident_driver_input_settings',
@@ -205,7 +205,7 @@ describe('fleet incident driver-input migration contract', () => {
 
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
-    expect(sql).toContain("filename = '507_fleet_incident_driver_input.sql'");
+    expect(sql).toContain("filename = '511_fleet_incident_driver_input.sql'");
     expect(sql).not.toMatch(/DROP TABLE IF EXISTS fleet_operational_/i);
     expect(sql).toMatch(/DROP COLUMN IF EXISTS visibility/i);
     expect(sql).toMatch(/DROP COLUMN IF EXISTS actor_staff_id/i);

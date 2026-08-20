@@ -147,7 +147,7 @@ npm test -- tests/unit/modules/fleet/gpsParser.test.ts
 - Migration: `scripts/migrations/039_fleet_module.sql`
 - Test Specs: `tests/specs/fleet-module.spec.md`
 
-## Operational Incidents (migration 506, PR 6)
+## Operational Incidents (migration 510, PR 6)
 
 `src/modules/fleet/incidents/` turns four PR 4 operational statuses (`late`,
 `wrong_site`, `evidence_mismatch`, `left_early`) into durable, reviewable
@@ -157,7 +157,7 @@ and manager review at `/fleet/incidents`. Full reference:
 `docs/operations/fleet-operational-incidents.md`. Migration execution and
 cron scheduling are separate deployment approvals — not part of this PR.
 
-## Driver Incident Input (migration 507, PR 7)
+## Driver Incident Input (migration 511, PR 7)
 
 `src/modules/fleet/incidents/driver/` gives a driver optional, read-only-by-default
 access to their own PR 6 incidents via `/my/fleet/incidents`, plus append-only
@@ -165,5 +165,5 @@ ways to explain, attach evidence, report a source-data concern, and link an
 existing Attendance correction. Monitoring, incident creation, and manager review
 require no driver action, and a missing response is never treated as an admission.
 Full reference: `.claude/modules/fleet.md` (Driver Incident Input section).
-Migration 507 is unapplied — merging this code creates no table, sends no
+Migration 511 is unapplied — merging this code creates no table, sends no
 notification, and enables no policy; deployment remains a separate approval.
