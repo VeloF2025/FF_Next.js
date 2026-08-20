@@ -23,6 +23,10 @@ export interface PwaScannedSerial {
   scannedAt: number; // epoch ms; used for sort + audit
   state: 'pending-validation' | 'valid' | 'invalid';
   errorMessage?: string;
+  /** Set on every member of one carton scan; absent for individually scanned units. */
+  groupId?: string;
+  /** Human label for the group header, e.g. 'Box · 9 serials'. Set on every member. */
+  groupLabel?: string;
 }
 
 export interface PwaIssueDraft {

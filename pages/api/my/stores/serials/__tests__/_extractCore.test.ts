@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
 import {
   decodeSerialFromImage,
+  decodeSerialsFromImage,
   validateSerialCandidate,
   parseVlmSerialResponse,
 } from '../_extractCore';
@@ -112,5 +113,50 @@ describe('parseVlmSerialResponse', () => {
     expect(
       parseVlmSerialResponse('{"serial":"GU18W12V2512041330","confidence":1.5}'),
     ).toEqual({ serial: 'GU18W12V2512041330', confidence: 1 });
+  });
+});
+
+/**
+ * Carton labels: one photo of a Nokia box yields every serial inside it.
+ *
+ * NOTE: ALCLB4923FA8 is in PROMPT_EXAMPLE_SERIALS (a VLM hallucination guard)
+ * and is therefore rejected by validateSerialCandidate — never use it here.
+ */
+describe('decodeSerialsFromImage — carton labels', () => {
+  const BOX_SERIALS = [
+    'ALCLB49486FF', 'ALCLB4948758', 'ALCLB4948779', 'ALCLB49488FC', 'ALCLB4949054',
+    'ALCLB4949388', 'ALCLB4949DEF', 'ALCLB4949F2F', 'ALCLB4949F3C',
+  ];
+
+  async function pngFor(payload: string, format = 'DataMatrix'): Promise<Buffer> {
+    const { writeBarcode } = await import('zxing-wasm/full');
+    const written = await writeBarcode(payload, { format });
+    return symbolToPng(written.symbol!);
+  }
+
+  it('returns all nine serials from a carton box DataMatrix', async () => {
+    expect(await decodeSerialsFromImage(await pngFor(BOX_SERIALS.join(';')))).toEqual(BOX_SERIALS);
+  });
+
+  it('returns a one-element list for a single-unit ISO envelope', async () => {
+    const payload = '[)>\x1e06\x1d1P3TN01414BA\x1dSALCLB4918842\x1e\x04';
+    expect(await decodeSerialsFromImage(await pngFor(payload))).toEqual(['ALCLB4918842']);
+  });
+
+  it('returns an empty list when nothing decodes', async () => {
+    const blank = await sharp({
+      create: { width: 200, height: 200, channels: 3, background: '#888888' },
+    }).jpeg().toBuffer();
+    expect(await decodeSerialsFromImage(blank)).toEqual([]);
+  });
+
+  it('drops carton members that fail the serial-family check', async () => {
+    // 3TN… is a part number, explicitly rejected by validateSerialCandidate.
+    const buf = await pngFor('ALCLB49486FF;3TN01414BA;ALCLB4948758');
+    expect(await decodeSerialsFromImage(buf)).toEqual(['ALCLB49486FF', 'ALCLB4948758']);
+  });
+
+  it('keeps decodeSerialFromImage returning just the first serial', async () => {
+    expect(await decodeSerialFromImage(await pngFor(BOX_SERIALS.join(';')))).toBe('ALCLB49486FF');
   });
 });

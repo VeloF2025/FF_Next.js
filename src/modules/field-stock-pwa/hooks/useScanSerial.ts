@@ -11,9 +11,10 @@
  *  - Row remove helper
  */
 
-import { useCallback, useRef, useEffect } from 'react';
-import { validateSerial } from '@/modules/field-stock-pwa/api';
-import { extractScannedSerial } from '@/modules/field-stock-pwa/lib/scannedSerial';
+import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { validateSerial, validateSerialBatch } from '@/modules/field-stock-pwa/api';
+import { parseScanPayload, MAX_BOX_SERIALS } from '@/modules/field-stock-pwa/lib/boxScan';
+import { verdictForSerial } from '@/modules/field-stock-pwa/lib/serialVerdict';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
 interface UseScanSerialOptions {
@@ -37,15 +38,180 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
     return () => { mountedRef.current = false; };
   }, []);
 
-  const scannedSet = new Set(scanned.map((s) => s.serialNumber.toUpperCase()));
+  // Memoised: two callbacks depend on it, and a fresh Set on every render would
+  // rebuild both of them every time.
+  const scannedSet = useMemo(
+    () => new Set(scanned.map((s) => s.serialNumber.toUpperCase())),
+    [scanned],
+  );
+
+  /**
+   * The freshest scanned list, readable from inside an in-flight callback.
+   *
+   * Validation is async, so a callback that captured `scanned` at creation is
+   * working from a stale snapshot by the time its request resolves. Writing
+   * `[...scanned, ...resolved]` at that point would discard anything scanned
+   * during the wait — a whole second carton, silently. Every post-await write
+   * therefore rebuilds from this ref, replacing rows by serial number rather
+   * than appending to a remembered array.
+   */
+  const scannedRef = useRef(scanned);
+  // Syncs the ref from the prop for changes this hook did not make. Today that
+  // is only a fresh mount, because ScanSerialsStep is unmounted when the
+  // storeman picks a different item (IssueOrchestrator flips flow.step in the
+  // same update), so `useRef(scanned)` alone would suffice.
+  //
+  // INVARIANT this relies on: a live stockItem swap never happens on a mounted
+  // ScanSerialsStep. If that ever changes, this effect is NOT enough — an
+  // in-flight validation for the old item would merge into the new item's list,
+  // because nothing stamps a resolution with the item it was scanned for.
+  useEffect(() => { scannedRef.current = scanned; }, [scanned]);
+
+  /**
+   * The ONLY way this hook mutates the scanned list.
+   *
+   * Writes the ref synchronously as well as calling onChange, because the
+   * passive effect above does not run until after the next render — and a
+   * removal tap or a second resolution can land before that. Any site that
+   * calls onChange directly would read a stale ref and clobber whatever
+   * happened in that window, which is the bug this whole ref exists to stop.
+   */
+  const commit = useCallback(
+    (next: PwaScannedSerial[]) => {
+      scannedRef.current = next;
+      onChange(next);
+    },
+    [onChange],
+  );
+
+  /** Replace the given rows in the freshest list, matching on serial number. */
+  const applyResolved = useCallback(
+    (resolved: PwaScannedSerial[]) => {
+      const byNumber = new Map(resolved.map((r) => [r.serialNumber, r]));
+      // Rows no longer present were removed mid-flight and are NOT resurrected —
+      // the storeman's removal wins.
+      commit(scannedRef.current.map((row) => byNumber.get(row.serialNumber) ?? row));
+    },
+    [commit],
+  );
+
+  const [scanNotice, setScanNotice] = useState<string | null>(null);
+  const clearScanNotice = useCallback(() => setScanNotice(null), []);
+  const groupSeq = useRef(0);
+  /** Quantity declared by the carton's ISO data code, when the storeman scanned it. */
+  const declaredQuantity = useRef<number | null>(null);
+
+  const vibrate = (ms: number) => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms);
+  };
+
+  /** Expand one carton scan into grouped, batch-validated chips. */
+  const handleBoxScan = useCallback(
+    async (serials: string[]) => {
+      const fresh = serials.filter((s) => !scannedSet.has(s));
+      if (fresh.length === 0) { vibrate(30); return; }
+      vibrate(50);
+
+      groupSeq.current += 1;
+      const groupId = `box-${Date.now()}-${groupSeq.current}`;
+      const groupLabel = `Box · ${fresh.length} serial${fresh.length === 1 ? '' : 's'}`;
+      const scannedAt = Date.now();
+
+      const pending: PwaScannedSerial[] = fresh.map((serialNumber) => ({
+        serialNumber, stockItemId: '', stockItemName: '', scannedAt,
+        state: 'pending-validation', groupId, groupLabel,
+      }));
+      commit([...scannedRef.current, ...pending]);
+
+      let response: Awaited<ReturnType<typeof validateSerialBatch>>;
+      try {
+        response = await validateSerialBatch({
+          serials: fresh,
+          stockItemId: stockItem.id,
+          sourceLocationId: sourceLocation?.id ?? null,
+        });
+      } catch (err) {
+        if (!mountedRef.current) return;
+        const msg = err instanceof Error ? err.message : 'Validation request failed';
+        applyResolved(pending.map((p) => ({ ...p, state: 'invalid' as const, errorMessage: msg })));
+        return;
+      }
+
+      if (!mountedRef.current) return;
+
+      const byNumber = new Map(response.results.map((r) => [r.serialNumber, r]));
+      const resolved: PwaScannedSerial[] = pending.map((p) => {
+        const result = byNumber.get(p.serialNumber);
+        if (!result) {
+          return { ...p, state: 'invalid' as const, errorMessage: 'Serial number not found' };
+        }
+        return result.valid
+          ? {
+              ...p,
+              stockItemId: result.stockItemId ?? stockItem.id,
+              stockItemName: result.stockItemName ?? stockItem.name,
+              state: 'valid' as const,
+            }
+          : {
+              ...p,
+              stockItemId: result.stockItemId ?? '',
+              stockItemName: result.stockItemName ?? '',
+              state: 'invalid' as const,
+              errorMessage: result.errorMessage ?? 'Serial is not available',
+            };
+      });
+
+      if (response.quantsWarning) {
+        const drift =
+          `Stock ledger disagrees here — ${response.quantsWarning.serialsInStock} serials on the shelf, ` +
+          `${response.quantsWarning.quantsOnHand} on the books. Issue is still allowed.`;
+        // Append rather than replace: a short-read warning set by the caller is
+        // the more urgent message and must not be silently overwritten.
+        setScanNotice((prev) => (prev ? `${prev} ${drift}` : drift));
+      }
+
+      applyResolved(resolved);
+    },
+    [scannedSet, stockItem, sourceLocation, commit, applyResolved],
+  );
 
   const handleRawSerial = useCallback(
     async (rawSerial: string) => {
-      // DataMatrix labels (e.g. Nokia GPON ONT) wrap the serial in an ISO 15434
-      // envelope; extract the bare serial before validating. Bare 1D/manual
-      // input passes through unchanged.
-      const serial = extractScannedSerial(rawSerial).toUpperCase();
-      if (!serial) return;
+      // A scanned payload is a carton serial list, the carton's ISO data code,
+      // a single serial (bare or ISO-wrapped), or junk. parseScanPayload sorts
+      // them out; only the single-serial case falls through to the old path.
+      const payload = parseScanPayload(rawSerial);
+
+      if (payload.kind === 'package-data') {
+        // No serials here — but the declared quantity is worth keeping: if the
+        // box code then reads short (a partial decode), we can prove it.
+        declaredQuantity.current = payload.quantity ?? null;
+        setScanNotice("That's the data code. Scan the large square marked FULL SERIAL NUMBER LIST.");
+        return;
+      }
+      if (payload.kind === 'unrecognised') {
+        setScanNotice('That barcode is not a serial or a carton label.');
+        return;
+      }
+      if (payload.kind === 'box') {
+        if (payload.serials.length > MAX_BOX_SERIALS) {
+          setScanNotice(
+            `That code holds ${payload.serials.length} serials — more than the ${MAX_BOX_SERIALS} allowed in one scan.`,
+          );
+          return;
+        }
+        const declared = declaredQuantity.current;
+        setScanNotice(
+          declared !== null && declared !== payload.serials.length
+            ? `Label says ${declared}, read ${payload.serials.length} — rescan the box.`
+            : null,
+        );
+        await handleBoxScan(payload.serials);
+        return;
+      }
+
+      setScanNotice(null);
+      const serial = payload.serial;
 
       if (scannedSet.has(serial)) {
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
@@ -60,7 +226,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         scannedAt: Date.now(),
         state: 'pending-validation',
       };
-      onChange([...scanned, optimistic]);
+      commit([...scannedRef.current, optimistic]);
 
       let result: Awaited<ReturnType<typeof validateSerial>>;
       try {
@@ -68,57 +234,64 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
       } catch (err) {
         if (!mountedRef.current) return;
         const msg = err instanceof Error ? err.message : 'Validation request failed';
-        onChange(scanned.concat({ ...optimistic, state: 'invalid', errorMessage: msg }));
+        applyResolved([{ ...optimistic, state: 'invalid', errorMessage: msg }]);
         return;
       }
 
       if (!mountedRef.current) return;
 
-      let resolved: PwaScannedSerial;
-      if (!result.valid) {
-        resolved = { ...optimistic, state: 'invalid', errorMessage: result.errorMessage ?? 'Serial is not available' };
-      } else if (result.stockItemId && result.stockItemId !== stockItem.id) {
-        resolved = {
-          ...optimistic,
-          stockItemId: result.stockItemId,
-          stockItemName: result.stockItemName ?? '',
-          state: 'invalid',
-          errorMessage: `Wrong stock item — scanned ${result.stockItemName ?? result.stockItemId}, expected ${stockItem.name}`,
-        };
-      } else if (
-        sourceLocation &&
-        result.currentLocationId &&
-        result.currentLocationId !== sourceLocation.id
-      ) {
-        resolved = {
-          ...optimistic,
-          stockItemId: result.stockItemId ?? stockItem.id,
-          stockItemName: result.stockItemName ?? stockItem.name,
-          state: 'invalid',
-          errorMessage: `Serial is at ${result.currentLocationName ?? 'another warehouse'}, not ${sourceLocation.name}`,
-        };
-      } else {
-        resolved = {
-          ...optimistic,
-          stockItemId: result.stockItemId ?? stockItem.id,
-          stockItemName: result.stockItemName ?? stockItem.name,
-          state: 'valid',
-        };
-      }
-
-      onChange(
-        scanned
-          .filter((s) => !(s.serialNumber === serial && s.state === 'pending-validation'))
-          .concat(resolved)
+      const verdict = verdictForSerial(
+        result.valid
+          ? {
+              serialNumber: serial,
+              stockItemId: result.stockItemId ?? stockItem.id,
+              stockItemName: result.stockItemName ?? null,
+              status: 'in_stock', // validateSerial already applied the status gate
+              currentLocationId: result.currentLocationId ?? null,
+              currentLocationName: result.currentLocationName ?? null,
+            }
+          : null,
+        {
+          expectedItemId: stockItem.id,
+          expectedItemName: stockItem.name,
+          sourceLocation: sourceLocation ?? null,
+        },
       );
+
+      const resolved: PwaScannedSerial = verdict.valid
+        ? {
+            ...optimistic,
+            stockItemId: verdict.stockItemId,
+            stockItemName: verdict.stockItemName,
+            state: 'valid',
+          }
+        : {
+            ...optimistic,
+            stockItemId: verdict.stockItemId ?? '',
+            stockItemName: verdict.stockItemName ?? '',
+            state: 'invalid',
+            // validateSerial's own message (404, bad status) is more specific
+            // than the generic not-found the verdict produces from a null record.
+            errorMessage: result.valid
+              ? verdict.errorMessage
+              : (result.errorMessage ?? verdict.errorMessage),
+          };
+
+      applyResolved([resolved]);
     },
-    [scanned, scannedSet, stockItem, onChange, sourceLocation]
+    [scannedSet, stockItem, sourceLocation, commit, handleBoxScan, applyResolved]
   );
 
   const handleRemove = useCallback(
-    (serialNumber: string) => onChange(scanned.filter((s) => s.serialNumber !== serialNumber)),
-    [scanned, onChange]
+    (serialNumber: string) =>
+      commit(scannedRef.current.filter((s) => s.serialNumber !== serialNumber)),
+    [commit]
   );
 
-  return { handleRawSerial, handleRemove };
+  const handleRemoveGroup = useCallback(
+    (groupId: string) => commit(scannedRef.current.filter((s) => s.groupId !== groupId)),
+    [commit]
+  );
+
+  return { handleRawSerial, handleRemove, handleRemoveGroup, scanNotice, clearScanNotice };
 }

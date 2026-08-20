@@ -18,11 +18,17 @@ import { log } from '@/lib/logger';
 export interface PhotoSerialFallbackProps {
   /** Candidate serial extracted — parent pre-fills the manual field. */
   onSerial: (serial: string) => void;
+  /**
+   * Called instead of onSerial when the photo caught a whole carton label —
+   * the box DataMatrix carries every serial in the box, so the camera failing
+   * on a dense square does not cost the storeman the batch.
+   */
+  onSerials?: (serials: string[]) => void;
   /** Nothing readable — parent opens the manual field with a hint. */
   onNoSerial: (message: string) => void;
 }
 
-export function PhotoSerialFallback({ onSerial, onNoSerial }: PhotoSerialFallbackProps) {
+export function PhotoSerialFallback({ onSerial, onSerials, onNoSerial }: PhotoSerialFallbackProps) {
   const [extracting, setExtracting] = useState(false);
 
   const handlePick = useCallback(
@@ -34,7 +40,9 @@ export function PhotoSerialFallback({ onSerial, onNoSerial }: PhotoSerialFallbac
       try {
         const compressed = await compressFileToJpeg(file, { maxDim: 1920, quality: 0.9 });
         const result = await extractSerialFromPhoto(compressed);
-        if (result.serial) {
+        if (result.serials && result.serials.length > 1 && onSerials) {
+          onSerials(result.serials);
+        } else if (result.serial) {
           onSerial(result.serial);
         } else {
           onNoSerial("Couldn't read the label — type the serial below.");
@@ -46,7 +54,7 @@ export function PhotoSerialFallback({ onSerial, onNoSerial }: PhotoSerialFallbac
         setExtracting(false);
       }
     },
-    [onSerial, onNoSerial]
+    [onSerial, onSerials, onNoSerial]
   );
 
   return (
