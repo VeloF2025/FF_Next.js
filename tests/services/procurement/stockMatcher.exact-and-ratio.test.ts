@@ -72,6 +72,19 @@ describe('extractSplitRatio', () => {
     // "1-16.5" is a measurement, not a 1:16 split.
     expect(extractSplitRatio('BRACKET-1-16.5')).toBeNull();
   });
+
+  it('reads no ratio out of product codes that are not splitters', () => {
+    // Both are real catalogue entries. CAB-AER-SM-13.1-288F is a 288-fibre
+    // aerial cable whose decimal diameter and fibre count spell "1-288";
+    // HDPE-1-85 is a 1-way 8/5mm microduct. Inventing a ratio from either
+    // would veto correct matches — worse than never vetoing at all.
+    expect(extractSplitRatio('CAB-AER-SM-13.1-288F')).toBeNull();
+    expect(extractSplitRatio('HDPE-1-85')).toBeNull();
+  });
+
+  it('does not veto a cable against a splitter on an invented ratio', () => {
+    expect(ratiosConflict('CAB-AER-SM-13.1-288F', 'SPLIT-BF-1-16')).toBe(false);
+  });
 });
 
 describe('ratiosConflict', () => {
@@ -92,7 +105,8 @@ describe('stock matching', () => {
     const result = await match('1:16 Bare Fibre Splitter');
 
     expect(result.stockItem?.itemCode).toBe('SPLIT-BF-1-16');
-    expect(result.matchMethod).toBe('exact_code');
+    // Distinct from 'exact_code': the NAME matched, not the item code.
+    expect(result.matchMethod).toBe('exact_name');
     expect(result.matchConfidence).toBe(1);
   });
 
@@ -125,7 +139,7 @@ describe('stock matching', () => {
 
     const result = await match('Duplicated Name');
 
-    expect(result.matchMethod).not.toBe('exact_code');
+    expect(result.matchMethod).not.toBe('exact_name');
   });
 
   it('keeps matching an exact item code, which outranks the name', async () => {

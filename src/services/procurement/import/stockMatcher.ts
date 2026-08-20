@@ -21,7 +21,14 @@ const SUPPLIER_CODE_CONFIDENCE = 1.0;
 const FUZZY_THRESHOLD = 0.55; // Lower than MaterialMatcher (0.85) because stock names are technical codes
 const CATEGORY_BOOST = 0.15; // Bonus when categories match
 
-export type StockMatchMethod = 'supplier_code' | 'fuzzy_description' | 'exact_code' | 'category_rule' | 'manual' | 'none';
+export type StockMatchMethod =
+  | 'supplier_code'
+  | 'fuzzy_description'
+  | 'exact_code'
+  | 'exact_name'
+  | 'category_rule'
+  | 'manual'
+  | 'none';
 
 /** Lowercase, collapse whitespace. Used to compare a description to a name. */
 function normalizeForExactMatch(value: string | null | undefined): string {
@@ -36,9 +43,20 @@ function normalizeForExactMatch(value: string | null | undefined): string {
  * BOQ text — hence a dot may precede the 1. The trailing `(?![\d.])` keeps
  * "BRACKET-1-16.5" from reading as 1:16, since that is a measurement; the
  * leading non-digit keeps "11:8" from being read as 1:8.
+ *
+ * The text must also say "split". Without that, the pattern reads a ratio out
+ * of product codes that have nothing to do with splitters — the catalogue
+ * contains CAB-AER-SM-13.1-288F, a 288-fibre aerial cable whose decimal
+ * diameter and fibre count read as "1:288", and HDPE-1-85, a microduct that
+ * reads as "1:85". A ratio invented from those would veto correct matches,
+ * which is worse than the veto never firing.
  */
+const SPLITTER_CONTEXT = /split/i;
+
 export function extractSplitRatio(value: string | null | undefined): string | null {
-  const match = (value ?? '').match(/(?:^|[^\d])1\s*[:\-/]\s*(\d{1,3})(?![\d.])/);
+  const text = value ?? '';
+  if (!SPLITTER_CONTEXT.test(text)) return null;
+  const match = text.match(/(?:^|[^\d])1\s*[:\-/]\s*(\d{1,3})(?![\d.])/);
   return match ? `1:${match[1]}` : null;
 }
 
@@ -126,6 +144,7 @@ export class StockMatcher {
       byMethod: {
         supplier_code: matched.filter(r => r.matchMethod === 'supplier_code').length,
         exact_code: matched.filter(r => r.matchMethod === 'exact_code').length,
+        exact_name: matched.filter(r => r.matchMethod === 'exact_name').length,
         category_rule: matched.filter(r => r.matchMethod === 'category_rule').length,
         fuzzy_description: matched.filter(r => r.matchMethod === 'fuzzy_description').length,
       },
@@ -233,7 +252,7 @@ export class StockMatcher {
         return {
           ...baseResult,
           stockItem: nameMatches[0]!,
-          matchMethod: 'exact_code',
+          matchMethod: 'exact_name',
           matchConfidence: SUPPLIER_CODE_CONFIDENCE,
         };
       }
