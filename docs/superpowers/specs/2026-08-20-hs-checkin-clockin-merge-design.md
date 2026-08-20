@@ -155,9 +155,27 @@ Revisit deletion once combined-flow data shows standalone submissions near zero.
 | Worker declares unfit | Attendance stands, row marked `blocked`, outcome screen directs them to their supervisor. |
 | Second clock-in same day | H&S steps skipped via the per-day unique index. |
 | Signal lost mid-flow | Same as abandonment. Nothing to reconcile. |
+| **Clock-in queued offline** | H&S steps are skipped entirely. See below. |
 | Worker picks the wrong location | Correctable only by an officer today — the per-day unique index prevents re-submission. See open questions. |
 
 ---
+
+### Offline clock-ins skip the H&S steps
+
+`submitClockEventWithOfflineFallback` (`clock/useClockSubmission.ts:66`) can
+return `queued`: the attendance event is in IndexedDB on the phone and has not
+reached Postgres. There is no `attendance_entry_id` to link, no network to post
+the check-in, and clearance cannot be computed on the device — the medical and
+permit lookups are server-side.
+
+So a queued clock-in shows today's queued view and no safety questions. The
+worker is covered by the hub badge and the standalone page, exactly as they are
+today.
+
+Queuing the H&S declaration offline would need its own queue event type, a sync
+handler, and a decision about what a worker sees when a clearance computed
+hours later comes back `blocked`. That is a feature in its own right, not part
+of this one.
 
 ## Testing
 
@@ -180,6 +198,7 @@ Revisit deletion once combined-flow data shows standalone submissions near zero.
 - Populating `fleet_authorized_locations` — 0 rows today, which is why site
   cannot be derived from the geofence and is declared by the worker instead.
 - Any change to what H&S officers see beyond the office rows arriving.
+- Offline capture of the H&S declaration (see above).
 
 ---
 
