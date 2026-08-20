@@ -112,6 +112,27 @@ export default withAuth(withErrorHandler(async (
         return apiResponse.validationError(res, { items: 'At least one item is required' });
       }
 
+      // A receipt line only reaches stock if it carries a stock_item_id: both
+      // postGrnReceiptLines and the stock trigger key on it, and skip the line
+      // when it is null. The receive screen doesn't send one — it builds lines
+      // from the PO, and available-pos never exposed the field — so goods were
+      // being "received" into nothing. Take it from the PO line, which is the
+      // authoritative link, rather than trusting whatever the client posted.
+      const poItemIds = body.items
+        .map((i: { poItemId?: string }) => i.poItemId)
+        .filter((id: string | undefined): id is string => Boolean(id));
+      const stockItemByPoItem = new Map<string, string>();
+      if (poItemIds.length > 0) {
+        const poLines = await sql`
+          SELECT id, stock_item_id
+            FROM purchase_order_items
+           WHERE id = ANY(${poItemIds}::uuid[]) AND stock_item_id IS NOT NULL
+        `;
+        for (const row of poLines as Record<string, unknown>[]) {
+          stockItemByPoItem.set(row.id as string, row.stock_item_id as string);
+        }
+      }
+
       // Header and items go in together or not at all — a failing line must not
       // leave an item-less GRN behind (that is how GRN26-00326/00327 happened).
       const grn = await transaction(async (txn) => {
@@ -171,7 +192,8 @@ export default withAuth(withErrorHandler(async (
             [
               created!.id,
               item.poItemId || null,
-              item.stockItemId || null,
+              item.stockItemId
+                || (item.poItemId ? stockItemByPoItem.get(item.poItemId) ?? null : null),
               item.itemCode || null,
               item.itemDescription || null,
               item.quantityExpected || null,

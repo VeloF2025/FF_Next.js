@@ -56,6 +56,9 @@ function invoke(body: unknown = BODY) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The neon tag always resolves to a row array; default to "PO line has no
+  // stock item" so each test opts in to the linkage it wants to exercise.
+  mocks.neonTag.mockResolvedValue([]);
 });
 
 describe('POST /api/procurement/grn — atomicity', () => {
@@ -81,8 +84,10 @@ describe('POST /api/procurement/grn — atomicity', () => {
     expect(seen[0]!.text).toContain('INSERT INTO goods_receipt_notes');
     expect(seen.slice(1).every((q) => q.text.includes('INSERT INTO goods_receipt_items'))).toBe(true);
     expect(new Set(seen.map((q) => q.client)).size).toBe(1);
-    // The header must never be written through the non-transactional neon tag.
-    expect(mocks.neonTag).not.toHaveBeenCalled();
+    // The neon tag is only for the read-only PO-line lookup; nothing is
+    // WRITTEN outside the transaction.
+    const neonSql = mocks.neonTag.mock.calls.map((c) => (c[0] as string[]).join('?')).join('\n');
+    expect(neonSql).not.toMatch(/INSERT|UPDATE|DELETE/i);
   });
 
   it('surfaces a failing line as an error instead of returning a half-written GRN', async () => {
@@ -111,5 +116,82 @@ describe('POST /api/procurement/grn — atomicity', () => {
 
     expect(res._getStatusCode()).toBe(422);
     expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/procurement/grn — stock item linkage', () => {
+  /** Capture the stock_item_id (param $3) written for each receipt line. */
+  function captureLineStockItems(seen: unknown[][]) {
+    mocks.transaction.mockImplementation(async (cb: (txn: unknown) => Promise<unknown>) => {
+      const txn = {
+        query: async (_text: string, params: unknown[]) => { seen.push(params); return []; },
+        queryOne: async () => ({ id: 'grn-1', grn_number: 'GRN26-00401', supplier_id: 18 }),
+      };
+      return cb(txn);
+    });
+  }
+
+  it('takes stock_item_id from the PO line when the client sends none', async () => {
+    // The receive screen builds its lines from the PO and has no stock item to
+    // send. Without this, the receipt is skipped by the stock posting entirely.
+    mocks.neonTag.mockResolvedValueOnce([
+      { id: 'poi-1', stock_item_id: 'stock-cableclip' },
+      { id: 'poi-2', stock_item_id: 'stock-wallplug' },
+    ]);
+    const seen: unknown[][] = [];
+    captureLineStockItems(seen);
+
+    const res = await invoke({
+      ...BODY,
+      items: [
+        { poItemId: 'poi-1', itemCode: 'ITEM-1', quantityReceived: 500, quantityRejected: 0, uom: 'unit' },
+        { poItemId: 'poi-2', itemCode: 'ITEM-2', quantityReceived: 500, quantityRejected: 0, uom: 'unit' },
+      ],
+    });
+
+    expect(res._getStatusCode()).toBe(201);
+    expect(seen.map((p) => p[2])).toEqual(['stock-cableclip', 'stock-wallplug']);
+  });
+
+  it('keeps an explicit stock item from the client over the PO line', async () => {
+    mocks.neonTag.mockResolvedValueOnce([{ id: 'poi-1', stock_item_id: 'stock-from-po' }]);
+    const seen: unknown[][] = [];
+    captureLineStockItems(seen);
+
+    const res = await invoke({
+      ...BODY,
+      items: [{ poItemId: 'poi-1', stockItemId: 'stock-chosen', itemCode: 'ITEM-1', quantityReceived: 1, quantityRejected: 0, uom: 'unit' }],
+    });
+
+    expect(res._getStatusCode()).toBe(201);
+    expect(seen[0]![2]).toBe('stock-chosen');
+  });
+
+  it('leaves the line unlinked when the PO line has no stock item either', async () => {
+    mocks.neonTag.mockResolvedValueOnce([]); // PO line's stock_item_id is NULL
+    const seen: unknown[][] = [];
+    captureLineStockItems(seen);
+
+    const res = await invoke({
+      ...BODY,
+      items: [{ poItemId: 'poi-9', itemCode: 'ITEM-9', quantityReceived: 1, quantityRejected: 0, uom: 'unit' }],
+    });
+
+    expect(res._getStatusCode()).toBe(201);
+    expect(seen[0]![2]).toBeNull();
+  });
+
+  it('does not query the PO when no line references one', async () => {
+    const seen: unknown[][] = [];
+    captureLineStockItems(seen);
+
+    const res = await invoke({
+      ...BODY,
+      items: [{ stockItemId: 'stock-direct', itemCode: 'FREE', quantityReceived: 1, quantityRejected: 0, uom: 'unit' }],
+    });
+
+    expect(res._getStatusCode()).toBe(201);
+    expect(mocks.neonTag).not.toHaveBeenCalled();
+    expect(seen[0]![2]).toBe('stock-direct');
   });
 });
