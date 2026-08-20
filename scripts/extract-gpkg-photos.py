@@ -37,7 +37,7 @@ from qfield_project_registry import ALTERNATE_GPKGS, OPTICAL_GPKGS, PROJECTS
 # (minio_list_gpkg_versions/_family, qfc_list_dcim_files) are reached from inside the
 # storage modules' own namespaces, so importing them here would be dead — and worse
 # than dead: it would imply they are patchable from this module, which they are not.
-from qfield_gpkg_storage import resolve_gpkg_path
+from qfield_gpkg_storage import resolve_gpkg_paths
 from qfield_photo_storage import minio_resolve_photo_version
 from qfield_row_ingest import ingest_rows
 
@@ -68,26 +68,43 @@ DB_URL = os.environ.get("DATABASE_URL")
 
 
 def extract_project(conn, project_name, config, dry_run=False, force=False):
-    """Extract photo references from a project's GPKG and upsert into DB.
+    """Extract photo references from every GPKG in the project's family.
 
-    Coordinates the phases in qfield_extract_phases. A phase returning None means
-    "abort this project" and becomes (0, 0) here — see that module for why every
-    abort must happen before any sync-state is written.
+    Crews both RENAME an audit GPKG rather than overwriting it (Mahikeng: 918 photos
+    missed over 5 days) and SPLIT one into concurrent layers (Namakgale: four
+    civil-audit phase files, all live). Reading only the newest member handles the
+    first and silently drops the second, so every member is read; each keeps its own
+    sync-state row, so an unchanged one costs a download and a SKIP.
     """
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     qf_id = config["qf_project_id"]
-    ff_id = config["ff_project_id"]
 
     print(f"\n{'='*60}")
     print(f"Project: {project_name}")
     print(f"  QField: {qf_id}")
 
-    # Crews rename an audit GPKG rather than overwriting it, which silently pins the
-    # ingest to a dead file (Mahikeng: 918 photos missed over 5 days). Follow the
-    # rename to the newest member of the configured file's family. Every downstream
-    # step — sync-state lookup, download, sync-state upsert — must use gpkg_path, not
-    # config["gpkg_path"], or the delta check compares against the wrong state row.
-    gpkg_path = resolve_gpkg_path(qf_id, config["gpkg_path"])
+    total_found = 0
+    total_upserted = 0
+    for gpkg_path in resolve_gpkg_paths(qf_id, config["gpkg_path"]):
+        found, upserted = extract_gpkg(
+            conn, config, gpkg_path, dry_run=dry_run, force=force)
+        total_found += found
+        total_upserted += upserted
+    return total_found, total_upserted
+
+
+def extract_gpkg(conn, config, gpkg_path, dry_run=False, force=False):
+    """Extract photo references from ONE GPKG and upsert into DB.
+
+    Coordinates the phases in qfield_extract_phases. A phase returning None means
+    "abort this file" and becomes (0, 0) here — see that module for why every abort
+    must happen before any sync-state is written. Every step — sync-state lookup,
+    download, sync-state upsert — must use gpkg_path, not config["gpkg_path"], or the
+    delta check compares against the wrong state row.
+    """
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    qf_id = config["qf_project_id"]
+    ff_id = config["ff_project_id"]
+
     print(f"  GPKG:   {gpkg_path}")
 
     # pending_count = photos referenced by the GPKG whose binary had not yet uploaded

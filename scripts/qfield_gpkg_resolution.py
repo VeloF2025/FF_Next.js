@@ -15,9 +15,9 @@ reported success — and the coverage check stayed quiet because its guarantee o
 covers projects with ZERO ingested photos, not stale ones.
 
 Two independent defences live here:
-  * follow the rename  — pick the newest member of the configured file's family,
-    then find the photo table inside it (the layer name tracks the filename, so it
-    drifts too);
+  * follow the rename  — read every member of the configured file's family, newest
+    first, then find the photo table inside each (the layer name tracks the filename,
+    so it drifts too);
   * notice the freeze  — per file, ask whether a newer file exists that we are not
     reading: a newer version of the tracked path, or a newer same-family sibling
     (which is how a rename presents). See select_stale_gpkgs.
@@ -99,7 +99,7 @@ def family_members(configured_name, candidate_versions):
         and never written (Mahikeng's 'Civil_Audit_V02.gpkg'); a placeholder must never
         win the newest-file contest;
       * unparseable version ids — anything not 'v<14 digits>-…'. Ordering is by parsed
-        timestamp (see pick_latest_gpkg), so a token that cannot be parsed cannot be
+        timestamp (see order_family_gpkgs), so a token that cannot be parsed cannot be
         ranked. Silently sorting it as a plain string is how an unexpected key shape
         would win the contest and get downloaded.
     """
@@ -110,33 +110,44 @@ def family_members(configured_name, candidate_versions):
     }
 
 
-def pick_latest_gpkg(configured_name, candidate_versions):
-    """Pick the newest GPKG in configured_name's family.
+def order_family_gpkgs(configured_name, candidate_versions):
+    """Every member of configured_name's family, newest-uploaded FIRST.
 
-    candidate_versions: {filename: latest_version_id} for the GPKGs in the project.
-    Returns (filename, version_id), or (None, None) to mean "no redirect — use the
-    configured name". Fails OPEN to today's behaviour rather than skipping a project.
+    The extractor reads all of them each run; this decides the order and whether the
+    family may be expanded at all. Returns [] to mean "no expansion — read only the
+    configured name", which keeps a MinIO hiccup or a misconfigured path from silently
+    redirecting a project's ingest somewhere unexpected.
 
-    REQUIRES THE CONFIGURED FILE TO EXIST UNDER ITS EXACT NAME — it is the anchor of
+    THE CONFIGURED FILE MUST BE PRESENT UNDER ITS EXACT NAME — it is the anchor of
     trust. The presence test is exact, NOT normalized, even though membership is:
     three ALTERNATE_GPKGS entries (Mamelodi / Thembisa POP 1 / POP 3 →
     'civil_audit_.gpkg') name files absent from MinIO, and 'civil_audit_' normalizes to
     exactly 'civil audit', so a normalized test would treat Thembisa's real
-    'Civil Audit.gpkg' as "found" and ingest a never-reviewed audit through a second
-    fallback in the same run.
+    'Civil Audit.gpkg' as "found" and ingest a never-reviewed audit.
 
     Ordering is by PARSED version timestamp, not string compare; family_members has
     already dropped anything unparseable. The configured file wins ties.
+
+    Newest-first matters operationally, not cosmetically: the actively-written file is
+    the one whose photos are wanted on the dashboard soonest, and it is the one whose
+    log lines a human reads first when a run is truncated.
+
+    Why ALL members rather than the single newest this used to pick: a family is not
+    always a rename chain. HT Namakgale carries four concurrent civil-audit layers
+    ('Civil Audit.gpkg' + 'Civil Audit phase_2_/3_/4_.gpkg'), all published within one
+    second on 2026-08-14 and all still written to. Reading only the newest means the
+    other three are never read — and each carries the full set of 8 civil photo
+    columns, so the day a crew captures into one, those photos are dropped in silence.
     """
     family = family_members(configured_name, candidate_versions)
     if not family or configured_name not in family:
-        return None, None
+        return []
 
     def rank(item):
         name, version = item
         return (version_timestamp(version), 1 if name == configured_name else 0)
 
-    return max(family.items(), key=rank)
+    return [name for name, _ in sorted(family.items(), key=rank, reverse=True)]
 
 
 def pick_photo_table(configured_table, photo_column_counts, prefer_stem=None):

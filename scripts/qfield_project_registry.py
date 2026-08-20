@@ -17,7 +17,7 @@ the registry importable is what lets the alert name the real cause.
 Shape of a PROJECTS entry:
     qf_project_id  QFieldCloud project UUID
     ff_project_id  FibreFlow projects.id UUID
-    gpkg_path      family ROOT filename; resolve_gpkg_path() follows renames
+    gpkg_path      family ROOT filename; resolve_gpkg_paths() reads every member
     table_name     QField relation table holding the photo columns
     label_col      column holding the pole label — CASE-SENSITIVE (see below)
   optional:
@@ -109,15 +109,29 @@ PROJECTS = {
     # but with a "1. Permission Slip Photo" prefix that shifts step numbers by +1 —
     # handled by STEP_PATTERNS (leading-word, number-agnostic). Pole label lives in
     # the "Name" column (e.g. HT_MFKGP4_D2964PL); "Lable"/"Pole_ID" are empty/junk.
-    # GPKG file is "Civil audit.gpkg" (lower-case "audit"); table match is case-insensitive.
-    # gpkg_path is the FAMILY ROOT, not necessarily the file that gets read: the crew
-    # renames rather than overwrites ("Civil audit updated_27_07.gpkg"), and
-    # resolve_gpkg_path() follows that to the newest member each run. Leave it at the
-    # root — pinning a dated name here would need re-pinning after every rename.
+    # gpkg_path is the FAMILY ROOT: resolve_gpkg_paths() reads every same-family member
+    # each run, so an append-style rename ("Civil audit updated_27_07.gpkg") is followed
+    # without re-pinning anything here.
+    #
+    # REPOINTED 2026-08-20, and the reason is the limit of that mechanism. On 2026-08-04
+    # this crew renamed ACROSS the prefix — "Civil audit updated_30_07.gpkg" →
+    # "new_civil_audit_04_08_2026.gpkg" — and emptied every old version folder. A family
+    # is a normalized PREFIX match (is_family_member), so "new civil audit…" is not one:
+    # the old root resolved to zero versions, the download failed quietly, and Mahikeng
+    # ingested nothing for 17 days while the field kept shooting. Measured on the day of
+    # this change: 9 309 photos in QFieldCloud against 3 256 in qfield_photo_validations,
+    # last written 2026-08-03. The live file holds 4 418 rows and 7 741 photo references.
+    #
+    # So the root moves with the rename when the rename is unfollowable. Do NOT also pin
+    # table_name to the new stem: "civil_audit" is absent from this file and open_gpkg's
+    # TABLE-FALLBACK resolves the layer by counting photo columns, which survives the
+    # next rename. Pinning the dated table name would need re-pinning; leaving it does
+    # not. (Verified against v20260819134333: the sole photo-bearing table is
+    # "new_civil_audit_04_08_2026", label "Name", zone "Phase" — unchanged otherwise.)
     "Mahikeng": {
         "qf_project_id": "e801cd43-7efe-4f7a-bed5-ee0410f3dfd6",
         "ff_project_id": "7794d0ba-95c9-491b-8cb5-7f300c61aa23",
-        "gpkg_path": "Civil audit.gpkg",
+        "gpkg_path": "new_civil_audit_04_08_2026.gpkg",
         "table_name": "civil_audit",
         "label_col": "Name",
         "zone_col": "Phase",
@@ -199,7 +213,7 @@ PROJECTS = {
     # That this crew uses BOTH conventions is the risk worth knowing. is_family_member
     # was checked over all 60 GPKG names in the folder and BF's family is the singleton
     # ["Civil Audit (BF).gpkg"], so no sibling can be adopted INTO this entry — but the
-    # reverse is unguarded. If the crew renames AWAY from the paren name, pick_latest_gpkg
+    # reverse is unguarded. If the crew renames AWAY from the paren name, order_family_gpkgs
     # returns (None, None), the extractor keeps reading the still-present dead file and
     # logs "SKIP: Already processed this version" forever; select_stale_gpkgs uses the
     # same prefix rule so it cannot report it, and EXTRACT-GAP is already quiet once the

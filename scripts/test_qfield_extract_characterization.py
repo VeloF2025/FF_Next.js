@@ -92,7 +92,7 @@ def main():
     # Every stub invoked unconditionally on a real run. The two conditional ones
     # (resolve_spatial_pon_map, minio_resolve_photo_version) are asserted in the
     # scenarios that actually trigger them — asserting >0 here would fail spuriously.
-    for stub in ("resolve_gpkg_path", "minio_download_latest",
+    for stub in ("resolve_gpkg_paths", "minio_download_latest",
                  "minio_list_dcim_directory", "sync_hierarchy",
                  "fetch_linked_qf_project_ids", "hierarchy_backfill_needed"):
         check(h.stub_calls.get(stub, 0) > 0,
@@ -271,14 +271,49 @@ def main():
     check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"), "dry-run records no sync-state")
     check(not h.conn.committed, "dry-run does not commit")
 
-    print("\nSuperseded-path retirement")
+    print("\nNo sync-state row is ever retired")
+    # Inverted 2026-08-20. While the resolver picked ONE winner per family, the loser's
+    # row could never advance and was deleted as superseded. Every member is now read on
+    # every run, so that delete became actively harmful: reading a dormant sibling would
+    # drop the row of the actively-written file and force a full re-scan next run. It is
+    # also what stranded Namakgale's 'Civil Audit phase_2_.gpkg' row on 2026-08-14 — it
+    # cleaned the configured path when a sibling won, and nothing cleaned the sibling
+    # when the configured path won back, so the monitor paged on it for days.
     _, _, _, h = run(
-        config=config(gpkg_path="Civil audit.gpkg"),
-        gpkg_path="Civil audit updated_27_07.gpkg",
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path="Civil Audit phase_2_.gpkg",
         columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
         dcim={"a.jpg": "k/a"}, dry_run=False)
-    check(h.cursor.ran("DELETE FROM qfield_gpkg_sync_state"),
-          "a followed rename retires the superseded sync-state row")
+    check(not h.cursor.ran("DELETE FROM qfield_gpkg_sync_state"),
+          "reading a sibling does NOT delete the configured path's sync-state row")
+    check(h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
+          "the sibling records its own sync-state row")
+
+    print("\nEvery family member is read, and the totals are summed")
+    # The loop added on 2026-08-20. Namakgale publishes four concurrent civil-audit
+    # layers; reading only the newest is what left three of them unread. Two members
+    # here, each resolving to the same one-photo fixture: the assertion is that the
+    # second file is processed at all, and that extract_project reports the SUM rather
+    # than the last file's figures.
+    _, _, _, h = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    synced = [p[1] for sql, p in h.cursor.executed
+              if "INSERT INTO qfield_gpkg_sync_state" in sql]
+    check(synced == ["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+          f"both family members record their own sync-state row, got {synced}")
+    check(h.stub_calls.get("minio_download_latest", 0) == 2,
+          f"both are downloaded, got {h.stub_calls.get('minio_download_latest', 0)}")
+
+    found, upserted, _, _ = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=True)
+    check((found, upserted) == (2, 2),
+          f"extract_project returns the SUM across the family, got ({found},{upserted})")
 
     print()
     if failures:

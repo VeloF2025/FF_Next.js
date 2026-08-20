@@ -177,7 +177,10 @@ class Harness:
         # merely that the resolver was called.
         self._spatial_pon_map = spatial_pon_map if spatial_pon_map is not None else {}
         self._version = version
-        self._gpkg_path = gpkg_path
+        # A string is the single-file case; a LIST makes the family multi-member, which
+        # is the only way to exercise extract_project's loop (extract_gpkg is what the
+        # rest of these scenarios drive, one file at a time).
+        self._gpkg_paths = [gpkg_path] if isinstance(gpkg_path, str) else list(gpkg_path)
         self._linked = list(linked)
         # Interception machinery lives in qfield_patchkit; see its docstring for why
         # patching is by object identity and restore is by scan.
@@ -211,7 +214,7 @@ class Harness:
             self.hierarchy_calls.append((a, kw))
             return {"mapped": 0, "qa_poles": 0, "poles": 0, "reviews": 0}
 
-        self._patcher.patch("resolve_gpkg_path", lambda qf, p: self._gpkg_path)
+        self._patcher.patch("resolve_gpkg_paths", lambda qf, p: list(self._gpkg_paths))
         self._patcher.patch("minio_download_latest", _download)
         self._patcher.patch("minio_list_dcim_directory", _list_dcim)
         self._patcher.patch("minio_resolve_photo_version", lambda qf, p: None)

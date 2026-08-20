@@ -19,8 +19,8 @@ import subprocess
 
 from qfield_gpkg_resolution import (
     is_family_member,
+    order_family_gpkgs,
     parse_mc_gpkg_names,
-    pick_latest_gpkg,
 )
 
 # MinIO bucket. Deliberately restated rather than imported from a sibling module: the
@@ -92,8 +92,8 @@ def minio_list_gpkg_family(qf_project_id, configured_path):
     candidates = sorted(n for n in parse_mc_gpkg_names(result.stdout)
                         if is_family_member(configured_path, n))
     if len(candidates) > MAX_FAMILY_CANDIDATES:
-        # Keep the configured file whatever else goes: without it pick_latest_gpkg
-        # refuses to redirect at all, so dropping it would turn a cap into a silent
+        # Keep the configured file whatever else goes: without it order_family_gpkgs
+        # refuses to expand at all, so dropping it would turn a cap into a silent
         # loss of the whole feature. Descending order keeps the newest date-stamped
         # names, which are the plausible rename targets.
         keep = [configured_path] if configured_path in candidates else []
@@ -111,32 +111,40 @@ def minio_list_gpkg_family(qf_project_id, configured_path):
     return family
 
 
-def resolve_gpkg_path(qf_project_id, configured_path):
-    """Follow a crew rename: the newest GPKG in configured_path's family.
+def resolve_gpkg_paths(qf_project_id, configured_path):
+    """Every GPKG in configured_path's family, newest first — all of them get read.
 
-    Returns the filename to actually read. Falls back to configured_path whenever
-    the family cannot be listed or the configured file is still the newest.
+    Returns a list of filenames to actually read, always non-empty. Falls back to
+    [configured_path] whenever the family cannot be listed or the configured file is
+    not present under its exact name.
+
+    Replaces the earlier resolve_gpkg_path(), which returned only the single newest
+    member. That followed a crew RENAME correctly but mis-handled a crew SPLIT: HT
+    Namakgale publishes four concurrent civil-audit layers, and picking the newest
+    meant the other three went unread — including, on 2026-08-14, a redirect onto
+    'Civil Audit phase_2_.gpkg' that then left it stranded when the base file was next
+    written. See order_family_gpkgs for why every member is read instead.
     """
     family = minio_list_gpkg_family(qf_project_id, configured_path)
-    chosen, chosen_version = pick_latest_gpkg(configured_path, family)
+    ordered = order_family_gpkgs(configured_path, family)
 
-    if not chosen:
-        # pick_latest_gpkg refuses to redirect when the configured file itself is
+    if not ordered:
+        # order_family_gpkgs refuses to expand when the configured file itself is
         # missing. Say so out loud — that is a real misconfiguration (the download
-        # below will fail), just not one this function is allowed to guess its way out of.
+        # below will fail), just not one this function is allowed to guess its way
+        # out of. Mahikeng reached exactly this state on 2026-08-04: the crew renamed
+        # ACROSS the family prefix ('Civil audit updated_30_07.gpkg' →
+        # 'new_civil_audit_04_08_2026.gpkg'), every old version folder was emptied,
+        # and ~6 000 photos went unread for 17 days behind a quiet log line.
         if family and configured_path not in family:
             print(f"  WARN: configured '{configured_path}' is not in MinIO. Same-family "
-                  f"files exist ({sorted(family)}) but auto-redirect requires the "
+                  f"files exist ({sorted(family)}) but auto-expansion requires the "
                   f"configured file to exist — fix PROJECTS/ALTERNATE_GPKGS instead.")
-        return configured_path
+        return [configured_path]
 
-    if chosen == configured_path:
-        return configured_path
-
-    print(f"  REDIRECT: configured '{configured_path}' ({family.get(configured_path)}) is "
-          f"no longer the newest in its family — reading '{chosen}' ({chosen_version}) "
-          f"instead. Family: {sorted(family)}")
-    return chosen
+    if len(ordered) > 1:
+        print(f"  FAMILY: reading all {len(ordered)} same-family GPKG(s): {ordered}")
+    return ordered
 
 
 def minio_download_latest(qf_project_id, gpkg_path, dest_path):

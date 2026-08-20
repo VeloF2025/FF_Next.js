@@ -27,7 +27,7 @@ from qfield_gpkg_resolution import (  # noqa: E402
     is_family_member,
     normalize_stem,
     parse_mc_gpkg_names,
-    pick_latest_gpkg,
+    order_family_gpkgs,
     pick_photo_table,
     version_timestamp,
 )
@@ -92,14 +92,22 @@ GPKG_LISTINGS = {
         "Distribution.gpkg", "DistributionJoints.gpkg", "DistributionSpurs.gpkg",
         "DistributionSpurJoints.gpkg", "PON Progress.gpkg",
     ],
+    # Re-listed 2026-08-20. "new_civil_audit_04_08_2026.gpkg" is the live file and the
+    # registered one; the whole "Civil audit*" set above it is now EMPTY version folders
+    # (kept here because the resolver must still refuse to claim them across the prefix).
     "Mahikeng": [
+        "new_civil_audit_04_08_2026.gpkg",
         "Civil audit.gpkg", "Civil audit updated_22_07.gpkg", "Civil audit updated_27_07.gpkg",
+        "Civil audit updated_30_07.gpkg",
         "Civil_Audit_V02.gpkg", "MahikengPoles.gpkg", "MahikengPH4AOI.gpkg", "QA Audit.gpkg",
         "PON Progress.gpkg", "PON Progress V2.gpkg", "PON Progress new.gpkg",
         "cable_span_V4.gpkg", "DemandPoints.gpkg",
     ],
+    # Re-listed 2026-08-20. The three "phase_" files are CONCURRENT layers, not renames:
+    # all four were published within one second on 2026-08-14 and all four are written to.
     "Namakgale": [
-        "Civil Audit.gpkg", "Cable Span.gpkg", "Namakgale Existing DC.gpkg",
+        "Civil Audit.gpkg", "Civil Audit phase_2_.gpkg", "Civil Audit phase_3_.gpkg",
+        "Civil Audit phase_4_.gpkg", "Cable Span.gpkg", "Namakgale Existing DC.gpkg",
         "Namakgale P3 (A1) AOI.gpkg", "Namakgale P3 (A1) BH Civil.gpkg",
         "Namakgale P3 (A1) BH MHs.gpkg", "Namakgale P3 (A1) Demands.gpkg",
     ],
@@ -123,7 +131,7 @@ REGISTERED = [
     ("Thembisa POP 3", "THM_3_Poles.gpkg"),
     ("Thembisa POP 3", "Optical Audit.gpkg"),
     ("Tonga", "Civil Audit.gpkg"),
-    ("Mahikeng", "Civil audit.gpkg"),
+    ("Mahikeng", "new_civil_audit_04_08_2026.gpkg"),
     ("Namakgale", "Civil Audit.gpkg"),
 ]
 
@@ -212,67 +220,102 @@ def main():
     check("empty configured name claims nothing",
           not is_family_member("", "Civil audit.gpkg"))
 
-    print("\npick_latest_gpkg — Mahikeng resolves to the newest:")
-    mahikeng = versions_for("Mahikeng")
-    mahikeng["Civil audit updated_22_07.gpkg"] = V_MID
-    mahikeng["Civil audit updated_27_07.gpkg"] = V_NEW
-    chosen, version = pick_latest_gpkg("Civil audit.gpkg", mahikeng)
-    check("picks 'Civil audit updated_27_07.gpkg'", chosen == "Civil audit updated_27_07.gpkg")
-    check("returns its version", version == V_NEW)
-    check("versionless 'Civil_Audit_V02.gpkg' never wins", chosen != "Civil_Audit_V02.gpkg")
+    print("\norder_family_gpkgs — a rename chain reads newest-first:")
+    mahikeng_old = {
+        "Civil audit.gpkg": V_OLD,
+        "Civil audit updated_22_07.gpkg": V_MID,
+        "Civil audit updated_27_07.gpkg": V_NEW,
+        "Civil_Audit_V02.gpkg": None,
+    }
+    ordered = order_family_gpkgs("Civil audit.gpkg", mahikeng_old)
+    check("newest rename comes first", ordered[0] == "Civil audit updated_27_07.gpkg")
+    check("but the older members are still read",
+          set(ordered) == {"Civil audit.gpkg", "Civil audit updated_22_07.gpkg",
+                           "Civil audit updated_27_07.gpkg"})
+    check("versionless 'Civil_Audit_V02.gpkg' is never read", "Civil_Audit_V02.gpkg" not in ordered)
 
-    print("\npick_latest_gpkg — guards:")
-    check("no redirect when the configured file is the newest",
-          pick_latest_gpkg("Civil audit.gpkg", {"Civil audit.gpkg": V_NEW,
-                                                "Civil audit updated_22_07.gpkg": V_OLD})[0]
+    print("\norder_family_gpkgs — Namakgale's concurrent phase layers are ALL read:")
+    # The regression this function exists for. Under the old single-winner resolver the
+    # three phase files went unread whenever the base file was newest, and the one that
+    # briefly won on 2026-08-14 was stranded with a sync-state row that could never
+    # advance — which is what paged for 3.4 days.
+    namakgale = versions_for("Namakgale")           # base file newest
+    ordered = order_family_gpkgs("Civil Audit.gpkg", namakgale)
+    check("all four civil-audit layers are read",
+          set(ordered) == {"Civil Audit.gpkg", "Civil Audit phase_2_.gpkg",
+                           "Civil Audit phase_3_.gpkg", "Civil Audit phase_4_.gpkg"})
+    check("unrelated 'Cable Span.gpkg' is not one of them", "Cable Span.gpkg" not in ordered)
+    for newest in ("Civil Audit.gpkg", "Civil Audit phase_2_.gpkg", "Civil Audit phase_4_.gpkg"):
+        listing = versions_for("Namakgale", newest=newest)
+        got = order_family_gpkgs("Civil Audit.gpkg", listing)
+        check(f"whichever member is newest ({newest}) leads, and none is dropped",
+              got[0] == newest and len(got) == 4)
+
+    print("\norder_family_gpkgs — guards:")
+    check("configured file leads when it is the newest",
+          order_family_gpkgs("Civil audit.gpkg", {"Civil audit.gpkg": V_NEW,
+                                                  "Civil audit updated_22_07.gpkg": V_OLD})[0]
           == "Civil audit.gpkg")
     check("configured file wins a version tie",
-          pick_latest_gpkg("Civil audit.gpkg", {"Civil audit.gpkg": V_NEW,
-                                                "Civil audit updated_27_07.gpkg": V_NEW})[0]
+          order_family_gpkgs("Civil audit.gpkg", {"Civil audit.gpkg": V_NEW,
+                                                  "Civil audit updated_27_07.gpkg": V_NEW})[0]
           == "Civil audit.gpkg")
-    check("empty candidate set → no redirect", pick_latest_gpkg("Civil audit.gpkg", {}) == (None, None))
-    check("None candidate set → no redirect", pick_latest_gpkg("Civil audit.gpkg", None) == (None, None))
-    check("no redirect when the configured file is absent, even with a newer sibling",
-          pick_latest_gpkg("civil_audit_.gpkg", {"Civil Audit Audit.gpkg": V_NEW}) == (None, None))
+    check("empty candidate set → no expansion", order_family_gpkgs("Civil audit.gpkg", {}) == [])
+    check("None candidate set → no expansion", order_family_gpkgs("Civil audit.gpkg", None) == [])
+    check("no expansion when the configured file is absent, even with a newer sibling",
+          order_family_gpkgs("civil_audit_.gpkg", {"Civil Audit Audit.gpkg": V_NEW}) == [])
     check("presence test is EXACT, not normalized ('civil_audit_' ≠ 'Civil Audit')",
-          pick_latest_gpkg("civil_audit_.gpkg", {"Civil Audit.gpkg": V_NEW}) == (None, None))
+          order_family_gpkgs("civil_audit_.gpkg", {"Civil Audit.gpkg": V_NEW}) == [])
     check("unrelated newer files are ignored",
-          pick_latest_gpkg("Civil audit.gpkg", {"Civil audit.gpkg": V_OLD,
-                                                "Optical Audit.gpkg": V_NEW})[0]
-          == "Civil audit.gpkg")
+          order_family_gpkgs("Civil audit.gpkg", {"Civil audit.gpkg": V_OLD,
+                                                  "Optical Audit.gpkg": V_NEW})
+          == ["Civil audit.gpkg"])
 
-    print("\nNO-OP for every registered project (real MinIO listings):")
-    # Assert the FAMILY SET, not just the winner. Checking only the winner proves
-    # nothing here: every candidate carries the same version, so pick_latest_gpkg's
-    # tie-break returns the configured file whether or not the pattern over-matched.
-    # Verified by mutation — replacing the word-boundary prefix with a bare substring
-    # match (a severe over-match bug) left all 16 winner-only checks GREEN. Comparing
-    # the set is what actually fails, because a wrongly-claimed sibling shows up in it.
+    print("\nMahikeng's 2026-08-04 rename is UNFOLLOWABLE — the registry had to move:")
+    # Why the registered path is now the dated file. The crew renamed across the family
+    # prefix, so no amount of family-following reaches it; the old root resolved to zero
+    # versions and ~6 000 photos went unread for 17 days. Assert both halves: the old
+    # root cannot claim the new file, and the new file's own family is just itself.
+    check("'Civil audit.gpkg' does NOT claim 'new_civil_audit_04_08_2026.gpkg'",
+          not is_family_member("Civil audit.gpkg", "new_civil_audit_04_08_2026.gpkg"))
+    check("nor the other way round",
+          not is_family_member("new_civil_audit_04_08_2026.gpkg", "Civil audit.gpkg"))
+    check("the registered file reads itself and nothing else",
+          order_family_gpkgs("new_civil_audit_04_08_2026.gpkg", versions_for("Mahikeng"))
+          == ["new_civil_audit_04_08_2026.gpkg"])
+
+    print("\nEvery registered project reads its OWN family and nothing else:")
+    # Assert the whole SET, not just the leader. Checking only the leader proves nothing
+    # here: every candidate carries the same version, so the tie-break returns the
+    # configured file whether or not the pattern over-matched. Verified by mutation —
+    # replacing the word-boundary prefix with a bare substring match (a severe over-match
+    # bug) left all 16 leader-only checks GREEN. Comparing the set is what actually
+    # fails, because a wrongly-claimed sibling shows up in it.
+    EXPECTED_FAMILY = {
+        ("Namakgale", "Civil Audit.gpkg"): {
+            "Civil Audit.gpkg", "Civil Audit phase_2_.gpkg",
+            "Civil Audit phase_3_.gpkg", "Civil Audit phase_4_.gpkg",
+        },
+    }
     for project, configured in REGISTERED:
         listing = versions_for(project)
-        chosen, _ = pick_latest_gpkg(configured, listing)
-        check(f"{project} / {configured} → itself", chosen == configured)
-        fam = set(family_members(configured, listing))
-        expected = {configured} if project != "Mahikeng" else {
-            "Civil audit.gpkg",
-            "Civil audit updated_22_07.gpkg",
-            "Civil audit updated_27_07.gpkg",
-        }
-        check(f"{project} / {configured} family == {sorted(expected)}", fam == expected)
+        resolved = order_family_gpkgs(configured, listing)
+        expected = EXPECTED_FAMILY.get((project, configured), {configured})
+        check(f"{project} / {configured} → {sorted(expected)}", set(resolved) == expected)
+        check(f"{project} / {configured} family_members agrees",
+              set(family_members(configured, listing)) == expected)
 
-    print("\nNO-OP even when a neighbour is newer (over-match would redirect):")
+    print("\nNO-OP even when a neighbour is newer (over-match would adopt it):")
     for project, configured in REGISTERED:
-        if project == "Mahikeng":
-            continue  # Mahikeng SHOULD redirect — asserted above
+        expected = EXPECTED_FAMILY.get((project, configured), {configured})
         for neighbour in GPKG_LISTINGS[project]:
-            if neighbour == configured:
+            if neighbour in expected:
                 continue
             listing = versions_for(project, newest=neighbour)
-            chosen, _ = pick_latest_gpkg(configured, listing)
-            if chosen != configured:
-                check(f"{project} / {configured} wrongly redirected to '{neighbour}'", False)
-    check("no registered project redirects onto a newer neighbour",
-          not any("wrongly redirected" in f for f in _FAILURES))
+            if set(order_family_gpkgs(configured, listing)) != expected:
+                check(f"{project} / {configured} wrongly adopted '{neighbour}'", False)
+    check("no registered project adopts a newer neighbour",
+          not any("wrongly adopted" in f for f in _FAILURES))
 
     print("\nThe POP 1 hazard, end-to-end through its REAL listing:")
     # GPKG_LISTINGS stays honest — POP 1 holds 'Poles drag and drop.shp/.dbf/.prj/.shx',
@@ -281,23 +324,23 @@ def main():
     pop1 = versions_for("Thembisa POP 1")
     pop1["Poles drag and drop.gpkg"] = V_NEW   # the QGIS "export to GeoPackage"
     pop1["Poles HLD.gpkg"] = V_NEW             # the shape THM POP 3 already carries
-    chosen, _ = pick_latest_gpkg("Poles.gpkg", pop1)
-    check("a newer 'Poles drag and drop.gpkg' does NOT capture 'Poles.gpkg'",
-          chosen == "Poles.gpkg")
-    check("neither does a newer 'Poles HLD.gpkg'", chosen != "Poles HLD.gpkg")
+    resolved = order_family_gpkgs("Poles.gpkg", pop1)
+    check("a newer 'Poles drag and drop.gpkg' does NOT join 'Poles.gpkg'",
+          resolved == ["Poles.gpkg"])
+    check("neither does a newer 'Poles HLD.gpkg'", "Poles HLD.gpkg" not in resolved)
     check("and neither joins the family at all",
           set(family_members("Poles.gpkg", pop1)) == {"Poles.gpkg"})
     # The same project must still accept a genuine, version-stamped rename.
     pop1_renamed = dict(pop1)
     pop1_renamed["Poles updated_28_07.gpkg"] = V_NEW
     check("but a version-stamped 'Poles updated_28_07.gpkg' IS followed",
-          pick_latest_gpkg("Poles.gpkg", pop1_renamed)[0] == "Poles updated_28_07.gpkg")
+          order_family_gpkgs("Poles.gpkg", pop1_renamed)[0] == "Poles updated_28_07.gpkg")
 
     print("\nUnresolvable ALTERNATE_GPKGS stay unresolved (not silently adopted):")
     for project, configured in REGISTERED_MISSING:
         listing = versions_for(project)
-        check(f"{project} / {configured} → no redirect",
-              pick_latest_gpkg(configured, listing) == (None, None))
+        check(f"{project} / {configured} → no expansion",
+              order_family_gpkgs(configured, listing) == [])
 
     print("\npick_photo_table:")
     check("exact configured table wins even with fewer photo columns",

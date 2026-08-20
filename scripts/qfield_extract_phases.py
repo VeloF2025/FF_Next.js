@@ -218,16 +218,12 @@ def finalize(cur, conn, qf_id, ff_id, config, gpkg_path, version, table,
             pending_count = EXCLUDED.pending_count
     """, (qf_id, gpkg_path, version, len(table.rows), photos_skipped_missing))
 
-    # Retire the row we just superseded. After a redirect the old path keeps a row
-    # whose last_version can never advance again — nothing writes to it and nothing
-    # deletes it — so the staleness monitor would report it as behind forever, paging
-    # on this fix's own success and burying the real signal. Scoped to the configured
-    # path of THIS project: the resolver only ever redirects away from that one name.
-    if gpkg_path != config["gpkg_path"]:
-        cur.execute(
-            "DELETE FROM qfield_gpkg_sync_state WHERE qf_project_id = %s::uuid AND gpkg_path = %s",
-            (qf_id, config["gpkg_path"]),
-        )
-        if cur.rowcount:
-            print(f"  Retired superseded sync-state row for '{config['gpkg_path']}'")
+    # NO row is retired here any more. While the resolver picked a single winner, the
+    # loser's row could never advance again, so it was deleted as superseded. Now every
+    # family member is read on every run, so every row advances and a delete would be
+    # actively wrong: reading 'Civil Audit phase_2_.gpkg' would drop the row belonging
+    # to the actively-written 'Civil Audit.gpkg', losing its delta state and forcing a
+    # full re-scan next run. The one-directional delete is also what stranded
+    # Namakgale's phase_2_ row on 2026-08-14 — it cleaned the configured path when a
+    # sibling won, but nothing cleaned the sibling when the configured path won back.
     conn.commit()
