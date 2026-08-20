@@ -75,7 +75,7 @@ function mapIncident(row: IncidentRow): IncidentRecord {
   };
 }
 
-// `INC-<TYPE>-<YYYYMMDD>-<6 hex>`. No sequence table backs this (migration 502 defines none); the random suffix
+// `INC-<TYPE>-<YYYYMMDD>-<6 hex>`. No sequence table backs this (migration 506 defines none); the random suffix
 // makes a collision astronomically unlikely, and `incident_reference` carries its own UNIQUE constraint as a
 // backstop, so no retry loop is warranted here.
 function buildIncidentReference(incidentType: IncidentType, detectedAt: string): string {

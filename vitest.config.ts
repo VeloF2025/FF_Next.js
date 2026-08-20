@@ -77,7 +77,7 @@ export default defineConfig({
       'tests/migrations/499_attendance_project_aois.test.ts',
       'tests/migrations/500_attendance_exception_kinds.test.ts',
       'tests/migrations/501_attendance_clock_out_aoi.test.ts',
-      'tests/migrations/502_fleet_operational_incidents.test.ts',
+      'tests/migrations/506_fleet_operational_incidents.test.ts',
       'tests/migrations/metric-registry-execution.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.

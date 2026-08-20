@@ -1,4 +1,4 @@
--- 502_fleet_operational_incidents.sql
+-- 506_fleet_operational_incidents.sql
 -- Durable, reviewable Fleet operational incidents. No person is seeded here.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 CREATE TABLE IF NOT EXISTS fleet_operational_incident_rules (

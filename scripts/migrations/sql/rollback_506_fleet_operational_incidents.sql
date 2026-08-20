@@ -1,4 +1,4 @@
--- Rollback 502. This removes durable incident and audit evidence; execute only with approval.
+-- Rollback 506. This removes durable incident and audit evidence; execute only with approval.
 
 DELETE FROM user_permission_overrides
  WHERE permission_key IN ('fleet.incidents', 'fleet.incidents-settings');
@@ -16,4 +16,4 @@ DROP TABLE IF EXISTS fleet_operational_incident_rules;
 DELETE FROM access_permissions
  WHERE key IN ('fleet.incidents', 'fleet.incidents-settings');
 DELETE FROM schema_migrations
- WHERE filename = '502_fleet_operational_incidents.sql';
+ WHERE filename = '506_fleet_operational_incidents.sql';
