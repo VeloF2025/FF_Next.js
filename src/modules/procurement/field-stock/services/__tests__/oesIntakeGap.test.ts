@@ -12,7 +12,7 @@
  * SharePoint import (460 such serials at Tembelihle on 2026-08-20).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { closeOesIntakeGap } from '../oesIntakeGap';
+import { closeOesIntakeGap, MAX_PROMOTIONS_PER_RUN } from '../oesIntakeGap';
 import type { GapQuerier } from '../oesIntakeGap';
 
 const FT_ONT_ITEM_ID = '84cc2348-f8a9-486f-826a-6b8b20579765';
@@ -171,6 +171,48 @@ describe('closeOesIntakeGap', () => {
     });
 
     expect(order).toEqual(['find-missing', 'receive', 'find-promotable', 'promote', 'find-promotable']);
+  });
+
+  it('REFUSES to promote a set larger than the per-run cap', async () => {
+    // Unattended write to a shared prod DB: an unexpectedly huge set means
+    // something is wrong upstream, and a human should look before it runs.
+    const huge: Row[] = Array.from({ length: MAX_PROMOTIONS_PER_RUN + 1 }, (_, i) => ({
+      serial_number: `ALCLB4A${String(i).padStart(5, '0')}`,
+      drop_number: `DR${i}`,
+    }));
+    const promote = vi.fn(async () => {});
+
+    const report = await closeOesIntakeGap(querier([], huge), {
+      receive: vi.fn(async () => ({ received: 0, skipped: 0 })),
+      promote,
+    });
+
+    expect(promote).not.toHaveBeenCalled();
+    expect(report).toMatchObject({
+      promoted: 0, stillInStock: MAX_PROMOTIONS_PER_RUN + 1, promotionFailed: true,
+    });
+  });
+
+  it('promotes a set exactly at the cap', async () => {
+    const atCap: Row[] = Array.from({ length: MAX_PROMOTIONS_PER_RUN }, (_, i) => ({
+      serial_number: `ALCLB4A${String(i).padStart(5, '0')}`,
+      drop_number: `DR${i}`,
+    }));
+    const promote = vi.fn(async () => {});
+
+    const report = await closeOesIntakeGap(querier([], atCap, []), {
+      receive: vi.fn(async () => ({ received: 0, skipped: 0 })),
+      promote,
+    });
+
+    expect(promote).toHaveBeenCalledTimes(1);
+    expect(report.promoted).toBe(MAX_PROMOTIONS_PER_RUN);
+  });
+
+  it('the cap leaves room for the known first-run backlog', () => {
+    // 682 received + 460 already stuck on 2026-08-20. If the cap ever drops
+    // below the real backlog, the job silently stops doing its job.
+    expect(MAX_PROMOTIONS_PER_RUN).toBeGreaterThan(1142);
   });
 
   it('asks only for OES-active ALCL serials with no stock row', async () => {

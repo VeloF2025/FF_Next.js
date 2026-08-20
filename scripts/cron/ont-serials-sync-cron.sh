@@ -59,6 +59,9 @@ fi
 if grep -qE '"stillInStock":[1-9]' <<<"$response"; then
   log "WARN: OES-active serials are still sitting in_stock after the promotion pass"
 fi
+if grep -qE '"stillInStock":(2[0-9]{3}|[3-9][0-9]{3})' <<<"$response"; then
+  log "ERROR: promotable set exceeded the per-run cap — promotion REFUSED, a human needs to look"
+fi
 if grep -q '"promotionFailed":true' <<<"$response"; then
   log "WARN: the OES gap promotion did not fully succeed — check the app log for per-serial failures"
 fi

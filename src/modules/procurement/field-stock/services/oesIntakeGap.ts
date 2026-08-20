@@ -53,6 +53,20 @@ import { promoteOesActivatedSerials } from '@/modules/activate/services/oes/oesS
 import type { OesSerialRow } from '@/modules/activate/services/oes/oesSerialLifecycle';
 import { FT_ONT_ITEM_ID } from './ontSerialWorkbook';
 
+/**
+ * Refuse to promote more than this in one unattended run.
+ *
+ * This job writes `activated` to a shared production database on a 4-hourly
+ * cron with nobody watching. Steady state is near zero; the first run clears a
+ * known backlog of ~1,142 (682 received + 460 already stuck). The ceiling is
+ * whatever FT-ONT stock is `in_stock` at all — 2,931 today — so a number above
+ * the backlog but below the ceiling turns "something is badly wrong" into a
+ * refusal and a loud log, instead of a four-figure silent state change.
+ *
+ * Tripping this is not self-correcting: it needs a human to look.
+ */
+export const MAX_PROMOTIONS_PER_RUN = 2000;
+
 /** Minimal query surface needed here — a pg Pool satisfies it. */
 export interface GapQuerier {
   query<T>(text: string, params?: unknown[]): Promise<{ rows: T[] }>;
@@ -156,6 +170,15 @@ async function promoteInStock(
 ): Promise<{ promoted: number; stillInStock: number; promotionFailed?: boolean }> {
   const { rows } = await db.query<GapRow>(PROMOTABLE_SQL, [FT_ONT_ITEM_ID]);
   if (rows.length === 0) return { promoted: 0, stillInStock: 0 };
+
+  if (rows.length > MAX_PROMOTIONS_PER_RUN) {
+    log.error(
+      'OES intake gap: promotable set exceeds the per-run cap — REFUSING to promote, needs a human',
+      { promotable: rows.length, cap: MAX_PROMOTIONS_PER_RUN },
+      'oes-intake-gap',
+    );
+    return { promoted: 0, stillInStock: rows.length, promotionFailed: true };
+  }
 
   try {
     await deps.promote(rows);
