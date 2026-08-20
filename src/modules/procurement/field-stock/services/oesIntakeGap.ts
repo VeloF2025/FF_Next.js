@@ -44,7 +44,7 @@ import { FT_ONT_ITEM_ID } from './ontSerialWorkbook';
 
 /** Minimal query surface needed here — a pg Pool satisfies it. */
 export interface GapQuerier {
-  query<T>(text: string): Promise<{ rows: T[] }>;
+  query<T>(text: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
 export interface OesIntakeGapReport {
@@ -72,8 +72,13 @@ interface GapRow {
 }
 
 /**
- * Every OES-active serial currently sitting `in_stock`, whatever put it there.
- * Recomputed AFTER the receive so it includes rows this run just created.
+ * Every ONT currently sitting `in_stock` that OES reports active, whatever put
+ * it there. Recomputed AFTER the receive so it includes rows this run created.
+ *
+ * Bounded to the FT-ONT stock item on purpose, mirroring the receive side.
+ * `oes_activations` is an external feed: today its only non-ONT rows are 60
+ * `-` placeholders matching nothing, but an unbounded join would let a future
+ * feed promote a Gizzu — or anything else — out of stock on a 4-hourly cron.
  */
 const PROMOTABLE_SQL = `
   SELECT DISTINCT ON (ss.serial_number)
@@ -83,6 +88,8 @@ const PROMOTABLE_SQL = `
     JOIN oes_activations oa
       ON upper(trim(oa.serial_number)) = ss.serial_number
    WHERE ss.status = 'in_stock'
+     AND ss.stock_item_id = $1
+     AND ss.serial_number LIKE 'ALCL%'
    ORDER BY ss.serial_number, oa.activation_date DESC NULLS LAST`;
 
 export async function closeOesIntakeGap(
@@ -134,7 +141,7 @@ async function promoteInStock(
   db: GapQuerier,
   deps: GapDeps,
 ): Promise<{ promoted: number; promotionFailed?: boolean }> {
-  const { rows } = await db.query<GapRow>(PROMOTABLE_SQL);
+  const { rows } = await db.query<GapRow>(PROMOTABLE_SQL, [FT_ONT_ITEM_ID]);
   if (rows.length === 0) return { promoted: 0 };
 
   try {

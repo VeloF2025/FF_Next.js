@@ -167,4 +167,20 @@ describe('closeOesIntakeGap', () => {
     expect(promoteSql).toContain("ss.status = 'in_stock'");
     expect(promoteSql).toContain('FROM stock_serials');
   });
+
+  it('bounds the promotion to FT-ONT serials, not anything OES mentions', async () => {
+    // oes_activations is an external feed; an unbounded join would let a future
+    // non-ONT row promote something else out of stock on a 4-hourly cron.
+    const db = querier(MISSING, MISSING);
+    await closeOesIntakeGap(db, {
+      receive: vi.fn(async () => ({ received: 2, skipped: 0 })),
+      promote: vi.fn(async () => {}),
+    });
+
+    const calls = (db.query as unknown as { mock: { calls: [string, unknown[]?][] } }).mock.calls;
+    const [promoteSql, params] = calls[1]!;
+    expect(promoteSql).toContain('ss.stock_item_id = $1');
+    expect(promoteSql).toContain("ss.serial_number LIKE 'ALCL%'");
+    expect(params).toEqual([FT_ONT_ITEM_ID]);
+  });
 });
