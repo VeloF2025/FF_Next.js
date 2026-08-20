@@ -26,7 +26,9 @@ I/O call, add its module there or the suite will silently hit real MinIO.
 import re
 from datetime import datetime, timezone
 
-from qfield_gpkg_storage import minio_download_latest
+import psycopg2.extras
+
+from qfield_gpkg_storage import minio_download_latest, minio_latest_version
 from qfield_hierarchy_sync import resolve_spatial_pon_map, sync_hierarchy
 from qfield_photo_storage import minio_list_dcim_directory
 
@@ -81,13 +83,13 @@ def download_and_check_delta(qf_id, gpkg_path, tmp_path, state, force,
     Aborts when the download fails, or when the delta check says this exact version
     was already processed and nothing is outstanding.
     """
-    version, size = minio_download_latest(qf_id, gpkg_path, tmp_path)
+    version = minio_latest_version(qf_id, gpkg_path)
     if not version:
         print(f"  SKIP: Could not download GPKG")
         return None
 
-    print(f"  Version: {version} ({size // 1024}KB)")
-
+    # Decide BEFORE transferring. The unchanged case is the common one across a family
+    # — most members sit still between runs — and it needs nothing off the file itself.
     if state and state["last_version"] == version and not force:
         pending = state.get("pending_count") or 0
         # Re-scan an unchanged GPKG only while it still has pending photos AND the GPKG
@@ -108,7 +110,50 @@ def download_and_check_delta(qf_id, gpkg_path, tmp_path, state, force,
             print("  RE-SCAN: Work QA hierarchy backfill required")
         else:
             print(f"  RE-SCAN: same version but {pending} photo(s) were pending upload last run")
+
+    downloaded, size = minio_download_latest(qf_id, gpkg_path, tmp_path, version=version)
+    if not downloaded:
+        print(f"  SKIP: Could not download GPKG")
+        return None
+    print(f"  Version: {version} ({size // 1024}KB)")
     return version
+
+
+class ProjectContext:
+    """Per-project values every family member needs, computed at most once.
+
+    LAZY on purpose: a project whose every GPKG is unchanged since the last run must
+    still cost nothing but the version listings, which is what it cost before the
+    family loop existed. Building eagerly would add a DCIM walk to every project on
+    every run — a regression paid by the 14 projects that are not Namakgale.
+    """
+
+    def __init__(self, conn, config):
+        self._cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        self._config = config
+        self._photo_index = None
+        self._dedup = None
+
+    def photo_index(self):
+        """(spatial_pon_map, combined_dcim, linked_qf_ids)"""
+        if self._photo_index is None:
+            self._photo_index = build_photo_index(
+                self._cur, self._config["qf_project_id"],
+                self._config["ff_project_id"], self._config)
+        return self._photo_index
+
+    def dedup_sets(self):
+        """(existing_keys, existing_filenames, existing_photo_keys) — MUTABLE.
+
+        ingest_rows adds to these as it writes, so a photo ingested from one family
+        member is already known when the next member references it.
+        """
+        if self._dedup is None:
+            _, _, linked_qf_ids = self.photo_index()
+            self._dedup = load_dedup_sets(
+                self._cur, self._config["qf_project_id"],
+                self._config["ff_project_id"], linked_qf_ids)
+        return self._dedup
 
 
 def build_photo_index(cur, qf_id, ff_id, config):

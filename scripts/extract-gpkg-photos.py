@@ -15,6 +15,7 @@ import argparse
 import os
 import sys
 import tempfile
+import traceback
 
 import psycopg2
 import psycopg2.extras
@@ -45,10 +46,9 @@ from qfield_row_ingest import ingest_rows
 # NOTE: the patchable I/O these phases call resolves in THAT module's namespace, so
 # the test harness patches qfield_extract_phases too — see its docstring.
 from qfield_extract_phases import (
-    build_photo_index,
+    ProjectContext,
     download_and_check_delta,
     finalize,
-    load_dedup_sets,
 )
 from qfield_gpkg_table import open_gpkg
 
@@ -84,15 +84,31 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
 
     total_found = 0
     total_upserted = 0
+    # Built once and SHARED across the family. The photo index shells out an `mc ls`
+    # over the whole DCIM directory (9 309 objects on Mahikeng) and the dedup sets cost
+    # two queries; none of it varies between members of the same project. Sharing the
+    # dedup sets also keeps a photo referenced by two members from being counted twice —
+    # a real run dedups against the DB between members, but a --dry-run commits nothing
+    # and would otherwise report the overlap twice in the figure an operator reads.
+    shared = ProjectContext(conn, config)
     for gpkg_path in resolve_gpkg_paths(qf_id, config["gpkg_path"]):
-        found, upserted = extract_gpkg(
-            conn, config, gpkg_path, dry_run=dry_run, force=force)
+        try:
+            found, upserted = extract_gpkg(
+                conn, config, gpkg_path, shared, dry_run=dry_run, force=force)
+        except Exception as exc:
+            # One member must not take the rest of the family — or, since main() has no
+            # per-project guard either, every project queued behind it — down with it.
+            # Reading N files means N times the transient-MinIO surface of reading one.
+            print(f"  ERROR: '{gpkg_path}' failed, continuing with the rest: "
+                  f"{type(exc).__name__}: {exc}")
+            traceback.print_exc()
+            continue
         total_found += found
         total_upserted += upserted
     return total_found, total_upserted
 
 
-def extract_gpkg(conn, config, gpkg_path, dry_run=False, force=False):
+def extract_gpkg(conn, config, gpkg_path, shared, dry_run=False, force=False):
     """Extract photo references from ONE GPKG and upsert into DB.
 
     Coordinates the phases in qfield_extract_phases. A phase returning None means
@@ -131,11 +147,8 @@ def extract_gpkg(conn, config, gpkg_path, dry_run=False, force=False):
         table = open_gpkg(tmp_path, config, gpkg_path)
         if table is None:
             return 0, 0
-        spatial_pon_map, combined_dcim, linked_qf_ids = build_photo_index(
-            cur, qf_id, ff_id, config)
-
-        existing_keys, existing_filenames, existing_photo_keys = load_dedup_sets(
-            cur, qf_id, ff_id, linked_qf_ids)
+        spatial_pon_map, combined_dcim, _linked_qf_ids = shared.photo_index()
+        existing_keys, existing_filenames, existing_photo_keys = shared.dedup_sets()
 
         photos_found, photos_upserted, photos_skipped_missing = ingest_rows(
             cur, qf_id, table, combined_dcim,

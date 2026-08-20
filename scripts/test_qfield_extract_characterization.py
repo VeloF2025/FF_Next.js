@@ -92,7 +92,7 @@ def main():
     # Every stub invoked unconditionally on a real run. The two conditional ones
     # (resolve_spatial_pon_map, minio_resolve_photo_version) are asserted in the
     # scenarios that actually trigger them — asserting >0 here would fail spuriously.
-    for stub in ("resolve_gpkg_paths", "minio_download_latest",
+    for stub in ("resolve_gpkg_paths", "minio_latest_version", "minio_download_latest",
                  "minio_list_dcim_directory", "sync_hierarchy",
                  "fetch_linked_qf_project_ids", "hierarchy_backfill_needed"):
         check(h.stub_calls.get(stub, 0) > 0,
@@ -310,10 +310,72 @@ def main():
     found, upserted, _, _ = run(
         config=config(gpkg_path="Civil Audit.gpkg"),
         gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
-        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
-        dcim={"a.jpg": "k/a"}, dry_run=True)
-    check((found, upserted) == (2, 2),
+        columns=["NAME", STEP_1, STEP_2],
+        rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg", STEP_2: "DCIM/b.jpg"}],
+        dcim={"a.jpg": "k/a", "b.jpg": "k/b"}, dry_run=True)
+    check((found, upserted) == (4, 2),
           f"extract_project returns the SUM across the family, got ({found},{upserted})")
+
+    print("\nAn unchanged member is not transferred at all")
+    # The delta check resolves the version first, so the common case across a family —
+    # a member nobody touched since the last run — costs one listing and no download.
+    _, _, out, h = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"},
+        state={"last_version": "v20260731122829-abc12345", "pending_count": 0},
+        dry_run=False)
+    check("SKIP: Already processed this version" in out, "the unchanged version is skipped")
+    check(h.stub_calls.get("minio_download_latest", 0) == 0,
+          f"and never downloaded, got {h.stub_calls.get('minio_download_latest', 0)} download(s)")
+    check(h.stub_calls.get("minio_latest_version", 0) == 1,
+          "the version is resolved without a transfer")
+
+    print("\nPer-project work is shared across the family, and stays lazy")
+    _, _, _, h = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    check(h.stub_calls.get("minio_list_dcim_directory", 0) == 1,
+          f"the DCIM directory is listed ONCE for two members, got "
+          f"{h.stub_calls.get('minio_list_dcim_directory', 0)}")
+
+    _, _, _, h = run(
+        gpkg_path=["Civil Audit.gpkg"],
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"},
+        state={"last_version": "v20260731122829-abc12345", "pending_count": 0},
+        dry_run=False)
+    check(h.stub_calls.get("minio_list_dcim_directory", 0) == 0,
+          "a project with nothing to do never walks DCIM at all")
+
+    print("\nA photo referenced by two members is counted once (dry-run too)")
+    # Real runs dedup against the DB between members; a --dry-run commits nothing, so
+    # without a shared dedup set the overlap is reported twice in the preview figure.
+    for dry in (False, True):
+        found, upserted, _, _ = run(
+            config=config(gpkg_path="Civil Audit.gpkg"),
+            gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+            columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+            dcim={"a.jpg": "k/a"}, dry_run=dry)
+        check((found, upserted) == (2, 1),
+              f"dry_run={dry}: both members SEE the photo, only one INGESTS it, "
+              f"got ({found},{upserted})")
+
+    print("\nOne member failing does not take the family down")
+    found, upserted, out, h = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        fail_on=["Civil Audit.gpkg"],
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    check("ERROR: 'Civil Audit.gpkg' failed" in out, "the failure is reported, not swallowed")
+    check((found, upserted) == (1, 1),
+          f"the surviving member still ingests, got ({found},{upserted})")
+    synced = [p[1] for sql, p in h.cursor.executed
+              if "INSERT INTO qfield_gpkg_sync_state" in sql]
+    check(synced == ["Civil Audit phase_2_.gpkg"],
+          f"and only the surviving member records a sync, got {synced}")
 
     print()
     if failures:

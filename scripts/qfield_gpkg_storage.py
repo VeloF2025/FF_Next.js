@@ -147,13 +147,29 @@ def resolve_gpkg_paths(qf_project_id, configured_path):
     return ordered
 
 
-def minio_download_latest(qf_project_id, gpkg_path, dest_path):
-    """Download the latest version of a GPKG from MinIO."""
+def minio_latest_version(qf_project_id, gpkg_path):
+    """The newest version id of one GPKG, or None — WITHOUT downloading it.
+
+    Split out so the delta check can run before the transfer. Every family member is
+    read on every run now, and a member nobody has touched since the last run is the
+    common case (dead rename history, a phase layer between captures): downloading
+    ~1.3MB per member per run only to print "Already processed this version" is pure
+    waste that scales with how many times a crew has ever renamed the file.
+    """
+    versions = minio_list_gpkg_versions(qf_project_id, gpkg_path)
+    return versions[-1] if versions else None
+
+
+def minio_download_latest(qf_project_id, gpkg_path, dest_path, version=None):
+    """Download a GPKG from MinIO — `version` if given, else the latest.
+
+    Pass `version` when the caller has already resolved it via minio_latest_version()
+    to skip a second `mc ls`.
+    """
     try:
-        versions = minio_list_gpkg_versions(qf_project_id, gpkg_path)
-        if not versions:
+        latest = version or minio_latest_version(qf_project_id, gpkg_path)
+        if not latest:
             return None, None
-        latest = versions[-1]
 
         # Download
         src = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/{latest}"

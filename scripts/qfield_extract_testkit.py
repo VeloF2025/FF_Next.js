@@ -157,7 +157,7 @@ class Harness:
     def __init__(self, mod, table="civil_audit", columns=None, rows=None,
                  dcim=None, state=None, existing_keys=(), existing_photo_keys=(),
                  linked=(), linked_dcim=None, hierarchy_backfill=False,
-                 download_fails=False, spatial_pon_map=None,
+                 download_fails=False, fail_on=None, spatial_pon_map=None,
                  version="v20260731122829-abc12345", gpkg_path="Civil Audit.gpkg"):
         self.mod = mod
         self.tmpdir = tempfile.mkdtemp(prefix="qfield_char_")
@@ -173,6 +173,9 @@ class Harness:
         # minio_download_latest returns (None, 0) when MinIO has no such object. Without
         # a way to simulate it, that abort path had no coverage at all.
         self._download_fails = download_fails
+        # {gpkg_path} whose download RAISES rather than returning empty — the transient
+        # network error, which is a different path from "MinIO has no such object".
+        self._fail_on = set(fail_on or ())
         # Distinctive so a scenario can prove the map reaches sync_hierarchy rather than
         # merely that the resolver was called.
         self._spatial_pon_map = spatial_pon_map if spatial_pon_map is not None else {}
@@ -197,7 +200,9 @@ class Harness:
         m = self.mod
         src = self.gpkg_file
 
-        def _download(qf_id, path, dest):
+        def _download(qf_id, path, dest, version=None):
+            if path in self._fail_on:
+                raise RuntimeError(f"simulated MinIO failure on {path}")
             if self._download_fails:
                 return None, 0
             with open(src, "rb") as a, open(dest, "wb") as b:
@@ -216,6 +221,11 @@ class Harness:
 
         self._patcher.patch("resolve_gpkg_paths", lambda qf, p: list(self._gpkg_paths))
         self._patcher.patch("minio_download_latest", _download)
+        # The delta check resolves the version BEFORE downloading, so a scenario that
+        # simulates "MinIO has no such object" has to fail here too — otherwise
+        # download_fails would abort one step later than it does in production.
+        self._patcher.patch("minio_latest_version",
+                            lambda qf, p: None if self._download_fails else self._version)
         self._patcher.patch("minio_list_dcim_directory", _list_dcim)
         self._patcher.patch("minio_resolve_photo_version", lambda qf, p: None)
         self._patcher.patch("fetch_linked_qf_project_ids", lambda cur, ff, qf: list(self._linked))

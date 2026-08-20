@@ -107,6 +107,12 @@ def ingest_rows(cur, qf_id, table, combined_dcim, existing_keys, existing_filena
 
             if dry_run:
                 photos_upserted += 1
+                # Record it anyway. Nothing is committed under --dry-run, so the DB
+                # cannot dedup between family members; without this the preview counts
+                # a photo referenced by two members of the same family twice, and that
+                # figure is exactly what an operator reads before running for real.
+                existing_keys.add(full_key)
+                existing_filenames.add(base_fn)
                 continue
 
             # Upsert into qfield_photo_validations — use resolved_qf_id so
@@ -158,6 +164,12 @@ def ingest_rows(cur, qf_id, table, combined_dcim, existing_keys, existing_filena
 
             if dry_run:
                 photos_upserted += 1
+                # Record it anyway. Nothing is committed under --dry-run, so the DB
+                # cannot dedup between family members; without this the preview counts
+                # a photo referenced by two members of the same family twice, and that
+                # figure is exactly what an operator reads before running for real.
+                existing_keys.add(full_key)
+                existing_filenames.add(base_fn)
                 continue
 
             cur.execute("""
