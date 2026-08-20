@@ -38,6 +38,81 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+/**
+ * The caller's hard budget. The velo cron invokes this endpoint with
+ * `curl -s -m 30` (~/bin/wa-bridge-health-cron.sh), so at 30 s curl gives up and
+ * the tick lands in the log as a probe failure instead of a verdict.
+ *
+ * Every knob below is env-settable, which means an operator typo can otherwise
+ * push the probe past the point where its answer can still be delivered —
+ * `WA_BRIDGE_PROBE_TIMEOUT_MS=600000` was accepted verbatim before this clamp.
+ */
+export const CALLER_BUDGET_MS = 30_000;
+
+/** Leaves room for classification, alert dispatch and writing the response. */
+const PROBE_BUDGET_MS = 25_000;
+
+/** Bounds each knob before the budget check, so one absurd value cannot dominate. */
+const LIMITS = {
+  attempts: { min: 1, max: 5 },
+  // The floor matters as much as the ceiling: TIMEOUT_MS=1 fails every attempt
+  // instantly and swings the monitor into the alert storm this file exists to
+  // stop. 500 ms is already ~1.5x the observed p99 on the velo -> VPS path.
+  timeoutMs: { min: 500, max: 15_000 },
+  backoffMs: { min: 0, max: 5_000 },
+} as const;
+
+function clamp(value: number, { min, max }: { min: number; max: number }): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+export interface ProbeConfig {
+  url: string;
+  attempts: number;
+  timeoutMs: number;
+  backoffMs: number;
+}
+
+/** Worst case if every attempt burns its full timeout. No sleep after the last. */
+export function probeBudgetMs(
+  config: Pick<ProbeConfig, 'attempts' | 'timeoutMs' | 'backoffMs'>,
+): number {
+  return config.attempts * config.timeoutMs + (config.attempts - 1) * config.backoffMs;
+}
+
+/**
+ * Resolve the probe config from options, then env, then defaults — and clamp it
+ * so the worst case stays inside what the caller will wait for.
+ *
+ * Exported so the budget guarantee can be tested against the REAL defaults. A
+ * test that recomputes `3 * 5000 + 2 * 1500` from its own literals keeps passing
+ * after someone changes those defaults, which makes it no guard at all.
+ *
+ * Attempts are shed last-first when the budget is blown: one probe that
+ * completes and reports beats three that curl cuts off mid-flight.
+ */
+export function resolveProbeConfig(opts: ProbeOptions = {}): ProbeConfig {
+  const url = opts.url ?? process.env.WA_BRIDGE_HEALTH_URL ?? DEFAULT_BRIDGE_HEALTH_URL;
+  const timeoutMs = clamp(
+    opts.timeoutMs ?? envInt('WA_BRIDGE_PROBE_TIMEOUT_MS', 5000),
+    LIMITS.timeoutMs,
+  );
+  const backoffMs = clamp(
+    opts.backoffMs ?? envInt('WA_BRIDGE_PROBE_BACKOFF_MS', 1500),
+    LIMITS.backoffMs,
+  );
+  let attempts = clamp(opts.attempts ?? envInt('WA_BRIDGE_PROBE_ATTEMPTS', 3), LIMITS.attempts);
+
+  while (
+    attempts > LIMITS.attempts.min &&
+    probeBudgetMs({ attempts, timeoutMs, backoffMs }) > PROBE_BUDGET_MS
+  ) {
+    attempts -= 1;
+  }
+
+  return { url, attempts, timeoutMs, backoffMs };
+}
+
 export const DEFAULT_BRIDGE_HEALTH_URL = 'http://72.61.197.178:8083/health';
 
 export interface ProbeOptions {
@@ -103,15 +178,12 @@ async function attemptProbe(
  * the nginx in front of the bridge is the same class of transient blip as a
  * dropped packet, and the previous code collapsed both into an immediate page.
  *
- * The worst-case wall time is `attempts * timeoutMs + (attempts - 1) *
- * backoffMs`. With the defaults that is 18 s, which must stay comfortably
- * inside the caller's own budget — the velo cron gives the endpoint 30 s.
+ * The worst-case wall time is `probeBudgetMs(config)`; `resolveProbeConfig`
+ * clamps the config so that stays inside the 30 s the velo cron's `curl -m 30`
+ * allows, whatever the env vars say.
  */
 export async function probeBridgeHealth(opts: ProbeOptions = {}): Promise<ProbeResult> {
-  const url = opts.url ?? process.env.WA_BRIDGE_HEALTH_URL ?? DEFAULT_BRIDGE_HEALTH_URL;
-  const attempts = Math.max(1, opts.attempts ?? envInt('WA_BRIDGE_PROBE_ATTEMPTS', 3));
-  const timeoutMs = opts.timeoutMs ?? envInt('WA_BRIDGE_PROBE_TIMEOUT_MS', 5000);
-  const backoffMs = opts.backoffMs ?? envInt('WA_BRIDGE_PROBE_BACKOFF_MS', 1500);
+  const { url, attempts, timeoutMs, backoffMs } = resolveProbeConfig(opts);
   const fetchImpl = opts.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const sleep = opts.sleep ?? defaultSleep;
 

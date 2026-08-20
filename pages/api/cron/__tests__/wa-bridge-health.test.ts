@@ -288,10 +288,10 @@ describe('unreachable confirmation gate', () => {
 
     expect(dispatchBridgeAlert).not.toHaveBeenCalled();
     expect(res.body.alertSuppressed).toBe(true);
-    expect(res.body.consecutiveUnreachable).toBe(1);
+    expect(res.body.unreachableInWindow).toBe(1);
   });
 
-  it('pages once the second consecutive tick confirms it', async () => {
+  it('pages once the second tick confirms it', async () => {
     bridgeUnreachable();
     await handler(req(), mockRes());
     const second = mockRes();
@@ -299,20 +299,39 @@ describe('unreachable confirmation gate', () => {
 
     expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
     expect(second.body.alertSuppressed).toBe(false);
-    expect(second.body.consecutiveUnreachable).toBe(2);
+    expect(second.body.unreachableInWindow).toBe(2);
   });
 
-  it('resets the count when a tick succeeds, so blips never accumulate', async () => {
+  it('drops a blip out of the window, so isolated stalls never accumulate', async () => {
     bridgeUnreachable();
-    await handler(req(), mockRes());          // 1 — held
+    await handler(req(), mockRes());          // held
     bridgeReturns(HEALTHY);
-    await handler(req(), mockRes());          // recovered before confirmation
+    await handler(req(), mockRes());
+    await handler(req(), mockRes());          // blip now aged out of the window
     bridgeUnreachable();
-    const third = mockRes();
-    await handler(req(), third);              // 1 again, not 2
+    const fourth = mockRes();
+    await handler(req(), fourth);             // 1 again, not 2
 
     expect(dispatchBridgeAlert).not.toHaveBeenCalled();
-    expect(third.body.consecutiveUnreachable).toBe(1);
+    expect(fourth.body.unreachableInWindow).toBe(1);
+  });
+
+  // Regression for the gate's own failure mode. A consecutive-run counter resets
+  // on every healthy tick, so a bridge that is genuinely half down — unreachable,
+  // healthy, unreachable, healthy — would never reach the threshold and would
+  // never page at all, which is worse than the false pages being fixed.
+  it('pages a flapping bridge, which a consecutive-run counter would never catch', async () => {
+    bridgeUnreachable();
+    await handler(req(), mockRes());          // held
+    bridgeReturns(HEALTHY);
+    await handler(req(), mockRes());          // a run counter resets here
+    bridgeUnreachable();
+    const third = mockRes();
+    await handler(req(), third);              // 2 within 3 ticks — pages
+
+    expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
+    expect(third.body.alertSuppressed).toBe(false);
+    expect(third.body.unreachableInWindow).toBe(2);
   });
 
   // The failure this monitor exists for must not be slowed down by the gate.

@@ -34,7 +34,7 @@ import {
 import { probeBridgeHealth } from '@/lib/wa-bridge-health/probe';
 
 /**
- * How many consecutive `unreachable` ticks before anyone is paged.
+ * How many `unreachable` ticks inside UNREACHABLE_WINDOW_TICKS before paging.
  *
  * The retrying probe already absorbs a single stalled request. This gate covers
  * the case where a whole tick's worth of attempts fails at once — still far more
@@ -51,8 +51,24 @@ import { probeBridgeHealth } from '@/lib/wa-bridge-health/probe';
  * The gate applies to `unreachable` ALONE. `logged_out` and `disconnected` mean
  * the bridge answered and described its own state, which is authoritative and
  * pages on the first tick exactly as before.
+ *
+ * A WINDOW, not a consecutive run. Requiring consecutive ticks looks equivalent
+ * and is not: a bridge alternating unreachable/healthy every tick — genuinely
+ * half down — resets the run on every healthy tick and would never reach the
+ * threshold, so it would never page at all. That is a worse failure than the one
+ * being fixed, because the old code at least paged. Counting within a short
+ * window catches the flap on its second failure while still ignoring the
+ * isolated blips that produced all 124 false pages: those were minutes to hours
+ * apart, not two inside ten.
  */
 const UNREACHABLE_TICKS_BEFORE_ALERT = 2;
+
+/**
+ * How far back the gate counts, in ticks. At the cron's 5-minute cadence this is
+ * a 15-minute window, so a flapping bridge pages within 10 minutes while two
+ * blips a quarter-hour apart still do not.
+ */
+const UNREACHABLE_WINDOW_TICKS = 3;
 
 /**
  * Re-alert interval for a continuing outage. A logout is not self-healing, so a
@@ -63,10 +79,20 @@ const REALERT_MS = 30 * 60 * 1000;
 
 /**
  * Module-level, so it survives between cron invocations in the long-lived Next
- * server. A restart resets it, which costs one duplicate alert and — if the
- * bridge is already down at restart — reseeds `downSince` to the restart time,
- * so the recovery alert then under-reports total downtime. Both are acceptable;
- * neither can suppress an alert.
+ * server. A restart resets it, at three costs:
+ *
+ *   - one duplicate alert for an outage that was already being reported;
+ *   - if the bridge is already down at restart, `downSince` reseeds to the
+ *     restart time, so the recovery alert under-reports total downtime;
+ *   - the unreachable window empties, so an ongoing unreachable outage has to
+ *     re-earn its second tick — up to one extra tick, 5 minutes, of delay per
+ *     restart.
+ *
+ * The third only exists since the confirmation gate was added and is the reason
+ * this comment no longer claims a restart cannot delay an alert: it can. It
+ * cannot suppress one indefinitely, because the window refills from the next
+ * tick onward. Deploys are the common cause and are not concurrent with outages
+ * often enough to justify persisting this to Postgres.
  */
 let lastVerdict: BridgeVerdict | null = null;
 let lastAlertAt = 0;
@@ -79,8 +105,11 @@ let lastAlertAt = 0;
  */
 let prevNeedsHuman = false;
 let downSince = 0;
-/** Consecutive `unreachable` ticks so far, for UNREACHABLE_TICKS_BEFORE_ALERT. */
-let consecutiveUnreachable = 0;
+/**
+ * Whether each of the last UNREACHABLE_WINDOW_TICKS ticks was `unreachable`,
+ * oldest first. Bounded, so it cannot grow across a long-running process.
+ */
+let unreachableWindow: boolean[] = [];
 
 /** Exported for tests: module state must be resettable between cases. */
 export function __resetStateForTests(): void {
@@ -88,7 +117,7 @@ export function __resetStateForTests(): void {
   lastAlertAt = 0;
   prevNeedsHuman = false;
   downSince = 0;
-  consecutiveUnreachable = 0;
+  unreachableWindow = [];
 }
 
 async function probe(): Promise<{ payload: BridgeHealthPayload | null; attempts: number }> {
@@ -134,11 +163,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const status = classifyBridgeHealth(payload);
   const now = Date.now();
 
-  consecutiveUnreachable = status.verdict === 'unreachable' ? consecutiveUnreachable + 1 : 0;
+  unreachableWindow = [...unreachableWindow, status.verdict === 'unreachable'].slice(
+    -UNREACHABLE_WINDOW_TICKS,
+  );
+  const unreachableInWindow = unreachableWindow.filter(Boolean).length;
 
-  // A first `unreachable` tick is observed and counted, but not announced.
+  // A lone `unreachable` tick is observed and counted, but not announced.
   const suppressed =
-    status.verdict === 'unreachable' && consecutiveUnreachable < UNREACHABLE_TICKS_BEFORE_ALERT;
+    status.verdict === 'unreachable' && unreachableInWindow < UNREACHABLE_TICKS_BEFORE_ALERT;
 
   const observedAlerting = isAlerting(status.verdict);
   const alerting = observedAlerting && !suppressed;
@@ -151,7 +183,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (suppressed) {
     log.warn('WA bridge unreachable — holding the alert pending confirmation', {
-      consecutiveUnreachable,
+      unreachableInWindow,
+      windowTicks: UNREACHABLE_WINDOW_TICKS,
       ticksBeforeAlert: UNREACHABLE_TICKS_BEFORE_ALERT,
       probeAttempts,
     }, 'WaBridgeHealth');
@@ -246,7 +279,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // monitor behaved. `probeAttempts: 3` on an otherwise healthy tick is the
     // early warning that the path is degrading.
     probeAttempts,
-    consecutiveUnreachable,
+    unreachableInWindow,
     alertSuppressed: suppressed,
     timestamp: new Date().toISOString(),
   });

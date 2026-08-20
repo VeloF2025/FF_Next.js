@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { probeBridgeHealth, DEFAULT_BRIDGE_HEALTH_URL } from './probe';
+import {
+  probeBridgeHealth,
+  probeBudgetMs,
+  resolveProbeConfig,
+  CALLER_BUDGET_MS,
+  DEFAULT_BRIDGE_HEALTH_URL,
+} from './probe';
 
 const HEALTHY = {
   connected: true, session_valid: true, needs_auth: false,
@@ -156,8 +162,12 @@ describe('probeBridgeHealth configuration', () => {
     expect(fetchImpl).toHaveBeenCalledWith('http://example.test/health', expect.anything());
   });
 
+  // Shorter per-attempt timeout so five attempts still fit the caller budget;
+  // asking for five at the default 5 s would be shed back to four, which is the
+  // clamp doing its job rather than env tuning failing.
   it('reads the attempt count from env so a bad week needs no deploy', async () => {
     process.env.WA_BRIDGE_PROBE_ATTEMPTS = '5';
+    process.env.WA_BRIDGE_PROBE_TIMEOUT_MS = '2000';
     const fetchImpl = vi.fn().mockRejectedValue(new Error('nope'));
     const result = await probeBridgeHealth({ fetchImpl, sleep: noSleep });
 
@@ -182,9 +192,37 @@ describe('probeBridgeHealth configuration', () => {
     expect(result.payload).toEqual(HEALTHY);
   });
 
-  // Worst case must stay inside the 30s budget the velo cron gives the endpoint.
-  it('keeps its worst-case wall time inside the caller budget', async () => {
-    const attempts = 3, timeoutMs = 5000, backoffMs = 1500;
-    expect(attempts * timeoutMs + (attempts - 1) * backoffMs).toBeLessThan(30_000);
+  // Worst case must stay inside the 30s the velo cron's `curl -m 30` allows.
+  // Derived from the REAL resolved config, not from literals restating the
+  // defaults — the earlier version of this test recomputed 3 * 5000 + 2 * 1500
+  // from its own copies and so kept passing no matter what the defaults became.
+  it('keeps its worst-case wall time inside the caller budget on the defaults', () => {
+    expect(probeBudgetMs(resolveProbeConfig())).toBeLessThan(CALLER_BUDGET_MS);
+  });
+
+  it('clamps an oversized env config back inside the caller budget', () => {
+    process.env.WA_BRIDGE_PROBE_ATTEMPTS = '999';
+    process.env.WA_BRIDGE_PROBE_TIMEOUT_MS = '600000';
+    process.env.WA_BRIDGE_PROBE_BACKOFF_MS = '600000';
+
+    const config = resolveProbeConfig();
+
+    expect(probeBudgetMs(config)).toBeLessThan(CALLER_BUDGET_MS);
+    expect(config.attempts).toBeGreaterThanOrEqual(1);
+  });
+
+  it('floors a too-small timeout, which would fail every attempt instantly', () => {
+    process.env.WA_BRIDGE_PROBE_TIMEOUT_MS = '1';
+    expect(resolveProbeConfig().timeoutMs).toBeGreaterThanOrEqual(500);
+  });
+
+  it('still makes one full-timeout attempt when the budget forces attempts down', () => {
+    process.env.WA_BRIDGE_PROBE_ATTEMPTS = '5';
+    process.env.WA_BRIDGE_PROBE_TIMEOUT_MS = '15000';
+
+    const config = resolveProbeConfig();
+
+    expect(config.attempts).toBe(1);
+    expect(config.timeoutMs).toBe(15_000);
   });
 });
