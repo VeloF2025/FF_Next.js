@@ -5,9 +5,12 @@ interface RecordedQuery { text: string; params: unknown[] }
 const txnQueries: RecordedQuery[] = [];
 
 // Configurable per-test canned rows for the in-transaction PO-line lookup.
-const cfg: { grnStatus: string; poLine: Record<string, unknown> | null } = {
+const cfg: { grnStatus: string; poLine: Record<string, unknown> | null; cumulativeReceived: number } = {
   grnStatus: 'draft',
   poLine: null,
+  // What SUM(quantity_accepted) over goods_receipt_items returns for the PO
+  // line — the trigger-maintained figure the handler now reads back.
+  cumulativeReceived: 0,
 };
 
 vi.mock('@/lib/db-pool', () => ({
@@ -18,6 +21,7 @@ vi.mock('@/lib/db-pool', () => ({
       txnQueries.push({ text, params });
       if (/goods_receipt_notes[\s\S]*FOR UPDATE/i.test(text)) return [{ status: cfg.grnStatus }];
       if (/purchase_order_items[\s\S]*FOR UPDATE/i.test(text)) return cfg.poLine ? [cfg.poLine] : [];
+      if (/SUM\(quantity_accepted\)[\s\S]*goods_receipt_items/i.test(text)) return [{ received: cfg.cumulativeReceived }];
       if (/RETURNING/i.test(text)) return [{ id: 'mv-1' }];
       return [];
     }),
@@ -49,7 +53,10 @@ function makeRes() {
 const joined = () => txnQueries.map(q => q.text).join('\n');
 
 describe('POST /api/procurement/grn-confirm', () => {
-  beforeEach(() => { txnQueries.length = 0; cfg.grnStatus = 'draft'; cfg.poLine = null; vi.clearAllMocks(); });
+  beforeEach(() => {
+    txnQueries.length = 0; cfg.grnStatus = 'draft'; cfg.poLine = null; cfg.cumulativeReceived = 0;
+    vi.clearAllMocks();
+  });
 
   it('runs the receipt posting inside a single transaction', async () => {
     const draftGrn = { id: 'g1', grn_number: 'GRN-1', status: 'draft', warehouse_id: 'loc-dc', supplier_name: 'S', warehouse_name: 'DC' };
@@ -76,13 +83,16 @@ describe('POST /api/procurement/grn-confirm', () => {
       .mockResolvedValue({ id: 'loc-vend' });
     (dbPool.query as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce([{ stock_item_id: 'item-1', po_item_id: 'poi-1', quantity_received: 8, quantity_rejected: 2, lot_number: null, total_cost: 0 }]);
-    cfg.poLine = { quantity_ordered: 100, quantity_received: 5, item_code: 'ITEM-1' };
+    // The trigger has already folded this GRN's accepted 6 into the cumulative
+    // total (5 from an earlier receipt + 6 = 11). The handler must write that
+    // figure, NOT add its own 6 on top of a column that already contains it.
+    cfg.poLine = { quantity_ordered: 100, quantity_received: 11, item_code: 'ITEM-1' };
+    cfg.cumulativeReceived = 11;
 
     const res = makeRes();
     await handler(makeReq({ grnId: 'g1' }), res);
 
     expect((res as { _status?: number })._status).toBe(200);
-    // accepted = 8 - 2 = 6; new received = 5 + 6 = 11.
     const poUpdate = txnQueries.find(q => /UPDATE purchase_order_items SET quantity_received/i.test(q.text));
     expect(poUpdate).toBeDefined();
     expect(poUpdate!.params).toEqual(['poi-1', 11]);
@@ -94,13 +104,36 @@ describe('POST /api/procurement/grn-confirm', () => {
       .mockResolvedValue({ id: 'loc-vend' });
     (dbPool.query as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce([{ stock_item_id: 'item-1', po_item_id: 'poi-1', quantity_received: 50, quantity_rejected: 0, lot_number: null, total_cost: 0 }]);
-    cfg.poLine = { quantity_ordered: 100, quantity_received: 60, item_code: 'ITEM-1' }; // 60 + 50 = 110 > 100
+    // A genuine over-receipt: 110 accepted in total against 100 ordered.
+    cfg.poLine = { quantity_ordered: 100, quantity_received: 110, item_code: 'ITEM-1' };
+    cfg.cumulativeReceived = 110;
 
     const res = makeRes();
     await handler(makeReq({ grnId: 'g1' }), res);
 
     expect((res as { _status?: number })._status).toBe(400);
     expect(txnQueries.find(q => /UPDATE purchase_order_items SET quantity_received/i.test(q.text))).toBeUndefined();
+  });
+
+  it('confirms a full receipt without double-counting the trigger-maintained quantity', async () => {
+    // Lizelle's GRN26-00329 against PO-2026-0240 on 2026-08-20: 500 received
+    // against 500 ordered. update_poi_received() had already set the column to
+    // 500 on insert, so the old "column + accepted" arithmetic reported
+    // "1000 received vs 500 ordered" and refused an exactly-complete receipt.
+    (dbPool.queryOne as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ id: 'g1', grn_number: 'GRN26-00329', status: 'draft', warehouse_id: 'loc-dc', purchase_order_id: 'po-1' })
+      .mockResolvedValue({ id: 'loc-vend' });
+    (dbPool.query as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([{ stock_item_id: 'item-4', po_item_id: 'poi-4', quantity_received: 500, quantity_rejected: 0, lot_number: null, total_cost: 0 }]);
+    cfg.poLine = { quantity_ordered: 500, quantity_received: 500, item_code: 'ITEM-4' };
+    cfg.cumulativeReceived = 500;
+
+    const res = makeRes();
+    await handler(makeReq({ grnId: 'g1' }), res);
+
+    expect((res as { _status?: number })._status).toBe(200);
+    const poUpdate = txnQueries.find(q => /UPDATE purchase_order_items SET quantity_received/i.test(q.text));
+    expect(poUpdate!.params).toEqual(['poi-4', 500]);
   });
 
   it('returns 409 when a concurrent confirm already completed the GRN (FOR UPDATE re-check)', async () => {
