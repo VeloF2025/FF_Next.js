@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react';
+import React from 'react';
 
 import { ConsentModal, GpsStep, SelfieStep } from '../clockSteps';
 import { GpsPermissionHelp } from '../GpsPermissionHelp';
@@ -11,6 +12,7 @@ import {
 import { DrainedQueuedView, NotSavedView, QueuedView, SuccessView } from '../clockResults';
 import { useAttendanceSync } from '../offline/useAttendanceSync';
 import { useDeviceFingerprint } from '../useDeviceFingerprint';
+import { HsCheckinSteps } from './HsCheckinSteps';
 import { useClockEvidence } from './useClockEvidence';
 import { useClockSubmission } from './useClockSubmission';
 import type { ClockAction } from './useClockSubmission';
@@ -33,6 +35,7 @@ export function ClockActionFlow({
     online: sync.online,
     refreshPendingCount: sync.refreshPendingCount,
   });
+  const [hsDone, setHsDone] = React.useState(false);
   const heading = action === 'in' ? 'Clock in' : 'Clock out';
   const disabled = !evidence.selfieFile || !evidence.gps || submission.state === 'submitting' || evidence.capturing;
   const formVisible = submission.state === 'idle' || submission.state === 'submitting' || submission.state === 'error';
@@ -65,7 +68,14 @@ export function ClockActionFlow({
       {unrelatedFailureCount > 0 && (
         <QueueSyncIssuesBanner failureCount={unrelatedFailureCount} />
       )}
-      {submission.state === 'success' && (
+      {submission.state === 'success' && action === 'in' && !hsDone && (
+        <HsCheckinSteps
+          attendanceEntryId={submission.entryId}
+          gps={evidence.gps ? { lat: evidence.gps.lat, lon: evidence.gps.lon } : null}
+          onDone={() => setHsDone(true)}
+        />
+      )}
+      {submission.state === 'success' && (action === 'out' || hsDone) && (
         <SuccessView
           message={submission.successMessage ?? 'Done.'}
           onDone={() => onDone(action === 'in' ? '/my' : '/my/attendance')}
