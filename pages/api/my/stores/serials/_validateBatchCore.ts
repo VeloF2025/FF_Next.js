@@ -54,6 +54,11 @@ export async function runBatchValidation(
 ): Promise<BatchResponse> {
   const { serials, stockItemId, sourceLocationId } = input;
 
+  // Plain equality, not UPPER(TRIM(...)): it matches the single-serial route
+  // (serialService.getSerialByNumber) exactly, and it can use
+  // idx_stock_serials_number — the function-wrapped form forces a sequential
+  // scan of every serial on each carton scan. Callers already upper-case and
+  // trim, and every stored serial is already normalised.
   const rows = await db.query<SerialQueryRow>(
     `SELECT s.serial_number,
             s.stock_item_id,
@@ -64,7 +69,7 @@ export async function runBatchValidation(
        FROM stock_serials s
        LEFT JOIN stock_items     i ON i.id = s.stock_item_id
        LEFT JOIN stock_locations l ON l.id = s.current_location_id
-      WHERE UPPER(TRIM(s.serial_number)) = ANY($1::text[])`,
+      WHERE s.serial_number = ANY($1::text[])`,
     [serials],
   );
 
