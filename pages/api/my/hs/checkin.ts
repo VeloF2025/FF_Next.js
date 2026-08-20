@@ -68,11 +68,18 @@ export default withMySession(async (req, res, session) => {
         WHERE p.status IN ('active', 'in_progress')
         ORDER BY p.project_name
       `;
-      const lastPick = await sql<{ project_id: string }>`
-        SELECT project_id FROM hs_daily_checkins
+      // work_location travels WITH project_id: an office day carries no project,
+      // so returning the project alone would let one office day silently wipe a
+      // site worker's sticky default (and offer a site worker no default at all
+      // on the day after they sat in the office).
+      const lastPick = await sql<{ project_id: string | null; work_location: string | null }>`
+        SELECT project_id, work_location FROM hs_daily_checkins
         WHERE staff_id = ${session.staffId} AND capture_mode = 'self'
         ORDER BY checkin_date DESC LIMIT 1
       `;
+      const lastLocation = lastPick[0]?.work_location;
+      const defaultWorkLocation: CheckinWorkLocation | null =
+        lastLocation === 'site' || lastLocation === 'office' ? lastLocation : null;
       const medicalStatus = await lookupMedicalStatus({ staffId: session.staffId }, today);
 
       return apiResponse.success(res, {
@@ -81,6 +88,9 @@ export default withMySession(async (req, res, session) => {
         checkin: existing,
         projects,
         default_project_id: lastPick[0]?.project_id ?? null,
+        // Additive: the standalone page ignores an office default and keeps
+        // using default_project_id, which is unchanged.
+        default_work_location: defaultWorkLocation,
         activities: Object.values(CHECKIN_ACTIVITIES),
         // Surfaced so the worker learns about an expiring certificate at the
         // moment it matters, rather than discovering it when blocked.

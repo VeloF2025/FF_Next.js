@@ -70,7 +70,11 @@ const HsCheckinPage: NextPage & { getLayout?: (p: React.ReactElement) => React.R
         setProjects(d.projects ?? []);
         setActivities(d.activities ?? []);
         setMedicalStatus(d.medical_status ?? null);
-        if (d.default_project_id) {
+        // Sticky default from the last self declaration. An office day carries
+        // no project, so the location has to be honoured on its own.
+        if (d.default_work_location === 'office') {
+          setLocation('office');
+        } else if (d.default_project_id) {
           setProjectId(d.default_project_id);
           setLocation('site');
         }
@@ -88,7 +92,7 @@ const HsCheckinPage: NextPage & { getLayout?: (p: React.ReactElement) => React.R
 
   async function submit() {
     setError(null);
-    if (!location) return setError('Choose which project you are on today.');
+    if (!location) return setError('Choose where you are working today.');
     if (fit === null) return setError('Answer whether you are fit for duty.');
     if (location === 'site' && ppe === null) return setError('Answer whether you have your PPE.');
 

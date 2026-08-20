@@ -78,7 +78,7 @@ describe('/my/hs-checkin — office option', () => {
     expect(screen.queryByText('Seen anything unsafe? (optional)')).not.toBeInTheDocument();
   });
 
-  it('still requires a project when a site is chosen', async () => {
+  it('refuses to submit until a work location is chosen', async () => {
     vi.stubGlobal('fetch', fetchMockFor({ success: true, data: { checkin: {}, blocked_reasons: [] } }));
     const user = userEvent.setup();
 
@@ -90,6 +90,6 @@ describe('/my/hs-checkin — office option', () => {
     await user.click(screen.getByText('Yes, I am'));
     await user.click(screen.getByText('Submit check-in'));
 
-    expect(await screen.findByText(/choose which project/i)).toBeInTheDocument();
+    expect(await screen.findByText(/choose where you are working/i)).toBeInTheDocument();
   });
 });
