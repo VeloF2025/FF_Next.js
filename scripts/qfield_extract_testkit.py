@@ -137,10 +137,14 @@ class FakeCursor:
 
 
 class FakeConn:
-    def __init__(self, cursor):
+    def __init__(self, cursor, rollback_fails=False):
         self._cursor = cursor
         self.committed = False
         self.rollbacks = 0
+        # A connection too dead to roll back. The handler re-raises rather than looping
+        # on it, and that branch needs its own coverage — a rollback that always works
+        # cannot exercise it.
+        self._rollback_fails = rollback_fails
 
     def cursor(self, *a, **kw):
         return self._cursor
@@ -151,6 +155,8 @@ class FakeConn:
     def rollback(self):
         """Clears the aborted state, exactly as Postgres does."""
         self.rollbacks += 1
+        if self._rollback_fails:
+            raise RuntimeError("connection already closed")
         self._cursor.aborted = False
 
     def close(self):
@@ -180,6 +186,7 @@ class Harness:
                  dcim=None, state=None, existing_keys=(), existing_photo_keys=(),
                  linked=(), linked_dcim=None, hierarchy_backfill=False,
                  download_fails=False, no_versions=False, fail_on=None, raise_once_on=None,
+                 rollback_fails=False,
                  spatial_pon_map=None,
                  version="v20260731122829-abc12345", gpkg_path="Civil Audit.gpkg"):
         self.mod = mod
@@ -188,7 +195,7 @@ class Harness:
         make_gpkg(self.gpkg_file, table, columns or [], rows or [])
         self.cursor = FakeCursor(state, existing_keys, existing_photo_keys, linked,
                                  raise_once_on=raise_once_on)
-        self.conn = FakeConn(self.cursor)
+        self.conn = FakeConn(self.cursor, rollback_fails=rollback_fails)
         self._dcim = dcim if dcim is not None else {}
         # {linked_qf_id: {filename: key}} — per-project, so a scenario can tell
         # "primary wins on conflict" from "linked wins"; one shared dict cannot.

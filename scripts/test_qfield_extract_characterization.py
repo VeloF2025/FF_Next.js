@@ -377,6 +377,9 @@ def main():
               f"got ({found},{upserted})")
 
     print("\nOne member failing does not take the family down")
+    # EXTRACT_FAILURES is module state that main() turns into the exit code; reset it so
+    # these scenarios stay independent of each other and of their order in this file.
+    MOD.EXTRACT_FAILURES.clear()
     found, upserted, out, h = run(
         config=config(gpkg_path="Civil Audit.gpkg"),
         gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
@@ -401,6 +404,7 @@ def main():
     # end of transaction block". Without a rollback, continuing to the next member
     # means every later statement — for this family, for every project after it in an
     # --all run — raises and gets swallowed, writing nothing while reporting success.
+    MOD.EXTRACT_FAILURES.clear()
     found, upserted, out, h = run(
         config=config(gpkg_path="Civil Audit.gpkg"),
         gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
@@ -416,6 +420,25 @@ def main():
           f"the next member still writes its sync-state row, got {synced}")
     check((found, upserted) == (1, 1),
           f"and still ingests its photo, got ({found},{upserted})")
+    check([f[1] for f in MOD.EXTRACT_FAILURES] == ["Civil Audit.gpkg"],
+          f"the DB failure is recorded too, got {MOD.EXTRACT_FAILURES}")
+
+    print("\nA connection too dead to roll back stops the run instead of looping")
+    MOD.EXTRACT_FAILURES.clear()
+    raised = None
+    try:
+        run(config=config(gpkg_path="Civil Audit.gpkg"),
+            gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+            raise_once_on="INSERT INTO qfield_photo_validations",
+            rollback_fails=True,
+            columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+            dcim={"a.jpg": "k/a"}, dry_run=False)
+    except Exception as exc:
+        raised = exc
+    check(raised is not None and "connection already closed" in str(raised),
+          f"the failed rollback propagates rather than being swallowed, got {raised!r}")
+    check(raised is not None and raised.__context__ is not None,
+          "and the original failure is preserved as its context")
 
     print()
     if failures:
