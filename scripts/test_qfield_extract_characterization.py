@@ -195,6 +195,20 @@ def main():
     check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
           "download failure writes NO sync-state")
 
+    # A file MinIO holds no version of is a different fault from a broken transfer —
+    # the first is how a dead path presents (Mahikeng's emptied version folders), and a
+    # cron log has to be able to tell them apart.
+    found, upserted, out, h = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, no_versions=True, dry_run=False)
+    check((found, upserted) == (0, 0), f"no versions -> (0,0), got ({found},{upserted})")
+    check("No versions of this GPKG in MinIO" in out,
+          "a versionless GPKG is reported as such, not as a download failure")
+    check(h.stub_calls.get("minio_download_latest", 0) == 0,
+          "and no transfer is attempted")
+    check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
+          "no versions writes NO sync-state")
+
     found, upserted, out, h = run(
         columns=["NAME", "unrelated"],
         rows=[{"NAME": "P1", "unrelated": "x"}], dry_run=False)
@@ -376,6 +390,32 @@ def main():
               if "INSERT INTO qfield_gpkg_sync_state" in sql]
     check(synced == ["Civil Audit phase_2_.gpkg"],
           f"and only the surviving member records a sync, got {synced}")
+    # main() turns this into a non-zero exit. Recovering per file must not make the RUN
+    # look green — cron-qa-ingest.sh branches on that status to log "Extraction FAILED".
+    check([f[1] for f in MOD.EXTRACT_FAILURES] == ["Civil Audit.gpkg"],
+          f"the failure is recorded for the run's exit status, got {MOD.EXTRACT_FAILURES}")
+
+    print("\nA DB-originated failure is rolled back, not carried into the next member")
+    # The dangerous shape. psycopg2 runs with autocommit=False, so a failed statement
+    # puts the connection in "current transaction is aborted, commands ignored until
+    # end of transaction block". Without a rollback, continuing to the next member
+    # means every later statement — for this family, for every project after it in an
+    # --all run — raises and gets swallowed, writing nothing while reporting success.
+    found, upserted, out, h = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        raise_once_on="INSERT INTO qfield_photo_validations",
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    check(h.conn.rollbacks >= 1,
+          f"the aborted transaction is rolled back, got {h.conn.rollbacks} rollback(s)")
+    check(not h.cursor.aborted, "the connection is usable again afterwards")
+    synced = [p[1] for sql, p in h.cursor.executed
+              if "INSERT INTO qfield_gpkg_sync_state" in sql]
+    check(synced == ["Civil Audit phase_2_.gpkg"],
+          f"the next member still writes its sync-state row, got {synced}")
+    check((found, upserted) == (1, 1),
+          f"and still ingests its photo, got ({found},{upserted})")
 
     print()
     if failures:

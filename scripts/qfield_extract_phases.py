@@ -17,7 +17,7 @@ so a stuck project keeps looking stuck instead of looking freshly synced.
 IMPORTANT for tests — read before adding a call here. The characterization harness
 intercepts I/O by setattr()ing stubs onto the module where the call is RESOLVED, and
 CPython resolves a function's globals in the module where that function is DEFINED. So
-every patchable name this module calls (minio_download_latest,
+every patchable name this module calls (minio_latest_version, minio_download_latest,
 minio_list_dcim_directory, resolve_spatial_pon_map, sync_hierarchy) must be patched
 HERE, not only on extract-gpkg-photos.py. qfield_extract_testkit patches every module
 in its _patch_targets list and asserts interception actually happened; if you add a new
@@ -85,7 +85,10 @@ def download_and_check_delta(qf_id, gpkg_path, tmp_path, state, force,
     """
     version = minio_latest_version(qf_id, gpkg_path)
     if not version:
-        print(f"  SKIP: Could not download GPKG")
+        # No download was attempted — say which step failed, or a cron log cannot tell
+        # "MinIO has no versions of this file" (a dead path, the Mahikeng shape) from
+        # "the transfer broke" (transient).
+        print(f"  SKIP: No versions of this GPKG in MinIO")
         return None
 
     # Decide BEFORE transferring. The unchanged case is the common one across a family

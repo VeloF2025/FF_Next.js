@@ -78,8 +78,15 @@ class FakeCursor:
     which is the whole point of a characterization harness.
     """
 
-    def __init__(self, state=None, existing_keys=(), existing_photo_keys=(), linked=()):
+    def __init__(self, state=None, existing_keys=(), existing_photo_keys=(), linked=(),
+                 raise_once_on=None):
         self.executed = []           # [(sql, params)]
+        # Substring of the statement that should blow up ONCE, modelling a DB-originated
+        # failure (constraint violation, bad cast, blip). Postgres then refuses every
+        # further statement on the connection until it is rolled back, so the stub
+        # models that too — without it a missing rollback() looks perfectly healthy.
+        self._raise_once_on = raise_once_on
+        self.aborted = False
         self._state = state          # dict for qfield_gpkg_sync_state, or None
         self._existing_keys = list(existing_keys)
         self._existing_photo_keys = list(existing_photo_keys)
@@ -88,6 +95,15 @@ class FakeCursor:
         self.rowcount = 0
 
     def execute(self, sql, params=None):
+        if self.aborted:
+            raise RuntimeError(
+                "current transaction is aborted, commands ignored until end of "
+                "transaction block")
+        if self._raise_once_on and self._raise_once_on.lower() in sql.lower():
+            self._raise_once_on = None
+            self.aborted = True
+            self.executed.append((" ".join(sql.split()), params))
+            raise RuntimeError('duplicate key value violates unique constraint')
         self.executed.append((" ".join(sql.split()), params))
         low = sql.lower()
         if "from qfield_gpkg_sync_state" in low and low.strip().startswith("select"):
@@ -124,12 +140,18 @@ class FakeConn:
     def __init__(self, cursor):
         self._cursor = cursor
         self.committed = False
+        self.rollbacks = 0
 
     def cursor(self, *a, **kw):
         return self._cursor
 
     def commit(self):
         self.committed = True
+
+    def rollback(self):
+        """Clears the aborted state, exactly as Postgres does."""
+        self.rollbacks += 1
+        self._cursor.aborted = False
 
     def close(self):
         pass
@@ -157,13 +179,15 @@ class Harness:
     def __init__(self, mod, table="civil_audit", columns=None, rows=None,
                  dcim=None, state=None, existing_keys=(), existing_photo_keys=(),
                  linked=(), linked_dcim=None, hierarchy_backfill=False,
-                 download_fails=False, fail_on=None, spatial_pon_map=None,
+                 download_fails=False, no_versions=False, fail_on=None, raise_once_on=None,
+                 spatial_pon_map=None,
                  version="v20260731122829-abc12345", gpkg_path="Civil Audit.gpkg"):
         self.mod = mod
         self.tmpdir = tempfile.mkdtemp(prefix="qfield_char_")
         self.gpkg_file = os.path.join(self.tmpdir, "fixture.gpkg")
         make_gpkg(self.gpkg_file, table, columns or [], rows or [])
-        self.cursor = FakeCursor(state, existing_keys, existing_photo_keys, linked)
+        self.cursor = FakeCursor(state, existing_keys, existing_photo_keys, linked,
+                                 raise_once_on=raise_once_on)
         self.conn = FakeConn(self.cursor)
         self._dcim = dcim if dcim is not None else {}
         # {linked_qf_id: {filename: key}} — per-project, so a scenario can tell
@@ -173,6 +197,9 @@ class Harness:
         # minio_download_latest returns (None, 0) when MinIO has no such object. Without
         # a way to simulate it, that abort path had no coverage at all.
         self._download_fails = download_fails
+        # Two distinct MinIO failures the delta check now tells apart: no versions at
+        # all (the file is dead in MinIO) vs the transfer itself breaking.
+        self._no_versions = no_versions
         # {gpkg_path} whose download RAISES rather than returning empty — the transient
         # network error, which is a different path from "MinIO has no such object".
         self._fail_on = set(fail_on or ())
@@ -221,11 +248,10 @@ class Harness:
 
         self._patcher.patch("resolve_gpkg_paths", lambda qf, p: list(self._gpkg_paths))
         self._patcher.patch("minio_download_latest", _download)
-        # The delta check resolves the version BEFORE downloading, so a scenario that
-        # simulates "MinIO has no such object" has to fail here too — otherwise
-        # download_fails would abort one step later than it does in production.
+        # The delta check resolves the version BEFORE downloading, so "MinIO holds no
+        # version of this file" is now a separate abort from "the transfer failed".
         self._patcher.patch("minio_latest_version",
-                            lambda qf, p: None if self._download_fails else self._version)
+                            lambda qf, p: None if self._no_versions else self._version)
         self._patcher.patch("minio_list_dcim_directory", _list_dcim)
         self._patcher.patch("minio_resolve_photo_version", lambda qf, p: None)
         self._patcher.patch("fetch_linked_qf_project_ids", lambda cur, ff, qf: list(self._linked))

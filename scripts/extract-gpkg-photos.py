@@ -67,6 +67,12 @@ DB_URL = os.environ.get("DATABASE_URL")
 
 
 
+# [(project_name, gpkg_path, error)] for every family member that failed this run.
+# Swallowing a per-file error to protect the other files is only safe if the RUN still
+# reports failure — otherwise cron reads exit 0 and nobody learns a project was skipped.
+EXTRACT_FAILURES = []
+
+
 def extract_project(conn, project_name, config, dry_run=False, force=False):
     """Extract photo references from every GPKG in the project's family.
 
@@ -102,6 +108,19 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
             print(f"  ERROR: '{gpkg_path}' failed, continuing with the rest: "
                   f"{type(exc).__name__}: {exc}")
             traceback.print_exc()
+            # MANDATORY, not tidiness. The connection runs autocommit=False, so if the
+            # exception came from a statement, Postgres has put it in "current
+            # transaction is aborted, commands ignored until end of transaction block".
+            # Continuing without this means every later statement — the rest of this
+            # family, every project after it in an --all run, and
+            # resolve_unversioned_keys() at the end — raises and is swallowed here, so
+            # the run writes nothing further while printing as though it recovered.
+            try:
+                conn.rollback()
+            except Exception as rb_exc:      # a dead connection cannot be rolled back
+                print(f"  ERROR: rollback after '{gpkg_path}' failed: {rb_exc}")
+                raise
+            EXTRACT_FAILURES.append((project_name, gpkg_path, f"{type(exc).__name__}: {exc}"))
             continue
         total_found += found
         total_upserted += upserted
@@ -282,10 +301,17 @@ def main():
     print(f"TOTAL: {total_found} photos found, {total_upserted} new upserted")
     if args.dry_run:
         print("DRY RUN — no changes written")
+    if EXTRACT_FAILURES:
+        print(f"{len(EXTRACT_FAILURES)} GPKG(s) FAILED and were skipped:")
+        for project_name, gpkg_path, err in EXTRACT_FAILURES:
+            print(f"  {project_name} / {gpkg_path}: {err}")
     print(f"{'='*60}")
 
     conn.close()
+    # Per-file recovery keeps the other files moving; it must not turn a real failure
+    # into a green cron run. The wrapper (cron-qa-ingest.sh) branches on this status.
+    return 1 if EXTRACT_FAILURES else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
