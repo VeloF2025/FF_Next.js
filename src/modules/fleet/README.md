@@ -156,3 +156,14 @@ and manager review at `/fleet/incidents`. Full reference:
 `.claude/modules/fleet.md` (Operational Incidents section) and
 `docs/operations/fleet-operational-incidents.md`. Migration execution and
 cron scheduling are separate deployment approvals — not part of this PR.
+
+## Driver Incident Input (migration 503, PR 7)
+
+`src/modules/fleet/incidents/driver/` gives a driver optional, read-only-by-default
+access to their own PR 6 incidents via `/my/fleet/incidents`, plus append-only
+ways to explain, attach evidence, report a source-data concern, and link an
+existing Attendance correction. Monitoring, incident creation, and manager review
+require no driver action, and a missing response is never treated as an admission.
+Full reference: `.claude/modules/fleet.md` (Driver Incident Input section).
+Migration 503 is unapplied — merging this code creates no table, sends no
+notification, and enables no policy; deployment remains a separate approval.

@@ -154,3 +154,141 @@ to a shared distribution list during this pass — use test accounts.
 Record screenshots or a trace for each scenario. Do not invoke production cron,
 install scheduler entries, send real notifications, or apply migration 506
 during this pass.
+
+---
+
+# PR 7 addendum — optional driver incident input
+
+PR 7 (`feat/fleet-oversight-pr7-driver-input`) extends the PR 6 incident domain
+with optional, driver-transparent access to a driver's own incidents at
+`/my/fleet/incidents`, append-only explanations/evidence/concerns, and links to
+existing Attendance corrections. Full behavioural reference:
+`.claude/modules/fleet.md` → "Driver Incident Input (migration 503, PR 7)".
+
+**Merging this code does nothing by itself.** Migration 503 is unapplied. **PR 7
+requires no driver action** — monitoring, incident creation, escalation, and
+manager review all continue exactly as PR 6 without a single driver response.
+
+## What this PR adds
+
+| Behaviour | Detail |
+|---|---|
+| Driver visibility | `/my/fleet/incidents` shows the authenticated driver's non-terminal incidents, terminal incidents closed in the last 90 days (configurable), and a `View history` control up to a configurable 12-month maximum. Server-side redaction — no coordinates, provider payloads, recipient data, internal notes, or other staff identities ever leave the API. |
+| Manager request | `POST /api/fleet/incidents/[incidentId]/request-driver-input` — optional guidance, default respond-by = end of the driver's 2nd scheduled workday (SAST, Attendance-schedule-aware, Mon–Fri fallback), idempotent, supersedes rather than overwrites a prior open request. |
+| Driver submissions | Free-text explanation, zero or more evidence files, one structured concern category, append-only, idempotent by `(incident_id, staff_id, idempotency_key)`. Never changes lifecycle, outcome, or acknowledgement. |
+| Evidence | Reuses PR 6's VF Storage category and byte-signature MIME verification; upload-then-DB-insert transaction; PR 6's orphan-cleanup path covers a post-upload DB failure. No delete route. |
+| Visibility classes | `internal` / `shared_with_driver` / `driver_submitted` on evidence and actions; every existing and future manager-authored row defaults to `internal`. |
+| Attendance linking | Maps incident staff/work-date to an **existing** Attendance required-day exception only — never creates a generic correction. Fleet stores a reference and displays Attendance's canonical state; Attendance stays the source of truth. |
+| Notifications | `fleet.driver_input_requested`, `fleet.driver_response_received` — driver notified only after a manager's request, never on incident open. |
+| Manager queue | Driver-submitted content renders in the existing PR 6 evidence/action timeline with a visibility badge (commit `caf1d18a9`). Filtering the queue by driver-input/correction state is **not implemented** — do not assume it exists. |
+
+## Deployment sequence (not part of this PR — record approval for each step)
+
+1. **Approve and apply migration 503**
+   (`scripts/migrations/sql/503_fleet_incident_driver_input.sql`) against the
+   shared database. Confirm readback:
+   `SELECT filename FROM schema_migrations WHERE filename = '503_fleet_incident_driver_input.sql'`.
+2. **Re-verify the next free migration number before any further Fleet
+   migration.** This PR's number moved 490 → 496 → 499 → 503 while in
+   flight, as master consumed intervening numbers for unrelated work — do not
+   assume the integer after 503 is free without checking
+   `scripts/migrations/sql/` first.
+3. **No new cron entries.** PR 7 adds no scheduled job; existing PR 6 crons are
+   unaffected.
+4. **Verify** using the readback queries below before treating driver input as
+   "live" in an environment.
+
+### Post-install readback
+
+```sql
+-- Exactly one open settings version, seeded values as expected:
+SELECT version, response_window_workdays, recent_window_days, history_window_days,
+       enabled_concern_categories, evidence_allowed_mime_types, evidence_max_bytes
+FROM fleet_incident_driver_input_settings WHERE effective_to IS NULL;
+
+-- No requests/submissions/links exist yet (expected immediately after migration):
+SELECT count(*) FROM fleet_incident_driver_input_requests;
+SELECT count(*) FROM fleet_incident_driver_submissions;
+SELECT count(*) FROM fleet_incident_attendance_correction_links;
+
+-- Every existing PR 6 evidence/action row still defaults to internal:
+SELECT visibility, count(*) FROM fleet_operational_incident_evidence GROUP BY visibility;
+SELECT visibility, count(*) FROM fleet_operational_incident_actions GROUP BY visibility;
+```
+
+## Rollback
+
+`scripts/migrations/sql/rollback_503_fleet_incident_driver_input.sql` drops the
+four new tables and reverts the PR 6 evidence/action column additions. **This
+deletes any driver-submitted explanations, evidence references, and correction
+links captured since deployment — execute only with the same approval level as
+the forward migration.**
+
+## Verification already completed (this PR)
+
+- Focused test suites pass — see the PR description / CI run for exact counts.
+- `npm run agents:mirror` / `npm run agents:check` — mirrors regenerated and
+  verified.
+- `git diff --check` — no whitespace conflicts.
+- `node scripts/check-migration-versions.mjs` — no reused migration numbers.
+- Diff scanned for `TODO`/`PLACEHOLDER`/hardcoded personal email addresses —
+  see the PR description for the exact scan command and result.
+- `bash scripts/secret-scan.sh` — run with no bypasses.
+
+## Outstanding gates (not completed by this PR)
+
+- [ ] **Migration 503 applied** to the shared database.
+- [ ] **`npm run ci:quick` run on the GitHub Actions self-hosted runner** — the
+      local Windows workstation used for this task cannot run it directly (its
+      `bash` step is unavailable on this box). Pending the GHA run on the PR.
+- [ ] **Browser verification (below)** — not attempted in this environment (no
+      `DATABASE_URL`, no browser automation available). A human with database
+      and browser access must execute the scenarios below before merge, per
+      the repository's UI-change verification rule.
+
+## Browser verification checklist (to be executed by a human before merge)
+
+Run `PORT=3004 npm run dev` against a database that has migrations 502 and 503
+applied, at least one active project, one project manager account, one Fleet
+oversight override grant, and at least one driver test account with a linked
+`/my` session. Do not send real WhatsApp/email notifications to a shared
+distribution list during this pass — use test accounts.
+
+1. **Driver scope.** Sign in as a driver with at least one active incident.
+   Confirm `/my/fleet/incidents` shows only that driver's incidents and the
+   network response contains no coordinates, provider payloads, recipient
+   data, internal notes, or other staff identities.
+2. **IDOR check.** As a different driver, attempt to load the first driver's
+   incident detail by ID directly. Confirm a 404, not a 403 or a partial
+   record — indistinguishable from a genuinely missing incident.
+3. **No incident-opened notification.** Confirm a newly opened incident
+   produces no driver notification and is still visible in `/my` without one.
+4. **Manager request.** As a PM/oversight user with edit permission, call
+   `Request driver input` with optional guidance. Confirm exactly one driver
+   notification is sent, the due-date copy is neutral, and re-requesting
+   supersedes rather than duplicates the prior request.
+5. **Response and follow-up.** As the driver, submit a voluntary response
+   before any request, then a requested response, then an append-only
+   follow-up. Confirm each appears in the manager's evidence/action timeline
+   with the driver's explanation text visible and a `driver_submitted`
+   visibility badge, and that a scoped manager receives a notification.
+6. **Evidence retry.** Submit explanation text with a file that fails to
+   upload (e.g. disallowed MIME). Confirm the text is still accepted and the
+   file can be retried without re-entering or losing the explanation.
+7. **Attendance correction.** Confirm `Correct attendance` appears only when
+   an existing required-day exception is eligible, opens
+   `/my/attendance/corrections/new` with incident context, and — after a
+   successful Attendance submission — links the canonical adjustment without
+   auto-closing the incident.
+8. **Races and limits.** Confirm a response submitted as an incident closes is
+   resolved by row-lock (first committed state wins), an expired request
+   becomes read-only with neutral copy, the 90-day recent view and 12-month
+   history limit behave as configured, and idempotent retry with the same key
+   returns the original record rather than creating a duplicate.
+9. **Regression.** Confirm the existing `/my` hub, Attendance correction flow,
+   Fleet review queue, Dashboard, and Map are all unaffected.
+10. **No driver action required.** Confirm monitoring, incident creation, and
+    manager workflows all function with zero driver responses.
+
+Record screenshots or a trace for each scenario. Do not apply migration 503,
+send production notifications, or deploy during this pass.

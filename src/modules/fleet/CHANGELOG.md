@@ -6,6 +6,42 @@ Format: `## [Commit Hash] - YYYY-MM-DD - Author - Type`
 
 ---
 
+## [PR 7] - 2026-08-20 - Feature
+
+**feat(fleet): optional driver incident responses and Attendance correction linking**
+
+Migration 503 (unapplied pending deployment approval) gives a driver
+transparent, optional access to their own PR 6 operational incidents via
+`/my/fleet/incidents`, plus append-only explanations, follow-ups, evidence
+uploads, structured source-data concerns, and links to an existing Attendance
+required-day correction. Drivers are notified only after an authorized
+manager calls the new `request-driver-input` action — never merely because
+an incident opened. Adds a `visibility` classification (`internal` /
+`shared_with_driver` / `driver_submitted`) to PR 6 evidence/actions,
+defaulting every existing and future manager-authored row to `internal`.
+Two notification events registered
+(`fleet.driver_input_requested`, `fleet.driver_response_received`). A driver
+response never changes incident lifecycle/outcome, never rewrites Attendance/
+GPS/assignment/site/vehicle/geofence evidence, and triggers no automatic
+payroll/disciplinary/fraud/score effect. Requires no driver action — PR 6
+workflows are unaffected. See `.claude/modules/fleet.md` (Driver Incident
+Input section) and `docs/operations/fleet-operational-incidents.md`.
+
+**Known gaps recorded, not silently fixed:** `explanationSummary` is always
+`null` (no safe generator exists yet — an open product question); manager
+queue filtering by `driverInputState`/`attendanceCorrectionState` is not
+implemented (dead client plumbing for it was removed); `MAX_EXPLANATION_LENGTH
+= 4000` has no basis in the design and awaits confirmation.
+
+**Files:** `src/modules/fleet/incidents/driver/**`,
+`pages/api/my/fleet/incidents/**`,
+`pages/api/fleet/incidents/[incidentId]/request-driver-input.ts`,
+`scripts/migrations/sql/503_fleet_incident_driver_input.sql`,
+`src/modules/attendance/portal/client/**` (hub tile, correction-form
+callback), `src/modules/notifications/constants/index.ts` (2 new events).
+
+---
+
 ## [PR 6] - 2026-08-18 - Feature
 
 **feat(fleet): operational incidents, escalation, and manager review queue**

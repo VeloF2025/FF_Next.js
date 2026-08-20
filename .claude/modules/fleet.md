@@ -431,6 +431,150 @@ and gets no link. The link carries `incidentType`, `projectId`, and `staffId` in
 `/fleet/incidents?...` so the queue opens pre-filtered. No new dashboard tab or
 replacement page exists; the existing Dashboard and Map are unmodified otherwise.
 
+## Driver Incident Input (migration 503, PR 7)
+
+PR 7 gives a driver optional, transparent access to their own PR 6 incidents and
+append-only ways to explain, attach evidence, report a source-data concern, and
+link a canonical Attendance correction — through `/my/fleet/incidents`, not a new
+portal. Implementation lives in `src/modules/fleet/incidents/driver/`; driver APIs
+are under `/api/my/fleet/incidents`; the one manager-side addition is
+`POST /api/fleet/incidents/[incidentId]/request-driver-input`.
+
+**Migration 503 is unapplied — merging this code creates no table, sends no
+notification, and applies no policy.** PR 7 requires no driver action: monitoring,
+incident creation, escalation, and manager review all work exactly as PR 6 without
+a single response. **Migration numbering moved while this PR was in flight** —
+503 was 490, then 496, then 499, before landing here as master consumed each
+number for unrelated work. Re-check `scripts/migrations/sql/` for the next free
+number before creating any further Fleet migration; do not assume the next
+integer after 503 is free.
+
+### Append-only, with one narrow exception
+
+`fleet_incident_driver_input_requests`, `fleet_incident_driver_submissions`, and
+`fleet_incident_attendance_correction_links` are granted `SELECT, INSERT` only —
+no blanket `UPDATE`, no `DELETE`. The one exception is a **column-scoped** grant on
+`fleet_incident_driver_input_requests`: `superseded_at`, `closed_at`,
+`closure_reason`, and the three `delivery_*_count` columns are writable, because
+supersession/closure/delivery outcome are durable bookkeeping a manager reads back
+later, not transient return values. `incident_id`, `requested_by`, `guidance`,
+`requested_at`, `respond_by`, and `idempotency_key` remain unwritable after insert
+— a blanket `UPDATE` grant would also let a manager silently rewrite the guidance
+they sent a driver, which is exactly what this column list is designed to prevent.
+
+### The driver's explanation is stored twice, on purpose
+
+`fleet_incident_driver_submissions.explanation` is the driver-scoped source
+record. Every accepted submission also writes that same trimmed text verbatim into
+the `note` column of a `driver_response_received` row in
+`fleet_operational_incident_actions` (`submissionService.ts`). This is not
+duplication to clean up: the actions table is the append-only, manager-visible
+audit timeline that `reviewQueries.ts`/`IncidentReviewDrawer.tsx` already render
+and already gate behind PR 6's project-scope check — no manager read path selects
+`fleet_incident_driver_submissions` directly. Before commit `caf1d18a9` the `note`
+was hardcoded `NULL` and a manager could see *that* a driver responded but not
+*what* they said; do not "deduplicate" this by dropping either copy.
+
+### Visibility classification
+
+`fleet_operational_incident_evidence` and `fleet_operational_incident_actions`
+each gain a `visibility` column (`internal` / `shared_with_driver` /
+`driver_submitted`), defaulting existing PR 6 rows and every future
+manager-authored row to `internal` so nothing is retroactively disclosed. Driver
+detail queries (`driverInputRepository.ts`) select only `shared_with_driver` and
+`driver_submitted` rows — filtering happens in SQL, not by hiding fields in React.
+Managers see all three classes; `IncidentReviewDrawer.tsx` renders a visibility
+badge so a manager can tell an internal note from one shared with or submitted by
+the driver.
+
+### Driver-input state and response window
+
+State is independent of incident lifecycle: `not_requested -> requested ->
+responded`, with `expired` (window passed unanswered) and a presentation-only
+`closed` (incident resolved/dismissed before a response). A manager's
+`request-driver-input` call supersedes any prior open request rather than
+overwriting it — only the latest open request controls the current `respond_by`.
+The default response window is the end of the driver's second scheduled working
+day after the request, computed from the driver's Attendance schedule in SAST,
+skipping unscheduled days; with no schedule rows it falls back to Monday–Friday.
+All of this is effective-dated configuration
+(`fleet_incident_driver_input_settings`), not a hardcoded constant.
+
+### Evidence MIME allowlist fails closed
+
+`versionDriverInputSettings` (`settingsRepository.ts`) rejects any
+`evidenceAllowedMimeTypes` entry absent from `vfStorageUpload.ts`'s
+`SIGNATURE_REGISTERED_TYPES` — the list of MIME types `uploadCategorizedFile` can
+actually verify by byte signature. Content verification fails closed there:
+allowing a type in settings without a registered signature would make every
+upload of it fail at runtime with a generic "content does not match declared
+type" error, disconnected from the real cause. **Adding a new evidence MIME type
+therefore always requires two changes together**: register its byte signature in
+`MIME_SIGNATURES` (`src/lib/vfStorageUpload.ts`) first, then it becomes eligible
+to enable in driver-input settings. The initial allowlist is `image/jpeg`,
+`image/png`, `application/pdf`, 15 MB max.
+
+### `explanationSummary` is deliberately always `null`
+
+`DriverIncidentDetail.explanationSummary` (`driverIncidentService.ts`) is hardcoded
+`null` in this PR — not a bug. No safe generator exists for a plain-language "why
+this was flagged" summary: the only raw material is `evidenceSnapshot`, which
+design §4/§9 forbids sending to a driver (it can carry coordinates/provider
+payloads). `neutralLabel` remains the only shipped summary a driver sees. If a
+manager requests input without writing guidance, the driver currently sees no
+incident-specific reason beyond that neutral label — an open product question for
+a future PR, not something to silently "fix" by relaxing the evidence-snapshot
+boundary.
+
+### Queue filtering is not implemented — do not add half of it
+
+The manager queue does **not** filter by `driverInputState` or
+`attendanceCorrectionState`. A client-only round-trip for both existed briefly in
+`incidentApi.ts` and was removed in commit `caf1d18a9` because the server never
+implemented the corresponding query parameters and no UI control ever called it —
+it was dead plumbing pointing at a contract nobody honored. If this filtering is
+built, the query-parameter handling in `pages/api/fleet/incidents/index.ts` (or
+equivalent) and the client call in `incidentApi.ts` must land in the same change;
+do not reintroduce one half without the other.
+
+### Attendance correction linking
+
+`attendanceCorrectionLinkService.ts` maps an incident's staff/work-date to an
+**existing** Attendance required-day exception — it never creates a generic
+correction, and generic Attendance corrections remain retired. Fleet stores only a
+link (`fleet_incident_attendance_correction_links`, unique per
+incident/correction pair) and displays Attendance's canonical state
+(pending/approved/declined/cancelled) at read time; it never caches a second
+authoritative status or copies correction content into incident fields. An
+Attendance correction failure never discards an already-accepted Fleet
+explanation, and a correction outcome never auto-closes the incident.
+
+### `MAX_EXPLANATION_LENGTH` needs confirmation
+
+`submissionService.ts` enforces a 4000-character cap on `explanation`. This number
+was chosen with no basis in the PR 7 design document and awaits confirmation —
+treat it as a placeholder-with-a-value, not a settled product decision, if it ever
+needs to change.
+
+### Notifications
+
+Two events, registered in `src/modules/notifications/constants/index.ts`:
+`fleet.driver_input_requested` and `fleet.driver_response_received`. Idempotency
+keys: `fleet-driver-input-requested:{inputRequestId}:{driverUserId}` and
+`fleet-driver-response-received:{submissionId}:{recipientUserId}`. A driver is
+never notified merely because an incident opened — only after an authorized
+manager requests input. Missing driver user mapping returns a recorded delivery
+failure without losing the request (same pattern as PR 6's recipient resolution).
+
+### Portal composition
+
+`/my/fleet/incidents` and `/my/fleet/incidents/[incidentId]` compose into the
+existing `/my` shell; the hub tile lives in the existing "Fleet & vehicle" group
+in `MyHub.tsx`/`tiles.tsx`, not a new dashboard. `hub-summary.ts` adds
+`fleetIncidents: { activeCount, inputRequestedCount }`, staff-scoped. No offline
+upload queue exists in PR 7 — text submits first, files upload after and can retry
+independently without discarding the accepted explanation.
+
 ## Tracking (Live GPS)
 
 Vehicle position history lands in `fleet_vehicle_positions` via two provider-blind ingestion
