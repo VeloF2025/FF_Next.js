@@ -32,6 +32,17 @@
  *      units as warehouse stock that OES already reports live at a customer
  *      (460 such serials at Tembelihle on 2026-08-20, straight from a sheet
  *      import). Those are phantom shelf stock until something reconciles them.
+ *
+ * `promoted` is MEASURED, not assumed. `promoteOesActivatedSerials` catches
+ * every per-serial error internally and never rethrows, so "the call returned"
+ * says nothing about how many serials actually moved. This re-runs the
+ * promotable query afterwards: whatever still answers is still `in_stock`, and
+ * is reported as `stillInStock` rather than counted as a success.
+ *
+ * A separate nightly backstop also exists — `reconcileInStockOesActivated()`,
+ * called from oesPostImportService — so a serial this run fails to move is not
+ * lost forever. This module does not depend on that, and reports its own
+ * stragglers regardless.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -54,9 +65,11 @@ export interface OesIntakeGapReport {
   received: number;
   /** Already present (idempotent re-run). */
   skipped: number;
-  /** Serials handed to the activation cascade. */
+  /** Serials that ACTUALLY left in_stock, measured after the fact. */
   promoted: number;
-  /** Set when promotion threw — the receive still stands and is reported. */
+  /** OES-active serials still sitting in_stock after the promotion attempt. */
+  stillInStock: number;
+  /** Set when promotion threw outright, or left stragglers behind. */
   promotionFailed?: boolean;
 }
 
@@ -140,21 +153,36 @@ export async function closeOesIntakeGap(
 async function promoteInStock(
   db: GapQuerier,
   deps: GapDeps,
-): Promise<{ promoted: number; promotionFailed?: boolean }> {
+): Promise<{ promoted: number; stillInStock: number; promotionFailed?: boolean }> {
   const { rows } = await db.query<GapRow>(PROMOTABLE_SQL, [FT_ONT_ITEM_ID]);
-  if (rows.length === 0) return { promoted: 0 };
+  if (rows.length === 0) return { promoted: 0, stillInStock: 0 };
 
   try {
     await deps.promote(rows);
-    return { promoted: rows.length };
   } catch (error) {
     log.error(
-      'OES intake gap: promotion failed — OES-active serials remain in_stock',
+      'OES intake gap: promotion threw — OES-active serials remain in_stock',
       { error, promotable: rows.length },
       'oes-intake-gap',
     );
-    return { promoted: 0, promotionFailed: true };
+    return { promoted: 0, stillInStock: rows.length, promotionFailed: true };
   }
+
+  // Measure. promoteOesActivatedSerials swallows per-serial failures, so the
+  // only honest count comes from asking the database what actually moved.
+  const after = await db.query<GapRow>(PROMOTABLE_SQL, [FT_ONT_ITEM_ID]);
+  const stillInStock = after.rows.length;
+  const promoted = rows.length - stillInStock;
+
+  if (stillInStock > 0) {
+    log.warn(
+      'OES intake gap: some serials did not leave in_stock',
+      { attempted: rows.length, promoted, stillInStock },
+      'oes-intake-gap',
+    );
+  }
+
+  return { promoted, stillInStock, ...(stillInStock > 0 ? { promotionFailed: true } : {}) };
 }
 
 /** Production wiring: the real intake and the real activation cascade. */

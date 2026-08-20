@@ -56,6 +56,9 @@ fi
 if grep -qE '"rowsLostToUnresolvedSheets":[1-9]' <<<"$response"; then
   log "WARN: one or more workbook tabs did not resolve to a warehouse — serials skipped"
 fi
+if grep -qE '"stillInStock":[1-9]' <<<"$response"; then
+  log "WARN: OES-active serials are still sitting in_stock after the promotion pass"
+fi
 if grep -q '"promotionFailed":true' <<<"$response"; then
-  log "WARN: OES gap serials were received but NOT promoted — they may sit in_stock with no location"
+  log "WARN: the OES gap promotion did not fully succeed — check the app log for per-serial failures"
 fi

@@ -23,10 +23,15 @@ type Row = { serial_number: string; drop_number: string };
  * Routes by query shape: the receive query starts FROM oes_activations, the
  * promotion query starts FROM stock_serials.
  */
-function querier(missing: Row[], promotable: Row[]): GapQuerier {
-  const query = vi.fn(async (sql: string) => ({
-    rows: sql.includes('FROM oes_activations') ? missing : promotable,
-  }));
+function querier(missing: Row[], promotable: Row[], leftOver: Row[] = []): GapQuerier {
+  // The promotable query runs TWICE: once to pick candidates, once afterwards
+  // to measure what actually moved. `leftOver` is what the second call sees.
+  let promotableCalls = 0;
+  const query = vi.fn(async (sql: string) => {
+    if (sql.includes('FROM oes_activations')) return { rows: missing };
+    promotableCalls += 1;
+    return { rows: promotableCalls === 1 ? promotable : leftOver };
+  });
   return { query } as unknown as GapQuerier;
 }
 
@@ -42,7 +47,7 @@ describe('closeOesIntakeGap', () => {
 
     const report = await closeOesIntakeGap(querier(MISSING, MISSING), { receive, promote });
 
-    expect(report).toEqual({ candidates: 2, received: 2, skipped: 0, promoted: 2 });
+    expect(report).toEqual({ candidates: 2, received: 2, skipped: 0, promoted: 2, stillInStock: 0 });
     expect(promote.mock.calls[0]![0]).toEqual(MISSING);
   });
 
@@ -66,7 +71,7 @@ describe('closeOesIntakeGap', () => {
 
     const report = await closeOesIntakeGap(querier([], stranded), { receive, promote });
 
-    expect(report).toEqual({ candidates: 0, received: 0, skipped: 0, promoted: 1 });
+    expect(report).toEqual({ candidates: 0, received: 0, skipped: 0, promoted: 1, stillInStock: 0 });
     expect(receive).not.toHaveBeenCalled();
     expect(promote).toHaveBeenCalledWith(stranded);
   });
@@ -103,7 +108,7 @@ describe('closeOesIntakeGap', () => {
 
     const report = await closeOesIntakeGap(querier([], []), { receive, promote });
 
-    expect(report).toEqual({ candidates: 0, received: 0, skipped: 0, promoted: 0 });
+    expect(report).toEqual({ candidates: 0, received: 0, skipped: 0, promoted: 0, stillInStock: 0 });
     expect(receive).not.toHaveBeenCalled();
     expect(promote).not.toHaveBeenCalled();
   });
@@ -116,7 +121,32 @@ describe('closeOesIntakeGap', () => {
 
     const report = await closeOesIntakeGap(querier(MISSING, MISSING), { receive, promote });
 
-    expect(report).toMatchObject({ received: 2, promoted: 0, promotionFailed: true });
+    expect(report).toMatchObject({ received: 2, promoted: 0, stillInStock: 2, promotionFailed: true });
+  });
+
+  it('does NOT count a serial as promoted when it is still in_stock afterwards', async () => {
+    // promoteOesActivatedSerials swallows per-serial failures and never
+    // rethrows, so "the call returned" proves nothing. Only re-measuring does.
+    const stuck: Row[] = [{ serial_number: 'ALCLB4A22222', drop_number: 'DR1002' }];
+    const report = await closeOesIntakeGap(querier(MISSING, MISSING, stuck), {
+      receive: vi.fn(async () => ({ received: 2, skipped: 0 })),
+      promote: vi.fn(async () => {}), // resolves happily, one serial never moves
+    });
+
+    expect(report).toMatchObject({ promoted: 1, stillInStock: 1, promotionFailed: true });
+  });
+
+  it('re-measures with the same query it selected candidates with', async () => {
+    const db = querier(MISSING, MISSING);
+    await closeOesIntakeGap(db, {
+      receive: vi.fn(async () => ({ received: 2, skipped: 0 })),
+      promote: vi.fn(async () => {}),
+    });
+
+    const calls = (db.query as unknown as { mock: { calls: [string, unknown[]?][] } }).mock.calls;
+    // find-missing, find-promotable, re-measure
+    expect(calls).toHaveLength(3);
+    expect(calls[2]![0]).toBe(calls[1]![0]);
   });
 
   it('recomputes the promotion set AFTER the receive, not before', async () => {
@@ -140,7 +170,7 @@ describe('closeOesIntakeGap', () => {
       }),
     });
 
-    expect(order).toEqual(['find-missing', 'receive', 'find-promotable', 'promote']);
+    expect(order).toEqual(['find-missing', 'receive', 'find-promotable', 'promote', 'find-promotable']);
   });
 
   it('asks only for OES-active ALCL serials with no stock row', async () => {

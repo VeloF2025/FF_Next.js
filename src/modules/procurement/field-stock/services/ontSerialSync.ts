@@ -152,14 +152,39 @@ export async function syncOntSerialsFromSharePoint(pool: Pool): Promise<OntSeria
   // row are received and promoted to `activated` in the same pass, so they
   // never sit as location-less `in_stock` rows that any warehouse could issue.
   // The sync used to only ever report this number, which is why it never moved.
-  const oesIntakeGap = await closeOesIntakeGap(pool, liveGapDeps(pool));
-  if (oesIntakeGap.candidates > 0) {
+  //
+  // Wrapped: this is a reconciliation pass bolted onto a sheet import. If it
+  // fails, the sheet import that already succeeded must still be reported.
+  let oesIntakeGap: OesIntakeGapReport;
+  try {
+    oesIntakeGap = await closeOesIntakeGap(pool, liveGapDeps(pool));
+  } catch (error) {
+    log.error(
+      'OES intake gap pass failed — sheet import above still applied',
+      { error },
+      'ont-serial-sync',
+    );
+    oesIntakeGap = {
+      candidates: 0, received: 0, skipped: 0, promoted: 0, stillInStock: 0, promotionFailed: true,
+    };
+  }
+
+  // Logged whenever the pass did ANYTHING — not gated on `candidates`, because
+  // the self-healing branch promotes with zero candidates by design, and an
+  // unattended write to `activated` on a shared database must never be silent.
+  if (
+    oesIntakeGap.candidates > 0 ||
+    oesIntakeGap.promoted > 0 ||
+    oesIntakeGap.stillInStock > 0 ||
+    oesIntakeGap.promotionFailed
+  ) {
     log.info(
-      'OES intake gap closed',
+      'OES intake gap pass',
       {
         candidates: oesIntakeGap.candidates,
         received: oesIntakeGap.received,
         promoted: oesIntakeGap.promoted,
+        stillInStock: oesIntakeGap.stillInStock,
         promotionFailed: oesIntakeGap.promotionFailed ?? false,
       },
       'ont-serial-sync',
