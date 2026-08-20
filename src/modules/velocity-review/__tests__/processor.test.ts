@@ -213,6 +213,7 @@ function runDeps(values: PreparedCandidate[], control: Partial<{
       if (!ready) return null; const claimed = { ...ready, state: 'upserting' as const, attemptCount: ready.attemptCount + 1 };
       rows.set(claimed.id, claimed); events.push(`claim:${claimed.drNumber}`); return claimed;
     }), claimDueAcknowledgementCleanup: vi.fn(async () => null),
+    expireStalledHandshakes: vi.fn(async () => 0),
     transitionExportState: vi.fn(async (id, _expected, state, updates = {}) => {
       const changed = { ...rows.get(id)!, ...updates, state }; rows.set(id, changed); events.push(`${state}:${changed.drNumber}`); return changed;
     }) }, summary: { send: vi.fn(async () => true) },
@@ -221,6 +222,31 @@ function runDeps(values: PreparedCandidate[], control: Partial<{
 }
 
 describe('runVelocityReviewExport', () => {
+  it('expires handshakes stalled beyond 24 hours before claiming any work', async () => {
+    const { deps, events } = runDeps([candidate()]);
+
+    await runVelocityReviewExport({}, deps);
+
+    expect(deps.exports.expireStalledHandshakes).toHaveBeenCalledTimes(1);
+    const [cutoff] = (deps.exports.expireStalledHandshakes as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(cutoff).toEqual(new Date(NOW.getTime() - 24 * 60 * 60_000));
+    // Must run before the first claim, or the stale row still pins its date partial.
+    const order = (deps.exports.expireStalledHandshakes as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[0];
+    const firstClaim = (deps.exports.claimNextExport as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[0];
+    expect(events.length).toBeGreaterThan(0);
+    expect(order).toBeLessThan(firstClaim);
+  });
+
+  it('does not expire handshakes on a blocked run', async () => {
+    const { deps } = runDeps([candidate()], { goLiveDate: null });
+
+    await runVelocityReviewExport({}, deps);
+
+    expect(deps.exports.expireStalledHandshakes).not.toHaveBeenCalled();
+  });
+
   it('suppresses a completed duplicate without counting it as newly acknowledged or failed', async () => {
     const value = candidate();
     const { deps, rows } = runDeps([value]);

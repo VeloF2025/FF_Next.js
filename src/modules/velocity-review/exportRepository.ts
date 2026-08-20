@@ -1,4 +1,4 @@
-import { queryOne, transaction, type SqlRow } from '@/lib/db-pool';
+import { query, queryOne, transaction, type SqlRow } from '@/lib/db-pool';
 import type { CandidateDecision, ExportState, PreparedCandidate } from './types';
 import type { VelocityReviewRun } from './runRepository';
 
@@ -272,4 +272,27 @@ export async function transitionExportState(
     RETURNING ${EXPORT_COLUMNS}
   `, params);
   return row ? mapExport(row) : null;
+}
+
+// `ambiguous` and `ack_cleanup_pending` park a row whose GHL mutation may or may
+// not have landed, so neither is ever re-claimed — a blind retry risks a duplicate
+// customer message. Correct for the handshake, fatal for the run: finishDate reads
+// both as incomplete, so the date never reaches `complete`, stays due forever, and
+// trips the 7-day gap guard that blocks the export for every date. Live 2026-08-15
+// to 08-20, six days, nothing exported. Past this window the handshake is over, so
+// resolve it terminally — it also holds the one-phone-inflight index, blocking any
+// later install at that number.
+export async function expireStalledHandshakes(cutoff: Date): Promise<number> {
+  const rows = await query<{ id: string } & SqlRow>(`
+    UPDATE velocity_review_exports
+    SET state = 'permanent_failure',
+        error_code = COALESCE(error_code, '') || ':handshake_expired',
+        next_attempt_at = NULL,
+        completed_at = COALESCE(completed_at, NOW()),
+        updated_at = NOW()
+    WHERE state IN ('ambiguous', 'ack_cleanup_pending')
+      AND updated_at < $1
+    RETURNING id
+  `, [cutoff]);
+  return rows.length;
 }

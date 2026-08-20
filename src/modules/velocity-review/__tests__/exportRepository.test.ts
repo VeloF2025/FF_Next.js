@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PreparedCandidate } from '../types';
 
 const mocks = vi.hoisted(() => ({
+  query: vi.fn(),
   queryOne: vi.fn(),
   transaction: vi.fn(),
 }));
 
 vi.mock('@/lib/db-pool', () => ({
+  query: mocks.query,
   queryOne: mocks.queryOne,
   transaction: mocks.transaction,
 }));
@@ -15,6 +17,7 @@ import {
   claimDueAcknowledgementCleanup,
   claimNextExport,
   createExport,
+  expireStalledHandshakes,
   saveCandidateDecision,
   transitionExportState,
 } from '../exportRepository';
@@ -244,5 +247,31 @@ describe('Velocity review export persistence', () => {
     expect(beforeTx.queryOne).toHaveBeenCalledTimes(1);
     expect(afterTx.queryOne).toHaveBeenCalledTimes(2);
     expect(afterTx.queryOne.mock.calls[1]?.[1]).toEqual(['export-1', ['export-1'], restartAt, restartLease]);
+  });
+});
+
+
+describe('expireStalledHandshakes', () => {
+  beforeEach(() => {
+    mocks.query.mockReset();
+  });
+
+  it('resolves only ambiguous and ack_cleanup_pending rows older than the cutoff', async () => {
+    mocks.query.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+    const cutoff = new Date('2026-08-19T09:00:00.000Z');
+
+    const expired = await expireStalledHandshakes(cutoff);
+
+    expect(expired).toBe(2);
+    const [sql, params] = mocks.query.mock.calls[0];
+    expect(params).toEqual([cutoff]);
+    expect(sql).toContain("state IN ('ambiguous', 'ack_cleanup_pending')");
+    expect(sql).toContain('updated_at < $1');
+    expect(sql).toContain("state = 'permanent_failure'");
+  });
+
+  it('reports zero when nothing is stale', async () => {
+    mocks.query.mockResolvedValue([]);
+    await expect(expireStalledHandshakes(new Date())).resolves.toBe(0);
   });
 });

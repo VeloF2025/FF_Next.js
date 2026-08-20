@@ -52,6 +52,7 @@ export interface ProcessorDependencies {
     claimNextExport(now: Date, eligibleExportIds: readonly string[]): Promise<VelocityReviewExport | null>;
     claimDueAcknowledgementCleanup(now: Date, eligibleExportIds: readonly string[],
       leaseUntil: Date): Promise<VelocityReviewExport | null>;
+    expireStalledHandshakes(cutoff: Date): Promise<number>;
     transitionExportState(id: string, expected: ExportState, next: ExportState,
       updates?: ExportTransitionUpdates): Promise<VelocityReviewExport | null>;
   };

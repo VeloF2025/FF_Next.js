@@ -3,8 +3,8 @@ import { prepareCandidate } from './candidateService';
 import { cleanupLeaseUntil, processAcknowledgementCleanup } from './acknowledgementCleanup';
 import { recordOneMapConsent } from './consentService';
 import {
-  claimDueAcknowledgementCleanup, claimNextExport, createExport, saveCandidateDecision,
-  transitionExportState, type VelocityReviewExport,
+  claimDueAcknowledgementCleanup, claimNextExport, createExport, expireStalledHandshakes,
+  saveCandidateDecision, transitionExportState, type VelocityReviewExport,
 } from './exportRepository';
 import {
   HighLevelClient, loadVelocityReviewGhlConfig,
@@ -40,6 +40,9 @@ export type {
 const RUN_BUDGET_MS = 25 * 60_000;
 const CONTACT_DRAIN_MS = 3 * 60_000;
 const MAX_CONCURRENT_EXPORTS = 4;
+// A parked handshake older than this will never resolve itself; see
+// expireStalledHandshakes for why leaving it pinned deadlocks the whole export.
+const HANDSHAKE_STALE_MS = 24 * 60 * 60_000;
 
 type ClaimedWork = { kind: 'export' | 'cleanup'; row: VelocityReviewExport };
 
@@ -108,6 +111,9 @@ async function lockedRun(deps: ProcessorDependencies): Promise<VelocityReviewRun
     const blocked = { status: 'blocked' as const, reason: due.reason, counts: {}, dates: [] };
     await deps.summary.send(blocked); return blocked;
   }
+  // Before any date is prepared: a handshake parked past the stale window is
+  // resolved terminally, so it cannot pin its date at `partial` for good.
+  await deps.exports.expireStalledHandshakes(new Date(deps.now().getTime() - HANDSHAKE_STALE_MS));
   const contexts = new Map<string, ProcessingContext>(); const work: DateWork[] = [];
   for (const date of due.dates) {
     work.push(await prepareDate(date, due.status === 'pilot' ? due.limit : null, deps, contexts));
@@ -168,7 +174,7 @@ function defaultDependencies(dry: boolean): ProcessorDependencies {
     candidates: { listCandidateRows, prepareCandidate: (row) => prepareCandidate(row, secret) },
     consent: { recordOneMapConsent }, ghl: config ? new HighLevelClient(config) : unavailable,
     exports: { saveCandidateDecision, createExport, claimNextExport,
-      claimDueAcknowledgementCleanup, transitionExportState },
+      claimDueAcknowledgementCleanup, expireStalledHandshakes, transitionExportState },
     runs: { withVelocityReviewLock, loadVelocityReviewControl, listCompletedRunDates,
       createOrResumeRun, transitionRunStatus }, summary: { send: sendVelocityReviewRunSummary } };
 }

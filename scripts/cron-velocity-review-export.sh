@@ -60,6 +60,9 @@ root = json.load(sys.stdin)
 data = root.get("data", root)
 counts = data.get("counts", {})
 dates = ",".join(str(item.get("targetDate", "")) for item in data.get("dates", []) if item.get("targetDate")) or "none"
+# A blocked run reports dates=none and every count at zero, which reads exactly
+# like a quiet day. Name the reason so the log says why nothing was exported.
+reason = f" reason={data['reason']}" if data.get("reason") else ""
 discovered = int(counts.get("candidate_total", 0))
 duplicates = int(counts.get("duplicates", 0))
 quarantined = int(counts.get("quarantined", 0))
@@ -74,7 +77,7 @@ sources = ",".join(f"{key[7:]}:{int(counts.get(key, 0))}" for key in (
 quarantine_reasons = ",".join(f"{key[11:]}:{int(counts.get(key, 0))}" for key in (
     "quarantine_no_safe_phone", "quarantine_phone_conflict",
     "quarantine_consent_missing", "quarantine_consent_withdrawn"))
-print(f"status={data.get('"'"'status'"'"', '"'"'unknown'"'"')} dates={dates} discovered={discovered} contacts_upserted={contacts_upserted} duplicates={duplicates} quarantined={quarantined} pilot_deferred={pilot_deferred} deadline_deferred={deadline_deferred} sources={sources} quarantine_reasons={quarantine_reasons} acknowledged={acknowledged} failures={failures}")
+print(f"status={data.get('"'"'status'"'"', '"'"'unknown'"'"')}{reason} dates={dates} discovered={discovered} contacts_upserted={contacts_upserted} duplicates={duplicates} quarantined={quarantined} pilot_deferred={pilot_deferred} deadline_deferred={deadline_deferred} sources={sources} quarantine_reasons={quarantine_reasons} acknowledged={acknowledged} failures={failures}")
 ' 2>/dev/null)"; then
   echo "$LOG_PREFIX ERROR: Velocity review export returned an invalid aggregate response"
   exit 1
