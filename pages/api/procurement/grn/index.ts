@@ -7,6 +7,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createAuditLog } from '@/services/procurement/auditService';
+import { transaction } from '@/lib/db-pool';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -111,85 +112,90 @@ export default withAuth(withErrorHandler(async (
         return apiResponse.validationError(res, { items: 'At least one item is required' });
       }
 
-      // Insert GRN
-      const [grn] = await sql`
-        INSERT INTO goods_receipt_notes (
-          purchase_order_id,
-          supplier_id,
-          delivery_note_number,
-          carrier,
-          vehicle_number,
-          warehouse_id,
-          receiving_bay,
-          inspection_required,
-          received_by,
-          received_by_name,
-          notes,
-          status
-        ) VALUES (
-          ${body.purchaseOrderId || null},
-          ${body.supplierId},
-          ${body.deliveryNoteNumber || null},
-          ${body.carrier || null},
-          ${body.vehicleNumber || null},
-          ${body.warehouseId},
-          ${body.receivingBay || null},
-          ${body.inspectionRequired || false},
-          ${userId || 'system'},
-          ${body.receivedByName || 'System User'},
-          ${body.notes || null},
-          'draft'
-        )
-        RETURNING *
-      `;
+      // Header and items go in together or not at all — a failing line must not
+      // leave an item-less GRN behind (that is how GRN26-00326/00327 happened).
+      const grn = await transaction(async (txn) => {
+        const created = await txn.queryOne(
+          `INSERT INTO goods_receipt_notes (
+            purchase_order_id,
+            supplier_id,
+            delivery_note_number,
+            carrier,
+            vehicle_number,
+            warehouse_id,
+            receiving_bay,
+            inspection_required,
+            received_by,
+            received_by_name,
+            notes,
+            status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'draft')
+          RETURNING *`,
+          [
+            body.purchaseOrderId || null,
+            body.supplierId,
+            body.deliveryNoteNumber || null,
+            body.carrier || null,
+            body.vehicleNumber || null,
+            body.warehouseId,
+            body.receivingBay || null,
+            body.inspectionRequired || false,
+            userId || 'system',
+            body.receivedByName || 'System User',
+            body.notes || null,
+          ]
+        );
 
-      // Insert items
-      for (const item of body.items) {
-        await sql`
-          INSERT INTO goods_receipt_items (
-            grn_id,
-            po_item_id,
-            stock_item_id,
-            item_code,
-            item_description,
-            quantity_expected,
-            quantity_received,
-            quantity_rejected,
-            uom,
-            serial_numbers,
-            lot_number,
-            batch_number,
-            manufacture_date,
-            expiry_date,
-            location_id,
-            bin_location,
-            unit_cost,
-            notes
-          ) VALUES (
-            ${grn!.id},
-            ${item.poItemId || null},
-            ${item.stockItemId || null},
-            ${item.itemCode || null},
-            ${item.itemDescription || null},
-            ${item.quantityExpected || null},
-            ${item.quantityReceived},
-            ${item.quantityRejected || 0},
-            ${item.uom},
-            ${item.serialNumbers ? JSON.stringify(item.serialNumbers) : null},
-            ${item.lotNumber || null},
-            ${item.batchNumber || null},
-            ${item.manufactureDate || null},
-            ${item.expiryDate || null},
-            ${item.locationId || null},
-            ${item.binLocation || null},
-            ${item.unitCost || null},
-            ${item.notes || null}
-          )
-        `;
-      }
+        for (const item of body.items) {
+          await txn.query(
+            `INSERT INTO goods_receipt_items (
+              grn_id,
+              po_item_id,
+              stock_item_id,
+              item_code,
+              item_description,
+              quantity_expected,
+              quantity_received,
+              quantity_rejected,
+              uom,
+              serial_numbers,
+              lot_number,
+              batch_number,
+              manufacture_date,
+              expiry_date,
+              location_id,
+              bin_location,
+              unit_cost,
+              notes
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+            [
+              created!.id,
+              item.poItemId || null,
+              item.stockItemId || null,
+              item.itemCode || null,
+              item.itemDescription || null,
+              item.quantityExpected || null,
+              item.quantityReceived,
+              item.quantityRejected || 0,
+              item.uom,
+              item.serialNumbers ? JSON.stringify(item.serialNumbers) : null,
+              item.lotNumber || null,
+              item.batchNumber || null,
+              item.manufactureDate || null,
+              item.expiryDate || null,
+              item.locationId || null,
+              item.binLocation || null,
+              item.unitCost || null,
+              item.notes || null,
+            ]
+          );
+        }
+
+        return created;
+      });
 
       // Log creation
-      logCreate('goods_receipt_note', grn!.id, {
+      logCreate('goods_receipt_note', grn!.id as string, {
         grn_number: grn!.grn_number,
         supplier_id: grn!.supplier_id,
         items_count: body.items.length,
