@@ -13,6 +13,12 @@
 -- DEFAULT 'site' below for its crew rows — the default is intentionally kept,
 -- not a one-off backfill convenience.
 --
+-- The two CHECK constraints below are PROVEN to reject the rows they are
+-- meant to reject by scripts/hs-checkin-work-location-proof.sh, which applies
+-- this file to a throwaway Postgres and inserts rows that must fail. Nothing
+-- runs that script automatically: if these constraints are ever edited, re-run
+-- it by hand or their behaviour is unverified.
+--
 -- Idempotent. Rollback: rollback_504_hs_checkin_work_location.sql.
 
 ALTER TABLE hs_daily_checkins

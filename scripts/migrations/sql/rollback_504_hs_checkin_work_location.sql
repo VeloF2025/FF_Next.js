@@ -1,7 +1,16 @@
 -- Rollback 504. Office rows have no project and cannot satisfy the restored
 -- NOT NULL, so they are deleted — they carry no payroll or attendance meaning,
 -- only a fitness declaration that the worker can re-submit.
-DELETE FROM hs_daily_checkins WHERE work_location = 'office';
+-- Announced, not silent: an operator running this under incident pressure
+-- must see how many declarations this destroyed, not infer it afterwards.
+DO $$
+DECLARE
+  removed bigint;
+BEGIN
+  DELETE FROM hs_daily_checkins WHERE work_location = 'office';
+  GET DIAGNOSTICS removed = ROW_COUNT;
+  RAISE NOTICE 'rollback 504: deleted % office check-in row(s)', removed;
+END $$;
 
 ALTER TABLE hs_daily_checkins
   DROP CONSTRAINT IF EXISTS hs_daily_checkins_site_needs_project;

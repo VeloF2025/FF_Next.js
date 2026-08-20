@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Migration 504 (hs_daily_checkins.work_location) — live-Postgres proof.
 #
-# The vitest suite for this migration only asserts the SQL text is spelled
-# right (no live-Postgres harness exists in that test tree). A regex cannot
+# The vitest suite for this migration (checkinWorkLocationMigration.test.ts)
+# only asserts the SQL text is spelled right. A regex cannot
 # prove a CHECK constraint actually rejects a row, so this script — modelled
 # on scripts/hs-scratch-rebuild-proof.sh — spins up a throwaway Postgres 15,
 # creates the minimal stub tables hs_daily_checkins depends on, applies the

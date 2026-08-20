@@ -1,11 +1,17 @@
 /**
  * Migration 504: hs_daily_checkins.work_location.
  *
- * There is no live-Postgres harness for migration tests in this module —
- * checkinSchemaSync.test.ts (the existing pattern for this table) asserts
- * against the migration's SQL text, not a running database, so this file
- * follows the same approach rather than inventing a new harness. It pins the
- * exact constraint shapes so a later edit cannot silently soften them:
+ * This is the CHEAP, text-level half of the coverage: it reads the migration's
+ * SQL and pins the exact constraint shapes so a later edit cannot silently
+ * soften them. A regex cannot prove a CHECK actually rejects a row, and this
+ * file does not claim to.
+ *
+ * The EXECUTING half is scripts/hs-checkin-work-location-proof.sh, which spins
+ * up a throwaway Postgres, applies the migration and its rollback, and proves
+ * the constraints by inserting rows that must fail. Nothing runs it
+ * automatically — run it by hand whenever these constraints change.
+ *
+ * Pinned here:
  *
  *   hs_daily_checkins_work_location_check — only 'site' or 'office'.
  *   hs_daily_checkins_site_needs_project  — a site row must carry a project.

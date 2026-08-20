@@ -154,7 +154,13 @@ export const CHECKIN_WARNING_LABELS: Record<CheckinWarning, string> = {
 export interface HSDailyCheckin {
   id: string;
   checkin_date: string;
-  project_id: string;
+  /**
+   * Null for an office declaration. Migration 504 dropped the NOT NULL and
+   * replaced it with hs_daily_checkins_site_needs_project, which requires a
+   * project only when work_location is 'site'.
+   */
+  project_id: string | null;
+  work_location: CheckinWorkLocation;
   contractor_id: string | null;
   staff_id: string | null;
   team_member_id: string | null;

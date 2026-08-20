@@ -3,9 +3,13 @@
  *
  * Migration 504 added hs_daily_checkins.work_location NOT NULL, and made
  * project_id nullable only for an office declaration (the DB CHECK rejects a
- * null project on a site row). This pins that createCheckin's INSERT names
- * the column and forwards it positionally, and that a null project passes
- * through untouched for an office row.
+ * null project on a site row).
+ *
+ * This pins createCheckin's INSERT by POSITION, not by membership: the
+ * statement names 24 columns, and `values` holds nine nulls, so asserting that
+ * the array merely contains 'office' or null would pass for a site row and
+ * would survive a transposition of any two columns. The indices below are the
+ * column order in checkinWrite.ts — checkin_date, project_id, work_location.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -77,8 +81,9 @@ describe('createCheckin — work_location', () => {
   it('writes work_location and a null project for an office row', async () => {
     const captured = await captureInsert({ workLocation: 'office', projectId: null });
     expect(captured.text).toMatch(/work_location/);
-    expect(captured.values).toContain('office');
-    expect(captured.values).toContain(null);
+    expect(captured.values[0]).toBe('2026-08-20');
+    expect(captured.values[1]).toBeNull();
+    expect(captured.values[2]).toBe('office');
   });
 
   it('writes the project for a site row', async () => {
@@ -86,6 +91,7 @@ describe('createCheckin — work_location', () => {
       workLocation: 'site',
       projectId: '11111111-1111-4111-8111-111111111111',
     });
-    expect(captured.values).toContain('11111111-1111-4111-8111-111111111111');
+    expect(captured.values[1]).toBe('11111111-1111-4111-8111-111111111111');
+    expect(captured.values[2]).toBe('site');
   });
 });
