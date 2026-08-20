@@ -149,6 +149,7 @@ export default withMySession(async (req, res, session) => {
       checkin = await createCheckin({
         checkinDate: today,
         projectId,
+        workLocation: 'site', // this endpoint predates office declarations
         contractorId: null, // Velocity-internal; crew submissions carry theirs
         staffId: session.staffId,
         teamMemberId: null,
