@@ -9,7 +9,25 @@ const layers = vi.hoisted(() => ({
   markers: vi.fn(),
   tileLayers: vi.fn(),
   map: { getContainer: vi.fn(() => document.createElement('div')), getZoom: vi.fn(() => 10),
-    invalidateSize: vi.fn(), setView: vi.fn() },
+    invalidateSize: vi.fn(), setView: vi.fn(),
+    // Leaflet's real EPSG:3857 projection, not a linear stand-in: grouping and
+    // fan-out are pixel-distance decisions, so an inaccurate scale would make
+    // markers group here in ways they never would on a real map.
+    project: vi.fn(([lat, lon]: [number, number], zoom: number) => {
+      const scale = 256 * 2 ** zoom;
+      const s = Math.max(-0.9999, Math.min(0.9999, Math.sin((lat * Math.PI) / 180)));
+      return {
+        x: scale * ((lon + 180) / 360),
+        y: scale * (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)),
+      };
+    }),
+    unproject: vi.fn(([x, y]: [number, number], zoom: number) => {
+      const scale = 256 * 2 ** zoom;
+      return {
+        lat: (2 * Math.atan(Math.exp((0.5 - y / scale) * 2 * Math.PI)) - Math.PI / 2) * (180 / Math.PI),
+        lng: (x / scale) * 360 - 180,
+      };
+    }) },
 }));
 const leaflet = vi.hoisted(() => ({ divIcon: vi.fn((options: unknown) => ({ options })) }));
 
@@ -31,6 +49,8 @@ vi.mock('react-leaflet', () => ({
   GeoJSON: () => null,
   Circle: () => null,
   Popup: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  Tooltip: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  useMapEvents: () => layers.map,
   useMap: () => layers.map,
 }));
 
