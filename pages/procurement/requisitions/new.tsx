@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
+import { StockItemSelector } from '@/components/procurement/StockItemSelector';
 
 import {
   FileInput,
@@ -15,6 +16,7 @@ import {
   Calendar,
   Building2,
   ChevronDown,
+  Package,
 } from 'lucide-react';
 import type {
   CreateRequisitionRequest,
@@ -49,6 +51,14 @@ interface FormItem {
   uom: string;
   estimatedUnitPrice: number | '';
   notes: string;
+  /**
+   * Set when the line was picked from the stock catalogue. It is what
+   * ultimately lets a receipt reach stock: the id rides PR → PO → GRN, and a
+   * goods receipt line without one is skipped by the stock posting. A typed
+   * line leaves it undefined, which is honest — the item is not in the
+   * catalogue and nothing should guess which one was meant.
+   */
+  stockItemId?: string;
 }
 
 interface Project {
@@ -69,6 +79,7 @@ export default function NewRequisitionPage() {
   const [items, setItems] = useState<FormItem[]>([
     { id: crypto.randomUUID(), itemDescription: '', quantity: '', uom: 'units', estimatedUnitPrice: '', notes: '' },
   ]);
+  const [stockSelectorIndex, setStockSelectorIndex] = useState<number | null>(null);
 
   // Projects & departments
   const [projects, setProjects] = useState<Project[]>([]);
@@ -145,7 +156,33 @@ export default function NewRequisitionPage() {
   };
 
   const updateItem = (index: number, field: keyof FormItem, value: string | number) => {
-    setItems(items.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+    setItems(items.map((item, i) => {
+      if (i !== index) return item;
+      const next = { ...item, [field]: value };
+      // Typing over a catalogue description makes the line free text again.
+      // Keeping the old id would silently receive a different item than the
+      // one the description now names.
+      if (field === 'itemDescription' && item.stockItemId) delete next.stockItemId;
+      return next;
+    }));
+  };
+
+  const handleStockItemSelect = (stockItem: {
+    stockItemId: string;
+    description: string;
+    unit: string;
+    estimatedUnitPrice: number;
+  }) => {
+    if (stockSelectorIndex !== null) {
+      setItems(items.map((item, i) => (i === stockSelectorIndex ? {
+        ...item,
+        itemDescription: stockItem.description,
+        uom: stockItem.unit || item.uom,
+        estimatedUnitPrice: stockItem.estimatedUnitPrice || item.estimatedUnitPrice,
+        stockItemId: stockItem.stockItemId,
+      } : item)));
+    }
+    setStockSelectorIndex(null);
   };
 
   // Validation
@@ -211,6 +248,7 @@ export default function NewRequisitionPage() {
           .filter((item) => item.itemDescription.trim() && item.quantity !== '' && item.quantity > 0)
           .map((item) => ({
             itemDescription: item.itemDescription,
+            stockItemId: item.stockItemId,
             quantity: item.quantity as number,
             uom: item.uom,
             estimatedUnitPrice: item.estimatedUnitPrice !== '' ? item.estimatedUnitPrice : undefined,
@@ -492,7 +530,22 @@ export default function NewRequisitionPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        {items.length > 1 && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setStockSelectorIndex(index)}
+                            className={`p-1.5 rounded transition-colors hover:bg-blue-500/10 ${
+                              item.stockItemId
+                                ? 'text-blue-400'
+                                : 'text-[var(--ff-text-tertiary)] hover:text-blue-400'
+                            }`}
+                            title={item.stockItemId
+                              ? 'Linked to the stock catalogue — click to change'
+                              : 'Pick from the stock catalogue'}
+                          >
+                            <Package className="h-4 w-4" />
+                          </button>
+                          {items.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
@@ -500,7 +553,8 @@ export default function NewRequisitionPage() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
-                        )}
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -563,6 +617,12 @@ export default function NewRequisitionPage() {
           </div>
         </form>
       </div>
+
+      <StockItemSelector
+        isOpen={stockSelectorIndex !== null}
+        onClose={() => setStockSelectorIndex(null)}
+        onSelect={handleStockItemSelect}
+      />
     </AppLayout>
   );
 }
