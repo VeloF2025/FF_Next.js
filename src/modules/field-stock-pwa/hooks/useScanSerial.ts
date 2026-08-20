@@ -11,9 +11,9 @@
  *  - Row remove helper
  */
 
-import { useCallback, useRef, useEffect } from 'react';
-import { validateSerial } from '@/modules/field-stock-pwa/api';
-import { extractScannedSerial } from '@/modules/field-stock-pwa/lib/scannedSerial';
+import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { validateSerial, validateSerialBatch } from '@/modules/field-stock-pwa/api';
+import { parseScanPayload, MAX_BOX_SERIALS } from '@/modules/field-stock-pwa/lib/boxScan';
 import { verdictForSerial } from '@/modules/field-stock-pwa/lib/serialVerdict';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
@@ -38,15 +38,133 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
     return () => { mountedRef.current = false; };
   }, []);
 
-  const scannedSet = new Set(scanned.map((s) => s.serialNumber.toUpperCase()));
+  // Memoised: two callbacks depend on it, and a fresh Set on every render would
+  // rebuild both of them every time.
+  const scannedSet = useMemo(
+    () => new Set(scanned.map((s) => s.serialNumber.toUpperCase())),
+    [scanned],
+  );
+
+  const [scanNotice, setScanNotice] = useState<string | null>(null);
+  const clearScanNotice = useCallback(() => setScanNotice(null), []);
+  const groupSeq = useRef(0);
+  /** Quantity declared by the carton's ISO data code, when the storeman scanned it. */
+  const declaredQuantity = useRef<number | null>(null);
+
+  const vibrate = (ms: number) => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms);
+  };
+
+  /** Expand one carton scan into grouped, batch-validated chips. */
+  const handleBoxScan = useCallback(
+    async (serials: string[]) => {
+      const fresh = serials.filter((s) => !scannedSet.has(s));
+      if (fresh.length === 0) { vibrate(30); return; }
+      vibrate(50);
+
+      groupSeq.current += 1;
+      const groupId = `box-${Date.now()}-${groupSeq.current}`;
+      const groupLabel = `Box · ${fresh.length} serial${fresh.length === 1 ? '' : 's'}`;
+      const scannedAt = Date.now();
+
+      const pending: PwaScannedSerial[] = fresh.map((serialNumber) => ({
+        serialNumber, stockItemId: '', stockItemName: '', scannedAt,
+        state: 'pending-validation', groupId, groupLabel,
+      }));
+      onChange([...scanned, ...pending]);
+
+      let response: Awaited<ReturnType<typeof validateSerialBatch>>;
+      try {
+        response = await validateSerialBatch({
+          serials: fresh,
+          stockItemId: stockItem.id,
+          sourceLocationId: sourceLocation?.id ?? null,
+        });
+      } catch (err) {
+        if (!mountedRef.current) return;
+        const msg = err instanceof Error ? err.message : 'Validation request failed';
+        onChange([
+          ...scanned,
+          ...pending.map((p) => ({ ...p, state: 'invalid' as const, errorMessage: msg })),
+        ]);
+        return;
+      }
+
+      if (!mountedRef.current) return;
+
+      const byNumber = new Map(response.results.map((r) => [r.serialNumber, r]));
+      const resolved: PwaScannedSerial[] = pending.map((p) => {
+        const result = byNumber.get(p.serialNumber);
+        if (!result) {
+          return { ...p, state: 'invalid' as const, errorMessage: 'Serial number not found' };
+        }
+        return result.valid
+          ? {
+              ...p,
+              stockItemId: result.stockItemId ?? stockItem.id,
+              stockItemName: result.stockItemName ?? stockItem.name,
+              state: 'valid' as const,
+            }
+          : {
+              ...p,
+              stockItemId: result.stockItemId ?? '',
+              stockItemName: result.stockItemName ?? '',
+              state: 'invalid' as const,
+              errorMessage: result.errorMessage ?? 'Serial is not available',
+            };
+      });
+
+      if (response.quantsWarning) {
+        const drift =
+          `Stock ledger disagrees here — ${response.quantsWarning.serialsInStock} serials on the shelf, ` +
+          `${response.quantsWarning.quantsOnHand} on the books. Issue is still allowed.`;
+        // Append rather than replace: a short-read warning set by the caller is
+        // the more urgent message and must not be silently overwritten.
+        setScanNotice((prev) => (prev ? `${prev} ${drift}` : drift));
+      }
+
+      onChange([...scanned, ...resolved]);
+    },
+    [scanned, scannedSet, stockItem, onChange, sourceLocation],
+  );
 
   const handleRawSerial = useCallback(
     async (rawSerial: string) => {
-      // DataMatrix labels (e.g. Nokia GPON ONT) wrap the serial in an ISO 15434
-      // envelope; extract the bare serial before validating. Bare 1D/manual
-      // input passes through unchanged.
-      const serial = extractScannedSerial(rawSerial).toUpperCase();
-      if (!serial) return;
+      // A scanned payload is a carton serial list, the carton's ISO data code,
+      // a single serial (bare or ISO-wrapped), or junk. parseScanPayload sorts
+      // them out; only the single-serial case falls through to the old path.
+      const payload = parseScanPayload(rawSerial);
+
+      if (payload.kind === 'package-data') {
+        // No serials here — but the declared quantity is worth keeping: if the
+        // box code then reads short (a partial decode), we can prove it.
+        declaredQuantity.current = payload.quantity ?? null;
+        setScanNotice("That's the data code. Scan the large square marked FULL SERIAL NUMBER LIST.");
+        return;
+      }
+      if (payload.kind === 'unrecognised') {
+        setScanNotice('That barcode is not a serial or a carton label.');
+        return;
+      }
+      if (payload.kind === 'box') {
+        if (payload.serials.length > MAX_BOX_SERIALS) {
+          setScanNotice(
+            `That code holds ${payload.serials.length} serials — more than the ${MAX_BOX_SERIALS} allowed in one scan.`,
+          );
+          return;
+        }
+        const declared = declaredQuantity.current;
+        setScanNotice(
+          declared !== null && declared !== payload.serials.length
+            ? `Label says ${declared}, read ${payload.serials.length} — rescan the box.`
+            : null,
+        );
+        await handleBoxScan(payload.serials);
+        return;
+      }
+
+      setScanNotice(null);
+      const serial = payload.serial;
 
       if (scannedSet.has(serial)) {
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
@@ -118,7 +236,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
           .concat(resolved)
       );
     },
-    [scanned, scannedSet, stockItem, onChange, sourceLocation]
+    [scanned, scannedSet, stockItem, onChange, sourceLocation, handleBoxScan]
   );
 
   const handleRemove = useCallback(
@@ -126,5 +244,10 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
     [scanned, onChange]
   );
 
-  return { handleRawSerial, handleRemove };
+  const handleRemoveGroup = useCallback(
+    (groupId: string) => onChange(scanned.filter((s) => s.groupId !== groupId)),
+    [scanned, onChange]
+  );
+
+  return { handleRawSerial, handleRemove, handleRemoveGroup, scanNotice, clearScanNotice };
 }
