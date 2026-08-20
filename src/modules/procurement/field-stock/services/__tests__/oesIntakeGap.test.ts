@@ -136,6 +136,24 @@ describe('closeOesIntakeGap', () => {
     expect(report).toMatchObject({ promoted: 1, stillInStock: 1, promotionFailed: true });
   });
 
+  it('never reports a negative promoted count when a concurrent run adds rows', async () => {
+    // The two selects are independent, so the re-measure can legitimately see
+    // MORE rows than the first. The subtraction must not go negative.
+    const more: Row[] = [
+      ...MISSING,
+      { serial_number: 'ALCLB4A33333', drop_number: 'DR1003' },
+    ];
+    const report = await closeOesIntakeGap(querier([], MISSING, more), {
+      receive: vi.fn(async () => ({ received: 0, skipped: 0 })),
+      promote: vi.fn(async () => {}),
+    });
+
+    expect(report.promoted).toBe(0);
+    // stillInStock stays a direct reading of the true stuck count.
+    expect(report.stillInStock).toBe(3);
+    expect(report.promotionFailed).toBe(true);
+  });
+
   it('re-measures with the same query it selected candidates with', async () => {
     const db = querier(MISSING, MISSING);
     await closeOesIntakeGap(db, {

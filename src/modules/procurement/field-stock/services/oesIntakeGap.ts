@@ -193,9 +193,16 @@ async function promoteInStock(
 
   // Measure. promoteOesActivatedSerials swallows per-serial failures, so the
   // only honest count comes from asking the database what actually moved.
+  //
+  // The two selects are independent — no snapshot ties them together — so under
+  // a concurrent run the second can see serials the first did not, and the
+  // subtraction is an attribution estimate rather than an exact figure. Clamped
+  // at zero so it can never report a nonsensical negative. `stillInStock` needs
+  // no such caveat: it is a direct reading of the true stuck count either way,
+  // which is the number the failure signal and the cron warning key off.
   const after = await db.query<GapRow>(PROMOTABLE_SQL, [FT_ONT_ITEM_ID]);
   const stillInStock = after.rows.length;
-  const promoted = rows.length - stillInStock;
+  const promoted = Math.max(0, rows.length - stillInStock);
 
   if (stillInStock > 0) {
     log.warn(
