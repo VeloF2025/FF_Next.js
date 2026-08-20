@@ -1,4 +1,4 @@
--- Rollback 503. This removes the PR7 driver-input tables and reverts the
+-- Rollback 506. This removes the PR7 driver-input tables and reverts the
 -- PR6 evidence/actions visibility extension. Execute only with approval.
 
 DROP TABLE IF EXISTS fleet_incident_attendance_correction_links;
@@ -48,4 +48,4 @@ ALTER TABLE fleet_operational_incident_evidence
   DROP COLUMN IF EXISTS visibility;
 
 DELETE FROM schema_migrations
- WHERE filename = '503_fleet_incident_driver_input.sql';
+ WHERE filename = '506_fleet_incident_driver_input.sql';

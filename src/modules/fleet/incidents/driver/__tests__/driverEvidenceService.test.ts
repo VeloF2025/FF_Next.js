@@ -40,8 +40,8 @@ const OTHER_STAFF = '99999999-9999-4999-8999-999999999999';
 const UPLOADED = { url: '/storage/fleet/incidents/key.jpg', key: 'fleet/incidents/key.jpg' };
 const BASE64 = 'aW1hZ2U=';
 
-// Mirrors migration 503's `fleet_incident_driver_input_settings` seed
-// (`evidence_allowed_mime_types` default) — see `scripts/migrations/sql/503_fleet_incident_driver_input.sql`.
+// Mirrors migration 506's `fleet_incident_driver_input_settings` seed
+// (`evidence_allowed_mime_types` default) — see `scripts/migrations/sql/506_fleet_incident_driver_input.sql`.
 const DEFAULT_EVIDENCE_MIME_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
 
 function settingsRow(overrides: Record<string, unknown> = {}) {
@@ -161,7 +161,7 @@ describe('configured MIME/byte limits', () => {
     // to the migration's DEFAULT would leave this green while every HEIC upload was rejected
     // by the fail-closed signature check, surfacing only as a confused driver.
     const migration = readFileSync(
-      resolve(process.cwd(), 'scripts/migrations/sql/503_fleet_incident_driver_input.sql'), 'utf8');
+      resolve(process.cwd(), 'scripts/migrations/sql/506_fleet_incident_driver_input.sql'), 'utf8');
     const seeded = migration.match(/evidence_allowed_mime_types TEXT\[\] NOT NULL DEFAULT ARRAY\[([^\]]*)\]/i);
     expect(seeded).not.toBeNull();
     const types = seeded![1]!.split(',').map((entry) => entry.trim().replace(/^'|'$/g, '')).filter(Boolean);

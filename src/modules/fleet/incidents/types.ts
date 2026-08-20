@@ -20,7 +20,7 @@ export type IncidentOutcome =
   | 'assignment_error' | 'geofence_error' | 'duplicate' | 'no_action_required';
 /**
  * `driver_input_requested`/`driver_response_received` are written by PR7's
- * driver-input domain (migration 503's `fleet_operational_incident_actions`
+ * driver-input domain (migration 506's `fleet_operational_incident_actions`
  * type-check constraint) — added here so the manager queue (Task 8) can
  * type-check timeline authorship without an unsound `as string` cast; the
  * values themselves have flowed through `getIncidentActions` since PR7
@@ -32,7 +32,7 @@ export type IncidentActionType =
   | 'driver_input_requested' | 'driver_response_received';
 export type IncidentEvidenceType = 'photo' | 'document' | 'manager_note' | 'external_reference';
 /**
- * PR7 (migration 503) visibility classification on `fleet_operational_incident_actions`/
+ * PR7 (migration 506) visibility classification on `fleet_operational_incident_actions`/
  * `fleet_operational_incident_evidence`. `internal` is manager-only; `shared_with_driver` is
  * manager-authored content also made visible to the linked driver; `driver_submitted` is
  * content the driver itself submitted. Existing PR6 rows and any future manager-authored row

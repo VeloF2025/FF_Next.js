@@ -163,9 +163,9 @@ PR 7 (`feat/fleet-oversight-pr7-driver-input`) extends the PR 6 incident domain
 with optional, driver-transparent access to a driver's own incidents at
 `/my/fleet/incidents`, append-only explanations/evidence/concerns, and links to
 existing Attendance corrections. Full behavioural reference:
-`.claude/modules/fleet.md` → "Driver Incident Input (migration 503, PR 7)".
+`.claude/modules/fleet.md` → "Driver Incident Input (migration 506, PR 7)".
 
-**Merging this code does nothing by itself.** Migration 503 is unapplied. **PR 7
+**Merging this code does nothing by itself.** Migration 506 is unapplied. **PR 7
 requires no driver action** — monitoring, incident creation, escalation, and
 manager review all continue exactly as PR 6 without a single driver response.
 
@@ -184,10 +184,10 @@ manager review all continue exactly as PR 6 without a single driver response.
 
 ## Deployment sequence (not part of this PR — record approval for each step)
 
-1. **Approve and apply migration 503**
-   (`scripts/migrations/sql/503_fleet_incident_driver_input.sql`) against the
+1. **Approve and apply migration 506**
+   (`scripts/migrations/sql/506_fleet_incident_driver_input.sql`) against the
    shared database. Confirm readback:
-   `SELECT filename FROM schema_migrations WHERE filename = '503_fleet_incident_driver_input.sql'`.
+   `SELECT filename FROM schema_migrations WHERE filename = '506_fleet_incident_driver_input.sql'`.
 2. **Re-verify the next free migration number before any further Fleet
    migration.** This PR's number moved 490 → 496 → 499 → 503 while in
    flight, as master consumed intervening numbers for unrelated work — do not
@@ -218,7 +218,7 @@ SELECT visibility, count(*) FROM fleet_operational_incident_actions GROUP BY vis
 
 ## Rollback
 
-`scripts/migrations/sql/rollback_503_fleet_incident_driver_input.sql` drops the
+`scripts/migrations/sql/rollback_506_fleet_incident_driver_input.sql` drops the
 four new tables and reverts the PR 6 evidence/action column additions. **This
 deletes any driver-submitted explanations, evidence references, and correction
 links captured since deployment — execute only with the same approval level as
@@ -237,7 +237,7 @@ the forward migration.**
 
 ## Outstanding gates (not completed by this PR)
 
-- [ ] **Migration 503 applied** to the shared database.
+- [ ] **Migration 506 applied** to the shared database.
 - [ ] **`npm run ci:quick` run on the GitHub Actions self-hosted runner** — the
       local Windows workstation used for this task cannot run it directly (its
       `bash` step is unavailable on this box). Pending the GHA run on the PR.
@@ -290,5 +290,5 @@ distribution list during this pass — use test accounts.
 10. **No driver action required.** Confirm monitoring, incident creation, and
     manager workflows all function with zero driver responses.
 
-Record screenshots or a trace for each scenario. Do not apply migration 503,
+Record screenshots or a trace for each scenario. Do not apply migration 506,
 send production notifications, or deploy during this pass.

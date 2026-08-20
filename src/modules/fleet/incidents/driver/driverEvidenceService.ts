@@ -33,7 +33,7 @@
  * rather than through `../incidentRepository.ts`'s `insertIncidentEvidence`/
  * `insertIncidentAction` — those functions have no `visibility`/
  * `uploaded_by_staff_id`/`actor_staff_id` columns in their INSERT lists
- * (added by migration 503 for PR6's `internal`-by-default columns), so
+ * (added by migration 506 for PR6's `internal`-by-default columns), so
  * reusing them would silently persist `visibility = 'internal'` for a
  * driver upload. `./submissionService.ts` made the same call for its own
  * `driver_response_received` action row.

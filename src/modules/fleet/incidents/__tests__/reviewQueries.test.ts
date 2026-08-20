@@ -131,7 +131,7 @@ describe('getIncidentActions and getIncidentEvidence', () => {
     expect(evidence).toEqual([expect.objectContaining({ id: 'e1', evidenceType: 'photo' })]);
   });
 
-  it('selects visibility so a manager can distinguish internal notes from driver-shared/driver-submitted ones (migration 503)', async () => {
+  it('selects visibility so a manager can distinguish internal notes from driver-shared/driver-submitted ones (migration 506)', async () => {
     await getIncidentActions(INCIDENT);
     const [actionsText] = db.query.mock.calls[0]!;
     expect(actionsText).toMatch(/\bvisibility\b/);
@@ -175,7 +175,7 @@ describe('getIncidentDeliverySummary', () => {
 /**
  * PR7 review C1: correction links were written by the driver-scoped `/my` portal
  * (`attendanceCorrectionLinkService.ts`) and read only there — no manager surface read them
- * at all. Column names asserted here are verified against migration 503
+ * at all. Column names asserted here are verified against migration 506
  * (`fleet_incident_attendance_correction_links`: `attendance_correction_id`, `linked_at`) and
  * migration 320 (`attendance_adjustments.status`) — the SQL risk this branch's review
  * specifically warned about, since a mocked DB never catches a wrong column name.
@@ -208,14 +208,14 @@ describe('getIncidentCorrectionLinks', () => {
  * and could never report `expired`/`closed`, and `respond_by`/`delivery_failed_count` were
  * durable columns nothing manager-facing read. This proves the single source of truth is
  * `deriveDriverInputState` fed by the real `fleet_incident_driver_input_requests`/
- * `fleet_incident_driver_submissions` columns (migration 503) — not a re-derived heuristic.
+ * `fleet_incident_driver_submissions` columns (migration 506) — not a re-derived heuristic.
  */
 describe('getIncidentDriverInputSummary', () => {
   const currentRequestRow = {
     incident_id: INCIDENT, requested_at: '2026-08-18T07:00:00.000Z', respond_by: '2026-08-20T21:59:59.999Z', delivery_failed_count: 0,
   };
 
-  it('reads the current non-superseded request and surfaces respondBy, verified against migration 503 columns', async () => {
+  it('reads the current non-superseded request and surfaces respondBy, verified against migration 506 columns', async () => {
     db.queryOne.mockResolvedValueOnce(settingsRow);
     db.query.mockResolvedValueOnce([currentRequestRow]);
     db.query.mockResolvedValueOnce([]);

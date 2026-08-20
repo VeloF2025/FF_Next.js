@@ -1,7 +1,7 @@
 /**
  * Effective-dated driver-input configuration: response window, post-closure
  * policy, recent/history visibility limits, evidence allowlist, and the two
- * notification events' channel defaults (migration 503,
+ * notification events' channel defaults (migration 506,
  * `fleet_incident_driver_input_settings`). Mirrors
  * `../settingsRepository.ts`'s `versionIncidentRule`: lock the currently
  * open row, close it at the new activation instant, and insert

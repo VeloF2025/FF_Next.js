@@ -19,7 +19,7 @@
  * [incidentId]/attendance-correction-link.ts` keeps a single import
  * surface and never needs to know the split exists.
  *
- * `fleet_incident_attendance_correction_links` (migration 503) grants the
+ * `fleet_incident_attendance_correction_links` (migration 506) grants the
  * app SELECT/INSERT only — no UPDATE at all, unlike the sibling requests
  * table's six-column carve-out — because this table stores no status of
  * its own; `correctionState` is read live from `attendance_adjustments`
