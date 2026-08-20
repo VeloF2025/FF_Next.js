@@ -58,6 +58,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   __resetStateForTests();
   process.env.CRON_SECRET = SECRET;
+  // The probe retries; without this the suite would sit through real backoffs.
+  process.env.WA_BRIDGE_PROBE_BACKOFF_MS = '0';
   dispatchBridgeAlert.mockResolvedValue({ delivered: ['email'], problems: [] });
 });
 
@@ -121,12 +123,15 @@ describe('verdicts', () => {
     expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
   });
 
+  // Still classified as unreachable on the first tick — it is only the ALERT
+  // that waits for confirmation. Defaulting to healthy here is the regression
+  // that would hide a real outage.
   it('treats an unreachable bridge as unreachable, not healthy', async () => {
     bridgeUnreachable();
     const res = mockRes();
     await handler(req(), res);
     expect(res.body.verdict).toBe('unreachable');
-    expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
+    expect(res.statusCode).toBe(503);
   });
 
   it('treats a non-2xx bridge response as unreachable', async () => {
@@ -266,5 +271,122 @@ describe('recovery', () => {
     bridgeReturns(LOGGED_OUT);
     await handler(req(), mockRes());
     expect(dispatchBridgeAlert).toHaveBeenCalledTimes(3);
+  });
+});
+
+
+// Regression, 2026-08-20. 124 `unreachable` pages between 2026-08-03 and
+// 2026-08-20, every one of them false: the bridge ran 20 days with zero
+// restarts and its on-box healthcheck logged `healthy` at the exact minute of
+// each page. Median velo -> VPS round trip is ~320 ms against an 8 s single-shot
+// budget, so these were stalls on the path, not the bridge.
+describe('unreachable confirmation gate', () => {
+  it('does not page on a single unreachable tick', async () => {
+    bridgeUnreachable();
+    const res = mockRes();
+    await handler(req(), res);
+
+    expect(dispatchBridgeAlert).not.toHaveBeenCalled();
+    expect(res.body.alertSuppressed).toBe(true);
+    expect(res.body.consecutiveUnreachable).toBe(1);
+  });
+
+  it('pages once the second consecutive tick confirms it', async () => {
+    bridgeUnreachable();
+    await handler(req(), mockRes());
+    const second = mockRes();
+    await handler(req(), second);
+
+    expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
+    expect(second.body.alertSuppressed).toBe(false);
+    expect(second.body.consecutiveUnreachable).toBe(2);
+  });
+
+  it('resets the count when a tick succeeds, so blips never accumulate', async () => {
+    bridgeUnreachable();
+    await handler(req(), mockRes());          // 1 — held
+    bridgeReturns(HEALTHY);
+    await handler(req(), mockRes());          // recovered before confirmation
+    bridgeUnreachable();
+    const third = mockRes();
+    await handler(req(), third);              // 1 again, not 2
+
+    expect(dispatchBridgeAlert).not.toHaveBeenCalled();
+    expect(third.body.consecutiveUnreachable).toBe(1);
+  });
+
+  // The failure this monitor exists for must not be slowed down by the gate.
+  it('still pages on the FIRST tick for a logout, which the bridge reports itself', async () => {
+    bridgeReturns(LOGGED_OUT);
+    await handler(req(), mockRes());
+    expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
+  });
+
+  it('still pages on the first tick for a dropped socket', async () => {
+    bridgeReturns(DISCONNECTED);
+    await handler(req(), mockRes());
+    expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
+  });
+
+  // A held tick is not an outage anyone was told about, so there is nothing to
+  // sound the all-clear for. Sending one would be its own false alarm.
+  it('sends no all-clear after a blip that was never announced', async () => {
+    bridgeUnreachable();
+    await handler(req(), mockRes());
+    bridgeReturns(HEALTHY);
+    await handler(req(), mockRes());
+
+    expect(dispatchBridgeAlert).not.toHaveBeenCalled();
+  });
+
+  // But a REAL outage that is still running must not be mistaken for recovery
+  // just because the box stopped answering mid-outage.
+  it('does not sound the all-clear when a logout degrades into unreachable', async () => {
+    bridgeReturns(LOGGED_OUT);
+    await handler(req(), mockRes());
+    expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
+
+    bridgeUnreachable();
+    await handler(req(), mockRes());          // held, and NOT a recovery
+    expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
+
+    bridgeReturns(HEALTHY);
+    await handler(req(), mockRes());          // now it really did recover
+    expect(dispatchBridgeAlert).toHaveBeenCalledTimes(2);
+    expect(String(dispatchBridgeAlert.mock.calls[1][0])).toContain('RECOVERED');
+  });
+
+  it('measures downtime from the first held tick, not from the page', async () => {
+    vi.useFakeTimers();
+    const start = Date.now();
+
+    bridgeUnreachable();
+    await handler(req(), mockRes());          // t+0, held
+
+    vi.setSystemTime(new Date(start + 5 * 60 * 1000));
+    await handler(req(), mockRes());          // t+5, pages
+
+    vi.setSystemTime(new Date(start + 10 * 60 * 1000));
+    bridgeReturns(HEALTHY);
+    await handler(req(), mockRes());          // t+10, all-clear
+
+    // 10 minutes of observed downtime, not the 5 since the page went out.
+    const subject = String(dispatchBridgeAlert.mock.calls.at(-1)![0]);
+    expect(subject).toContain('RECOVERED');
+    expect(subject).toContain('10 min');
+  });
+
+  it('retries before giving up, and reports how many attempts it took', async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error('stalled'))
+      .mockResolvedValue({ ok: true, status: 200, json: async () => HEALTHY });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = mockRes();
+    await handler(req(), res);
+
+    expect(res.body.verdict).toBe('healthy');
+    expect(res.body.probeAttempts).toBe(2);
+    expect(dispatchBridgeAlert).not.toHaveBeenCalled();
   });
 });
