@@ -1,4 +1,4 @@
--- 507: append-only record of stock_quants disagreeing with the serial ledger.
+-- 509: append-only record of stock_quants disagreeing with the serial ledger.
 --
 -- Serial-tracked issues now trust the scanned serials, because stock_quants is
 -- a 26-May-2026 Odoo opening-balance snapshot with no consumption postings —
