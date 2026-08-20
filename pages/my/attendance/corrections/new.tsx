@@ -8,7 +8,7 @@ import { CorrectionForm } from '@/modules/attendance/portal/client/correction/Co
 import { RequiredCorrectionSuccess } from '@/modules/attendance/portal/client/correction/RequiredCorrectionSuccess';
 import { useCorrectionForm } from '@/modules/attendance/portal/client/correction/useCorrectionForm';
 import { useCorrectionPageData } from '@/modules/attendance/portal/client/correction/useCorrectionPageData';
-import { linkAttendanceCorrection } from '@/modules/fleet/incidents/driver/web/AttendanceCorrectionLink';
+import { linkAttendanceCorrection } from '@/modules/fleet/incidents/driver/web/attendanceCorrectionApi';
 
 // `incident_id` is optional Fleet context (design §8): safe to parse from the
 // URL because it is only ever a Fleet incident id, never staff identity or

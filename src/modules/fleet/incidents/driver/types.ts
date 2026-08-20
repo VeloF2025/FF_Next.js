@@ -1,5 +1,4 @@
 import type { NotifyResult } from '@/modules/notifications/types';
-import type { IncidentSeverity, IncidentType } from '../types';
 
 export type DriverInputState = 'not_requested' | 'requested' | 'responded' | 'expired' | 'closed';
 export type IncidentVisibility = 'internal' | 'shared_with_driver' | 'driver_submitted';

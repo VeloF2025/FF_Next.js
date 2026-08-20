@@ -2,11 +2,8 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  AttendanceCorrectionLink,
-  fetchAttendanceCorrectionEligibility,
-  linkAttendanceCorrection,
-} from '../AttendanceCorrectionLink';
+import { AttendanceCorrectionLink } from '../AttendanceCorrectionLink';
+import { fetchAttendanceCorrectionEligibility, linkAttendanceCorrection } from '../attendanceCorrectionApi';
 
 const INCIDENT = '22222222-2222-4222-8222-222222222222';
 const CORRECTION = '55555555-5555-4555-8555-555555555555';

@@ -8,57 +8,14 @@
  * renders neutral, non-accusatory copy for why it is not currently
  * offered (design §4: no "fraud"/"misconduct"/"violation" wording).
  *
- * `linkAttendanceCorrection` below is also imported directly by
- * `pages/my/attendance/corrections/new.tsx` to record the link once
- * Attendance's own submission succeeds — this file is the one place that
- * owns the Fleet-side fetch contract for this endpoint.
+ * The fetch contract itself lives in `attendanceCorrectionApi.ts`, because
+ * `pages/my/attendance/corrections/new.tsx` also calls it directly and a
+ * module that exports both components and plain functions breaks Fast Refresh.
  */
 import React from 'react';
 import Link from 'next/link';
-import type { AttendanceCorrectionEligibility, AttendanceCorrectionState } from '../types';
-
-interface ApiEnvelope<T> {
-  success: boolean;
-  data?: T;
-  error?: { code: string; message: string };
-}
-
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-  const envelope = (await response.json()) as ApiEnvelope<T>;
-  if (!response.ok || !envelope.success || envelope.data === undefined) {
-    throw new Error(envelope.error?.message ?? `Request failed (HTTP ${response.status})`);
-  }
-  return envelope.data;
-}
-
-function correctionLinkPath(incidentId: string): string {
-  return `/api/my/fleet/incidents/${encodeURIComponent(incidentId)}/attendance-correction-link`;
-}
-
-export function fetchAttendanceCorrectionEligibility(incidentId: string): Promise<AttendanceCorrectionEligibility> {
-  return requestJson<AttendanceCorrectionEligibility>(correctionLinkPath(incidentId), { method: 'GET' });
-}
-
-export interface AttendanceCorrectionLinkResultDto {
-  linkId: string;
-  incidentId: string;
-  attendanceCorrectionId: string;
-  correctionState: AttendanceCorrectionState;
-}
-
-export function linkAttendanceCorrection(
-  incidentId: string, attendanceCorrectionId: string,
-): Promise<AttendanceCorrectionLinkResultDto> {
-  return requestJson<AttendanceCorrectionLinkResultDto>(correctionLinkPath(incidentId), {
-    method: 'POST',
-    body: JSON.stringify({ attendanceCorrectionId }),
-  });
-}
+import type { AttendanceCorrectionEligibility } from '../types';
+import { fetchAttendanceCorrectionEligibility } from './attendanceCorrectionApi';
 
 const INELIGIBLE_COPY: Record<Extract<AttendanceCorrectionEligibility, { eligible: false }>['reason'], string> = {
   no_required_exception: 'No attendance correction is currently required for this incident.',

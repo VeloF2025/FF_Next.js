@@ -15,7 +15,7 @@ import type {
   DriverSubmissionKind, DriverSubmissionResult,
 } from '../types';
 
-export { fetchAttendanceCorrectionEligibility, linkAttendanceCorrection as linkMyAttendanceCorrection } from './AttendanceCorrectionLink';
+export { fetchAttendanceCorrectionEligibility, linkAttendanceCorrection as linkMyAttendanceCorrection } from './attendanceCorrectionApi';
 
 export class DriverIncidentApiError extends Error {
   readonly status: number;
