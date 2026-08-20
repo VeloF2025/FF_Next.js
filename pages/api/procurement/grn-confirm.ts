@@ -126,26 +126,24 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         vendorsLocationId: vendors.id,
       });
 
-      // Write received quantities back to the PO lines and block over-receipt.
+      // Block over-receipt before the GRN is allowed to complete.
       //
-      // purchase_order_items.quantity_received is NOT ours to increment: the
-      // update_poi_received() trigger already sets it to SUM(quantity_accepted)
-      // over goods_receipt_items the moment a GRN line is inserted, draft
-      // included. Adding this GRN's quantity on top counted the same receipt
-      // twice and rejected honest full receipts — 500 received against 500
-      // ordered came back as "1000 received vs 500 ordered".
+      // purchase_order_items.quantity_received is not ours to write: migration
+      // 506 has the database maintain it as SUM(quantity_accepted) across
+      // COMPLETED GRNs, recomputed when this GRN's status flips at the end of
+      // this transaction. A draft consumes nothing until then.
       //
-      // So recompute the cumulative figure from the receipt lines themselves
-      // and write that absolute value. Same source of truth as the trigger, and
-      // it self-heals a stale column (the trigger does not fire on DELETE).
-      const poItemIds = new Set<string>();
+      // So the check is: what the already-completed GRNs hold for this line,
+      // plus what this one is about to add. The line is locked first, which
+      // serialises two confirms racing on the same PO line.
+      const acceptedByPoItem = new Map<string, number>();
       for (const it of grnItems) {
         if (!it.po_item_id) continue;
         const accepted = Number(it.quantity_received || 0) - Number(it.quantity_rejected || 0);
         if (accepted <= 0) continue;
-        poItemIds.add(it.po_item_id);
+        acceptedByPoItem.set(it.po_item_id, (acceptedByPoItem.get(it.po_item_id) ?? 0) + accepted);
       }
-      for (const poItemId of poItemIds) {
+      for (const [poItemId, accepted] of acceptedByPoItem) {
         const poLine = await txn.query<{ quantity_ordered: number; item_code: string | null }>(
           `SELECT quantity_ordered, item_code
              FROM purchase_order_items WHERE id = $1 FOR UPDATE`, [poItemId]);
@@ -158,11 +156,14 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
             grnId, poItemId, module: 'procurement:grn-confirm' });
           continue;
         }
-        const cumulative = await txn.query<{ received: number }>(
-          `SELECT COALESCE(SUM(quantity_accepted), 0)::numeric AS received
-             FROM goods_receipt_items WHERE po_item_id = $1`, [poItemId]);
+        const priorRows = await txn.query<{ received: number }>(
+          `SELECT COALESCE(SUM(i.quantity_accepted), 0)::numeric AS received
+             FROM goods_receipt_items i
+             JOIN goods_receipt_notes g ON g.id = i.grn_id
+            WHERE i.po_item_id = $1 AND g.status = 'completed' AND i.grn_id <> $2`,
+          [poItemId, grnId]);
         const ordered = Number(line.quantity_ordered) || 0;
-        const newReceived = Number(cumulative[0]?.received ?? 0);
+        const newReceived = Number(priorRows[0]?.received ?? 0) + accepted;
         if (ordered <= 0) {
           // ordered 0/NULL means the over-receipt cap can't be enforced for this
           // line — almost always a data problem, not an intentional "no limit".
@@ -174,9 +175,6 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
             `Receipt exceeds the ordered quantity for ${line.item_code || 'a PO line'}: ` +
             `${newReceived} received vs ${ordered} ordered. Adjust the GRN quantities.`);
         }
-        await txn.query(
-          `UPDATE purchase_order_items SET quantity_received = $2, updated_at = NOW() WHERE id = $1`,
-          [poItemId, newReceived]);
       }
 
       await txn.query(
