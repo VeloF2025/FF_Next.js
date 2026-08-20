@@ -282,7 +282,7 @@ export async function transitionExportState(
 // exported. Past this window the handshake is over, so resolve it terminally, freeing
 // the one-phone-inflight index for any later install. A row whose own retry is still
 // scheduled is left alone — nextRetryAt caps nothing above a GHL Retry-After header.
-export async function expireStalledHandshakes(cutoff: Date): Promise<number> {
+export async function expireStalledHandshakes(cutoff: Date, now: Date): Promise<number> {
   const rows = await query<{ id: string } & SqlRow>(`
     UPDATE velocity_review_exports
     SET state = 'permanent_failure',
@@ -292,8 +292,8 @@ export async function expireStalledHandshakes(cutoff: Date): Promise<number> {
         updated_at = NOW()
     WHERE state IN ('ambiguous', 'ack_cleanup_pending')
       AND updated_at < $1
-      AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
+      AND (next_attempt_at IS NULL OR next_attempt_at <= $2)
     RETURNING id
-  `, [cutoff]);
+  `, [cutoff, now]);
   return rows.length;
 }

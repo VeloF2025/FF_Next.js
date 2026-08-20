@@ -260,11 +260,14 @@ describe('expireStalledHandshakes', () => {
     mocks.query.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
     const cutoff = new Date('2026-08-19T09:00:00.000Z');
 
-    const expired = await expireStalledHandshakes(cutoff);
+    const now = new Date('2026-08-20T09:00:00.000Z');
+
+    const expired = await expireStalledHandshakes(cutoff, now);
 
     expect(expired).toBe(2);
     const [sql, params] = mocks.query.mock.calls[0];
-    expect(params).toEqual([cutoff]);
+    // One injectable clock: the retry-due bound is a parameter, not SQL NOW().
+    expect(params).toEqual([cutoff, now]);
     expect(sql).toContain("state IN ('ambiguous', 'ack_cleanup_pending')");
     expect(sql).toContain('updated_at < $1');
     expect(sql).toContain("state = 'permanent_failure'");
@@ -273,18 +276,18 @@ describe('expireStalledHandshakes', () => {
   it('leaves a row alone while its own retry is still scheduled', async () => {
     mocks.query.mockResolvedValue([]);
 
-    await expireStalledHandshakes(new Date('2026-08-19T09:00:00.000Z'));
+    await expireStalledHandshakes(new Date('2026-08-19T09:00:00.000Z'), new Date());
 
     // nextRetryAt honours an uncapped GHL Retry-After, so a pending next_attempt_at
     // can outlive the stale window; expiring it would drop a live retry.
     const [sql] = mocks.query.mock.calls[0];
-    expect(sql).toContain('next_attempt_at IS NULL OR next_attempt_at <= NOW()');
+    expect(sql).toContain('next_attempt_at IS NULL OR next_attempt_at <= $2');
   });
 
   it('does not prefix a bare handshake code with a colon', async () => {
     mocks.query.mockResolvedValue([]);
 
-    await expireStalledHandshakes(new Date());
+    await expireStalledHandshakes(new Date(), new Date());
 
     const [sql] = mocks.query.mock.calls[0];
     expect(sql).toContain("COALESCE(error_code || ':', '') || 'handshake_expired'");
@@ -292,6 +295,6 @@ describe('expireStalledHandshakes', () => {
 
   it('reports zero when nothing is stale', async () => {
     mocks.query.mockResolvedValue([]);
-    await expect(expireStalledHandshakes(new Date())).resolves.toBe(0);
+    await expect(expireStalledHandshakes(new Date(), new Date())).resolves.toBe(0);
   });
 });

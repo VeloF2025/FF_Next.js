@@ -239,12 +239,15 @@ describe('runVelocityReviewExport', () => {
     expect(order).toBeLessThan(firstClaim);
   });
 
-  it('does not expire handshakes on a blocked run', async () => {
+  it('still expires handshakes when the run is blocked', async () => {
+    // A blocked run is when parked rows accrue fastest, and each one holds the
+    // one-phone-inflight index against a number a later install needs.
     const { deps } = runDeps([candidate()], { goLiveDate: null });
 
-    await runVelocityReviewExport({}, deps);
+    const result = await runVelocityReviewExport({}, deps);
 
-    expect(deps.exports.expireStalledHandshakes).not.toHaveBeenCalled();
+    expect(result.status).toBe('blocked');
+    expect(deps.exports.expireStalledHandshakes).toHaveBeenCalledTimes(1);
   });
 
   it('suppresses a completed duplicate without counting it as newly acknowledged or failed', async () => {
