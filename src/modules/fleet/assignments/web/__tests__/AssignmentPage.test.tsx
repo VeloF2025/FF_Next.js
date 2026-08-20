@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { act, type ReactNode } from 'react';
+import { hydrateRoot, type Root } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -10,8 +12,12 @@ const permissions = vi.hoisted(() => ({ canEditRules: false }));
 vi.mock('@/components/layout/AppLayout', () => ({ AppLayout: ({ children }: { children: ReactNode }) => children }));
 vi.mock('@/components/module-page', () => ({ ModulePage: ({ children }: { children: ReactNode }) => children }));
 vi.mock('@/modules/navigation', () => ({ fleetConfig: {} }));
+vi.mock('next/router', () => ({ useRouter: () => ({ isReady: true, query: Object.fromEntries(new URLSearchParams(window.location.search)) }) }));
 vi.mock('@/modules/fleet/assignments/web/assignmentApi', () => ({ assignmentApi: api }));
-vi.mock('@/modules/fleet/assignments/web/AssignmentEditor', () => ({ AssignmentEditor: () => null }));
+vi.mock('@/modules/fleet/assignments/web/AssignmentEditor', () => ({
+  AssignmentEditor: ({ initialStaffId, projectId, from, to }: { initialStaffId?: string; projectId: string; from: string; to: string }) =>
+    <output aria-label="Assignment editor state">{[initialStaffId, projectId, from, to].join('|')}</output>,
+}));
 vi.mock('@/modules/fleet/assignments/web/ProjectSiteManager', () => ({ ProjectSiteManager: () => null }));
 vi.mock('@/modules/fleet/assignments/web/ConflictReview', () => ({ ConflictReview: () => null }));
 vi.mock('@/hooks/usePermission', () => ({ usePermission: () => ({ can: (key: string, action: string) => key === 'fleet.operations-rules' && action === 'edit' && permissions.canEditRules, isLoading: false }) }));
@@ -21,8 +27,8 @@ vi.mock('@/modules/fleet/assignments/web/AssignmentFilters', () => ({
     <button onClick={() => onChange({ from: '2026-08-17', to: '2026-08-21', projectId: 'project-1', siteId: 'site-1', source: '', unassignedScheduled: false })}>Choose project</button>,
 }));
 vi.mock('@/modules/fleet/assignments/web/AssignmentRoster', () => ({
-  AssignmentRoster: ({ rows, onSelect }: { rows: Array<{ assignmentId: string | null; staffName: string }>; onSelect: (ids: string[]) => void }) =>
-    <>{rows.map((row) => <button key={row.assignmentId} onClick={() => onSelect([row.assignmentId!])}>Select {row.staffName}</button>)}</>,
+  AssignmentRoster: ({ rows, selected, onSelect }: { rows: Array<{ assignmentId: string | null; staffName: string }>; selected: string[]; onSelect: (ids: string[]) => void }) =>
+    <>{rows.map((row) => <button key={row.staffName} aria-pressed={selected.includes(row.assignmentId!)} onClick={() => onSelect([row.assignmentId!])}>Select {row.staffName}</button>)}</>,
 }));
 
 import AssignmentPage from '../../../../../../pages/fleet/assignments/index';
@@ -41,6 +47,7 @@ async function selectAssignment() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.history.replaceState({}, '', '/fleet/assignments');
   permissions.canEditRules = false;
   api.options.mockResolvedValue({ staff: [], teams: [], projects: [], sites: [{ id: 'site-1', label: 'Site One', projectId: 'project-1' }, { id: 'site-2', label: 'Site Two', projectId: 'project-1' }], vehicles: [], siteSources: [] });
   api.roster.mockResolvedValue({ items: [assignment], total: 1 });
@@ -92,5 +99,49 @@ describe('AssignmentPage manager actions', () => {
 
     expect(await screen.findByLabelText('Assignment history')).toHaveTextContent('Coverage change');
     expect(api.history).toHaveBeenCalledWith('assignment-1');
+  });
+
+  it('initializes the project, work date, staff query, and intended assignment from a dashboard deep link', async () => {
+    const projectId = '11111111-1111-4111-8111-111111111111';
+    const staffId = '22222222-2222-4222-8222-222222222222';
+    const assignmentId = '33333333-3333-4333-8333-333333333333';
+    window.history.replaceState({}, '', `/fleet/assignments?projectId=${projectId}&staffId=${staffId}&workDate=2026-08-13`);
+    api.roster.mockResolvedValue({ items: [{ ...assignment, assignmentId, projectId, staffId }], total: 1 });
+
+    render(<AssignmentPage />);
+
+    const row = await screen.findByRole('button', { name: 'Select Driver One' });
+    expect(row).toHaveAttribute('aria-pressed', 'true');
+    expect(api.roster).toHaveBeenCalledWith(expect.stringContaining(`projectId=${projectId}`));
+    expect(api.roster).toHaveBeenCalledWith(expect.stringContaining(`staffId=${staffId}`));
+    expect(api.roster).toHaveBeenCalledWith(expect.stringContaining('from=2026-08-13'));
+    expect(api.roster).toHaveBeenCalledWith(expect.stringContaining('to=2026-08-13'));
+  });
+
+  it('renders stable server defaults before hydrating a dashboard deep link', async () => {
+    const projectId = '11111111-1111-4111-8111-111111111111';
+    const staffId = '22222222-2222-4222-8222-222222222222';
+    window.history.replaceState({}, '', `/fleet/assignments?projectId=${projectId}&staffId=${staffId}&workDate=2026-08-13`);
+    api.roster.mockResolvedValue({ items: [{ ...assignment, assignmentId: '33333333-3333-4333-8333-333333333333', projectId, staffId }], total: 1 });
+
+    const markup = renderToString(<AssignmentPage />);
+    expect(markup).toContain('Select a project to load its roster.');
+    const container = document.createElement('div'); container.innerHTML = markup; document.body.append(container);
+    let root: Root | undefined;
+    await act(async () => { root = hydrateRoot(container, <AssignmentPage />); });
+    expect(await screen.findByRole('button', { name: 'Select Driver One' })).toHaveAttribute('aria-pressed', 'true');
+    await act(async () => root?.unmount()); container.remove();
+  });
+
+  it.each(['vehicle_project', 'home_site', 'unassigned'] as const)('opens a %s derived row in an initialized editor', async (assignmentKind) => {
+    const projectId = '11111111-1111-4111-8111-111111111111';
+    const staffId = '22222222-2222-4222-8222-222222222222';
+    window.history.replaceState({}, '', `/fleet/assignments?projectId=${projectId}&staffId=${staffId}&workDate=2026-08-13`);
+    api.roster.mockResolvedValue({ items: [{ ...assignment, assignmentId: null, assignmentKind, projectId, staffId }], total: 1 });
+
+    render(<AssignmentPage />);
+
+    expect(await screen.findByLabelText('Assignment editor state')).toHaveTextContent(`${staffId}|${projectId}|2026-08-13|2026-08-13`);
+    expect(await screen.findByRole('button', { name: 'Select Driver One' })).toHaveAttribute('aria-pressed', 'false');
   });
 });

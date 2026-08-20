@@ -44,4 +44,17 @@ describe('AssignmentEditor', () => {
     fireEvent.change(screen.getByLabelText('Search staff'), { target: { value: 'Driver' } });
     expect(screen.getByRole('alert')).toHaveTextContent('Preview service unavailable');
   });
+
+  it('initializes a linked derived staff member as an editable proposal', async () => {
+    render(<AssignmentEditor options={options} projectId="2" siteId="3" from="2026-08-12" to="2026-08-12"
+      initialStaffId="1" onCommitted={vi.fn()} />);
+    expect(screen.getByLabelText('Driver')).toBeChecked();
+    vi.mocked(assignmentApi.preview).mockResolvedValue({ normalizedRows: [], conflicts: [], fingerprint: 'x', sourceVersion: 'v', excludedStaffIds: [] });
+
+    await act(async () => { fireEvent.click(screen.getByText('Preview assignments')); });
+
+    await waitFor(() => expect(assignmentApi.preview).toHaveBeenCalledWith([
+      expect.objectContaining({ staffId: '1', projectId: '2', startDate: '2026-08-12', endDate: '2026-08-12' }),
+    ], [], undefined));
+  });
 });

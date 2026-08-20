@@ -76,6 +76,10 @@ describe('getActiveTabId', () => {
     expect(getActiveTabId('/fleet/parking/requests', {})).toBe('operations');
   });
 
+  it('resolves the incident review queue to operations', () => {
+    expect(getActiveTabId('/fleet/incidents', {})).toBe('operations');
+  });
+
   it('falls back to dashboard for an unknown fleet route', () => {
     expect(getActiveTabId('/fleet/not-a-real-page', {})).toBe('dashboard');
   });
@@ -91,6 +95,14 @@ describe('TABS', () => {
   it('exposes the map, parking, requests, and locations routes', () => {
     const hrefs = allHrefs(TABS);
     expect(hrefs).toEqual(expect.arrayContaining(['/fleet/map', '/fleet/parking', '/fleet/parking/requests', '/fleet/locations']));
+  });
+
+  it('exposes the incident review queue under Operations, not a new Dashboard tab', () => {
+    const operations = TABS.find((tab) => tab.id === 'operations');
+    const hrefs = operations ? allHrefs([operations]) : [];
+    expect(hrefs).toContain('/fleet/incidents');
+    const dashboard = TABS.find((tab) => tab.id === 'dashboard');
+    expect(dashboard?.href).toBe('/fleet');
   });
 
   it('exposes Assignments under Operations', () => {

@@ -12,6 +12,7 @@ import { isStoresAuthorised } from '@/modules/field-stock-pwa/lib/storesRoles';
 import {
   ClockTile,
   CorrectionsTile,
+  FleetIncidentsTile,
   HsCheckinTile,
   HsCrewCheckinTile,
   ParkingTile,
@@ -147,7 +148,12 @@ export function MyHub({ profile }: MyHubProps) {
       </TileGroup>
 
       {!isPending && (
-        <TileGroup title="My vehicle">
+        // Renamed from "My vehicle" (PR7 Task 7, design §15): Fleet
+        // Incidents belongs here too, and unlike Vehicle/Parking it is
+        // shown to every active approved driver regardless of whether
+        // they currently have an assigned vehicle — a driver's own past
+        // incidents don't disappear just because their assignment did.
+        <TileGroup title="Fleet & vehicle">
           <VehicleTile
             summary={data.summary}
             hasVehicle={profile.hasAssignedVehicle}
@@ -158,6 +164,12 @@ export function MyHub({ profile }: MyHubProps) {
             hasVehicle={profile.hasAssignedVehicle}
             onClick={() => router.push('/my/vehicle/parking')}
           />
+          {profile.accountStatus === 'active' && (
+            <FleetIncidentsTile
+              summary={data.summary}
+              onClick={() => router.push('/my/fleet/incidents')}
+            />
+          )}
         </TileGroup>
       )}
 

@@ -22,6 +22,7 @@ import {
   findRequiredAttendanceAction,
   type RequiredAttendanceAction,
 } from '@/modules/attendance/workflow/requiredActionQueries';
+import { listDriverIncidents } from '@/modules/fleet/incidents/driver/driverIncidentService';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4kb' } },
@@ -55,6 +56,12 @@ export interface HubSummary {
   pendingCorrectionsCount: number;
   recentEntryCount: number;
   requiredAttendanceAction: RequiredAttendanceAction | null;
+  fleetIncidents: FleetIncidentHubCounts;
+}
+
+export interface FleetIncidentHubCounts {
+  inputRequestedCount: number;
+  activeCount: number;
 }
 
 interface VehicleCheckReminderRow extends Record<string, unknown> {
@@ -113,6 +120,46 @@ async function findVehicleCheckReminder(
   }
 }
 
+/**
+ * Bounded to the driver's currently-visible (recent-window) incidents —
+ * `listDriverIncidents` already applies the effective-dated settings/window
+ * filtering (design §4/§12), so this reuses that instead of a second,
+ * possibly-drifting SQL predicate. Never throws — a badge count
+ * unavailable is not worth failing the whole hub for (matches
+ * `findVehicleCheckReminder`'s own fail-open shape above).
+ *
+ * Deliberately bounded rather than derived from the full result set
+ * (this task's ruling): `driverInputState`/`lifecyclePresentation` are
+ * computed by `./inputState.ts`'s pure five-state machine (SAST calendar
+ * math, settings-driven post-closure windows) precisely so that logic
+ * stays in one drift-free JS implementation instead of a second,
+ * SQL-only copy — re-deriving it here to count past this route's own
+ * `limit: 100` page (this module's MAX_LIMIT) would reintroduce exactly
+ * that duplication risk for a badge count. `total` (already computed by
+ * `listDriverIncidents`, previously discarded here) is compared against
+ * the page actually read so a truncation is not silent: for one driver's
+ * recent (default 90-day) window, seeing more than 100 incidents would
+ * itself be far outside any realistic operational volume, so this is
+ * logged for visibility rather than treated as an error.
+ */
+async function loadFleetIncidentHubCounts(staffId: string): Promise<FleetIncidentHubCounts> {
+  try {
+    const { incidents, total } = await listDriverIncidents(staffId, { limit: 100 });
+    if (total > incidents.length) {
+      log.warn('[my/hub-summary] fleet incident hub counts truncated to the first page', {
+        staffId, total, countedIncidents: incidents.length,
+      });
+    }
+    return {
+      inputRequestedCount: incidents.filter((incident) => incident.driverInputState === 'requested').length,
+      activeCount: incidents.filter((incident) => incident.lifecyclePresentation !== 'Closed').length,
+    };
+  } catch (error) {
+    log.warn('[my/hub-summary] fleet incident counts unavailable', { error, staffId });
+    return { inputRequestedCount: 0, activeCount: 0 };
+  }
+}
+
 export default withMySession(async (req, res, session) => {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
@@ -128,6 +175,7 @@ export default withMySession(async (req, res, session) => {
       latestPayslip,
       latestReceipt,
       requiredAttendanceAction,
+      fleetIncidents,
     ] = await Promise.all([
       findOpenEntry(session.staffId),
       findActiveVehicleAssignment(session.staffId),
@@ -141,6 +189,7 @@ export default withMySession(async (req, res, session) => {
       findLatestPayslipForStaff(session.staffId),
       findLatestReceiptForStaff(session.staffId),
       findRequiredAttendanceAction(session.staffId, today),
+      loadFleetIncidentHubCounts(session.staffId),
     ]);
     const vehicleReminder = await findVehicleCheckReminder(
       vehicle?.vehicle_registration ?? null
@@ -171,6 +220,7 @@ export default withMySession(async (req, res, session) => {
       pendingCorrectionsCount: correctionCounts.pending,
       recentEntryCount: Number(recentRows[0]?.count ?? '0'),
       requiredAttendanceAction,
+      fleetIncidents,
     };
 
     return apiResponse.success(res, summary);

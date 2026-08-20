@@ -22,6 +22,7 @@ import {
 import Link from 'next/link';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
+import { TodayOperations } from '@/modules/fleet/operations/web/TodayOperations';
 
 interface FleetStats {
   totalVehicles: number;
@@ -241,6 +242,8 @@ export default function FleetDashboardPage() {
             ] as EnhancedStatCardProps[]}
             columns={4}
           />
+
+          <TodayOperations />
 
         {/* Recent Investigations */}
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)]">

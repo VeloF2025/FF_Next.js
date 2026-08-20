@@ -39,6 +39,12 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 | GET | `/api/fleet/analytics/index` | Fleet analytics summary |
 | GET | `/api/fleet/drivers/leaderboard` | Driver score leaderboard |
 | GET | `/api/fleet/expiring` | Expiring licences/documents |
+| GET | `/api/my/fleet/incidents` | Driver's own incident list (mig 511, PR 7) |
+| GET | `/api/my/fleet/incidents/[incidentId]` | Driver's own redacted incident detail |
+| POST | `/api/my/fleet/incidents/[incidentId]/submissions` | Driver explanation/follow-up (append-only) |
+| POST | `/api/my/fleet/incidents/[incidentId]/evidence` | Driver evidence upload |
+| POST | `/api/my/fleet/incidents/[incidentId]/attendance-correction-link` | Link an existing Attendance correction |
+| POST | `/api/fleet/incidents/[incidentId]/request-driver-input` | Manager requests optional driver input |
 
 ## Database Tables
 - `fleet_vehicles` — vehicle registry
@@ -53,6 +59,8 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - `fleet_portal_sessions` — sessionless portal tokens
 - `fleet_photo_vlm_results` — cached VLM results per photo
 - `fleet_audit_log` — audit trail
+- `fleet_operational_incidents` / `..._rules` / `..._observations` / `..._actions` / `..._evidence` / `..._oversight_members` / `..._monitor_runs` — operational incidents (mig 510, PR 6); see `.claude/modules/fleet.md`
+- `fleet_incident_driver_input_settings` / `..._requests` / `..._submissions` / `fleet_incident_attendance_correction_links` — optional driver incident input (mig 511, PR 7, unapplied); see `.claude/modules/fleet.md`
 
 ## Critical Rules
 - First-time check-in REQUIRES calibration modal — never skip
@@ -67,6 +75,14 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - Every parking submission enters as `pending`; even a first address needs approval
 - Parking approval is ONE transaction (supersede + promote); half of it leaves two active rows or none
 - Approving re-checks the driver still holds the vehicle; rejecting deliberately does not
+- Operational incidents (`src/modules/fleet/incidents/`, PR 6) auto-detect only `late`/`wrong_site`/`evidence_mismatch`/`left_early`; safety/telematics types need an explicit source event
+- Incident condition-clearing requires `attendance_confirmed`/`on_site_dual` AND zero evaluation flags — stale/missing evidence never clears
+- Migration 510 and its cron entries are unapplied/unscheduled until a separate deployment approval; see `.claude/modules/fleet.md`
+- Driver-input requests/submissions/correction-links (`src/modules/fleet/incidents/driver/`, PR 7) are append-only except a column-scoped `UPDATE` on 6 bookkeeping columns of `fleet_incident_driver_input_requests` — never a blanket grant
+- A driver's explanation is stored twice on purpose: `fleet_incident_driver_submissions.explanation` (driver-scoped) and verbatim in the `driver_response_received` action's `note` (manager-visible audit timeline) — do not deduplicate
+- New evidence MIME types need a registered byte signature in `MIME_SIGNATURES` (`src/lib/vfStorageUpload.ts`) BEFORE they can be enabled in driver-input settings — `versionDriverInputSettings` fails closed otherwise
+- Manager queue does NOT filter by `driverInputState`/`attendanceCorrectionState` — dead client plumbing for this was deliberately removed; land server + client together if built
+- Migration 511 and its number are unapplied; migration numbering churned (490→496→499→503→506→507→510→511) as master advanced — always re-check the free number before adding a new Fleet migration
 
 ## Common Issues
 | Issue | Fix |

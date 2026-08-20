@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   sql: vi.fn(),
+  query: vi.fn(),
+  queryOne: vi.fn(),
   findOpenEntry: vi.fn(),
   findActiveVehicleAssignment: vi.fn(),
   sastWorkDate: vi.fn(() => '2026-08-01'),
@@ -12,7 +14,11 @@ const mocks = vi.hoisted(() => ({
   findRequiredAttendanceAction: vi.fn(),
 }));
 
-vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
+// `query`/`queryOne` are needed even though this endpoint only uses `sql` directly: the hub's
+// Fleet-incident counts import listDriverIncidents, which reaches driverInputRepository and
+// its `query` import. Mocking a module replaces it wholesale, so an omitted export breaks
+// every transitive consumer, not just this file's own calls.
+vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql, query: mocks.query, queryOne: mocks.queryOne }));
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));

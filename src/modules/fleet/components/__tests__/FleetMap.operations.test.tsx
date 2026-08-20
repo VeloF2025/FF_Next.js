@@ -1,0 +1,179 @@
+import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
+import type { OperationalMapOverlay } from '../../operations/mapOverlayService';
+
+const layers = vi.hoisted(() => ({
+  circleMarkers: vi.fn(),
+  mapContainers: vi.fn(),
+  markers: vi.fn(),
+  tileLayers: vi.fn(),
+  map: { getContainer: vi.fn(() => document.createElement('div')), getZoom: vi.fn(() => 10),
+    invalidateSize: vi.fn(), setView: vi.fn(),
+    // Leaflet's real EPSG:3857 projection, not a linear stand-in: grouping and
+    // fan-out are pixel-distance decisions, so an inaccurate scale would make
+    // markers group here in ways they never would on a real map.
+    project: vi.fn(([lat, lon]: [number, number], zoom: number) => {
+      const scale = 256 * 2 ** zoom;
+      const s = Math.max(-0.9999, Math.min(0.9999, Math.sin((lat * Math.PI) / 180)));
+      return {
+        x: scale * ((lon + 180) / 360),
+        y: scale * (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)),
+      };
+    }),
+    unproject: vi.fn(([x, y]: [number, number], zoom: number) => {
+      const scale = 256 * 2 ** zoom;
+      return {
+        lat: (2 * Math.atan(Math.exp((0.5 - y / scale) * 2 * Math.PI)) - Math.PI / 2) * (180 / Math.PI),
+        lng: (x / scale) * 360 - 180,
+      };
+    }) },
+}));
+const leaflet = vi.hoisted(() => ({ divIcon: vi.fn((options: unknown) => ({ options })) }));
+
+vi.mock('leaflet', () => ({ divIcon: leaflet.divIcon }));
+vi.mock('react-leaflet', () => ({
+  MapContainer: (props: { children?: React.ReactNode }) => {
+    layers.mapContainers(props);
+    return <div>{props.children}</div>;
+  },
+  TileLayer: (props: Record<string, unknown>) => { layers.tileLayers(props); return null; },
+  CircleMarker: (props: { children?: React.ReactNode; pathOptions: Record<string, unknown> }) => {
+    layers.circleMarkers(props);
+    return <div data-testid="circle-marker">{props.children}</div>;
+  },
+  Marker: (props: { children?: React.ReactNode }) => {
+    layers.markers(props);
+    return <div data-testid="operational-badge">{props.children}</div>;
+  },
+  GeoJSON: () => null,
+  Circle: () => null,
+  Popup: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  Tooltip: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  useMapEvents: () => layers.map,
+  useMap: () => layers.map,
+}));
+
+import FleetMap from '../FleetMap';
+
+const vehicle: LiveVehicle = {
+  vehicleId: 'vehicle-1',
+  registration: 'ABC 123 GP',
+  driverName: 'Jane Doe',
+  provider: 'cartrack',
+  lat: -26.1,
+  lon: 28.05,
+  speedKph: 42.6,
+  ignition: false,
+  isSpeeding: false,
+  recordedAt: '2026-08-14T00:00:00.000Z',
+  ageSeconds: 7 * 3600,
+  isStale: true,
+  trackingState: 'tracked',
+};
+
+const operationalOverlay: OperationalMapOverlay = {
+  badges: [{
+    vehicleId: 'vehicle-1', staffId: 'staff-1', staffName: 'Jane Doe', projectId: 'project-1',
+    projectName: 'Project One', operationalSiteId: 'site-1', operationalSiteName: 'Site One',
+    status: 'late', flags: [], reasonCodes: ['arrival_not_confirmed'], evidenceTimestamps: [],
+    ruleId: 'rule-1', ruleVersion: 1,
+  }],
+  attendancePoints: [],
+  unplottable: [],
+  page: 1,
+  limit: 25,
+  total: 1,
+  hasMore: false,
+  workDate: '2026-08-14',
+  evaluatedAt: '2026-08-14T08:00:00.000Z',
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('FleetMap operational composition', () => {
+  it('keeps the legacy map, TileLayer, and vehicle marker contract when operational props are absent', () => {
+    render(<FleetMap vehicles={[vehicle]} />);
+
+    expect(layers.mapContainers).toHaveBeenCalledWith(expect.objectContaining({
+      center: [-26.05, 28.1], zoom: 10, style: { height: '100%', width: '100%' },
+    }));
+    expect(layers.tileLayers).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 18, detectRetina: true,
+    }));
+    expect(layers.circleMarkers).toHaveBeenCalledTimes(1);
+    expect(layers.markers).not.toHaveBeenCalled();
+  });
+
+  it('does not alter legacy marker grammar or popup content when an operational badge is added', () => {
+    const view = render(<FleetMap vehicles={[vehicle]} />);
+    const before = layers.circleMarkers.mock.calls[0]?.[0];
+    layers.circleMarkers.mockClear();
+
+    view.rerender(<FleetMap operationalOverlay={operationalOverlay} selectedStaffId="staff-1" vehicles={[vehicle]} />);
+
+    const after = layers.circleMarkers.mock.calls[0]?.[0];
+    const expectedPath = {
+      color: '#ffffff', weight: 2, opacity: 1, dashArray: '3 3',
+      fillColor: '#7c3aed', fillOpacity: 0.45,
+    };
+    expect(before.pathOptions).toEqual(expectedPath);
+    expect(after.pathOptions).toEqual(expectedPath);
+    expect(after.center).toEqual([-26.1, 28.05]);
+    expect(after.radius).toBe(8);
+    const popupText = screen.getByTestId('circle-marker').textContent;
+    expect(popupText).toContain('ABC 123 GP');
+    expect(popupText).toContain('Jane Doe');
+    expect(popupText).toContain('Parked · no contact · 43 km/h');
+    // master 8f8e6ba23 deliberately dropped the "(stale)" suffix here because it
+    // contradicted the "Parked" label; `style.label` already carries freshness.
+    // Assert both halves so neither the field nor that decision can regress.
+    expect(popupText).toContain('Last fix: 7h ago');
+    expect(popupText).not.toContain('(stale)');
+    expect(popupText).toContain('via cartrack');
+    expect(layers.markers).toHaveBeenCalledTimes(1);
+  });
+
+  it('can hide legacy vehicle circles without losing driver badge coordinate joins', () => {
+    render(<FleetMap operationalOverlay={operationalOverlay} showVehicleMarkers={false} vehicles={[vehicle]} />);
+
+    expect(layers.circleMarkers).not.toHaveBeenCalled();
+    expect(layers.markers).toHaveBeenCalledTimes(1);
+  });
+
+  it('pans, zooms, and opens the operational popup for a focus request', () => {
+    const marker = { getLatLng: vi.fn(() => ({ lat: -26.1, lng: 28.05 })), openPopup: vi.fn() };
+    const view = render(<FleetMap operationalOverlay={operationalOverlay} vehicles={[vehicle]} />);
+    const badgeProps = layers.markers.mock.calls.at(-1)?.[0] as {
+      eventHandlers: { add: (event: { target: typeof marker }) => void };
+    };
+    badgeProps.eventHandlers.add({ target: marker });
+
+    view.rerender(<FleetMap focusRequestId={1} focusStaffId="staff-1"
+      operationalOverlay={operationalOverlay} vehicles={[vehicle]} />);
+
+    expect(layers.map.setView).toHaveBeenCalledWith({ lat: -26.1, lng: 28.05 }, 15);
+    expect(marker.openPopup).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not focus a removed badge at its stale coordinate', () => {
+    const marker = { getLatLng: vi.fn(() => ({ lat: -26.1, lng: 28.05 })), openPopup: vi.fn() };
+    const view = render(<FleetMap operationalOverlay={operationalOverlay} vehicles={[vehicle]} />);
+    const badgeProps = layers.markers.mock.calls.at(-1)?.[0] as {
+      eventHandlers: { add: (event: { target: typeof marker }) => void };
+    };
+    badgeProps.eventHandlers.add({ target: marker });
+    view.rerender(<FleetMap focusRequestId={1} focusStaffId="staff-1"
+      operationalOverlay={operationalOverlay} vehicles={[vehicle]} />);
+    expect(marker.openPopup).toHaveBeenCalledTimes(1);
+    layers.map.setView.mockClear();
+
+    view.rerender(<FleetMap focusRequestId={2} focusStaffId="staff-1"
+      operationalOverlay={{ ...operationalOverlay, badges: [] }} vehicles={[vehicle]} />);
+
+    expect(layers.map.setView).not.toHaveBeenCalled();
+    expect(marker.openPopup).toHaveBeenCalledTimes(1);
+  });
+});

@@ -6,12 +6,25 @@
  * vehicle with an explicit trackingState, so this page must say so plainly
  * rather than silently drawing the handful it can plot.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { FleetMapLegend } from '@/modules/fleet/components/FleetMapLegend';
-import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
-import { log } from '@/lib/logger';
+import type { OperationalProjectOption } from '@/modules/fleet/operations/projectScope';
+import {
+  MapAttentionPanel,
+} from '@/modules/fleet/operations/web/MapAttentionPanel';
+import {
+  filterOperationalOverlay,
+  reconcileOperationalOverlay,
+} from '@/modules/fleet/operations/web/mapOverlayFilters';
+import { MapOperationsToolbar } from '@/modules/fleet/operations/web/MapOperationsToolbar';
+import {
+  OperationsPresentationApiError,
+  operationsPresentationApi,
+} from '@/modules/fleet/operations/web/operationsPresentationApi';
+import { useFleetMapLayers } from '@/modules/fleet/operations/web/useFleetMapLayers';
+import { useMapOperationFilters } from '@/modules/fleet/operations/web/useMapOperationFilters';
 import {
   notPlottedReason,
   partitionVehicles,
@@ -24,42 +37,61 @@ const FleetMap = dynamic(() => import('@/modules/fleet/components/FleetMap'), {
   loading: () => <div className="p-6 text-sm">Loading map…</div>,
 });
 
-const REFRESH_MS = 30_000;
-
-interface LivePositionsResponse {
-  success: true;
-  data: { vehicles: LiveVehicle[] };
-}
-
 export default function FleetMapPage() {
-  const [vehicles, setVehicles] = useState<LiveVehicle[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const { change, currentFilters, filters, initialized } = useMapOperationFilters();
+  const [projects, setProjects] = useState<OperationalProjectOption[]>([]);
+  const [projectOptionsError, setProjectOptionsError] = useState(false);
+  const [focusRequest, setFocusRequest] = useState({ staffId: null as string | null, id: 0 });
+  const layers = useFleetMapLayers(filters);
+  const vehicles = layers.telemetry.data?.vehicles ?? [];
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch('/api/fleet/positions/live', { credentials: 'include' });
-        if (!res.ok) throw new Error(`Failed to load positions (${res.status})`);
-        const body = (await res.json()) as LivePositionsResponse;
-        if (!cancelled) {
-          setVehicles(body.data.vehicles);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load positions');
-        }
-        log.error('[fleet/map] failed to load live positions', { error: err });
-      }
+    if (!initialized) return;
+    let active = true;
+    const controller = new AbortController();
+    setProjectOptionsError(false);
+    void operationsPresentationApi.projectOptions(controller.signal).then((options) => {
+      if (!active) return;
+      setProjectOptionsError(false);
+      setProjects(options);
+      const current = currentFilters.current;
+      const valid = options.some((project) => project.id === current.projectId);
+      const projectId = valid ? current.projectId : options[0]?.id ?? current.projectId;
+      if (projectId !== current.projectId) change({ ...current, projectId }, true);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      const permission = error instanceof OperationsPresentationApiError && error.kind === 'permission';
+      if (permission) setProjects([]);
+      setProjectOptionsError(!permission);
+    });
+    return () => { active = false; controller.abort(); };
+  }, [change, currentFilters, initialized]);
+
+  useEffect(() => {
+    if (layers.overlay.error?.kind !== 'permission') return;
+    const current = currentFilters.current;
+    if (current.staffId || current.siteId) {
+      change({ ...current, staffId: undefined, siteId: undefined }, true);
     }
-    load();
-    const t = setInterval(load, REFRESH_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(t);
-    };
-  }, []);
+  }, [change, currentFilters, layers.overlay.error]);
+
+  const visibleOverlay = layers.overlay.data
+    ? filterOperationalOverlay(reconcileOperationalOverlay(layers.overlay.data, vehicles), filters) : undefined;
+  // Computed from the raw, unfiltered fetch — filterOperationalOverlay recomputes
+  // total/hasMore for the client-side status filter, which would hide the fact
+  // that the server itself already truncated the roster at `limit`.
+  const overlayTruncation = layers.overlay.data?.hasMore
+    ? {
+      shown: layers.overlay.data.badges.length + layers.overlay.data.attendancePoints.length
+        + layers.overlay.data.unplottable.length,
+      total: layers.overlay.data.total,
+    }
+    : undefined;
+  const showOperations = (filters.visibility ?? 'all') !== 'vehicles';
+  const selectStaff = useCallback((staffId: string) => {
+    change({ ...currentFilters.current, staffId });
+    setFocusRequest((request) => ({ staffId, id: request.id + 1 }));
+  }, [change, currentFilters]);
 
   const { plotted, notPlotted } = partitionVehicles(vehicles);
   // Counted from the plotted set only — the legend describes what is on the
@@ -104,13 +136,20 @@ export default function FleetMapPage() {
             {notPlotted.length > 0 && ` ${notPlotted.length} not on the map.`} Positions refresh
             every 30 seconds and are typically 1–5 minutes behind.
           </p>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          <MapOperationsToolbar filters={filters} onChange={change} overlay={layers.overlay}
+            projectOptionsError={projectOptionsError} projects={projects} telemetry={layers.telemetry} />
           <div className="mt-2">
             <FleetMapLegend counts={statusCounts} />
           </div>
         </header>
-        <div className="flex-1 min-h-0">
-          <FleetMap vehicles={vehicles} />
+        <div className="relative flex-1 min-h-0">
+          <FleetMap vehicles={vehicles} operationalOverlay={showOperations ? visibleOverlay : undefined}
+            focusRequestId={focusRequest.id} focusStaffId={focusRequest.staffId}
+            onStaffSelect={selectStaff} selectedStaffId={filters.staffId ?? null}
+            showVehicleMarkers={(filters.visibility ?? 'all') !== 'drivers'} />
+          {showOperations && visibleOverlay && <MapAttentionPanel filters={filters}
+            operationalOverlay={visibleOverlay} onFocusStaff={selectStaff}
+            selectedStaffId={filters.staffId ?? null} truncated={overlayTruncation} />}
         </div>
         {notPlotted.length > 0 && (
           <aside className="px-4 py-2 border-t text-sm">

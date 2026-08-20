@@ -13,6 +13,10 @@ export interface OperationalEvidenceDetail { staffId: string; workDate: string; 
   operationalSiteName: string | null; monitoringStart: string | null; scheduledStart: string | null;
   graceEnd: string | null; scheduledEnd: string | null; monitoringEnd: string | null;
   gpsStaleAfterSeconds: number | null; evaluation: OperationalEvaluation; points: EvidencePointDetail[] }
+export interface AttendancePointEligibility {
+  asOf: string; monitoringStart: string | null; monitoringEnd: string | null;
+  status: OperationalEvaluation['status']; reasonCodes: string[];
+}
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 function validDate(value: string): boolean { const match = DATE.exec(value); if (!match) return false; const date = new Date(0); date.setUTCFullYear(Number(match[1]), Number(match[2]) - 1, Number(match[3])); return date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3]); }
@@ -26,6 +30,14 @@ function validate(workDate: string, asOf: string): void {
 function fallback(evidence: OperationalEvidence): OperationalEvaluation { return { status: 'unverifiable', flags: ['evidence_source_error'], reasonCodes: ['person_evaluation_failed'], ruleId: evidence.rule.id, ruleVersion: evidence.rule.version, sourceTimestamps: [], thresholdsUsed: {} }; }
 function safelyEvaluate(evidence: OperationalEvidence): OperationalEvaluation { try { return evaluateOperationalStatus(evidence); } catch { return fallback(evidence); } }
 function windowFor(evidence: OperationalEvidence) { return evidence.schedule ? operationalWindow(evidence.schedule, evidence.rule) : null; }
+export function isOperationalAttendancePointEligible(input: AttendancePointEligibility): boolean {
+  if (!input.monitoringStart || !input.monitoringEnd) return false;
+  const asOf = Date.parse(input.asOf); const start = Date.parse(input.monitoringStart); const end = Date.parse(input.monitoringEnd);
+  if (![asOf, start, end].every(Number.isFinite) || asOf < start || asOf > end) return false;
+  const reasons = input.reasonCodes.join(' ');
+  return /attendance|sources_agree/.test(reasons)
+    || ['attendance_confirmed', 'on_site_dual', 'evidence_mismatch'].includes(input.status);
+}
 function summary(evidence: OperationalEvidence, evaluation: OperationalEvaluation): OperationalStatusSummary { const window = windowFor(evidence); return { staffId: evidence.staffId, staffName: evidence.staffName, projectId: evidence.assignment.projectId, projectName: evidence.assignment.projectName, operationalSiteId: evidence.assignment.operationalSiteId, operationalSiteName: evidence.assignment.operationalSiteName, status: evaluation.status, flags: evaluation.flags, reasonCodes: evaluation.reasonCodes, monitoringStart: window?.monitoringStart ?? null, scheduledStart: window?.scheduledStart ?? null, graceEnd: window?.graceEnd ?? null, scheduledEnd: window?.scheduledEnd ?? null, monitoringEnd: window?.monitoringEnd ?? null, gpsStaleAfterSeconds: evidence.vehicle.staleAfterSeconds, sourceTimestamps: evaluation.sourceTimestamps, ruleId: evaluation.ruleId, ruleVersion: evaluation.ruleVersion }; }
 
 export async function getOperationalRosterStatus(request: RosterStatusRequest): Promise<RosterStatusResult> {
@@ -44,11 +56,12 @@ export async function getOperationalEvidenceDetail(request: EvidenceDetailReques
   if (!evidence) throw new OperationalStatusRequestError('Operational evidence not found');
   const evaluation = safelyEvaluate(evidence); const window = windowFor(evidence);
   const points: EvidencePointDetail[] = [];
-  const insideWindow = window && Date.parse(evidence.asOf) >= Date.parse(window.monitoringStart)
-    && Date.parse(evidence.asOf) <= Date.parse(window.monitoringEnd);
+  const insideWindow = Boolean(window && Date.parse(evidence.asOf) >= Date.parse(window.monitoringStart)
+    && Date.parse(evidence.asOf) <= Date.parse(window.monitoringEnd));
   const reasons = evaluation.reasonCodes.join(' ');
-  const attendanceRelevant = /attendance|sources_agree/.test(reasons)
-    || ['attendance_confirmed', 'on_site_dual', 'evidence_mismatch'].includes(evaluation.status);
+  const attendanceRelevant = isOperationalAttendancePointEligible({ asOf: evidence.asOf,
+    monitoringStart: window?.monitoringStart ?? null, monitoringEnd: window?.monitoringEnd ?? null,
+    status: evaluation.status, reasonCodes: evaluation.reasonCodes });
   const vehicleRelevant = /vehicle|sources_agree/.test(reasons)
     || ['approaching', 'on_site_dual', 'evidence_mismatch'].includes(evaluation.status);
   if (insideWindow && attendanceRelevant && evidence.attendance.clockInPoint) points.push({ source: 'attendance_clock_in', ...evidence.attendance.clockInPoint });

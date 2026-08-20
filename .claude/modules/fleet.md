@@ -128,6 +128,453 @@ driver-facing confirmation/input, while PR 8 owns analytics and retention. Do no
 maps, alerts, persisted status snapshots, payroll/discipline effects, driver input, or analytics
 backward into this engine.
 
+## Operational Dashboard and Map (PR 5)
+
+PR 5 presents the PR 4 read-time decisions without recalculating, persisting, or escalating them.
+The existing `/fleet` Dashboard keeps its vehicle cards, investigations, and quick actions, and adds
+**Today’s Operations** after the stat cards. Its coordinate-free
+`GET /api/fleet/operations/overview` accepts scoped `projectId`, ISO `workDate`/`asOf`, optional
+status group/status, and bounded pagination; it returns grouped counts, attention rows, evaluation
+and rule metadata, pagination, and stale/source warnings. URL filters are the source of truth so
+Dashboard count controls, Map content, refresh, and browser back/forward remain synchronized.
+
+Only `on_site_dual` and `attendance_confirmed` count as **On site**. In particular,
+`vehicle_on_site_driver_unconfirmed` is **Unverifiable** and labelled
+`Vehicle on site — driver unconfirmed`: vehicle GPS is never presented as confirmed driver presence.
+Default Needs Attention contains `late`, `wrong_site`, `evidence_mismatch`, `left_early`,
+`unassigned`, `unverifiable`, and `vehicle_on_site_driver_unconfirmed`; normal states are available
+through explicit filters. Operational loading/error state is independent: a failure preserves the
+existing Dashboard/Map and last successful operational data with an explicit stale/error warning;
+it is never rendered as all clear.
+
+`GET /api/fleet/operations/map-overlay` requires ISO `workDate` and `asOf`, bounded pagination,
+and at least one narrow UUID selection (`projectId`, `staffId`, or `siteId`); it adds optional
+`staffId`, `siteId`, and scoped `includeGeometry`. It returns authorized operational badge rows, minimum authorized Attendance-only
+points, selected required-site geometry, evidence/status timestamps, unplottable rows, and
+evaluation metadata; it never returns raw provider payloads, unrelated geometry, contact details,
+or out-of-scope evidence. PMs remain limited to owned projects, while authorized
+oversight/admin access can span its permitted projects. `/api/fleet/positions/live` remains the
+separate existing telemetry source.
+
+The live Map’s marker grammar remains authoritative: marker fill is movement state and the white
+ring is GPS freshness/contact. PR 5 adds a small attached operational badge only: green check
+(on site), blue arrow (approaching), amber clock (late), red displaced pin (wrong site), purple
+split/evidence mark (mismatch), grey question (unverifiable), hollow person/check (vehicle on
+site, driver unconfirmed), orange exit (left early), or grey broken assignment (unassigned). A
+badge never replaces fill or ring, and existing popup provider/speed/ignition/last-fix evidence
+remains.
+
+Attendance-only markers use only a minimum authorized captured Attendance coordinate and must say
+`Attendance check-in evidence — not live tracking`; they are not animated or described as current
+location. Staff without permissible/usable coordinates remain separately labelled in the attention
+panel and are never fabricated at a project site, AOI centroid, home site, or vehicle position.
+AOI polygons and Authorized Location circles load only for a selected project/site/staff or an
+inspected attention row; all-project unfiltered mode never draws every geometry. Low-confidence
+AOIs retain a warning style without being declared invalid.
+
+Dashboard and Map current-date operational data may refresh no faster than every 30 seconds and
+both support manual refresh. Telemetry and the operational overlay refresh independently, retain
+their own last successful state on failure, and cancel updates on unmount/filter change. A selected
+historical date disables automatic refresh and shows `Historical view` with its evaluation `asOf`.
+Desktop attention is collapsible; mobile uses an accessible bottom sheet. Status needs icon/label
+accessibility rather than color alone.
+
+PR 5 has no migration. Roll back presentation with a normal PR revert: PR 4 APIs/rules remain
+valid and no database/data rollback is required.
+
+### Known limitations (PR 5)
+
+Oversight users cannot yet select **All Projects**. `GET /api/fleet/operations/overview` requires a
+`projectId`, and PR 4's `RosterStatusRequest.projectId` is a mandatory string. Project-manager scope
+works correctly. This was deferred deliberately rather than change merged PR 4 service contracts
+mid-stack; a follow-up PR must make the roster query optional-project and gate it to oversight roles.
+
+Large selections do the per-staff evidence work twice. `getOperationalMapOverlay` pages the roster
+and the evidence loader concurrently, but `getOperationalRosterStatus` already loads evidence per
+page, so the geospatial/attendance joins in `evidenceQueries.ts` run twice per staff member. It is
+bounded by `MAX_COMPLETE_ROSTER_ROWS` (2000; beyond that both endpoints return 400, never a 500 and
+never a silent truncation) and it is correct, but a project near that bound is measurably slower
+than a single-page selection. Worth collapsing to one evidence pass in a follow-up.
+
+## Operational Incidents (migration 510, PR 6)
+
+PR 6 turns four of PR 4's read-time statuses into durable, reviewable incidents and
+adds a separate escalation/summary/health cron. Implementation lives in
+`src/modules/fleet/incidents/`; protected APIs are under `/api/fleet/incidents`; the
+manager queue is `/fleet/incidents` (Operations → Incidents, not a new dashboard).
+
+**Migration execution and scheduler installation are deployment actions requiring
+separate approval — neither has happened yet.** Merging this code does not create a
+table, register a cron entry, or send a notification. **PR 6 requires no driver
+action**: only managers/oversight record a reason, comment, or evidence.
+
+### Incident types and lifecycle
+
+Fourteen `incident_type` values fall into three groups, enforced by a CHECK
+constraint on both `fleet_operational_incident_rules` and
+`fleet_operational_incidents`:
+
+| Group | Types | How they're produced |
+|---|---|---|
+| Scheduled (auto-detected) | `late`, `wrong_site`, `evidence_mismatch`, `left_early` | Every 5-minute monitor tick, straight off the PR 4 roster/status output. |
+| Summary-only | `unassigned`, `unverifiable`, `vehicle_on_site_driver_unconfirmed`, `evidence_gap` | Never open an incident. Counted into the 08:15 SAST summary only when the type's rule has `includeInMorningSummary`. |
+| Source-event (safety/telematics) | `accident_sos`, `dangerous_area_entry`, `theft_after_hours_movement`, `severe_driving`, `prolonged_unauthorized_stop`, `lost_contact_moving` | Require an explicit typed `IncidentSourceEvent` with a stable `sourceEventId` — **PR 6 ships no producer that calls these**; a future telematics/H&S integration calls `produceIncident({ producerKind: 'source_event', ... })`. |
+
+`resolveScheduledIncidentType` (`incidentProducer.ts`) is the single source of truth
+for the scheduled mapping — every other PR 4 status (`off_duty`, `approaching`,
+`on_site_dual`, etc.) maps to `null` and never opens or feeds anything.
+
+Lifecycle is `open -> acknowledged -> under_review -> resolved|dismissed`, enforced
+both by a `lifecycle_status`+detail-columns CHECK constraint (each status requires
+exactly its own actor/timestamp columns, no more, no less) and by
+`reviewTransitions.ts` locking the row `FOR UPDATE` inside every transition. A
+transition on an already-terminal incident is a 409, first-acknowledgement wins
+(later acknowledgements are idempotent no-ops), and `resolved`/`dismissed` each
+require a note plus an outcome drawn from their own fixed set (`resolved`:
+`confirmed`/`valid_reason`/`assignment_error`/`geofence_error`/`no_action_required`;
+`dismissed`: `false_positive`/`data_gap`/`duplicate`) — a further CHECK constraint
+enforces that pairing at the database level, not just in application code. A
+`duplicate` outcome requires a `linkedIncidentReference` resolving to a different,
+existing incident. A rule can additionally require evidence for specific outcomes
+(`evidence_required_outcomes`); the terminal transition 400s without at least one
+`fleet_operational_incident_evidence` row when the chosen outcome is in that list —
+acknowledgement is never blocked by this, only the terminal step.
+
+Observations and actions are append-only (the migration only grants
+`fibreflow_user` `SELECT, INSERT` on both tables, never `UPDATE`/`DELETE`).
+Recurrence works after a terminal close: the "one active incident" uniqueness index
+(`ux_fleet_operational_incidents_active_assignment`) is a **partial** index scoped
+to `lifecycle_status IN ('open','acknowledged','under_review')`, so a new detection
+for the same staff/type/day/assignment after a resolved-or-dismissed row opens a
+fresh incident rather than colliding with history.
+
+### Condition clearing — deliberately narrow
+
+`evaluateConditionClearing` only ever sets `condition_cleared_at` on a still-open
+incident — it never resolves or dismisses one, and is a safe no-op when there's no
+matching active incident. The monitor (`monitorService.ts`) calls it for every
+staff row whose *current* tick does **not** map to one of the four scheduled types,
+but only actually clears when **both**:
+
+- the current status is `attendance_confirmed` or `on_site_dual` — the only two PR 4
+  statuses that *positively confirm* evidence, as opposed to merely not (yet)
+  flagging a problem (`off_duty`, `approaching`, `scheduled_not_due` say nothing
+  positive and never clear); **and**
+- the evaluation carries zero flags of any kind — stale/missing GPS, missing
+  attendance, low-confidence geometry, a pending confirmation, etc. all block
+  clearing.
+
+Stale, missing, or ambiguous evidence therefore never clears an incident — absence
+of a problem signal is not proof the problem is gone. Recurrence before closure
+(the condition reappears before a human closes the incident) removes
+`condition_cleared_at` again without opening a second incident, via the same
+"touch last-seen" path a repeated detection already takes.
+
+`ScheduledIncidentProducerRequest` has no dedicated monitor-run field.
+`RecordObservationInput.monitorRunId` is deliberately left `null` for scheduled
+detections; run traceability instead flows through `requestCorrelationId`, which
+`incidentProducer` stores on the `opened`/`condition_cleared` actions — the monitor
+run ID is threaded in as that correlation ID rather than widening the Task 3
+contract.
+
+### Cron wrappers, auth, and health
+
+Two independent cron endpoints, both behind `pages/api/cron/...` and a matching
+`scripts/cron-fleet-*.sh` wrapper:
+
+| Endpoint | Cadence | Does |
+|---|---|---|
+| `/api/cron/fleet-operational-monitor` | every 5 min | Loads every active project's complete PR 4 roster (one roster-loading *phase*; any one project's load failing fails the whole phase — never a silent partial), runs `incidentProducer` per staff row, sends `opened` notifications after each incident transaction commits. |
+| `/api/cron/fleet-incident-actions` | at least every 5 min | Three independent phases in one tick: escalation (always), 08:15 SAST morning summary (at most once per SAST work date, skipped entirely before 08:15), status-monitor health check (always). One phase's failure never blocks or hides another's. |
+
+**Auth is `x-cron-secret: <CRON_SECRET>`** — matching this Fleet module's own
+existing convention (`fleet-parking-check.ts`, `fleet-check-reminders.ts`), fail-
+closed when unset. `Authorization: Bearer <CRON_SECRET>` is used by some other,
+unrelated cron endpoints in the repo (`appeals-vlm.ts`, `auto-qa.ts`,
+`backfill-onemap-data.ts`), but a header-check count found `x-cron-secret` more
+common overall — and either way, one module should not mix both conventions.
+Both endpoints deliberately do **not** also accept `Authorization: Bearer` —
+supporting two undocumented secret paths on one endpoint is exactly what this
+repo's secret-handling rules forbid.
+
+Both endpoints run their work inside `runWithCronLock` (`cronLock.ts`), which
+mirrors `appeals-vlm.ts`'s pinned-connection discipline: `pool.connect()`,
+`pg_try_advisory_lock(hashtext($1))` on that one connection, run the work, then
+`pg_advisory_unlock`. If the unlock query itself fails, the connection is destroyed
+via `client.release(true)` rather than returned to the pool — handing back a
+connection that still thinks it holds the lock would leak that lock for the pool's
+lifetime. Lock names are distinct per endpoint: `fleet-operational-monitor` and
+`fleet-incident-actions`.
+
+**Health.** `fleet_operational_monitor_runs` records `running` → `succeeded` /
+`partial_failure` / `failed` for each of the three run kinds
+(`status_monitor`/`escalation`/`morning_summary`). The incident-actions tick checks
+the *other* cron's health: a `status_monitor` run stuck `running` for more than 15
+minutes (3× the 5-minute cadence — absorbs one missed tick, still catches a real
+outage promptly) is converted to `failed` and alerted; if nothing is stale, a
+`status_monitor` run that hasn't started at all recently is also alerted.
+**This can only work because the incident-actions cron is itself still running.**
+If the entire external scheduler or host stops and *neither* endpoint executes,
+nothing inside either one can observe that — an outage of that kind requires
+external host/scheduler monitoring, not application code.
+
+### Recipients, notifications, and escalation
+
+`recipientService.resolveIncidentRecipients(projectId)` is the **one** recipient
+path for every PR 6 notification: the active project manager
+(`projects.project_manager`, which may hold either a `users.id` or a `staff.id`,
+so it is resolved through both) plus active Fleet oversight members
+(`fleet_operational_oversight_members`, effective-dated, one active row per user),
+deduplicated and filtered to `users.is_active = true`. A projectless incident (or a
+project-agnostic notification such as monitor-health) goes to oversight only. An
+empty result is not thrown — it's returned as `{ failed: true }`, which every
+caller records as a notification failure without rolling back the incident.
+
+Five notification events, registered in `src/modules/notifications/constants/index.ts`:
+`fleet.operational_incident_opened`, `_escalated`, `_resolved`,
+`fleet.operational_morning_summary`, and `fleet.operational_monitor_failed`.
+`fleet.incidents` and `fleet.incidents-settings` are RBAC permissions, not events —
+do not count them here. Idempotency
+keys are exact strings, not implementation detail: `fleet-incident-opened:<id>`,
+`fleet-incident-escalated:<id>:<level>`, `fleet-incident-resolved:<id>:<outcome>`,
+`fleet-morning-summary:<userId>:<projectId|unassigned>:<workDate>`,
+`fleet-monitor-failed:<runKind>:<runId|missing>`.
+
+**Mandatory WhatsApp for critical explicit-source incidents.** `notify()` resolves
+channels from `DEFAULT_CHANNEL_PREFERENCES` plus a per-user override and has no
+per-call channel override, and `fleet.operational_incident_opened` defaults to
+`whatsapp: false` so routine/scheduled incidents never gain WhatsApp by accident.
+So for the one case that must always get WhatsApp — `severity === 'critical' &&
+producerKind === 'source_event'` — `incidentNotifications.ts` places a direct,
+best-effort `deliverWhatsApp` call to every resolved recipient **in addition to**
+the normal `notify()` call. A WhatsApp failure there is counted in the returned
+`NotifyResult.failed` and never thrown; it cannot block the in-app/email delivery.
+
+Escalation (`actionRunner.ts`) is a row-locked, atomic level increment: due
+incidents are every `open` incident whose configured `acknowledgementTargetMinutes`
+(first check) or `reminderIntervalMinutes` (later checks) has elapsed, below the
+rule's `maximumEscalationLevel`. Seeded defaults: 15 minutes for the four scheduled
+types, 5 minutes for the six critical source-event types, 15-minute reminders, max
+level 3. Acknowledging an incident stops reminders by construction — escalation
+only ever fires on `lifecycle_status = 'open'` rows, and acknowledgement moves the
+row off `open` in its own transaction.
+
+### VF Storage evidence
+
+`uploadCategorizedFile` (`src/lib/vfStorageUpload.ts`) is a new, stricter,
+category-aware sibling to the existing `uploadToVfStorage` — SiteCam's function and
+behaviour are untouched; Fleet incident evidence uses only the new one. Fleet
+storage keys are `<incidentId>-<randomUUID()>.<ext>` — **never any component of the
+caller's filename or path** (`evidenceService.buildStorageFilename`); the display
+filename is sanitized separately via `safeFilename` and only ever affects the
+`original_filename` column, never the storage key.
+
+`uploadCategorizedFile` validates MIME (`image/jpeg`, `image/png`,
+`application/pdf`), size (15 MB, `MAX_EVIDENCE_BYTES`), and base64 shape **before**
+any network call, and rejects a returned URL that isn't an approved VF Storage
+origin (`isAllowedPhotoUrl`) via `VfStorageOriginError`. The upload only happens
+**after** `evidenceService.addIncidentEvidence` has resolved scope, loaded and
+scope-checked the incident, and confirmed it isn't `resolved`/`dismissed`. If the
+database insert then fails — evidence row plus `evidence_added` action, one
+transaction — the file is already sitting in VF Storage with nothing pointing at
+it: this is logged as a structured orphan-storage reference (incident ID, storage
+key/URL, MIME — never file content) via `IncidentEvidenceOrphanError`, for manual
+reconciliation. **No delete path exists anywhere in this module** — evidence is
+append-only both in the service and at the database grant level (`GRANT SELECT,
+INSERT` only on `fleet_operational_incident_evidence`); a photo/upload failure can
+never block acknowledgement or emergency notification delivery, because this
+service never touches lifecycle columns or calls `incidentNotifications`.
+
+### Review APIs and scope
+
+`fleet.incidents` (view/edit) gates the review queue; `fleet.incidents-settings`
+(view/edit) separately gates rule/oversight-membership management —
+`reviewScope.ts` calls `operations/projectScope.ts`'s `hasOperationalOversight`
+directly against these two keys (it is parameterized on permission key and
+action, already called with a non-default key at
+`pages/api/fleet/operations/rules.ts`), rather than duplicating its "base
+permission AND (admin role OR an active per-user override grant)" idiom.
+Migration 510 grants base `fleet.incidents` to `manager`/`project_manager` —
+NOT `fleet.incidents-settings`, which is `admin`/`super_admin` only. So a
+plain `manager` role never gains cross-project or projectless `fleet.incidents`
+reach without an explicit `admin`/`super_admin` role or an active override
+grant. A projectless incident always requires that unrestricted scope — a PM
+never sees it. Bulk-acknowledge validates every requested incident (exists,
+not already terminal, in scope) before mutating any; each acknowledgement then
+still runs as its own row-locked transaction, and a per-item `terminal_conflict`
+race (another manager resolved it in between) aborts the batch rather than
+being reported as a silent success.
+
+### Rule and oversight configuration
+
+`fleet_operational_incident_rules` versions are effective-dated and non-overlapping
+(a `gist` EXCLUDE constraint plus a partial unique index enforcing exactly one open
+version per `incident_type`); `versionIncidentRule` locks the current stream,
+closes it at the new effective timestamp, and inserts `version + 1` in one
+transaction — never overwrites history. `fleet_operational_oversight_members` is
+the same effective-dated shape: `addOversightMember` requires an active FibreFlow
+user (`isActiveFibreFlowUser`, checked before insert), and ending membership
+(`endOversightMembership`) requires a reason and only ever sets `effective_to` —
+membership is never deleted. **The migration seeds rules by incident type only;
+no person is seeded anywhere.** The settings dialog's user-search
+(`/api/fleet/incidents/settings/user-search`) is scoped to
+`fleet.incidents-settings:edit` — it was fixed post-merge (commit
+`41622266e`) after initially calling the admin-only `/api/admin/users`, which
+403'd a non-admin holding settings access via an override grant.
+
+### Dashboard/Map integration
+
+`AttentionList.tsx` and `MapAttentionPanel.tsx` add a "View incidents"/"Incidents"
+deep link **only** for the four incident-producing statuses (`late`, `wrong_site`,
+`evidence_mismatch`, `left_early`) — every other attention status is summary-only
+and gets no link. The link carries `incidentType`, `projectId`, and `staffId` into
+`/fleet/incidents?...` so the queue opens pre-filtered. No new dashboard tab or
+replacement page exists; the existing Dashboard and Map are unmodified otherwise.
+
+## Driver Incident Input (migration 511, PR 7)
+
+PR 7 gives a driver optional, transparent access to their own PR 6 incidents and
+append-only ways to explain, attach evidence, report a source-data concern, and
+link a canonical Attendance correction — through `/my/fleet/incidents`, not a new
+portal. Implementation lives in `src/modules/fleet/incidents/driver/`; driver APIs
+are under `/api/my/fleet/incidents`; the one manager-side addition is
+`POST /api/fleet/incidents/[incidentId]/request-driver-input`.
+
+**Migration 511 is unapplied — merging this code creates no table, sends no
+notification, and applies no policy.** PR 7 requires no driver action: monitoring,
+incident creation, escalation, and manager review all work exactly as PR 6 without
+a single response. **Migration numbering moved while this PR was in flight** —
+503 was 490, then 496, then 499, before landing here as master consumed each
+number for unrelated work. Re-check `scripts/migrations/sql/` for the next free
+number before creating any further Fleet migration; do not assume the next
+integer after 503 is free.
+
+### Append-only, with one narrow exception
+
+`fleet_incident_driver_input_requests`, `fleet_incident_driver_submissions`, and
+`fleet_incident_attendance_correction_links` are granted `SELECT, INSERT` only —
+no blanket `UPDATE`, no `DELETE`. The one exception is a **column-scoped** grant on
+`fleet_incident_driver_input_requests`: `superseded_at`, `closed_at`,
+`closure_reason`, and the three `delivery_*_count` columns are writable, because
+supersession/closure/delivery outcome are durable bookkeeping a manager reads back
+later, not transient return values. `incident_id`, `requested_by`, `guidance`,
+`requested_at`, `respond_by`, and `idempotency_key` remain unwritable after insert
+— a blanket `UPDATE` grant would also let a manager silently rewrite the guidance
+they sent a driver, which is exactly what this column list is designed to prevent.
+
+### The driver's explanation is stored twice, on purpose
+
+`fleet_incident_driver_submissions.explanation` is the driver-scoped source
+record. Every accepted submission also writes that same trimmed text verbatim into
+the `note` column of a `driver_response_received` row in
+`fleet_operational_incident_actions` (`submissionService.ts`). This is not
+duplication to clean up: the actions table is the append-only, manager-visible
+audit timeline that `reviewQueries.ts`/`IncidentReviewDrawer.tsx` already render
+and already gate behind PR 6's project-scope check — no manager read path selects
+`fleet_incident_driver_submissions` directly. Before commit `caf1d18a9` the `note`
+was hardcoded `NULL` and a manager could see *that* a driver responded but not
+*what* they said; do not "deduplicate" this by dropping either copy.
+
+### Visibility classification
+
+`fleet_operational_incident_evidence` and `fleet_operational_incident_actions`
+each gain a `visibility` column (`internal` / `shared_with_driver` /
+`driver_submitted`), defaulting existing PR 6 rows and every future
+manager-authored row to `internal` so nothing is retroactively disclosed. Driver
+detail queries (`driverInputRepository.ts`) select only `shared_with_driver` and
+`driver_submitted` rows — filtering happens in SQL, not by hiding fields in React.
+Managers see all three classes; `IncidentReviewDrawer.tsx` renders a visibility
+badge so a manager can tell an internal note from one shared with or submitted by
+the driver.
+
+### Driver-input state and response window
+
+State is independent of incident lifecycle: `not_requested -> requested ->
+responded`, with `expired` (window passed unanswered) and a presentation-only
+`closed` (incident resolved/dismissed before a response). A manager's
+`request-driver-input` call supersedes any prior open request rather than
+overwriting it — only the latest open request controls the current `respond_by`.
+The default response window is the end of the driver's second scheduled working
+day after the request, computed from the driver's Attendance schedule in SAST,
+skipping unscheduled days; with no schedule rows it falls back to Monday–Friday.
+All of this is effective-dated configuration
+(`fleet_incident_driver_input_settings`), not a hardcoded constant.
+
+### Evidence MIME allowlist fails closed
+
+`versionDriverInputSettings` (`settingsRepository.ts`) rejects any
+`evidenceAllowedMimeTypes` entry absent from `vfStorageUpload.ts`'s
+`SIGNATURE_REGISTERED_TYPES` — the list of MIME types `uploadCategorizedFile` can
+actually verify by byte signature. Content verification fails closed there:
+allowing a type in settings without a registered signature would make every
+upload of it fail at runtime with a generic "content does not match declared
+type" error, disconnected from the real cause. **Adding a new evidence MIME type
+therefore always requires two changes together**: register its byte signature in
+`MIME_SIGNATURES` (`src/lib/vfStorageUpload.ts`) first, then it becomes eligible
+to enable in driver-input settings. The initial allowlist is `image/jpeg`,
+`image/png`, `application/pdf`, 15 MB max.
+
+### `explanationSummary` is deliberately always `null`
+
+`DriverIncidentDetail.explanationSummary` (`driverIncidentService.ts`) is hardcoded
+`null` in this PR — not a bug. No safe generator exists for a plain-language "why
+this was flagged" summary: the only raw material is `evidenceSnapshot`, which
+design §4/§9 forbids sending to a driver (it can carry coordinates/provider
+payloads). `neutralLabel` remains the only shipped summary a driver sees. If a
+manager requests input without writing guidance, the driver currently sees no
+incident-specific reason beyond that neutral label — an open product question for
+a future PR, not something to silently "fix" by relaxing the evidence-snapshot
+boundary.
+
+### Queue filtering is not implemented — do not add half of it
+
+The manager queue does **not** filter by `driverInputState` or
+`attendanceCorrectionState`. A client-only round-trip for both existed briefly in
+`incidentApi.ts` and was removed in commit `caf1d18a9` because the server never
+implemented the corresponding query parameters and no UI control ever called it —
+it was dead plumbing pointing at a contract nobody honored. If this filtering is
+built, the query-parameter handling in `pages/api/fleet/incidents/index.ts` (or
+equivalent) and the client call in `incidentApi.ts` must land in the same change;
+do not reintroduce one half without the other.
+
+### Attendance correction linking
+
+`attendanceCorrectionLinkService.ts` maps an incident's staff/work-date to an
+**existing** Attendance required-day exception — it never creates a generic
+correction, and generic Attendance corrections remain retired. Fleet stores only a
+link (`fleet_incident_attendance_correction_links`, unique per
+incident/correction pair) and displays Attendance's canonical state
+(pending/approved/declined/cancelled) at read time; it never caches a second
+authoritative status or copies correction content into incident fields. An
+Attendance correction failure never discards an already-accepted Fleet
+explanation, and a correction outcome never auto-closes the incident.
+
+### `MAX_EXPLANATION_LENGTH` needs confirmation
+
+`submissionService.ts` enforces a 4000-character cap on `explanation`. This number
+was chosen with no basis in the PR 7 design document and awaits confirmation —
+treat it as a placeholder-with-a-value, not a settled product decision, if it ever
+needs to change.
+
+### Notifications
+
+Two events, registered in `src/modules/notifications/constants/index.ts`:
+`fleet.driver_input_requested` and `fleet.driver_response_received`. Idempotency
+keys: `fleet-driver-input-requested:{inputRequestId}:{driverUserId}` and
+`fleet-driver-response-received:{submissionId}:{recipientUserId}`. A driver is
+never notified merely because an incident opened — only after an authorized
+manager requests input. Missing driver user mapping returns a recorded delivery
+failure without losing the request (same pattern as PR 6's recipient resolution).
+
+### Portal composition
+
+`/my/fleet/incidents` and `/my/fleet/incidents/[incidentId]` compose into the
+existing `/my` shell; the hub tile lives in the existing "Fleet & vehicle" group
+in `MyHub.tsx`/`tiles.tsx`, not a new dashboard. `hub-summary.ts` adds
+`fleetIncidents: { activeCount, inputRequestedCount }`, staff-scoped. No offline
+upload queue exists in PR 7 — text submits first, files upload after and can retry
+independently without discarding the accepted explanation.
+
 ## Tracking (Live GPS)
 
 Vehicle position history lands in `fleet_vehicle_positions` via two provider-blind ingestion

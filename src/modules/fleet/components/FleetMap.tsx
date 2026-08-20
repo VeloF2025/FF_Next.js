@@ -21,6 +21,7 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { LiveVehicle } from '@/pages/api/fleet/positions/live';
+import type { OperationalMapDisplayOverlay } from '../operations/web/mapOverlayFilters';
 import {
   STATUS_STYLE,
   ageLabel,
@@ -33,6 +34,7 @@ import {
   statusFor,
 } from '../utils/liveMapHelpers';
 import type { PlottedVehicle } from '../utils/liveMapHelpers';
+import { OperationalMapLayers } from './OperationalMapLayers';
 
 export type { LiveVehicle };
 
@@ -146,8 +148,18 @@ function VehicleMarkers({ plotted }: { plotted: PlottedVehicle[] }) {
                 {v.speedKph !== null ? ` · ${Math.round(v.speedKph)} km/h` : ''}
                 {v.isSpeeding ? ' · SPEEDING' : ''}
                 <br />
+                {/*
+                  No "(stale)" suffix: `style.label` above already conveys
+                  freshness, and on a parked vehicle the suffix contradicted it.
+                  The reasoning lives in statusFor's docblock (liveMapHelpers) and
+                  is deliberately NOT restated here, so the two cannot drift.
+                  `isStale` is still load-bearing there — it gates `speeding` and
+                  drives `lostContact`; only this echo of it is gone.
+                  Removed in 8f8e6ba23, silently reintroduced by the marker
+                  fan-out rewrite in 55af6cddc; FleetMap.operations.test.tsx now
+                  asserts its absence so a third rewrite cannot bring it back.
+                */}
                 Last fix: {ageLabel(v.ageSeconds)}
-                {v.isStale ? ' (stale)' : ''}
                 <br />
                 <small>via {v.provider ?? 'unknown'}</small>
                 {nearestMeters !== null ? (
@@ -173,7 +185,26 @@ function VehicleMarkers({ plotted }: { plotted: PlottedVehicle[] }) {
   return <>{markers}</>;
 }
 
-export default function FleetMap({ vehicles }: { vehicles: LiveVehicle[] }) {
+
+export interface FleetMapProps {
+  vehicles: LiveVehicle[];
+  operationalOverlay?: OperationalMapDisplayOverlay;
+  selectedStaffId?: string | null;
+  onStaffSelect?: (staffId: string) => void;
+  showVehicleMarkers?: boolean;
+  focusStaffId?: string | null;
+  focusRequestId?: number;
+}
+
+export default function FleetMap({
+  vehicles,
+  operationalOverlay,
+  selectedStaffId,
+  onStaffSelect,
+  showVehicleMarkers = true,
+  focusStaffId,
+  focusRequestId = 0,
+}: FleetMapProps) {
   const { plotted } = partitionVehicles(vehicles);
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={10} style={{ height: '100%', width: '100%' }}>
@@ -184,7 +215,17 @@ export default function FleetMap({ vehicles }: { vehicles: LiveVehicle[] }) {
         maxZoom={18}
         detectRetina
       />
-      <VehicleMarkers plotted={plotted} />
+      {showVehicleMarkers && <VehicleMarkers plotted={plotted} />}
+      {operationalOverlay && (
+        <OperationalMapLayers
+          onStaffSelect={onStaffSelect}
+          operationalOverlay={operationalOverlay}
+          selectedStaffId={selectedStaffId}
+          focusRequestId={focusRequestId}
+          focusStaffId={focusStaffId}
+          vehicles={vehicles}
+        />
+      )}
     </MapContainer>
   );
 }

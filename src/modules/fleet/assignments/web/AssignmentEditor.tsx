@@ -1,10 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AssignmentOptions } from '../rosterQueries';
 import type { AssignmentKind, AssignmentProposalRow } from '../types';
 import { assignmentApi, AssignmentApiError, type AssignmentPreview } from './assignmentApi';
 import { ConflictReview } from './ConflictReview';
 
-export function AssignmentEditor({ options, projectId, siteId, from, to, onCommitted }: { options: AssignmentOptions; projectId: string; siteId: string; from: string; to: string; onCommitted: () => Promise<void> | void }) {
+interface AssignmentEditorProps {
+  options: AssignmentOptions; projectId: string; siteId: string; from: string; to: string;
+  initialStaffId?: string; onCommitted: () => Promise<void> | void;
+}
+
+export function AssignmentEditor({ options, projectId, siteId, from, to, initialStaffId, onCommitted }: AssignmentEditorProps) {
   const [staffIds, setStaffIds] = useState<string[]>([]); const [vehicles, setVehicles] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
   const [teamSearch, setTeamSearch] = useState('');
@@ -12,6 +17,9 @@ export function AssignmentEditor({ options, projectId, siteId, from, to, onCommi
   const [kind, setKind] = useState<AssignmentKind>('roster'); const [reason, setReason] = useState('');
   const [preview, setPreview] = useState<AssignmentPreview | null>(null); const [confirmed, setConfirmed] = useState(false);
   const [pending, setPending] = useState(false); const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (initialStaffId) setStaffIds([initialStaffId]);
+  }, [initialStaffId]);
   const rows = useMemo<AssignmentProposalRow[]>(() => staffIds.map((staffId) => ({ staffId, projectId, operationalSiteId: siteId, startDate: from, endDate: kind === 'daily_override' ? from : to, assignmentKind: kind, vehicleAssignmentId: vehicles[staffId] || null, reason: kind === 'daily_override' ? reason.trim() || null : null })), [staffIds, projectId, siteId, from, to, kind, vehicles, reason]);
   const blocking = preview?.conflicts.some((item) => item.level === 'blocking') ?? false; const warnings = preview?.conflicts.some((item) => item.level === 'warning') ?? false;
   function toggleStaff(id: string) { setPreview(null); setStaffIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]); }
