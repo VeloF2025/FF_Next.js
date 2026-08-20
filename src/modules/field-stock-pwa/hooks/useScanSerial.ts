@@ -14,6 +14,7 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { validateSerial } from '@/modules/field-stock-pwa/api';
 import { extractScannedSerial } from '@/modules/field-stock-pwa/lib/scannedSerial';
+import { verdictForSerial } from '@/modules/field-stock-pwa/lib/serialVerdict';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
 interface UseScanSerialOptions {
@@ -74,37 +75,42 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
 
       if (!mountedRef.current) return;
 
-      let resolved: PwaScannedSerial;
-      if (!result.valid) {
-        resolved = { ...optimistic, state: 'invalid', errorMessage: result.errorMessage ?? 'Serial is not available' };
-      } else if (result.stockItemId && result.stockItemId !== stockItem.id) {
-        resolved = {
-          ...optimistic,
-          stockItemId: result.stockItemId,
-          stockItemName: result.stockItemName ?? '',
-          state: 'invalid',
-          errorMessage: `Wrong stock item — scanned ${result.stockItemName ?? result.stockItemId}, expected ${stockItem.name}`,
-        };
-      } else if (
-        sourceLocation &&
-        result.currentLocationId &&
-        result.currentLocationId !== sourceLocation.id
-      ) {
-        resolved = {
-          ...optimistic,
-          stockItemId: result.stockItemId ?? stockItem.id,
-          stockItemName: result.stockItemName ?? stockItem.name,
-          state: 'invalid',
-          errorMessage: `Serial is at ${result.currentLocationName ?? 'another warehouse'}, not ${sourceLocation.name}`,
-        };
-      } else {
-        resolved = {
-          ...optimistic,
-          stockItemId: result.stockItemId ?? stockItem.id,
-          stockItemName: result.stockItemName ?? stockItem.name,
-          state: 'valid',
-        };
-      }
+      const verdict = verdictForSerial(
+        result.valid
+          ? {
+              serialNumber: serial,
+              stockItemId: result.stockItemId ?? stockItem.id,
+              stockItemName: result.stockItemName ?? null,
+              status: 'in_stock', // validateSerial already applied the status gate
+              currentLocationId: result.currentLocationId ?? null,
+              currentLocationName: result.currentLocationName ?? null,
+            }
+          : null,
+        {
+          expectedItemId: stockItem.id,
+          expectedItemName: stockItem.name,
+          sourceLocation: sourceLocation ?? null,
+        },
+      );
+
+      const resolved: PwaScannedSerial = verdict.valid
+        ? {
+            ...optimistic,
+            stockItemId: verdict.stockItemId,
+            stockItemName: verdict.stockItemName,
+            state: 'valid',
+          }
+        : {
+            ...optimistic,
+            stockItemId: verdict.stockItemId ?? '',
+            stockItemName: verdict.stockItemName ?? '',
+            state: 'invalid',
+            // validateSerial's own message (404, bad status) is more specific
+            // than the generic not-found the verdict produces from a null record.
+            errorMessage: result.valid
+              ? verdict.errorMessage
+              : (result.errorMessage ?? verdict.errorMessage),
+          };
 
       onChange(
         scanned
