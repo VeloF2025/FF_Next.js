@@ -1,6 +1,7 @@
 /**
- * Site-only questions for HsCheckinSteps — split out to keep that file under
- * the 200-line limit. Wording mirrors pages/my/hs-checkin.tsx exactly.
+ * Site-only questions plus small shared pieces for HsCheckinSteps — split
+ * out to keep that file under the 200-line limit. Wording mirrors
+ * pages/my/hs-checkin.tsx exactly.
  */
 
 import {
@@ -31,6 +32,22 @@ export function LocationOption(props: { label: string; active: boolean; onClick:
   );
 }
 
+/** Fit-for-duty question, shown regardless of work location. */
+export function FitForDutyCard(props: { fit: boolean | null; onChange: (v: boolean) => void }) {
+  return (
+    <div className={CHECKIN_CARD}>
+      <span className={labelCls}>Are you fit and well enough to work safely today?</span>
+      <YesNo value={props.fit} onChange={props.onChange} noLabel="No, I am not" yesLabel="Yes, I am" />
+      {props.fit === false && (
+        <p className="mt-3 text-sm text-amber-300">
+          Thank you for saying so. You will not be cleared to start, and someone will contact you.
+          Your time is already recorded — this answer does not affect it.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function HsCheckinSiteQuestions(props: {
   ppe: boolean | null;
   onPpeChange: (v: boolean) => void;
@@ -39,7 +56,14 @@ export function HsCheckinSiteQuestions(props: {
   onSelectedChange: (v: string[]) => void;
   hazard: string;
   onHazardChange: (v: string) => void;
+  medicalStatus: string | null;
 }) {
+  // Same gate as pages/my/hs-checkin.tsx: a selected activity that needs a
+  // medical, with no current Certificate of Fitness on file.
+  const medicalGated = props.selected.some(
+    (s) => props.activities.find((a) => a.value === s)?.requires_medical
+  );
+
   return (
     <>
       <div className={CHECKIN_CARD}>
@@ -60,6 +84,12 @@ export function HsCheckinSiteQuestions(props: {
           selected={props.selected}
           onChange={props.onSelectedChange}
         />
+        {medicalGated && props.medicalStatus && props.medicalStatus !== 'current' && (
+          <p className="mt-3 text-sm text-red-300">
+            Our records show no current Certificate of Fitness for you. If you select this work you
+            will not be cleared to do it — speak to the H&S officer.
+          </p>
+        )}
       </div>
 
       <div className={CHECKIN_CARD}>

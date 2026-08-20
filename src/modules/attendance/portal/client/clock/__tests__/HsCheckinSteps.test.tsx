@@ -156,6 +156,22 @@ describe('HsCheckinSteps', () => {
     expect(text).toMatch(/time (has been|is) recorded|shift is recorded/i);
   });
 
+  it('shows the reassurance immediately on "No" and not on "Yes"', async () => {
+    fetchMock.mockResolvedValueOnce(bootstrapResponse({ projects: [P1] }));
+    const user = userEvent.setup();
+
+    const { container } = await renderSteps();
+
+    await waitFor(() => expect(screen.getByText('Office')).toBeVisible());
+    await user.click(screen.getByRole('button', { name: 'Office' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, I am' }));
+    expect(concatText(container)).not.toMatch(/thank you for saying so/i);
+
+    await user.click(screen.getByRole('button', { name: 'No, I am not' }));
+    expect(concatText(container)).toMatch(/thank you for saying so/i);
+    expect(concatText(container)).toMatch(/already recorded/i);
+  });
+
   it('calls onDone and does not block when the POST fails', async () => {
     fetchMock.mockResolvedValueOnce(bootstrapResponse({ projects: [P1] }));
     fetchMock.mockRejectedValueOnce(new Error('network'));

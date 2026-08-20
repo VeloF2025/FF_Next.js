@@ -12,12 +12,11 @@
 import React from 'react';
 import { log } from '@/lib/logger';
 import {
-  YesNo,
   CheckinOutcome,
   CHECKIN_CARD,
   type CheckinActivityOption,
 } from '@/modules/health-safety/components/checkin/CheckinPrompts';
-import { HsCheckinSiteQuestions, LocationOption } from './HsCheckinSiteQuestions';
+import { HsCheckinSiteQuestions, LocationOption, FitForDutyCard } from './HsCheckinSiteQuestions';
 
 interface Project {
   id: string;
@@ -44,6 +43,7 @@ export function HsCheckinSteps(props: {
   const [ppe, setPpe] = React.useState<boolean | null>(null);
   const [selected, setSelected] = React.useState<string[]>([]);
   const [hazard, setHazard] = React.useState('');
+  const [medicalStatus, setMedicalStatus] = React.useState<string | null>(null);
   const [outcome, setOutcome] = React.useState<{ clearance: string; reasons: string[] } | null>(
     null
   );
@@ -65,6 +65,7 @@ export function HsCheckinSteps(props: {
         setProjects(d.projects ?? []);
         setActivities(d.activities ?? []);
         setProjectId(d.default_project_id ?? '');
+        setMedicalStatus(d.medical_status ?? null);
       })
       .catch((err) => {
         // A declaration is not payroll-critical — a broken bootstrap must not
@@ -161,12 +162,7 @@ export function HsCheckinSteps(props: {
         </div>
       </div>
 
-      {location && (
-        <div className={CHECKIN_CARD}>
-          <span className={labelCls}>Are you fit and well enough to work safely today?</span>
-          <YesNo value={fit} onChange={setFit} noLabel="No, I am not" yesLabel="Yes, I am" />
-        </div>
-      )}
+      {location && <FitForDutyCard fit={fit} onChange={setFit} />}
 
       {location === 'site' && (
         <HsCheckinSiteQuestions
@@ -177,6 +173,7 @@ export function HsCheckinSteps(props: {
           onSelectedChange={setSelected}
           hazard={hazard}
           onHazardChange={setHazard}
+          medicalStatus={medicalStatus}
         />
       )}
 
