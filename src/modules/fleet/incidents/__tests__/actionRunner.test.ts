@@ -373,6 +373,19 @@ describe('status-monitor health check', () => {
     expect(notifications.sendMonitorFailedNotification).toHaveBeenCalledWith(expect.objectContaining({ runKind: 'status_monitor' }));
   });
 
+  // There is no run to point at in the missing-run case, so nothing may be handed to the
+  // uuid `source_id` column; the per-day reference travels as `occurrenceKey` instead
+  // (see incidentNotifications.test.ts for what a non-uuid there costs).
+  it('sends the missing-run alert with a null runId and a per-day occurrenceKey', async () => {
+    runs.findLatestMonitorRun.mockResolvedValue(null);
+
+    await runIncidentActions(AFTER_0815);
+
+    expect(notifications.sendMonitorFailedNotification).toHaveBeenCalledWith(expect.objectContaining({
+      runId: null, occurrenceKey: 'missing:2026-08-18', runKind: 'status_monitor',
+    }));
+  });
+
   it('does not alert when the status monitor has run recently and healthily', async () => {
     runs.findLatestMonitorRun.mockResolvedValue(runRow({ runKind: 'status_monitor', status: 'succeeded', startedAt: AFTER_0815.effectiveAt }));
 
@@ -385,12 +398,29 @@ describe('status-monitor health check', () => {
     runs.findLatestMonitorRun.mockImplementation(async (kind: string) => (kind === 'status_monitor' ? null : runRow({ status: 'succeeded' })));
 
     await runIncidentActions(AFTER_0815);
-    const firstCallKey = notifications.sendMonitorFailedNotification.mock.calls[0]?.[0]?.runId;
+    const firstCallKey = notifications.sendMonitorFailedNotification.mock.calls[0]?.[0]?.occurrenceKey;
 
     notifications.sendMonitorFailedNotification.mockClear();
     await runIncidentActions(AFTER_0815);
-    const secondCallKey = notifications.sendMonitorFailedNotification.mock.calls[0]?.[0]?.runId;
+    const secondCallKey = notifications.sendMonitorFailedNotification.mock.calls[0]?.[0]?.occurrenceKey;
 
+    expect(firstCallKey).toBe('missing:2026-08-18');
     expect(firstCallKey).toBe(secondCallKey);
+  });
+
+  // ... but a DIFFERENT work date must produce a different key, or the alert would be
+  // suppressed for ever after the first day the monitor died.
+  it('produces a different occurrenceKey on the next work date', async () => {
+    runs.findLatestMonitorRun.mockImplementation(async (kind: string) => (kind === 'status_monitor' ? null : runRow({ status: 'succeeded' })));
+
+    await runIncidentActions(AFTER_0815);
+    const firstKey = notifications.sendMonitorFailedNotification.mock.calls[0]?.[0]?.occurrenceKey;
+
+    notifications.sendMonitorFailedNotification.mockClear();
+    await runIncidentActions({ requestedAt: '2026-08-19T06:30:00.000Z', effectiveAt: '2026-08-19T06:30:00.000Z' });
+    const nextDayKey = notifications.sendMonitorFailedNotification.mock.calls[0]?.[0]?.occurrenceKey;
+
+    expect(nextDayKey).toBe('missing:2026-08-19');
+    expect(nextDayKey).not.toBe(firstKey);
   });
 });

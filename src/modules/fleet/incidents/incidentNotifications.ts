@@ -32,6 +32,7 @@ import { notify } from '@/modules/notifications/services/notificationBus';
 import { claimNotification, releaseNotificationClaim } from '@/modules/notifications/services/notificationIdempotency';
 import { deliverWhatsApp } from '@/modules/notifications/services/whatsappDelivery';
 import type { NotifyPayload, NotifyResult } from '@/modules/notifications/types';
+import { isValidUUID } from '../services/mileageUtils';
 import { resolveIncidentRecipients } from './recipientService';
 import { requiresMandatoryIncidentWhatsApp, resolveIncidentOpenedNotification } from './types';
 import type {
@@ -305,13 +306,27 @@ export async function sendMorningSummaryNotification(input: MorningSummaryGroupI
 
 // -- Monitor health -----------------------------------------------------------
 
-export function buildMonitorFailedIdempotencyKey(runKind: MonitorRunKind, runId: string | null): string {
-  return `fleet-monitor-failed:${runKind}:${runId ?? 'missing'}`;
+/**
+ * `occurrenceRef` is the failed run's UUID when there is a run to point at, and a synthetic
+ * per-occurrence reference (`missing:<SAST date>`) when there is not. It must never be a
+ * constant for the missing-run case: a constant would dedupe the "the monitor is dead"
+ * alert permanently after the first day it fired — a silent failure strictly worse than the
+ * crash it replaces.
+ */
+export function buildMonitorFailedIdempotencyKey(runKind: MonitorRunKind, occurrenceRef: string): string {
+  return `fleet-monitor-failed:${runKind}:${occurrenceRef}`;
 }
 
-export interface MonitorFailedNotificationInput {
-  runId: string | null; runKind: MonitorRunKind; reason: string;
-}
+/**
+ * A missing-run alert has no run to reference, so it MUST carry an `occurrenceKey` instead
+ * — `user_notifications.source_id` is a uuid column (migration 192) and anything else
+ * written there raises 22P02 inside `notify()`, losing the in-app, email, AND WhatsApp
+ * dispatch that share one try block. The union makes that unrepresentable rather than
+ * merely documented.
+ */
+export type MonitorFailedNotificationInput =
+  | { runId: string; occurrenceKey?: never; runKind: MonitorRunKind; reason: string }
+  | { runId: null; occurrenceKey: string; runKind: MonitorRunKind; reason: string };
 
 export async function sendMonitorFailedNotification(input: MonitorFailedNotificationInput): Promise<NotifyResult> {
   const recipients = await resolveIncidentRecipients(null);
@@ -321,15 +336,30 @@ export async function sendMonitorFailedNotification(input: MonitorFailedNotifica
     }, MODULE);
     return { ...NO_RECIPIENT_RESULT };
   }
+  // Defence in depth behind the union type above: a cast or a JavaScript caller can still
+  // hand over a non-uuid runId, and the cost of one reaching the uuid column is the total,
+  // silent loss of this alert on every channel. Keep the reference in metadata (where it is
+  // jsonb and always safe) and warn — never let it reach source_id, never throw.
+  let sourceId: string | undefined;
+  if (input.runId !== null) {
+    if (isValidUUID(input.runId)) {
+      sourceId = input.runId;
+    } else {
+      log.warn('[fleet-incident-notifications] non-uuid runId kept out of source_id', {
+        runId: input.runId, runKind: input.runKind,
+      }, MODULE);
+    }
+  }
+  const occurrenceRef = sourceId ?? input.occurrenceKey ?? `unreferenced:${input.runId ?? 'missing'}`;
   return safeNotify({
     event_type: 'fleet.operational_monitor_failed',
     title: `Fleet ${humanizeCode(input.runKind)} monitor failure`,
     body: input.reason,
     action_url: '/fleet/incidents',
     source_module: 'fleet-incidents',
-    source_id: input.runId ?? undefined,
-    metadata: { runKind: input.runKind, runId: input.runId },
+    source_id: sourceId,
+    metadata: { runKind: input.runKind, runId: input.runId, occurrenceKey: input.occurrenceKey ?? null },
     recipient_user_ids: recipients.userIds,
-    idempotency_key: buildMonitorFailedIdempotencyKey(input.runKind, input.runId),
+    idempotency_key: buildMonitorFailedIdempotencyKey(input.runKind, occurrenceRef),
   }, { runId: input.runId, runKind: input.runKind });
 }

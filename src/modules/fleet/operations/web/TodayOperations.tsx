@@ -94,8 +94,13 @@ function OperationsPanel({ filters, projects, onChange }: OperationsPanelProps) 
           <div><h3 className="mb-2 font-medium text-[var(--ff-text-primary)]">Needs Attention</h3>
             {data.selectionState === 'no_scheduled_staff' && <p>No staff are scheduled for this selection.</p>}
             {data.selectionState === 'no_attention' && <p>No operational items need attention.</p>}
-            {data.selectionState === 'attention_available' && <AttentionList rows={data.attention.items} filters={evidenceFilters}
-              onOpenEvidence={(row, target) => { setSelected(row); setOpener(target); }} />}
+            {data.selectionState === 'attention_available' && <>
+              {data.attention.hasMore && <p className="mb-2 text-xs font-medium text-amber-700">
+                Showing {data.attention.items.length} of {data.attention.total} — {data.attention.total - data.attention.items.length} more not shown. Narrow the filters to see the rest.
+              </p>}
+              <AttentionList rows={data.attention.items} filters={evidenceFilters}
+                onOpenEvidence={(row, target) => { setSelected(row); setOpener(target); }} />
+            </>}
           </div></>}
       </div>
       {selected && <OperationalEvidenceDrawer row={selected} filters={evidenceFilters} returnFocus={opener}

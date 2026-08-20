@@ -157,7 +157,10 @@ async function runStatusMonitorHealthCheck(effectiveAt: string, totals: Escalati
     const latestStartMs = latest ? new Date(latest.startedAt).getTime() : null;
     if (latestStartMs !== null && latestStartMs >= new Date(staleBefore).getTime()) return; // ran recently — healthy
     applyDelivery(totals, await sendMonitorFailedNotification({
-      runId: `missing:${sastDateString(new Date(effectiveAt))}`, runKind: 'status_monitor',
+      // No run exists to point at, so `runId` must stay null — the reference travels as
+      // `occurrenceKey`, which lands in jsonb metadata and in the idempotency key (per SAST
+      // work date) rather than in the uuid `source_id` column.
+      runId: null, occurrenceKey: `missing:${sastDateString(new Date(effectiveAt))}`, runKind: 'status_monitor',
       reason: 'No Fleet status-monitor run has started recently. If the external cron scheduler has stopped entirely, this application-level check cannot detect that — external host/scheduler monitoring is required.',
     }));
   } catch (error) {

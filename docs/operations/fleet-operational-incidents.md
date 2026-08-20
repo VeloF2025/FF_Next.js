@@ -100,7 +100,7 @@ remove the schedule anyway before rolling back).
 Run `PORT=3004 npm run dev` against a database that has migration 510 applied
 and at least one active project, one project manager account, and one Fleet
 oversight override grant, with `CRON_SECRET` set so the two cron endpoints can
-be invoked manually with `curl -H "Authorization: Bearer $CRON_SECRET"` (do
+be invoked manually with `curl -H "x-cron-secret: $CRON_SECRET"` (do
 **not** install the crontab entries for this — invoke the endpoints directly,
 once, to produce test incidents). Do not send real WhatsApp/email notifications
 to a shared distribution list during this pass — use test accounts.

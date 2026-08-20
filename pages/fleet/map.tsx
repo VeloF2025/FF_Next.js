@@ -77,6 +77,16 @@ export default function FleetMapPage() {
 
   const visibleOverlay = layers.overlay.data
     ? filterOperationalOverlay(reconcileOperationalOverlay(layers.overlay.data, vehicles), filters) : undefined;
+  // Computed from the raw, unfiltered fetch — filterOperationalOverlay recomputes
+  // total/hasMore for the client-side status filter, which would hide the fact
+  // that the server itself already truncated the roster at `limit`.
+  const overlayTruncation = layers.overlay.data?.hasMore
+    ? {
+      shown: layers.overlay.data.badges.length + layers.overlay.data.attendancePoints.length
+        + layers.overlay.data.unplottable.length,
+      total: layers.overlay.data.total,
+    }
+    : undefined;
   const showOperations = (filters.visibility ?? 'all') !== 'vehicles';
   const selectStaff = useCallback((staffId: string) => {
     change({ ...currentFilters.current, staffId });
@@ -139,7 +149,7 @@ export default function FleetMapPage() {
             showVehicleMarkers={(filters.visibility ?? 'all') !== 'drivers'} />
           {showOperations && visibleOverlay && <MapAttentionPanel filters={filters}
             operationalOverlay={visibleOverlay} onFocusStaff={selectStaff}
-            selectedStaffId={filters.staffId ?? null} />}
+            selectedStaffId={filters.staffId ?? null} truncated={overlayTruncation} />}
         </div>
         {notPlotted.length > 0 && (
           <aside className="px-4 py-2 border-t text-sm">

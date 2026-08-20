@@ -80,6 +80,24 @@ describe('MapAttentionPanel', () => {
     expect(within(desktop).getByText('Attendance check-in evidence — not live tracking')).toBeInTheDocument();
   });
 
+  it('discloses when the server truncated the roster fetch below the true total', () => {
+    render(<MapAttentionPanel operationalOverlay={overlay} onFocusStaff={vi.fn()} selectedStaffId={null}
+      truncated={{ shown: 100, total: 240 }} />);
+    const desktop = screen.getByTestId('map-attention-desktop');
+    expect(within(desktop).getByText(/Showing 100 of 240/)).toBeInTheDocument();
+    expect(within(desktop).getByText(/140 more not shown/)).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByTestId('map-attention-mobile'))
+      .getByRole('button', { name: 'Expand mobile attention sheet' }));
+    expect(within(screen.getByTestId('map-attention-mobile')).getByText(/Showing 100 of 240/)).toBeInTheDocument();
+  });
+
+  it('says nothing when the fetch was not truncated', () => {
+    render(<MapAttentionPanel operationalOverlay={overlay} onFocusStaff={vi.fn()} selectedStaffId={null}
+      truncated={{ shown: 5, total: 5 }} />);
+    expect(screen.queryByText(/more not shown/)).not.toBeInTheDocument();
+  });
+
   it('collapses on desktop, expands as a mobile sheet, and retains the selected staff member', () => {
     render(<PanelHarness />);
     const focus = within(screen.getByTestId('map-attention-desktop'))

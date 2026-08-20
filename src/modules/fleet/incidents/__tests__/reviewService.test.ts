@@ -171,6 +171,60 @@ describe('transitionIncident', () => {
     expect(notifications.sendResolutionNotification).toHaveBeenCalledWith(notifyPayload);
   });
 
+  /**
+   * The scope chain only ever asked "is this incident in a project you manage?". A
+   * supervisor who manages a project AND is on the operational roster satisfies that for an
+   * incident about their own conduct, so without this guard they can acknowledge ->
+   * review_started -> dismissed it themselves. Every action type is covered because the
+   * chain is only as strong as its weakest link: acknowledging your own incident is the
+   * step that unlocks the rest.
+   */
+  const SELF_ACTIONS: IncidentTransitionRequest['actionType'][] = ['acknowledged', 'review_started', 'commented', 'resolved', 'dismissed'];
+  it.each(SELF_ACTIONS)('refuses %s when the acting manager is the subject of the incident, before mutating', async (actionType) => {
+    scope.resolveIncidentScope.mockResolvedValue({ unrestricted: false, pmUserId: USER, pmStaffId: STAFF });
+    scope.isProjectOwnedByScope.mockResolvedValue(true);
+    queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: 'this-pms-project', staffId: STAFF });
+
+    await expect(transitionIncident({ ...request, actionType, outcome: 'confirmed' }, viewer))
+      .rejects.toBeInstanceOf(IncidentAccessDeniedError);
+    expect(transitions.runIncidentTransition).not.toHaveBeenCalled();
+  });
+
+  it('refuses an oversight member acting on their own incident too', async () => {
+    scope.resolveIncidentScope.mockResolvedValue(unrestrictedScope);
+    queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: null, staffId: STAFF });
+
+    await expect(transitionIncident(request, viewer)).rejects.toBeInstanceOf(IncidentAccessDeniedError);
+    expect(transitions.runIncidentTransition).not.toHaveBeenCalled();
+  });
+
+  it('says plainly why the action was refused', async () => {
+    scope.resolveIncidentScope.mockResolvedValue(unrestrictedScope);
+    queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: null, staffId: STAFF });
+
+    await expect(transitionIncident(request, viewer)).rejects.toThrow(/about you/i);
+  });
+
+  // The negative case: the guard must not block ordinary review of someone else's incident,
+  // nor a manager who has no staff record at all (matching null-to-null would lock every
+  // non-staff manager out of the entire queue).
+  it('still lets a manager act on an incident about someone else', async () => {
+    scope.resolveIncidentScope.mockResolvedValue(unrestrictedScope);
+    queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: null, staffId: 'a-different-staff-id' });
+    transitions.runIncidentTransition.mockResolvedValue({ result: { incidentId: INCIDENT, lifecycleStatus: 'acknowledged', actionId: 'a1' } });
+
+    await expect(transitionIncident(request, viewer)).resolves.toMatchObject({ actionId: 'a1' });
+  });
+
+  it('still lets a manager with no staff record act on an unassigned incident', async () => {
+    scope.resolveIncidentScope.mockResolvedValue({ unrestricted: true, pmUserId: USER, pmStaffId: null });
+    queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: null, staffId: null });
+    transitions.runIncidentTransition.mockResolvedValue({ result: { incidentId: INCIDENT, lifecycleStatus: 'acknowledged', actionId: 'a1' } });
+
+    await expect(transitionIncident(request, { userId: USER, staffId: null, role: 'manager' }))
+      .resolves.toMatchObject({ actionId: 'a1' });
+  });
+
   it('does not notify for non-terminal transitions', async () => {
     scope.resolveIncidentScope.mockResolvedValue(unrestrictedScope);
     queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: null });
@@ -185,6 +239,15 @@ describe('bulkAcknowledgeIncidents', () => {
     scope.resolveIncidentScope.mockResolvedValue(null);
     await expect(bulkAcknowledgeIncidents([INCIDENT], viewer, null)).rejects.toBeInstanceOf(IncidentAccessDeniedError);
     expect(transitions.runBulkAcknowledge).not.toHaveBeenCalled();
+  });
+
+  it('passes the viewer staff id through so runBulkAcknowledge can refuse self-owned ids', async () => {
+    scope.resolveIncidentScope.mockResolvedValue(unrestrictedScope);
+    transitions.runBulkAcknowledge.mockResolvedValue({ results: [], conflicts: [] });
+
+    await bulkAcknowledgeIncidents([INCIDENT], viewer, 'req-1');
+
+    expect(transitions.runBulkAcknowledge).toHaveBeenCalledWith([INCIDENT], USER, expect.objectContaining({ pmStaffId: STAFF }), 'req-1');
   });
 
   it('delegates to runBulkAcknowledge with the resolved scope', async () => {

@@ -20,12 +20,13 @@
  * either; design §15: "File deletion is not exposed in PR 6").
  */
 import { randomUUID } from 'node:crypto';
-import { transaction } from '@/lib/db-pool';
+import { transaction, type TxnClient } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { safeFilename, uploadCategorizedFile, VfStorageOriginError, VfStorageValidationError } from '@/lib/vfStorageUpload';
 import { insertIncidentAction, insertIncidentEvidence, IncidentNotFoundError } from './incidentRepository';
 import { getIncidentCore } from './reviewQueries';
 import { isProjectOwnedByScope, resolveIncidentScope } from './reviewScope';
+import { SELF_REVIEW_REFUSAL_MESSAGE, isIncidentSubject } from './selfReviewGuard';
 import type { IncidentEvidence, IncidentLifecycleStatus } from './types';
 
 export { IncidentNotFoundError, VfStorageOriginError, VfStorageValidationError };
@@ -102,6 +103,20 @@ function buildStorageFilename(incidentId: string, mimeType: string): string {
   return `${incidentId}-${randomUUID()}.${extension}`;
 }
 
+interface LockedEvidenceRow extends Record<string, unknown> { lifecycle_status: IncidentLifecycleStatus }
+
+/** Row-locked re-read of the one column that can change under an in-flight upload. */
+async function lockIncidentForEvidence(incidentId: string, txn: TxnClient): Promise<IncidentLifecycleStatus> {
+  const row = await txn.queryOne<LockedEvidenceRow>(
+    `SELECT lifecycle_status FROM fleet_operational_incidents WHERE id = $1::uuid FOR UPDATE`, [incidentId],
+  );
+  if (!row) throw new IncidentNotFoundError(`No incident found for id ${incidentId}`);
+  if (TERMINAL_STATUSES.includes(row.lifecycle_status)) {
+    throw new IncidentEvidenceConflictError('Evidence cannot be added to a closed incident', row.lifecycle_status);
+  }
+  return row.lifecycle_status;
+}
+
 export async function addIncidentEvidence(
   request: AddIncidentEvidenceRequest,
   viewer: IncidentEvidenceViewer,
@@ -118,6 +133,12 @@ export async function addIncidentEvidence(
   if (!scope.unrestricted && !(await isProjectOwnedByScope(scope, core.projectId))) {
     throw new IncidentEvidenceAccessDeniedError();
   }
+  // Independent of project scope: nobody attaches evidence to an incident about themselves.
+  if (isIncidentSubject(scope.pmStaffId, core.staffId)) {
+    throw new IncidentEvidenceAccessDeniedError(SELF_REVIEW_REFUSAL_MESSAGE);
+  }
+  // Fast, unlocked rejection so an obviously closed incident never costs an upload. It is
+  // NOT the enforcement point — `lockIncidentForEvidence` below is (see the race note there).
   if (TERMINAL_STATUSES.includes(core.lifecycleStatus)) {
     throw new IncidentEvidenceConflictError('Evidence cannot be added to a closed incident', core.lifecycleStatus);
   }
@@ -140,6 +161,12 @@ export async function addIncidentEvidence(
 
   try {
     return await transaction(async (txn) => {
+      // The check above ran before a VF Storage round trip, so another manager can have
+      // resolved or dismissed the incident while this upload was in flight. Re-read the
+      // status under FOR UPDATE here — the same shape reviewTransitions.lockIncident and
+      // driver/driverEvidenceService.verifyEligibility use — or the module's invariant
+      // ("Evidence cannot be added to a closed incident") is only advisory.
+      const locked = await lockIncidentForEvidence(request.incidentId, txn);
       const evidence = await insertIncidentEvidence(
         {
           incidentId: request.incidentId,
@@ -160,8 +187,8 @@ export async function addIncidentEvidence(
           actorUserId: request.actorUserId,
           isSystemActor: false,
           note: null,
-          beforeLifecycleStatus: core.lifecycleStatus,
-          afterLifecycleStatus: core.lifecycleStatus,
+          beforeLifecycleStatus: locked,
+          afterLifecycleStatus: locked,
           beforeEscalationLevel: null,
           afterEscalationLevel: null,
           metadata: { evidenceId: evidence.id, evidenceType: request.evidenceType },
@@ -187,6 +214,10 @@ export async function addIncidentEvidence(
       },
       MODULE,
     );
+    // A lost race (or a vanished incident) is the incident's real answer, not a database
+    // outage: surface it as the 409/404 it is, never as a 500. The upload is orphaned either
+    // way, which is why the log above runs before this branch.
+    if (error instanceof IncidentEvidenceConflictError || error instanceof IncidentNotFoundError) throw error;
     throw new IncidentEvidenceOrphanError(
       'Evidence was uploaded to storage but could not be recorded against the incident',
       uploaded.key,

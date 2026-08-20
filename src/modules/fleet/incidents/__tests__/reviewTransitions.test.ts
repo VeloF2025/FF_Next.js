@@ -214,6 +214,64 @@ describe('runBulkAcknowledge', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
+  /**
+   * Bulk semantics for a self-owned incident, chosen to match the pass already in this
+   * function: validate everything, mutate nothing until all of it passes. A self-owned id
+   * therefore fails the WHOLE request before any acknowledgement commits — unlike the
+   * mid-loop terminal_conflict below, which cannot fail the request because earlier ids
+   * have already committed by then. The message names every refused id so the caller never
+   * has to guess which one was the problem.
+   */
+  it('refuses the whole batch, before any mutation, when one incident is about the actor', async () => {
+    db.query.mockResolvedValue([
+      { id: INCIDENT, lifecycle_status: 'open', project_id: null, staff_id: 'someone-else' },
+      { id: OTHER_INCIDENT, lifecycle_status: 'open', project_id: null, staff_id: STAFF },
+    ]);
+
+    await expect(runBulkAcknowledge([INCIDENT, OTHER_INCIDENT], USER, unrestrictedScope, null))
+      .rejects.toBeInstanceOf(IncidentTransitionForbiddenError);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('names every refused id, and only those, so the caller knows exactly which were rejected and why', async () => {
+    db.query.mockResolvedValue([
+      { id: INCIDENT, lifecycle_status: 'open', project_id: null, staff_id: STAFF },
+      { id: OTHER_INCIDENT, lifecycle_status: 'open', project_id: null, staff_id: 'someone-else' },
+    ]);
+
+    await expect(runBulkAcknowledge([INCIDENT, OTHER_INCIDENT], USER, unrestrictedScope, null))
+      .rejects.toThrow(new RegExp(INCIDENT));
+    await expect(runBulkAcknowledge([INCIDENT, OTHER_INCIDENT], USER, unrestrictedScope, null))
+      .rejects.toThrow(/about you/i);
+    // ... and says nothing happened to the rest of the batch, rather than leaving the
+    // caller to guess whether the others went through.
+    await expect(runBulkAcknowledge([INCIDENT, OTHER_INCIDENT], USER, unrestrictedScope, null))
+      .rejects.toThrow(/No incident in this request was acknowledged/i);
+    await expect(runBulkAcknowledge([INCIDENT, OTHER_INCIDENT], USER, unrestrictedScope, null))
+      .rejects.not.toThrow(new RegExp(OTHER_INCIDENT));
+  });
+
+  it('does not refuse a batch of other people\'s incidents', async () => {
+    db.query.mockResolvedValue([
+      { id: INCIDENT, lifecycle_status: 'open', project_id: null, staff_id: 'someone-else' },
+      { id: OTHER_INCIDENT, lifecycle_status: 'open', project_id: null, staff_id: null },
+    ]);
+    repo.acknowledgeIncident.mockResolvedValue({ outcome: 'acknowledged', lifecycleStatus: 'acknowledged', actionId: 'a1' });
+
+    const outcome = await runBulkAcknowledge([INCIDENT, OTHER_INCIDENT], USER, unrestrictedScope, null);
+
+    expect(outcome.results).toHaveLength(2);
+  });
+
+  it('does not lock an actor with no staff record out of unassigned incidents', async () => {
+    db.query.mockResolvedValue([{ id: INCIDENT, lifecycle_status: 'open', project_id: null, staff_id: null }]);
+    repo.acknowledgeIncident.mockResolvedValue({ outcome: 'acknowledged', lifecycleStatus: 'acknowledged', actionId: 'a1' });
+
+    const outcome = await runBulkAcknowledge([INCIDENT], USER, { unrestricted: true, pmUserId: USER, pmStaffId: null }, null);
+
+    expect(outcome.results).toHaveLength(1);
+  });
+
   it('acknowledges every incident once all pass validation', async () => {
     db.query.mockResolvedValue([
       { id: INCIDENT, lifecycle_status: 'open', project_id: null },

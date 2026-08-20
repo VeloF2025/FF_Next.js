@@ -333,9 +333,87 @@ describe('sendMonitorFailedNotification', () => {
   it('records a failure when no oversight recipient exists', async () => {
     recipients.resolveIncidentRecipients.mockResolvedValue({ userIds: [], failed: true });
 
-    const result = await sendMonitorFailedNotification({ runId: null, runKind: 'status_monitor', reason: 'no recent run found' });
+    const result = await sendMonitorFailedNotification({
+      runId: null, occurrenceKey: 'missing:2026-08-20', runKind: 'status_monitor', reason: 'no recent run found',
+    });
 
     expect(bus.notify).not.toHaveBeenCalled();
     expect(result.failed).toBe(1);
+  });
+
+  // `user_notifications.source_id` is a uuid column (migration 192, line 20). notify()
+  // writes it as-is, so a non-uuid reference raises 22P02 there — and because the in-app
+  // insert, the email dispatch, and the WhatsApp dispatch all live inside the same try
+  // block, that single throw loses ALL THREE channels for the one alert registered with
+  // `{ in_app: true, email: true, whatsapp: true }`. The missing-run branch of the health
+  // check is exactly that alert, so a non-uuid `source_id` there means the "the monitor is
+  // dead" page can never be delivered by any channel.
+  const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function notifyLikePostgres(): (payload: { source_id?: string }) => Promise<{ delivered: number; suppressed: number; failed: number }> {
+    return async (payload) => {
+      if (payload.source_id !== undefined && !UUID_PATTERN.test(payload.source_id)) {
+        throw new Error(`invalid input syntax for type uuid: "${payload.source_id}"`);
+      }
+      return { delivered: 3, suppressed: 0, failed: 0 };
+    };
+  }
+
+  it('delivers a missing-run alert on every channel instead of losing all three to a uuid cast', async () => {
+    bus.notify.mockImplementation(notifyLikePostgres());
+
+    const result = await sendMonitorFailedNotification({
+      runId: null, occurrenceKey: 'missing:2026-08-20', runKind: 'status_monitor',
+      reason: 'No Fleet status-monitor run has started recently.',
+    });
+
+    expect(result).toEqual({ delivered: 3, suppressed: 0, failed: 0 });
+    expect(bus.notify.mock.calls[0]?.[0]?.source_id).toBeUndefined();
+    expect(logger.log.error).not.toHaveBeenCalled();
+  });
+
+  // Defence in depth: the discriminated input type forbids a non-uuid `runId`, but a type
+  // cannot stop a cast or a JavaScript caller. Since the cost of one slipping through is
+  // total, silent loss of the alert on all three channels, the runtime must refuse to put a
+  // non-uuid in `source_id` too — dropping it to metadata and warning, never crashing.
+  it('refuses to put a non-uuid runId in source_id even when a caller supplies one', async () => {
+    bus.notify.mockImplementation(notifyLikePostgres());
+
+    const result = await sendMonitorFailedNotification({
+      runId: 'missing:2026-08-20' as string, runKind: 'status_monitor', reason: 'no recent run found',
+    });
+
+    expect(result).toEqual({ delivered: 3, suppressed: 0, failed: 0 });
+    expect(bus.notify.mock.calls[0]?.[0]?.source_id).toBeUndefined();
+    expect(bus.notify.mock.calls[0]?.[0]?.metadata).toEqual(expect.objectContaining({ runId: 'missing:2026-08-20' }));
+    expect(logger.log.warn).toHaveBeenCalled();
+  });
+
+  it('keeps the missing-run reference in metadata rather than losing it with source_id', async () => {
+    await sendMonitorFailedNotification({
+      runId: null, occurrenceKey: 'missing:2026-08-20', runKind: 'status_monitor', reason: 'no recent run found',
+    });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      source_id: undefined,
+      metadata: expect.objectContaining({ runKind: 'status_monitor', runId: null, occurrenceKey: 'missing:2026-08-20' }),
+    }));
+  });
+
+  it('still passes a real run uuid straight through as source_id for the stale-run branch', async () => {
+    bus.notify.mockImplementation(notifyLikePostgres());
+
+    const result = await sendMonitorFailedNotification({ runId: INCIDENT, runKind: 'status_monitor', reason: 'stale running run' });
+
+    expect(result.failed).toBe(0);
+    expect(bus.notify.mock.calls[0]?.[0]?.source_id).toBe(INCIDENT);
+  });
+
+  // A constant "missing" reference would dedupe the alert for ever after the first day it
+  // fires — worse than the crash it replaces, because it fails silently.
+  it('dedupes the missing-run alert per day, never permanently', () => {
+    expect(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-20'))
+      .toBe(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-20'));
+    expect(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-20'))
+      .not.toBe(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-21'));
   });
 });

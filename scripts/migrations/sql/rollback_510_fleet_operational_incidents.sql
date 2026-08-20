@@ -1,4 +1,6 @@
--- Rollback 506. This removes durable incident and audit evidence; execute only with approval.
+-- Rollback 510. This removes durable incident and audit evidence; execute only with approval.
+-- ORDER: roll back 511 BEFORE this file. 510 DROPs tables without CASCADE and
+-- 511 holds ON DELETE RESTRICT foreign keys into fleet_operational_incidents.
 
 DELETE FROM user_permission_overrides
  WHERE permission_key IN ('fleet.incidents', 'fleet.incidents-settings');

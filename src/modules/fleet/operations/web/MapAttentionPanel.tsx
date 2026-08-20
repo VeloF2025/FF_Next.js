@@ -69,21 +69,40 @@ function AttentionRows({ items, selectedStaffId, onFocusStaff, filters }: {
   })}</div>;
 }
 
+/**
+ * The server truncates the underlying roster fetch at `limit` (page 1, 100)
+ * before this panel ever sees it — `operationalOverlay` is already the
+ * client-filtered/reconciled view and can't tell truncation apart from a
+ * user filter excluding rows. The caller must pass the raw fetch's
+ * `hasMore`/`total` through separately so the panel can say so honestly.
+ */
+export interface MapAttentionTruncation { shown: number; total: number }
+
+function TruncationNotice({ truncated }: { truncated: MapAttentionTruncation }) {
+  return (
+    <p className="border-b bg-amber-50 p-2 text-xs font-medium text-amber-700">
+      Showing {truncated.shown} of {truncated.total} eligible staff — {truncated.total - truncated.shown} more not shown. Narrow the filters to see them.
+    </p>
+  );
+}
+
 export interface MapAttentionPanelProps {
   operationalOverlay: OperationalMapDisplayOverlay;
   selectedStaffId: string | null;
   onFocusStaff: (staffId: string) => void;
   filters?: OperationFilters;
+  truncated?: MapAttentionTruncation;
 }
 
 export function MapAttentionPanel({
-  operationalOverlay, selectedStaffId, onFocusStaff, filters = {},
+  operationalOverlay, selectedStaffId, onFocusStaff, filters = {}, truncated,
 }: MapAttentionPanelProps) {
   const [desktopExpanded, setDesktopExpanded] = useState(true);
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const filtered = mapAttentionItems(operationalOverlay).filter((item) => matchesMapFilters(item, filters));
   const hasExplicitFilter = Boolean(filters.status || filters.group || filters.evidence);
   const attention = hasExplicitFilter ? filtered : filtered.filter((item) => ACTIONABLE.has(item.row.status));
+  const isTruncated = Boolean(truncated && truncated.shown < truncated.total);
   return (
     <>
       <div data-testid="map-attention-desktop" className="absolute right-3 top-3 z-[500] hidden max-h-[calc(100%-1.5rem)] w-80 lg:block">
@@ -91,6 +110,7 @@ export function MapAttentionPanel({
           <div className="flex items-center justify-between border-b p-3"><strong>Needs attention ({attention.length})</strong>
             <button type="button" aria-expanded="true" aria-label="Collapse attention panel"
               onClick={() => setDesktopExpanded(false)}>Collapse</button></div>
+          {isTruncated && truncated && <TruncationNotice truncated={truncated} />}
           <AttentionRows items={attention} selectedStaffId={selectedStaffId} onFocusStaff={onFocusStaff} filters={filters} />
         </aside> : <button type="button" aria-expanded="false" aria-label="Expand attention panel"
           onClick={() => setDesktopExpanded(true)} className="rounded border bg-white px-3 py-2 shadow">Attention ({attention.length})</button>}
@@ -102,8 +122,10 @@ export function MapAttentionPanel({
             onClick={() => setMobileExpanded((value) => !value)} className="w-full p-3 text-left font-medium">
             Needs attention ({attention.length})
           </button>
-          {mobileExpanded && <div className="max-h-64 overflow-y-auto"><AttentionRows items={attention}
-            selectedStaffId={selectedStaffId} onFocusStaff={onFocusStaff} filters={filters} /></div>}
+          {mobileExpanded && <div className="max-h-64 overflow-y-auto">
+            {isTruncated && truncated && <TruncationNotice truncated={truncated} />}
+            <AttentionRows items={attention} selectedStaffId={selectedStaffId} onFocusStaff={onFocusStaff} filters={filters} />
+          </div>}
         </section>
       </div>
     </>
