@@ -122,3 +122,44 @@ export async function validateSerial(serialNumber: string): Promise<{
     throw err;
   }
 }
+
+// =============================================================================
+// Batch validation (carton scans)
+// =============================================================================
+
+export interface BatchSerialResult {
+  serialNumber: string;
+  valid: boolean;
+  errorMessage?: string;
+  stockItemId?: string;
+  stockItemName?: string;
+  currentLocationId?: string | null;
+  currentLocationName?: string | null;
+}
+
+export interface BatchSerialResponse {
+  results: BatchSerialResult[];
+  quantsWarning?: { serialsInStock: number; quantsOnHand: number };
+}
+
+/**
+ * Validate every serial from one carton scan in a single round-trip.
+ *
+ * Unlike validateSerial, this never throws on a per-serial problem — an unknown
+ * or misplaced serial comes back as a result with valid=false, so a partial box
+ * still yields its good members. Transport errors still throw.
+ */
+export async function validateSerialBatch(input: {
+  serials: string[];
+  stockItemId: string;
+  sourceLocationId?: string | null;
+}): Promise<BatchSerialResponse> {
+  return request<BatchSerialResponse>('/api/my/stores/serials/validate-batch', {
+    method: 'POST',
+    body: JSON.stringify({
+      serials: input.serials,
+      stockItemId: input.stockItemId,
+      sourceLocationId: input.sourceLocationId ?? null,
+    }),
+  });
+}
