@@ -260,20 +260,31 @@ export function SiteCamTile({ onClick }: { onClick: () => void }) {
  */
 export function HsCheckinTile({
   status,
+  clockedIn,
   onClick,
 }: {
   status: { completed: boolean; clearance: string | null } | null;
+  /**
+   * Whether the worker currently has an open attendance entry. Drives the
+   * louder "outstanding" treatment below — an office worker who hasn't
+   * clocked in yet is not overdue for anything, so this must stay false
+   * (not just omitted) until that is actually known.
+   */
+  clockedIn: boolean;
   onClick: () => void;
 }) {
   const blocked = status?.clearance === 'blocked';
   const done = status?.completed === true;
+  // Louder only while BOTH hold: clocked in AND not yet declared. Not known
+  // until status has loaded, so `status === null` never counts as outstanding.
+  const outstanding = status !== null && !blocked && !done && clockedIn;
 
   return (
     <Tile
       onClick={onClick}
       icon={<ShieldCheck className="w-5 h-5" />}
       iconClass={
-        blocked
+        blocked || outstanding
           ? 'bg-red-500/15 text-red-300'
           : done
             ? 'bg-emerald-500/15 text-emerald-300'
@@ -287,11 +298,13 @@ export function HsCheckinTile({
             ? 'Blocked — an H&S officer must clear you'
             : done
               ? 'Done for today'
-              : 'Not done today — tap to complete'
+              : outstanding
+                ? 'Still to do — you are clocked in'
+                : 'Not done today — tap to complete'
       }
-      badge={status === null ? null : blocked ? 'Blocked' : done ? null : 'Due'}
+      badge={status === null ? null : blocked ? 'Blocked' : done ? null : outstanding ? 'Outstanding' : 'Due'}
       badgeClass={
-        blocked
+        blocked || outstanding
           ? 'bg-red-500/15 text-red-300 border-red-500/30'
           : 'bg-orange-500/15 text-orange-300 border-orange-500/30'
       }
