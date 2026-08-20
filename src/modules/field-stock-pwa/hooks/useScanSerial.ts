@@ -56,6 +56,15 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
    * than appending to a remembered array.
    */
   const scannedRef = useRef(scanned);
+  // Syncs the ref from the prop for changes this hook did not make. Today that
+  // is only a fresh mount, because ScanSerialsStep is unmounted when the
+  // storeman picks a different item (IssueOrchestrator flips flow.step in the
+  // same update), so `useRef(scanned)` alone would suffice.
+  //
+  // INVARIANT this relies on: a live stockItem swap never happens on a mounted
+  // ScanSerialsStep. If that ever changes, this effect is NOT enough — an
+  // in-flight validation for the old item would merge into the new item's list,
+  // because nothing stamps a resolution with the item it was scanned for.
   useEffect(() => { scannedRef.current = scanned; }, [scanned]);
 
   /**
