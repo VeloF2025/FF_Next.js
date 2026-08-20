@@ -165,8 +165,11 @@ describe('fleet incident driver-input migration contract', () => {
       .toHaveLength(3);
     expect(sql).toMatch(/staff_id UUID NOT NULL REFERENCES staff\(id\) ON DELETE RESTRICT/i);
     expect(sql).toMatch(/input_request_id UUID REFERENCES fleet_incident_driver_input_requests\(id\) ON DELETE SET NULL/i);
-    expect(sql).toMatch(/driver_submission_id UUID REFERENCES fleet_incident_driver_submissions\(id\) ON DELETE SET NULL/i);
-    expect(sql).toMatch(/attendance_correction_id UUID NOT NULL REFERENCES attendance_adjustments\(id\) ON DELETE RESTRICT/i);
+    // These two carry an explicit CONSTRAINT name because the generated one would
+    // exceed Postgres' 63-byte identifier limit and be silently truncated. What is
+    // being asserted is the delete behaviour, so the name is optional in the match.
+    expect(sql).toMatch(/driver_submission_id UUID (?:CONSTRAINT \w+ )?REFERENCES fleet_incident_driver_submissions\(id\) ON DELETE SET NULL/i);
+    expect(sql).toMatch(/attendance_correction_id UUID NOT NULL (?:CONSTRAINT \w+ )?REFERENCES attendance_adjustments\(id\) ON DELETE RESTRICT/i);
     expect(sql).not.toMatch(/ON DELETE CASCADE/i);
   });
 

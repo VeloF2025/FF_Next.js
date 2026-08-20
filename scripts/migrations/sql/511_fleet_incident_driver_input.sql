@@ -110,8 +110,8 @@ CREATE INDEX IF NOT EXISTS ix_fleet_incident_driver_submissions_staff ON fleet_i
 CREATE TABLE IF NOT EXISTS fleet_incident_attendance_correction_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   incident_id UUID NOT NULL REFERENCES fleet_operational_incidents(id) ON DELETE RESTRICT,
-  driver_submission_id UUID REFERENCES fleet_incident_driver_submissions(id) ON DELETE SET NULL,
-  attendance_correction_id UUID NOT NULL REFERENCES attendance_adjustments(id) ON DELETE RESTRICT,
+  driver_submission_id UUID CONSTRAINT fleet_incident_attendance_correction_links_submission_fkey REFERENCES fleet_incident_driver_submissions(id) ON DELETE SET NULL, -- named: generated name is 68 bytes, over Postgres' 63-byte limit, which truncates silently
+  attendance_correction_id UUID NOT NULL CONSTRAINT fleet_incident_attendance_correction_links_correction_fkey REFERENCES attendance_adjustments(id) ON DELETE RESTRICT, -- named: generated name is 72 bytes, same reason
   staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE RESTRICT,
   linked_by UUID NOT NULL REFERENCES staff(id) ON DELETE RESTRICT,
   linked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
