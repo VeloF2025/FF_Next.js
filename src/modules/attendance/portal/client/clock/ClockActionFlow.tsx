@@ -4,6 +4,7 @@ import React from 'react';
 import { ConsentModal, GpsStep, SelfieStep } from '../clockSteps';
 import { GpsPermissionHelp } from '../GpsPermissionHelp';
 import {
+  ClockInRecordedBanner,
   OfflineBanner,
   PendingQueueBanner,
   QueueSyncIssuesBanner,
@@ -67,6 +68,9 @@ export function ClockActionFlow({
       )}
       {unrelatedFailureCount > 0 && (
         <QueueSyncIssuesBanner failureCount={unrelatedFailureCount} />
+      )}
+      {submission.state === 'success' && action === 'in' && !hsDone && (
+        <ClockInRecordedBanner message={submission.successMessage ?? 'Clocked in.'} />
       )}
       {submission.state === 'success' && action === 'in' && !hsDone && (
         <HsCheckinSteps

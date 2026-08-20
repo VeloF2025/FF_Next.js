@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HsCheckinSteps } from '../HsCheckinSteps';
+import { HS_BOOTSTRAP_TIMEOUT_MS } from '../hsCheckinBootstrap';
 
 const P1 = { id: 'proj-1', project_name: 'Lawley FTTH' };
 
@@ -15,6 +16,7 @@ function bootstrapResponse(overrides: {
   projects?: Array<{ id: string; project_name: string }>;
   completed?: boolean;
   default_project_id?: string | null;
+  default_work_location?: string | null;
   activities?: Array<{ value: string; label: string; requires_medical: boolean }>;
   medical_status?: string | null;
 }) {
@@ -28,6 +30,7 @@ function bootstrapResponse(overrides: {
         checkin: null,
         projects: overrides.projects ?? [],
         default_project_id: overrides.default_project_id ?? null,
+        default_work_location: overrides.default_work_location ?? null,
         activities: overrides.activities ?? [],
         medical_status: overrides.medical_status ?? 'current',
       },
@@ -220,6 +223,10 @@ describe('HsCheckinSteps', () => {
     await user.click(screen.getByRole('button', { name: P1.project_name }));
     // Deliberately do not check the activity checkbox.
 
+    // Positive anchor: without this, the absence below would also be satisfied
+    // by the site block failing to render at all, and the test would pass for
+    // entirely the wrong reason.
+    expect(screen.getByRole('checkbox', { name: /working at heights/i })).toBeInTheDocument();
     expect(concatText(container)).not.toMatch(/no current certificate of fitness/i);
   });
 
@@ -251,5 +258,109 @@ describe('HsCheckinSteps', () => {
       await Promise.resolve();
     });
     expect(concatText(container).trim()).toBe('');
+  });
+  it('pre-selects the sticky site default so the common case is one tap', async () => {
+    fetchMock.mockResolvedValueOnce(
+      bootstrapResponse({
+        projects: [P1],
+        default_project_id: P1.id,
+        default_work_location: 'site',
+      })
+    );
+
+    await renderSteps();
+
+    await waitFor(() => expect(screen.getByText(P1.project_name)).toBeVisible());
+    // aria-pressed is how LocationOption expresses selection, and it is keyed
+    // on BOTH location and projectId — so this fails if either half is unset.
+    expect(screen.getByRole('button', { name: P1.project_name })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Office' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    // The fit question only appears once a location is set — proof the default
+    // moved the flow forward rather than merely tinting a button.
+    expect(screen.getByRole('button', { name: 'Yes, I am' })).toBeInTheDocument();
+  });
+
+  it('pre-selects Office for a worker whose last declaration was an office day', async () => {
+    fetchMock.mockResolvedValueOnce(
+      bootstrapResponse({
+        projects: [P1],
+        default_project_id: null,
+        default_work_location: 'office',
+      })
+    );
+
+    await renderSteps();
+
+    await waitFor(() => expect(screen.getByText('Office')).toBeVisible());
+    expect(screen.getByRole('button', { name: 'Office' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: P1.project_name })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.getByRole('button', { name: 'Yes, I am' })).toBeInTheDocument();
+  });
+
+  it('nothing is pre-selected when the worker has no previous declaration', async () => {
+    fetchMock.mockResolvedValueOnce(bootstrapResponse({ projects: [P1] }));
+
+    await renderSteps();
+
+    await waitFor(() => expect(screen.getByText('Office')).toBeVisible());
+    // Anchored by the two assertions above having something to look at: the
+    // buttons are rendered, they are simply not pressed.
+    expect(screen.getByRole('button', { name: 'Office' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: P1.project_name })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.queryByRole('button', { name: 'Yes, I am' })).not.toBeInTheDocument();
+  });
+
+  it('fails open when the bootstrap REJECTS, rather than stranding the worker', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('network'));
+
+    const { onDone, container } = await renderSteps();
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    // Renders nothing itself — the caller is now responsible for the screen.
+    expect(concatText(container).trim()).toBe('');
+  });
+
+  it('fails open when the bootstrap NEVER SETTLES, once the timeout expires', async () => {
+    vi.useFakeTimers();
+    try {
+      // The failure this bounds: a fetch that neither resolves nor rejects, so
+      // no .catch ever runs. Without a timeout the worker sits on a blank
+      // screen with a committed clock-in.
+      fetchMock.mockImplementation(() => new Promise(() => {}));
+
+      const onDone = vi.fn();
+      let container!: HTMLElement;
+      await act(async () => {
+        container = render(
+          <HsCheckinSteps attendanceEntryId="entry-1" gps={null} onDone={onDone} />
+        ).container;
+      });
+
+      // Before the timeout: still waiting, and onDone has NOT been called —
+      // this is what makes the assertion after it meaningful rather than a
+      // foregone conclusion.
+      expect(onDone).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(HS_BOOTSTRAP_TIMEOUT_MS + 1);
+      });
+
+      expect(onDone).toHaveBeenCalled();
+      expect(concatText(container).trim()).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

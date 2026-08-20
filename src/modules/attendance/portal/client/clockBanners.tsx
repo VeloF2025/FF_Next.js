@@ -3,7 +3,7 @@
  * clockSteps so each file stays focused and under the line cap.
  */
 
-import { XCircle } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
 
 export function QueueUnavailableBanner() {
   return (
@@ -64,6 +64,33 @@ export function QueueSyncIssuesBanner({ failureCount }: { failureCount: number }
     <div className="rounded-lg bg-amber-950/40 border border-amber-800 px-3 py-2 text-sm text-amber-200 mb-3">
       {failureCount} other queued event{failureCount === 1 ? '' : 's'}{' '}
       {failureCount === 1 ? 'was' : 'were'} not submitted.
+    </div>
+  );
+}
+
+/**
+ * Shown above the inline H&S declaration, between a committed clock-in and the
+ * full SuccessView.
+ *
+ * Deliberately NOT SuccessView: that view carries a Done button, and offering
+ * an exit here would let a worker leave before declaring — the exact gap this
+ * flow closes. This is a statement that the shift is recorded, nothing more,
+ * so a worker whose declaration stalls or fails is never left wondering
+ * whether they are on the clock.
+ */
+export function ClockInRecordedBanner({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      className="rounded-lg bg-emerald-950/40 border border-emerald-800 px-3 py-2 mb-3 flex items-start gap-2 text-emerald-200"
+    >
+      <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+      <div>
+        <div className="text-sm font-semibold">{message}</div>
+        <div className="text-xs mt-0.5 text-emerald-300/80">
+          Your time is recorded. A few safety questions to finish.
+        </div>
+      </div>
     </div>
   );
 }

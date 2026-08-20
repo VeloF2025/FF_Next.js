@@ -7,6 +7,7 @@
 import {
   YesNo,
   ActivityPicker,
+  CheckinOutcome,
   CHECKIN_CARD,
   type CheckinActivityOption,
 } from '@/modules/health-safety/components/checkin/CheckinPrompts';
@@ -109,5 +110,28 @@ export function HsCheckinSiteQuestions(props: {
         </p>
       </div>
     </>
+  );
+}
+
+/**
+ * The declaration's outcome. The reassurance under a block is the load-bearing
+ * part: a worker told they are "not cleared" seconds after clocking in will
+ * assume the clock-in failed too, and clock in again.
+ */
+export function HsCheckinOutcomeCard(props: {
+  clearance: string;
+  reasons: string[];
+  onDone: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <CheckinOutcome clearance={props.clearance} reasons={props.reasons} onDone={props.onDone} />
+      {props.clearance === 'blocked' && (
+        <p className={`${CHECKIN_CARD} text-sm text-amber-300`}>
+          Your time has been recorded for today&apos;s shift already — that is not affected. Report
+          to your supervisor before you start work.
+        </p>
+      )}
+    </div>
   );
 }

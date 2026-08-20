@@ -12,18 +12,20 @@
 import React from 'react';
 import { log } from '@/lib/logger';
 import {
-  CheckinOutcome,
   CHECKIN_CARD,
   type CheckinActivityOption,
 } from '@/modules/health-safety/components/checkin/CheckinPrompts';
-import { HsCheckinSiteQuestions, LocationOption, FitForDutyCard } from './HsCheckinSiteQuestions';
-
-interface Project {
-  id: string;
-  project_name: string;
-}
-
-type WorkLocation = 'site' | 'office';
+import {
+  HsCheckinSiteQuestions,
+  HsCheckinOutcomeCard,
+  LocationOption,
+  FitForDutyCard,
+} from './HsCheckinSiteQuestions';
+import {
+  fetchHsCheckinBootstrap,
+  type HsCheckinProject as Project,
+  type HsCheckinWorkLocation as WorkLocation,
+} from './hsCheckinBootstrap';
 
 const labelCls = 'block text-sm font-medium text-neutral-200 mb-2';
 
@@ -49,32 +51,42 @@ export function HsCheckinSteps(props: {
   );
 
   React.useEffect(() => {
-    fetch('/api/my/hs/checkin', { credentials: 'include' })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`bootstrap failed: ${r.status}`);
-        return r.json();
-      })
-      .then((j) => {
-        const d = j?.data;
-        if (!d) throw new Error('bootstrap returned no data');
+    const abort = new AbortController();
+    // Aborting stops the request but cannot un-queue a continuation already
+    // scheduled, so guard the setters too.
+    let mounted = true;
+    fetchHsCheckinBootstrap(abort.signal)
+      .then((d) => {
+        if (!mounted) return;
         if (d.completed) {
           props.onDone();
           setSkip(true);
           return;
         }
-        setProjects(d.projects ?? []);
-        setActivities(d.activities ?? []);
-        setProjectId(d.default_project_id ?? '');
-        setMedicalStatus(d.medical_status ?? null);
+        setProjects(d.projects);
+        setActivities(d.activities);
+        setProjectId(d.defaultProjectId);
+        // Both halves or neither: every button's active state is keyed on the
+        // pair, so a project without a location pre-selects nothing.
+        setLocation(d.defaultWorkLocation);
+        setMedicalStatus(d.medicalStatus);
       })
       .catch((err) => {
-        // A declaration is not payroll-critical — a broken bootstrap must not
-        // block the worker from finishing the clock-in flow.
+        // A declaration is not payroll-critical — a broken or hanging bootstrap
+        // must not block the worker from finishing the clock-in flow. A timeout
+        // lands here too, which is the whole reason one exists.
+        if (!mounted) return;
         log.error('[HsCheckinSteps] bootstrap failed', { err });
         props.onDone();
         setSkip(true);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+      abort.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -121,17 +133,12 @@ export function HsCheckinSteps(props: {
   if (skip || loading) return <></>;
 
   if (outcome) {
-    const blocked = outcome.clearance === 'blocked';
     return (
-      <div className="space-y-3">
-        <CheckinOutcome clearance={outcome.clearance} reasons={outcome.reasons} onDone={props.onDone} />
-        {blocked && (
-          <p className={`${CHECKIN_CARD} text-sm text-amber-300`}>
-            Your time has been recorded for today&apos;s shift already — that is not affected. Report
-            to your supervisor before you start work.
-          </p>
-        )}
-      </div>
+      <HsCheckinOutcomeCard
+        clearance={outcome.clearance}
+        reasons={outcome.reasons}
+        onDone={props.onDone}
+      />
     );
   }
 

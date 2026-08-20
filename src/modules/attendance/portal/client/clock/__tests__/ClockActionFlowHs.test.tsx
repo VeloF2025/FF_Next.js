@@ -102,6 +102,7 @@ function bootstrapResponse() {
         checkin: null,
         projects: [],
         default_project_id: null,
+        default_work_location: null,
         activities: [],
         medical_status: 'current',
       },
@@ -221,5 +222,46 @@ describe('ClockActionFlow — H&S steps', () => {
     });
     await completeHsSteps();
     await waitFor(() => expect(concatText(container)).toMatch(/clocked in/i));
+  });
+  it('confirms the clock-in ABOVE the steps, so a stalled bootstrap is not a blank screen', async () => {
+    // Never settles: the ordinary flaky-mobile failure. Nothing in
+    // HsCheckinSteps will ever render, and no .catch fires within this test's
+    // window — exactly the state that used to leave a worker with a committed
+    // shift and nothing on screen.
+    fetchMock.mockImplementation(() => new Promise(() => {}));
+    let container!: HTMLElement;
+    await act(async () => {
+      container = render(<ClockActionFlow action="in" onDone={vi.fn()} />).container;
+    });
+
+    // The steps really are contributing nothing — this is what makes the
+    // confirmation below the ONLY thing the worker can be seeing.
+    expect(hsStepsSpy).toHaveBeenCalled();
+    expect(concatText(container)).not.toMatch(/where are you working/i);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Clocked in at Lawley FTTH.');
+    expect(concatText(container)).toMatch(/your time is recorded/i);
+
+    // A statement, not an exit: SuccessView's Done button must NOT be here, or
+    // a worker could leave before declaring and re-open the gap this closes.
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+  });
+
+  it('replaces the confirmation banner with the full success view once the declaration is done', async () => {
+    fetchMock.mockResolvedValueOnce(bootstrapResponse());
+    fetchMock.mockResolvedValueOnce(postResponse());
+    await act(async () => {
+      render(<ClockActionFlow action="in" onDone={vi.fn()} />);
+    });
+
+    // Banner present while the declaration is outstanding, Done absent.
+    expect(screen.getByRole('status')).toHaveTextContent('Clocked in at Lawley FTTH.');
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+
+    await completeHsSteps();
+
+    // Now the exit exists, and the interim banner is gone.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument());
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
