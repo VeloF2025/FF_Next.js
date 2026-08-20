@@ -23,6 +23,40 @@ const CATEGORY_BOOST = 0.15; // Bonus when categories match
 
 export type StockMatchMethod = 'supplier_code' | 'fuzzy_description' | 'exact_code' | 'category_rule' | 'manual' | 'none';
 
+/** Lowercase, collapse whitespace. Used to compare a description to a name. */
+function normalizeForExactMatch(value: string | null | undefined): string {
+  return (value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The split ratio of a splitter, as a normalised "1:N", or null.
+ *
+ * Written three ways in this data: "1:16 Bare Fibre Splitter" in descriptions,
+ * SPLIT-BF-1-16 in codes, and "Splitter.Bare.SM.G657A1.1:8" in dot-separated
+ * BOQ text — hence a dot may precede the 1. The trailing `(?![\d.])` keeps
+ * "BRACKET-1-16.5" from reading as 1:16, since that is a measurement; the
+ * leading non-digit keeps "11:8" from being read as 1:8.
+ */
+export function extractSplitRatio(value: string | null | undefined): string | null {
+  const match = (value ?? '').match(/(?:^|[^\d])1\s*[:\-/]\s*(\d{1,3})(?![\d.])/);
+  return match ? `1:${match[1]}` : null;
+}
+
+/**
+ * True when both sides name a split ratio and the ratios differ.
+ *
+ * A conflicting ratio is not a weak signal to be outscored — a 1:16 splitter
+ * is not a 1:2 splitter, and receiving one as the other puts the wrong item
+ * into stock. Fuzzy scoring rewarded agreement without ever punishing
+ * disagreement, so the ratio was free to lose to string similarity. This vetoes
+ * the candidate outright instead. Silence on either side vetoes nothing.
+ */
+export function ratiosConflict(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = extractSplitRatio(a);
+  const right = extractSplitRatio(b);
+  return left !== null && right !== null && left !== right;
+}
+
 export interface StockItem {
   id: string;
   itemCode: string;
@@ -178,6 +212,33 @@ export class StockMatcher {
       }
     }
 
+    // Stage 1d: exact name match.
+    //
+    // A description that IS a stock item's name is the strongest signal there
+    // is, and until now nothing looked for it — only codes were compared
+    // exactly, so these fell through to fuzzy scoring. That is not a
+    // theoretical loss: fuzzy ranked "1:16 Bare Fibre Splitter" as
+    // SPLIT-BF-1-2 (0.65) with the identically-named SPLIT-BF-1-16 LAST at
+    // 0.62, because normalised Levenshtein favours shorter names and the
+    // ratio contributes almost nothing to keyword overlap.
+    const normalizedDescription = normalizeForExactMatch(boqItem.description);
+    if (normalizedDescription) {
+      const nameMatches = stockItems.filter(
+        s => normalizeForExactMatch(s.name) === normalizedDescription
+      );
+      // Only when it identifies ONE item. Two stock items sharing a name is a
+      // catalogue problem, and guessing between them is how the wrong stock
+      // gets received.
+      if (nameMatches.length === 1) {
+        return {
+          ...baseResult,
+          stockItem: nameMatches[0]!,
+          matchMethod: 'exact_code',
+          matchConfidence: SUPPLIER_CODE_CONFIDENCE,
+        };
+      }
+    }
+
     // Stage 2: Fiber domain match (category + parameter matching)
     const domainResult = fiberDomainMatch(
       { description: boqItem.description, category: boqItem.category, itemCode: boqItem.itemCode },
@@ -200,7 +261,15 @@ export class StockMatcher {
 
     const candidates: Array<{ stockItem: StockItem; score: number }> = [];
 
+    const boqRatioText = `${boqItem.description} ${boqItem.itemCode ?? ''}`;
+
     for (const si of stockItems) {
+      // A conflicting split ratio disqualifies the candidate outright — see
+      // ratiosConflict. Checked before scoring so it cannot be outweighed.
+      if (ratiosConflict(boqRatioText, `${si.name} ${si.itemCode} ${si.description ?? ''}`)) {
+        continue;
+      }
+
       const siKeywords = stockKeywordsMap.get(si.id) || [];
       const siCategoryNorm = si.category ? si.category.toLowerCase().trim() : '';
 
