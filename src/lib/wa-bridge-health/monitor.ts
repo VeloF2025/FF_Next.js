@@ -156,9 +156,9 @@ const REMEDY: Record<Exclude<BridgeVerdict, 'healthy'>, string[]> = {
  * This used to be one blanket line on every alert: "DR submissions and photos
  * from every monitored group are being dropped". For a logout that is true. For
  * `unreachable` it is an unfounded claim — the bridge may be up and ingesting
- * normally while only the probe path is broken, which is what all 124 of the
+ * normally while only the probe path is broken, which is what all 128 of the
  * `unreachable` pages between 2026-08-03 and 2026-08-20 turned out to be. An
- * alert that overstates impact 124 times trains people to ignore the one that
+ * alert that overstates impact 89 times trains people to ignore the one that
  * does not, so each verdict now states only what is actually known.
  */
 const IMPACT: Record<Exclude<BridgeVerdict, 'healthy'>, string[]> = {

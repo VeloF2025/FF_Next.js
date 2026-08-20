@@ -1,11 +1,11 @@
 /**
  * Reaching the bridge's /health endpoint from off-box, with retries.
  *
- * Why retries exist: between 2026-08-03 and 2026-08-20 this monitor fired 124
- * "bridge UNREACHABLE — ACTION NEEDED" pages. Every one of them was wrong. The
- * bridge's own on-box healthcheck logged `healthy` at the same minute, in every
- * case, and `whatsapp-bridge.service` ran 20 days with zero restarts and a
- * valid session throughout.
+ * Why retries exist: between 2026-08-03 and 2026-08-20 this monitor sent 89
+ * "bridge UNREACHABLE — ACTION NEEDED" pages, off 128 `unreachable` verdicts.
+ * Every one of them was wrong. The bridge's own on-box healthcheck logged
+ * `healthy` at the same minute, in every case, and `whatsapp-bridge.service`
+ * ran 20 days with zero restarts and a valid session throughout.
  *
  * The cause was a single-shot 8-second fetch across the public internet from
  * velo to the Hostinger VPS. Median round trip on that path is ~320 ms, so an
@@ -26,6 +26,7 @@
  * @module lib/wa-bridge-health/probe
  */
 
+import { log } from '@/lib/logger';
 import type { BridgeHealthPayload } from './monitor';
 
 /** Read a positive integer from env, falling back when unset or malformed. */
@@ -93,21 +94,34 @@ export function probeBudgetMs(
  */
 export function resolveProbeConfig(opts: ProbeOptions = {}): ProbeConfig {
   const url = opts.url ?? process.env.WA_BRIDGE_HEALTH_URL ?? DEFAULT_BRIDGE_HEALTH_URL;
-  const timeoutMs = clamp(
-    opts.timeoutMs ?? envInt('WA_BRIDGE_PROBE_TIMEOUT_MS', 5000),
-    LIMITS.timeoutMs,
-  );
-  const backoffMs = clamp(
-    opts.backoffMs ?? envInt('WA_BRIDGE_PROBE_BACKOFF_MS', 1500),
-    LIMITS.backoffMs,
-  );
-  let attempts = clamp(opts.attempts ?? envInt('WA_BRIDGE_PROBE_ATTEMPTS', 3), LIMITS.attempts);
 
-  while (
-    attempts > LIMITS.attempts.min &&
-    probeBudgetMs({ attempts, timeoutMs, backoffMs }) > PROBE_BUDGET_MS
-  ) {
-    attempts -= 1;
+  // Clamping applies to ENV ONLY. The hazard being defended against is an
+  // operator typo in a env file that nothing type-checks; an explicit argument
+  // is code, written deliberately, and silently returning something other than
+  // what the caller asked for would be its own trap. Production passes neither
+  // — the handler supplies only `onAttemptFailure` — so the budget guarantee
+  // below still holds for every real invocation.
+  const timeoutMs =
+    opts.timeoutMs ?? clamp(envInt('WA_BRIDGE_PROBE_TIMEOUT_MS', 5000), LIMITS.timeoutMs);
+  const backoffMs =
+    opts.backoffMs ?? clamp(envInt('WA_BRIDGE_PROBE_BACKOFF_MS', 1500), LIMITS.backoffMs);
+  let attempts = opts.attempts ?? clamp(envInt('WA_BRIDGE_PROBE_ATTEMPTS', 3), LIMITS.attempts);
+
+  if (opts.attempts === undefined) {
+    const requested = attempts;
+    while (
+      attempts > LIMITS.attempts.min &&
+      probeBudgetMs({ attempts, timeoutMs, backoffMs }) > PROBE_BUDGET_MS
+    ) {
+      attempts -= 1;
+    }
+    // Never shed in silence: an operator who set ATTEMPTS=9 and sees 3 in the
+    // cron log needs to find out here why, not by reading this function.
+    if (attempts !== requested) {
+      log.warn('WA bridge probe attempts reduced to fit the caller budget', {
+        requested, attempts, timeoutMs, backoffMs, budgetMs: PROBE_BUDGET_MS,
+      }, 'WaBridgeHealth');
+    }
   }
 
   return { url, attempts, timeoutMs, backoffMs };

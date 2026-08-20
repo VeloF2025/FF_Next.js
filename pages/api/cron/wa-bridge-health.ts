@@ -38,14 +38,14 @@ import { probeBridgeHealth } from '@/lib/wa-bridge-health/probe';
  *
  * The retrying probe already absorbs a single stalled request. This gate covers
  * the case where a whole tick's worth of attempts fails at once — still far more
- * likely to be the velo -> VPS path than a dead bridge, on the evidence: 124
- * `unreachable` verdicts between 2026-08-03 and 2026-08-20, and the bridge's own
- * on-box healthcheck logged `healthy` for every one of them.
+ * likely to be the velo -> VPS path than a dead bridge, on the evidence: 128
+ * `unreachable` verdicts between 2026-08-03 and 2026-08-20 — 89 of which paged —
+ * and the bridge's own on-box healthcheck logged `healthy` for every one of them.
  *
  * The cost is honest and must not be glossed over: a genuinely dead VPS is now
- * reported one tick later, up to 5 minutes. Set against the failures this
- * monitor exists to catch — 80 minutes on 2026-07-30, a whole 06:00 window on
- * 2026-07-28 — 5 minutes is cheap, and 124 false pages that each claimed field
+ * reported two ticks later, 10 minutes. Set against the failures this monitor
+ * exists to catch — 80 minutes on 2026-07-30, a whole 06:00 window on
+ * 2026-07-28 — 10 minutes is cheap, and 89 false pages that each claimed field
  * work was being lost is not.
  *
  * The gate applies to `unreachable` ALONE. `logged_out` and `disconnected` mean
@@ -54,21 +54,40 @@ import { probeBridgeHealth } from '@/lib/wa-bridge-health/probe';
  *
  * A WINDOW, not a consecutive run. Requiring consecutive ticks looks equivalent
  * and is not: a bridge alternating unreachable/healthy every tick — genuinely
- * half down — resets the run on every healthy tick and would never reach the
- * threshold, so it would never page at all. That is a worse failure than the one
- * being fixed, because the old code at least paged. Counting within a short
- * window catches the flap on its second failure while still ignoring the
- * isolated blips that produced all 124 false pages: those were minutes to hours
- * apart, not two inside ten.
+ * half down — resets the run on every healthy tick, never reaches the threshold,
+ * and so would never page at all. That is a worse failure than the one being
+ * fixed, because the old code at least paged.
+ *
+ * These two numbers were not picked by taste. Replaying the 4,646 ticks in
+ * /tmp/wa-bridge-health.log (2026-08-03 to 2026-08-20, 128 `unreachable`
+ * verdicts, every one of them a false alarm) through each candidate gate:
+ *
+ *   gate                    false pages   full outage   50% flap
+ *   no gate (old code)               89       5 min       5 min
+ *   2 consecutive                    25      10 min      never
+ *   2 within 3                       32      10 min      15 min
+ *   3 within 4                       18      15 min      never
+ *   3 within 5  <- this               23      15 min      25 min
+ *
+ * "2 within 3" is worse than the consecutive gate it replaces on the very axis
+ * this endpoint is being fixed for: the log holds 14 pairs of blips exactly one
+ * healthy tick apart, and that gate pages on every one of them. The gates that
+ * score better on false pages do it by reopening the flapping hole — a strict
+ * alternation never reaches 3 inside 4. "3 within 5" is the only setting that
+ * beats the consecutive gate on false alarms AND still catches a flap.
+ *
+ * The boundary this draws is a duty cycle, and it is worth stating plainly: a
+ * bridge unreachable half the ticks pages; one unreachable a third of them (the
+ * log's 16 gaps of 15 minutes) does not. That matches the evidence — every
+ * one-in-three pattern in this log was the velo -> VPS path, not the bridge.
  */
-const UNREACHABLE_TICKS_BEFORE_ALERT = 2;
+const UNREACHABLE_TICKS_BEFORE_ALERT = 3;
 
 /**
- * How far back the gate counts, in ticks. At the cron's 5-minute cadence this is
- * a 15-minute window, so a flapping bridge pages within 10 minutes while two
- * blips a quarter-hour apart still do not.
+ * How far back the gate counts. At the cron's 5-minute cadence this is a
+ * 25-minute window.
  */
-const UNREACHABLE_WINDOW_TICKS = 3;
+export const UNREACHABLE_WINDOW_TICKS = 5;
 
 /**
  * Re-alert interval for a continuing outage. A logout is not self-healing, so a
@@ -85,7 +104,7 @@ const REALERT_MS = 30 * 60 * 1000;
  *   - if the bridge is already down at restart, `downSince` reseeds to the
  *     restart time, so the recovery alert under-reports total downtime;
  *   - the unreachable window empties, so an ongoing unreachable outage has to
- *     re-earn its second tick — up to one extra tick, 5 minutes, of delay per
+ *     re-earn its threshold — up to two extra ticks, 10 minutes, of delay per
  *     restart.
  *
  * The third only exists since the confirmation gate was added and is the reason

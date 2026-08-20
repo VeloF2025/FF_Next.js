@@ -6,7 +6,7 @@ vi.mock('@/lib/wa-bridge-health/alert', () => ({
   dispatchBridgeAlert: (...args: unknown[]) => dispatchBridgeAlert(...args),
 }));
 
-import handler, { __resetStateForTests } from '../wa-bridge-health';
+import handler, { __resetStateForTests, UNREACHABLE_WINDOW_TICKS } from '../wa-bridge-health';
 
 const SECRET = 'test-cron-secret';
 
@@ -291,29 +291,46 @@ describe('unreachable confirmation gate', () => {
     expect(res.body.unreachableInWindow).toBe(1);
   });
 
-  it('pages once the second tick confirms it', async () => {
+  it('pages once the third tick confirms it', async () => {
     bridgeUnreachable();
     await handler(req(), mockRes());
-    const second = mockRes();
-    await handler(req(), second);
+    await handler(req(), mockRes());
+    const third = mockRes();
+    await handler(req(), third);
 
     expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
-    expect(second.body.alertSuppressed).toBe(false);
-    expect(second.body.unreachableInWindow).toBe(2);
+    expect(third.body.alertSuppressed).toBe(false);
+    expect(third.body.unreachableInWindow).toBe(3);
   });
 
   it('drops a blip out of the window, so isolated stalls never accumulate', async () => {
     bridgeUnreachable();
     await handler(req(), mockRes());          // held
     bridgeReturns(HEALTHY);
-    await handler(req(), mockRes());
-    await handler(req(), mockRes());          // blip now aged out of the window
+    for (let i = 0; i < UNREACHABLE_WINDOW_TICKS; i++) await handler(req(), mockRes());
     bridgeUnreachable();
-    const fourth = mockRes();
-    await handler(req(), fourth);             // 1 again, not 2
+    const later = mockRes();
+    await handler(req(), later);              // 1 again — the blip has aged out
 
     expect(dispatchBridgeAlert).not.toHaveBeenCalled();
-    expect(fourth.body.unreachableInWindow).toBe(1);
+    expect(later.body.unreachableInWindow).toBe(1);
+  });
+
+  // The exact pattern the log is full of: two stalls one clean tick apart, 14 of
+  // them across the 17 days, every one a false alarm. A 2-within-3 gate pages on
+  // all 14. This is the boundary that setting is wrong about.
+  it('does not page for two blips separated by a healthy tick', async () => {
+    bridgeUnreachable();
+    await handler(req(), mockRes());
+    bridgeReturns(HEALTHY);
+    await handler(req(), mockRes());
+    bridgeUnreachable();
+    const third = mockRes();
+    await handler(req(), third);
+
+    expect(dispatchBridgeAlert).not.toHaveBeenCalled();
+    expect(third.body.alertSuppressed).toBe(true);
+    expect(third.body.unreachableInWindow).toBe(2);
   });
 
   // Regression for the gate's own failure mode. A consecutive-run counter resets
@@ -321,17 +338,18 @@ describe('unreachable confirmation gate', () => {
   // healthy, unreachable, healthy — would never reach the threshold and would
   // never page at all, which is worse than the false pages being fixed.
   it('pages a flapping bridge, which a consecutive-run counter would never catch', async () => {
+    for (const healthy of [false, true, false, true]) {
+      healthy ? bridgeReturns(HEALTHY) : bridgeUnreachable();
+      await handler(req(), mockRes());
+      expect(dispatchBridgeAlert).not.toHaveBeenCalled();
+    }
     bridgeUnreachable();
-    await handler(req(), mockRes());          // held
-    bridgeReturns(HEALTHY);
-    await handler(req(), mockRes());          // a run counter resets here
-    bridgeUnreachable();
-    const third = mockRes();
-    await handler(req(), third);              // 2 within 3 ticks — pages
+    const fifth = mockRes();
+    await handler(req(), fifth);              // 3 within 5 — pages
 
     expect(dispatchBridgeAlert).toHaveBeenCalledOnce();
-    expect(third.body.alertSuppressed).toBe(false);
-    expect(third.body.unreachableInWindow).toBe(2);
+    expect(fifth.body.alertSuppressed).toBe(false);
+    expect(fifth.body.unreachableInWindow).toBe(3);
   });
 
   // The failure this monitor exists for must not be slowed down by the gate.
@@ -383,16 +401,19 @@ describe('unreachable confirmation gate', () => {
     await handler(req(), mockRes());          // t+0, held
 
     vi.setSystemTime(new Date(start + 5 * 60 * 1000));
-    await handler(req(), mockRes());          // t+5, pages
+    await handler(req(), mockRes());          // t+5, held
 
     vi.setSystemTime(new Date(start + 10 * 60 * 1000));
-    bridgeReturns(HEALTHY);
-    await handler(req(), mockRes());          // t+10, all-clear
+    await handler(req(), mockRes());          // t+10, pages
 
-    // 10 minutes of observed downtime, not the 5 since the page went out.
+    vi.setSystemTime(new Date(start + 15 * 60 * 1000));
+    bridgeReturns(HEALTHY);
+    await handler(req(), mockRes());          // t+15, all-clear
+
+    // 15 minutes of observed downtime, not the 5 since the page went out.
     const subject = String(dispatchBridgeAlert.mock.calls.at(-1)![0]);
     expect(subject).toContain('RECOVERED');
-    expect(subject).toContain('10 min');
+    expect(subject).toContain('15 min');
   });
 
   it('retries before giving up, and reports how many attempts it took', async () => {
