@@ -125,6 +125,7 @@ export default withMySession(async (req, res, session) => {
     const withoutPermit = await findActivitiesWithoutPermit(projectId, activities, today);
 
     const decision = deriveClearance({
+      work_location: 'site',
       fit_for_duty: body.fit_for_duty,
       ppe_complete: body.ppe_complete,
       declared_activities: activities,

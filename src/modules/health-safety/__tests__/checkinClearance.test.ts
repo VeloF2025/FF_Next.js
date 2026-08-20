@@ -27,6 +27,7 @@ import {
 
 function input(over: Partial<ClearanceInput> = {}): ClearanceInput {
   return {
+    work_location: 'site',
     fit_for_duty: true,
     ppe_complete: true,
     declared_activities: [],

@@ -11,6 +11,13 @@
 /** How the declaration reached us. */
 export type CheckinCaptureMode = 'self' | 'crew_lead';
 
+/**
+ * Where the worker declared they are working today. Office declarations skip
+ * the site questions entirely — PPE and plant work are not desk risks — so
+ * this drives both the question set and the clearance rules.
+ */
+export type CheckinWorkLocation = 'site' | 'office';
+
 /** Mirrors the hs_daily_checkins.clearance DB CHECK — kept in sync by a ratchet test. */
 export type CheckinClearance = 'cleared' | 'blocked' | 'cleared_by_override';
 
