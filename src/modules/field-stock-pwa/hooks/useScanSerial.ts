@@ -58,17 +58,32 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
   const scannedRef = useRef(scanned);
   useEffect(() => { scannedRef.current = scanned; }, [scanned]);
 
+  /**
+   * The ONLY way this hook mutates the scanned list.
+   *
+   * Writes the ref synchronously as well as calling onChange, because the
+   * passive effect above does not run until after the next render — and a
+   * removal tap or a second resolution can land before that. Any site that
+   * calls onChange directly would read a stale ref and clobber whatever
+   * happened in that window, which is the bug this whole ref exists to stop.
+   */
+  const commit = useCallback(
+    (next: PwaScannedSerial[]) => {
+      scannedRef.current = next;
+      onChange(next);
+    },
+    [onChange],
+  );
+
   /** Replace the given rows in the freshest list, matching on serial number. */
   const applyResolved = useCallback(
     (resolved: PwaScannedSerial[]) => {
       const byNumber = new Map(resolved.map((r) => [r.serialNumber, r]));
-      const latest = scannedRef.current;
-      const merged = latest.map((row) => byNumber.get(row.serialNumber) ?? row);
-      // Anything not already present (the row was removed mid-flight) is dropped
-      // rather than resurrected — the storeman's removal wins.
-      onChange(merged);
+      // Rows no longer present were removed mid-flight and are NOT resurrected —
+      // the storeman's removal wins.
+      commit(scannedRef.current.map((row) => byNumber.get(row.serialNumber) ?? row));
     },
-    [onChange],
+    [commit],
   );
 
   const [scanNotice, setScanNotice] = useState<string | null>(null);
@@ -97,9 +112,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         serialNumber, stockItemId: '', stockItemName: '', scannedAt,
         state: 'pending-validation', groupId, groupLabel,
       }));
-      const withPending = [...scannedRef.current, ...pending];
-      scannedRef.current = withPending;
-      onChange(withPending);
+      commit([...scannedRef.current, ...pending]);
 
       let response: Awaited<ReturnType<typeof validateSerialBatch>>;
       try {
@@ -150,7 +163,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
 
       applyResolved(resolved);
     },
-    [scannedSet, stockItem, sourceLocation, onChange, applyResolved],
+    [scannedSet, stockItem, sourceLocation, commit, applyResolved],
   );
 
   const handleRawSerial = useCallback(
@@ -204,9 +217,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         scannedAt: Date.now(),
         state: 'pending-validation',
       };
-      const withOptimistic = [...scannedRef.current, optimistic];
-      scannedRef.current = withOptimistic;
-      onChange(withOptimistic);
+      commit([...scannedRef.current, optimistic]);
 
       let result: Awaited<ReturnType<typeof validateSerial>>;
       try {
@@ -259,17 +270,18 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
 
       applyResolved([resolved]);
     },
-    [scannedSet, stockItem, sourceLocation, onChange, handleBoxScan, applyResolved]
+    [scannedSet, stockItem, sourceLocation, commit, handleBoxScan, applyResolved]
   );
 
   const handleRemove = useCallback(
-    (serialNumber: string) => onChange(scanned.filter((s) => s.serialNumber !== serialNumber)),
-    [scanned, onChange]
+    (serialNumber: string) =>
+      commit(scannedRef.current.filter((s) => s.serialNumber !== serialNumber)),
+    [commit]
   );
 
   const handleRemoveGroup = useCallback(
-    (groupId: string) => onChange(scanned.filter((s) => s.groupId !== groupId)),
-    [scanned, onChange]
+    (groupId: string) => commit(scannedRef.current.filter((s) => s.groupId !== groupId)),
+    [commit]
   );
 
   return { handleRawSerial, handleRemove, handleRemoveGroup, scanNotice, clearScanNotice };

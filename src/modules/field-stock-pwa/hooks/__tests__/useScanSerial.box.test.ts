@@ -292,6 +292,91 @@ describe('useScanSerial overlapping scans', () => {
     expect(new Set(current.map((r) => r.groupId)).size).toBe(2);
   });
 
+  it('does not resurrect a removed row when the removal lands with NO render in between', async () => {
+    // The window that matters: React flushes passive effects after paint, so a
+    // removal tap can land in the same synchronous turn as an already-resolved
+    // fetch continuation. No rerender() here on purpose — a rerender would sync
+    // the ref and close the very race this guards.
+    let release: (v: unknown) => void = () => {};
+    const pending = new Promise((resolve) => { release = resolve; });
+    validateSerialBatchMock.mockImplementationOnce(async () => {
+      await pending;
+      return {
+        results: [
+          { serialNumber: 'ALCLB49486FF', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+          { serialNumber: 'ALCLB4948758', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+        ],
+      };
+    });
+
+    let current: PwaScannedSerial[] = [];
+    const onChange = vi.fn((next: PwaScannedSerial[]) => { current = next; });
+    const { result, rerender } = renderHook(
+      ({ scanned }) => useScanSerial({ stockItem: STOCK_ITEM, scanned, onChange, sourceLocation: GARSTFONTEIN }),
+      { initialProps: { scanned: current } },
+    );
+
+    let scan: Promise<void>;
+    await act(async () => { scan = result.current.handleRawSerial('ALCLB49486FF;ALCLB4948758'); });
+    rerender({ scanned: current });
+
+    // Remove and resolve inside ONE act, so no render happens between them.
+    await act(async () => {
+      result.current.handleRemove('ALCLB4948758');
+      release(null);
+      await scan!;
+    });
+
+    expect(current.map((r) => r.serialNumber)).toEqual(['ALCLB49486FF']);
+  });
+
+  it('keeps a mid-flight removal when a second batch resolves after it', async () => {
+    // Two cartons in flight; the storeman removes a row from the first, then the
+    // second resolves. The removal must survive the second resolution's write.
+    let releaseB: (v: unknown) => void = () => {};
+    const bPending = new Promise((resolve) => { releaseB = resolve; });
+    validateSerialBatchMock
+      .mockImplementationOnce(async () => ({
+        results: [
+          { serialNumber: 'ALCLB49486FF', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+          { serialNumber: 'ALCLB4948758', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+        ],
+      }))
+      .mockImplementationOnce(async () => {
+        await bPending;
+        return {
+          results: [
+            { serialNumber: 'ALCLB4949DEF', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+            { serialNumber: 'ALCLB4949F2F', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+          ],
+        };
+      });
+
+    let current: PwaScannedSerial[] = [];
+    const onChange = vi.fn((next: PwaScannedSerial[]) => { current = next; });
+    const { result, rerender } = renderHook(
+      ({ scanned }) => useScanSerial({ stockItem: STOCK_ITEM, scanned, onChange, sourceLocation: GARSTFONTEIN }),
+      { initialProps: { scanned: current } },
+    );
+
+    await act(async () => { await result.current.handleRawSerial('ALCLB49486FF;ALCLB4948758'); });
+    rerender({ scanned: current });
+
+    let scanB: Promise<void>;
+    await act(async () => { scanB = result.current.handleRawSerial('ALCLB4949DEF;ALCLB4949F2F'); });
+    rerender({ scanned: current });
+
+    await act(async () => {
+      result.current.handleRemove('ALCLB4948758');
+      releaseB(null);
+      await scanB!;
+    });
+
+    expect(current.map((r) => r.serialNumber).sort()).toEqual(
+      ['ALCLB49486FF', 'ALCLB4949DEF', 'ALCLB4949F2F'],
+    );
+  });
+
   it('does not resurrect a row the storeman removed while it was validating', async () => {
     let release: (v: unknown) => void = () => {};
     const pending = new Promise((resolve) => { release = resolve; });
