@@ -1,5 +1,9 @@
+import { createLogger } from '@/lib/logger';
 import { query, type SqlRow } from '@/lib/db-pool';
+import { HighLevelRequestError } from './ghlClient';
 import { ENROLLED_TAG, READY_TAG } from './types';
+
+const logger = createLogger('velocity-review:stale-handshakes');
 
 export interface StaleHandshakeRow {
   id: string;
@@ -79,7 +83,18 @@ export async function sweepStalledHandshakes(
     let removed = attempted.get(contactId);
     if (removed === undefined) {
       removed = await deps.ghl.removeTags(contactId, [READY_TAG, ENROLLED_TAG])
-        .then(() => true).catch(() => false);
+        .then(() => true)
+        .catch((error: unknown) => {
+          // The row keeps only a `tags_left` marker, and on 2026-08-03 a bare code with
+          // no status left 225 rows untriageable. The status is not recorded anywhere
+          // else, so log it here. Contact ids are GHL-side and carry no phone number.
+          logger.warn('Velocity review stale handshake tag removal failed', {
+            exportId: row.id, contactId,
+            status: error instanceof HighLevelRequestError ? error.status : null,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+          return false;
+        });
       attempted.set(contactId, removed);
     }
     if (!removed) await deps.exports.markHandshakeTagsLeft(row.id);

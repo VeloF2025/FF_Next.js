@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ query: vi.fn() }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), warn: vi.fn() }));
+
+vi.mock('@/lib/logger', () => ({
+  createLogger: () => ({ warn: mocks.warn, info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+}));
 
 vi.mock('@/lib/db-pool', () => ({
   query: mocks.query,
@@ -12,6 +16,7 @@ import {
   expireStalledHandshakes, markHandshakeTagsLeft, sweepStalledHandshakes,
   type StaleHandshakeRow,
 } from '../staleHandshakes';
+import { HighLevelRequestError } from '../ghlClient';
 import { ENROLLED_TAG, READY_TAG } from '../types';
 
 function sweepDeps(expired: StaleHandshakeRow[], removeTags = vi.fn(async () => undefined)) {
@@ -148,6 +153,23 @@ describe('sweepStalledHandshakes', () => {
 
     expect(removeTags).toHaveBeenCalledTimes(1);
     expect(deps.exports.markHandshakeTagsLeft.mock.calls).toEqual([['a'], ['b']]);
+  });
+
+  it('logs the GHL status behind a removal it could not complete', async () => {
+    const removeTags = vi.fn(async () => {
+      throw new HighLevelRequestError('rate limited', 429, true, false);
+    });
+    const deps = sweepDeps([{ id: 'a', ghlContactId: 'contact-a' }], removeTags);
+    mocks.warn.mockClear();
+
+    await sweepStalledHandshakes(new Date(), new Date(), deps);
+
+    // A bare error code with no status left 225 rows untriageable on 2026-08-03, and
+    // the status is recorded nowhere else once the promise is swallowed.
+    expect(mocks.warn).toHaveBeenCalledTimes(1);
+    expect(mocks.warn.mock.calls[0][1]).toMatchObject({
+      exportId: 'a', contactId: 'contact-a', status: 429,
+    });
   });
 
   it('does not mark rows on a contact whose removal succeeded', async () => {
