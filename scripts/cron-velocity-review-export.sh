@@ -62,7 +62,10 @@ counts = data.get("counts", {})
 dates = ",".join(str(item.get("targetDate", "")) for item in data.get("dates", []) if item.get("targetDate")) or "none"
 # A blocked run reports dates=none and every count at zero, which reads exactly
 # like a quiet day. Name the reason so the log says why nothing was exported.
-reason = f" reason={data['reason']}" if data.get("reason") else ""
+# Double quotes only: this block is embedded in a bash single-quoted string, so a
+# literal apostrophe would close it and the shell would strip it from the source.
+blocked_reason = data.get("reason")
+reason = f" reason={blocked_reason}" if blocked_reason else ""
 discovered = int(counts.get("candidate_total", 0))
 duplicates = int(counts.get("duplicates", 0))
 quarantined = int(counts.get("quarantined", 0))

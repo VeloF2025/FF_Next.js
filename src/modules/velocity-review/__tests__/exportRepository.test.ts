@@ -270,6 +270,26 @@ describe('expireStalledHandshakes', () => {
     expect(sql).toContain("state = 'permanent_failure'");
   });
 
+  it('leaves a row alone while its own retry is still scheduled', async () => {
+    mocks.query.mockResolvedValue([]);
+
+    await expireStalledHandshakes(new Date('2026-08-19T09:00:00.000Z'));
+
+    // nextRetryAt honours an uncapped GHL Retry-After, so a pending next_attempt_at
+    // can outlive the stale window; expiring it would drop a live retry.
+    const [sql] = mocks.query.mock.calls[0];
+    expect(sql).toContain('next_attempt_at IS NULL OR next_attempt_at <= NOW()');
+  });
+
+  it('does not prefix a bare handshake code with a colon', async () => {
+    mocks.query.mockResolvedValue([]);
+
+    await expireStalledHandshakes(new Date());
+
+    const [sql] = mocks.query.mock.calls[0];
+    expect(sql).toContain("COALESCE(error_code || ':', '') || 'handshake_expired'");
+  });
+
   it('reports zero when nothing is stale', async () => {
     mocks.query.mockResolvedValue([]);
     await expect(expireStalledHandshakes(new Date())).resolves.toBe(0);

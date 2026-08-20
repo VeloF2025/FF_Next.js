@@ -274,24 +274,25 @@ export async function transitionExportState(
   return row ? mapExport(row) : null;
 }
 
-// `ambiguous` and `ack_cleanup_pending` park a row whose GHL mutation may or may
-// not have landed, so neither is ever re-claimed — a blind retry risks a duplicate
-// customer message. Correct for the handshake, fatal for the run: finishDate reads
-// both as incomplete, so the date never reaches `complete`, stays due forever, and
-// trips the 7-day gap guard that blocks the export for every date. Live 2026-08-15
-// to 08-20, six days, nothing exported. Past this window the handshake is over, so
-// resolve it terminally — it also holds the one-phone-inflight index, blocking any
-// later install at that number.
+// `ambiguous` and `ack_cleanup_pending` park a row whose GHL mutation may or may not
+// have landed, so neither is re-claimed — a blind retry risks a duplicate customer
+// message. Correct for the handshake, fatal for the run: finishDate reads both as
+// incomplete, so the date never reaches `complete`, stays due forever, and trips the
+// 7-day gap guard that blocks every date. Live 2026-08-15 to 08-20: six days, nothing
+// exported. Past this window the handshake is over, so resolve it terminally, freeing
+// the one-phone-inflight index for any later install. A row whose own retry is still
+// scheduled is left alone — nextRetryAt caps nothing above a GHL Retry-After header.
 export async function expireStalledHandshakes(cutoff: Date): Promise<number> {
   const rows = await query<{ id: string } & SqlRow>(`
     UPDATE velocity_review_exports
     SET state = 'permanent_failure',
-        error_code = COALESCE(error_code, '') || ':handshake_expired',
+        error_code = COALESCE(error_code || ':', '') || 'handshake_expired',
         next_attempt_at = NULL,
         completed_at = COALESCE(completed_at, NOW()),
         updated_at = NOW()
     WHERE state IN ('ambiguous', 'ack_cleanup_pending')
       AND updated_at < $1
+      AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
     RETURNING id
   `, [cutoff]);
   return rows.length;
