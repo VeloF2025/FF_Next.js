@@ -86,13 +86,27 @@ function handlePreview(res: NextApiResponse, workbook: any, XLSX: any) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- xlsx untyped
 async function handleImport(res: NextApiResponse, workbook: any, XLSX: any): Promise<void> {
-  const parsed = parseOntGizzuWorkbook(workbook, XLSX);
+  // Warehouses resolved from the database, same as the recurring sync — see
+  // sheetLocation.ts for why a hardcoded map was removed.
+  const locRows = await pool.query<{ id: string; name: string }>(
+    `SELECT id, name FROM stock_locations WHERE location_type = 'warehouse'`,
+  );
+  const parsed = parseOntGizzuWorkbook(workbook, XLSX, locRows.rows);
   const result: ImportResult = {
     ontImported: 0,
     upsImported: 0,
     ontSkipped: 0,
     upsSkipped: 0,
-    errors: parsed.skippedSheets.map((s) => `Unknown project "${s}" — skipped`),
+    // Reason and row cost, not just the tab name: an unresolved tab used to be
+    // indistinguishable from an ignored summary tab.
+    errors: parsed.unresolvedSheets
+      .filter((u) => u.reason !== 'not-a-project')
+      .map(
+        (u) =>
+          `Sheet "${u.sheetName}" not imported (${u.reason}${
+            u.candidates ? `: ${u.candidates.join(', ')}` : ''
+          }) — ${u.rowsLost} row(s) skipped`,
+      ),
     // Per-project counts hold serials actually RECEIVED (inserted), not parsed.
     perProject: {},
   };

@@ -20,6 +20,8 @@ import { randomUUID } from 'node:crypto';
 import { log } from '@/lib/logger';
 import { receiveSerials } from './serialIntake';
 import { parseOntGizzuWorkbook } from './ontSerialWorkbook';
+import type { UnresolvedSheet } from './ontSerialWorkbook';
+import type { LocationRef } from './sheetLocation';
 
 /** Warn if more than this many OES-active ONTs remain unreceived after a sync. */
 const GAP_WARN_THRESHOLD = 50;
@@ -32,6 +34,10 @@ export interface OntSerialSyncReport {
   gizzuReceived: number;
   gizzuSkipped: number;
   skippedSheets: string[];
+  /** Tabs that produced nothing, each with the reason and the rows it cost. */
+  unresolvedSheets: UnresolvedSheet[];
+  /** Serial-bearing rows lost across all unresolved project tabs. */
+  rowsLostToUnresolvedSheets: number;
   /** OES-active ONT serials still not present in stock_serials after this run. */
   oesGapRemaining: number;
   /** True when oesGapRemaining exceeds the warn threshold (source likely stale/incomplete). */
@@ -100,7 +106,27 @@ export async function syncOntSerialsFromSharePoint(pool: Pool): Promise<OntSeria
   const buf = await downloadWorkbook(url);
   const XLSX = await import('xlsx');
   const workbook = XLSX.read(buf, { type: 'buffer' });
-  const parsed = parseOntGizzuWorkbook(workbook, XLSX);
+  // Warehouses come from the database so a new project imports as soon as it
+  // has one — the hardcoded map this replaced dropped whole tabs in silence.
+  const locRows = await pool.query<{ id: string; name: string }>(
+    `SELECT id, name FROM stock_locations WHERE location_type = 'warehouse'`,
+  );
+  const locations: LocationRef[] = locRows.rows;
+
+  const parsed = parseOntGizzuWorkbook(workbook, XLSX, locations);
+
+  // A tab that carries serials but resolves to no warehouse is a real loss, not
+  // a summary tab being ignored. Say so at warn level with the row count.
+  const costly = parsed.unresolvedSheets.filter(
+    (u) => u.reason !== 'not-a-project' && u.rowsLost > 0,
+  );
+  for (const u of costly) {
+    log.warn(
+      'ONT serial sync: tab not imported',
+      { sheet: u.sheetName, reason: u.reason, rowsLost: u.rowsLost, candidates: u.candidates },
+      'ont-serial-sync',
+    );
+  }
 
   const reference = `FT SharePoint Sync ${new Date().toISOString().split('T')[0]}`;
   const sourceId = randomUUID();
@@ -127,6 +153,8 @@ export async function syncOntSerialsFromSharePoint(pool: Pool): Promise<OntSeria
     gizzuReceived: gizzu.received,
     gizzuSkipped: gizzu.skipped,
     skippedSheets: parsed.skippedSheets,
+    unresolvedSheets: parsed.unresolvedSheets,
+    rowsLostToUnresolvedSheets: costly.reduce((n, u) => n + u.rowsLost, 0),
     oesGapRemaining,
     sourceLikelyStale,
   };
