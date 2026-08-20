@@ -89,6 +89,15 @@ describe('resolveSheetLocation', () => {
     });
   });
 
+  it('recognises a punctuated or padded summary tab as not-a-project', () => {
+    // Reported to ops as a failure otherwise, when it is ignored on purpose.
+    for (const variant of ['Info-Sheet', 'info_sheet', 'ALL ', 'A.L.L']) {
+      const result = resolveSheetLocation(variant, LOCATIONS);
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.reason).toBe('not-a-project');
+    }
+  });
+
   it('refuses an unknown tab with a reason instead of skipping silently', () => {
     const result = resolveSheetLocation('Kimberley', LOCATIONS);
     expect(result.ok).toBe(false);

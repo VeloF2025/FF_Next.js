@@ -36,7 +36,14 @@ export type SheetLocationResult =
       candidates?: string[];
     };
 
-/** Tabs that are summaries or documentation, never a project. */
+/**
+ * Tabs that are summaries or documentation, never a project.
+ *
+ * Compared AFTER `normalise()`, same as every other rule — matching on the raw
+ * lowercased name instead would let "Info-Sheet" or "ALL " fall through to the
+ * matching rules and be reported to ops as lost rows, when it is a tab we
+ * ignore on purpose.
+ */
 export const NON_PROJECT_SHEETS: readonly string[] = ['info sheet', 'all'];
 
 /**
@@ -84,11 +91,15 @@ export function resolveSheetLocation(
 ): SheetLocationResult {
   const key = normalise(sheetName);
 
-  if (NON_PROJECT_SHEETS.includes(sheetName.toLowerCase().trim())) {
+  if (NON_PROJECT_SHEETS.some((n) => normalise(n) === key)) {
     return { ok: false, reason: 'not-a-project' };
   }
 
   // 1. Explicit alias wins — it is a recorded human decision.
+  //    NOTE: this deliberately runs before the exact-name check. If a warehouse
+  //    is ever literally renamed to a tab name that has an alias, the alias
+  //    would still redirect it — revisit this ordering then; today no warehouse
+  //    shares a name with an alias key.
   const aliasTarget = aliases[key];
   if (aliasTarget) {
     const target = locations.find((l) => normalise(l.name) === normalise(aliasTarget));
