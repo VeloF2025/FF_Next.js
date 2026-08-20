@@ -1,4 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+const warn = vi.fn();
+vi.mock('@/lib/logger', () => ({
+  log: {
+    warn: (...args: unknown[]) => warn(...args),
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 import {
   probeBridgeHealth,
   probeBudgetMs,
@@ -224,5 +235,55 @@ describe('probeBridgeHealth configuration', () => {
 
     expect(config.attempts).toBe(1);
     expect(config.timeoutMs).toBe(15_000);
+  });
+
+  // The clamp defends against an operator typo in an env file that nothing
+  // type-checks. An explicit argument is code, written deliberately, and
+  // handing back something other than what was asked for is its own trap — so
+  // the two paths must behave differently, and that difference needs pinning.
+  describe('clamping applies to env, not to explicit arguments', () => {
+    it('honours an explicit attempts count instead of shedding it to fit', () => {
+      // Same numbers via env would shed to 1; passed explicitly they stand.
+      const config = resolveProbeConfig({ attempts: 5, timeoutMs: 15_000 });
+
+      expect(config.attempts).toBe(5);
+      expect(probeBudgetMs(config)).toBeGreaterThan(CALLER_BUDGET_MS);
+    });
+
+    it('honours an explicit timeout below the env floor', () => {
+      process.env.WA_BRIDGE_PROBE_TIMEOUT_MS = '1';
+
+      expect(resolveProbeConfig({ timeoutMs: 10 }).timeoutMs).toBe(10);
+      // ...while the env value on the same run is still floored.
+      expect(resolveProbeConfig().timeoutMs).toBe(500);
+    });
+
+    it('honours an explicit backoff above the env ceiling', () => {
+      expect(resolveProbeConfig({ backoffMs: 60_000 }).backoffMs).toBe(60_000);
+      process.env.WA_BRIDGE_PROBE_BACKOFF_MS = '60000';
+      expect(resolveProbeConfig().backoffMs).toBe(5_000);
+    });
+
+    it('warns rather than shedding env attempts in silence', () => {
+      process.env.WA_BRIDGE_PROBE_ATTEMPTS = '5';
+      process.env.WA_BRIDGE_PROBE_TIMEOUT_MS = '15000';
+
+      resolveProbeConfig();
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('attempts reduced'),
+        expect.objectContaining({ requested: 5, attempts: 1 }),
+        expect.anything(),
+      );
+    });
+
+    it('does not warn when the env config already fits', () => {
+      resolveProbeConfig();
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('attempts reduced'),
+        expect.anything(),
+        expect.anything(),
+      );
+    });
   });
 });

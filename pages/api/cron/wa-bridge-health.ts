@@ -62,6 +62,12 @@ import { probeBridgeHealth } from '@/lib/wa-bridge-health/probe';
  * /tmp/wa-bridge-health.log (2026-08-03 to 2026-08-20, 128 `unreachable`
  * verdicts, every one of them a false alarm) through each candidate gate:
  *
+ * The two time columns are worst case, counted from when the bridge actually
+ * went down — which lands up to a full tick before the probe next looks. The
+ * unit tests measure the same scenarios tick-aligned, so they read one tick
+ * lower (a full outage pages at t+10 there, 15 here); both are right, they just
+ * start the clock in different places.
+ *
  *   gate                    false pages   full outage   50% flap
  *   no gate (old code)               89       5 min       5 min
  *   2 consecutive                    25      10 min      never
