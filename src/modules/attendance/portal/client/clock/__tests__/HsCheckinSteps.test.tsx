@@ -7,10 +7,16 @@ import { HsCheckinSteps } from '../HsCheckinSteps';
 
 const P1 = { id: 'proj-1', project_name: 'Lawley FTTH' };
 
+// A real member of MEDICAL_REQUIRED_ACTIVITIES (checkin.types.ts) — not an
+// invented key — so the gate under test is the genuine one, not a stand-in.
+const HEIGHTS_ACTIVITY = { value: 'working_at_heights', label: 'Working at heights', requires_medical: true };
+
 function bootstrapResponse(overrides: {
   projects?: Array<{ id: string; project_name: string }>;
   completed?: boolean;
   default_project_id?: string | null;
+  activities?: Array<{ value: string; label: string; requires_medical: boolean }>;
+  medical_status?: string | null;
 }) {
   return {
     ok: true,
@@ -22,8 +28,8 @@ function bootstrapResponse(overrides: {
         checkin: null,
         projects: overrides.projects ?? [],
         default_project_id: overrides.default_project_id ?? null,
-        activities: [],
-        medical_status: 'current',
+        activities: overrides.activities ?? [],
+        medical_status: overrides.medical_status ?? 'current',
       },
     }),
   };
@@ -170,6 +176,51 @@ describe('HsCheckinSteps', () => {
     await user.click(screen.getByRole('button', { name: 'No, I am not' }));
     expect(concatText(container)).toMatch(/thank you for saying so/i);
     expect(concatText(container)).toMatch(/already recorded/i);
+  });
+
+  it('warns about the missing medical when a medical-gated activity is selected and the certificate is not current', async () => {
+    fetchMock.mockResolvedValueOnce(
+      bootstrapResponse({ projects: [P1], activities: [HEIGHTS_ACTIVITY], medical_status: 'expired' })
+    );
+    const user = userEvent.setup();
+
+    const { container } = await renderSteps();
+
+    await waitFor(() => expect(screen.getByText(P1.project_name)).toBeVisible());
+    await user.click(screen.getByRole('button', { name: P1.project_name }));
+    await user.click(screen.getByRole('checkbox', { name: /working at heights/i }));
+
+    expect(concatText(container)).toMatch(/no current certificate of fitness/i);
+  });
+
+  it('does not warn when the same activity is selected but the certificate is current', async () => {
+    fetchMock.mockResolvedValueOnce(
+      bootstrapResponse({ projects: [P1], activities: [HEIGHTS_ACTIVITY], medical_status: 'current' })
+    );
+    const user = userEvent.setup();
+
+    const { container } = await renderSteps();
+
+    await waitFor(() => expect(screen.getByText(P1.project_name)).toBeVisible());
+    await user.click(screen.getByRole('button', { name: P1.project_name }));
+    await user.click(screen.getByRole('checkbox', { name: /working at heights/i }));
+
+    expect(concatText(container)).not.toMatch(/no current certificate of fitness/i);
+  });
+
+  it('does not warn when no medical-gated activity is selected, even with a lapsed certificate', async () => {
+    fetchMock.mockResolvedValueOnce(
+      bootstrapResponse({ projects: [P1], activities: [HEIGHTS_ACTIVITY], medical_status: 'expired' })
+    );
+    const user = userEvent.setup();
+
+    const { container } = await renderSteps();
+
+    await waitFor(() => expect(screen.getByText(P1.project_name)).toBeVisible());
+    await user.click(screen.getByRole('button', { name: P1.project_name }));
+    // Deliberately do not check the activity checkbox.
+
+    expect(concatText(container)).not.toMatch(/no current certificate of fitness/i);
   });
 
   it('calls onDone and does not block when the POST fails', async () => {
