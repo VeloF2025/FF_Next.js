@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 
 // Note: pon-zip.ts is currently not unit-tested. Project precedent
-// (see pages/api/works-qa/__tests__/photo-snag-api.test.ts) mocks the
+// (see tests/routes/api/works-qa/photo-snag-api.test.ts) mocks the
 // pool import via vi.mock. Follow that pattern.
 
 const { poolMock } = vi.hoisted(() => ({ poolMock: { query: vi.fn() } }));

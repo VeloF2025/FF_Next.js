@@ -6,7 +6,7 @@
  * - Mock execSync for journalctl calls
  * - Test database fixtures
  * 
- * Run with: npm test -- pages/api/__tests__/deployment-health.test.ts
+ * Run with: npm test -- tests/routes/api/deployment-health.test.ts
  */
 
 import { createMocks } from 'node-mocks-http';
