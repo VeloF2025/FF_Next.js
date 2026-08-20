@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PreparedCandidate } from '../types';
 
 const mocks = vi.hoisted(() => ({
+  query: vi.fn(),
   queryOne: vi.fn(),
   transaction: vi.fn(),
 }));
 
 vi.mock('@/lib/db-pool', () => ({
+  query: mocks.query,
   queryOne: mocks.queryOne,
   transaction: mocks.transaction,
 }));

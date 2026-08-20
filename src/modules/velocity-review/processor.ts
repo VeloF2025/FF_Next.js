@@ -3,9 +3,12 @@ import { prepareCandidate } from './candidateService';
 import { cleanupLeaseUntil, processAcknowledgementCleanup } from './acknowledgementCleanup';
 import { recordOneMapConsent } from './consentService';
 import {
-  claimDueAcknowledgementCleanup, claimNextExport, createExport, saveCandidateDecision,
-  transitionExportState, type VelocityReviewExport,
+  claimDueAcknowledgementCleanup, claimNextExport, createExport,
+  saveCandidateDecision, transitionExportState, type VelocityReviewExport,
 } from './exportRepository';
+import {
+  expireStalledHandshakes, markHandshakeTagsLeft, sweepStalledHandshakes,
+} from './staleHandshakes';
 import {
   HighLevelClient, loadVelocityReviewGhlConfig,
 } from './ghlClient';
@@ -40,6 +43,9 @@ export type {
 const RUN_BUDGET_MS = 25 * 60_000;
 const CONTACT_DRAIN_MS = 3 * 60_000;
 const MAX_CONCURRENT_EXPORTS = 4;
+// A parked handshake older than this will never resolve itself; see
+// expireStalledHandshakes for why leaving it pinned deadlocks the whole export.
+const HANDSHAKE_STALE_MS = 24 * 60 * 60_000;
 
 type ClaimedWork = { kind: 'export' | 'cleanup'; row: VelocityReviewExport };
 
@@ -101,6 +107,19 @@ async function lockedRun(deps: ProcessorDependencies): Promise<VelocityReviewRun
   const claimCutoff = runDeadline - limits.contactDrainMs;
   const control = await deps.runs.loadVelocityReviewControl();
   if (!control.automationEnabled && !control.pilotEnabled) return { status: 'disabled', counts: {}, dates: [] };
+  // Maintenance, not date work, so it runs before any early return: a parked
+  // handshake pins its date at `partial`, and it also holds the one-phone-inflight
+  // index against its number. A blocked run is exactly when both keep accruing, so
+  // skipping the sweep there is the one case where it is most needed.
+  //
+  // This does not un-block a run. `gap_older_than_7_days` is keyed on
+  // velocity_review_runs.status, which only a processed date can change, so clearing
+  // export rows cannot lift it — and should not. The guard exists to stop a long
+  // outage messaging customers about installs from weeks ago; lifting it is a human
+  // decision, which is why the cron summary now names the reason.
+  const sweepNow = deps.now();
+  await sweepStalledHandshakes(
+    new Date(sweepNow.getTime() - HANDSHAKE_STALE_MS), sweepNow, deps);
   const completed = await deps.runs.listCompletedRunDates();
   const due = selectDueDates(control, completed, previousDate(sastDate(deps.now())));
   if (due.status === 'disabled') return { status: 'disabled', counts: {}, dates: [] };
@@ -168,7 +187,8 @@ function defaultDependencies(dry: boolean): ProcessorDependencies {
     candidates: { listCandidateRows, prepareCandidate: (row) => prepareCandidate(row, secret) },
     consent: { recordOneMapConsent }, ghl: config ? new HighLevelClient(config) : unavailable,
     exports: { saveCandidateDecision, createExport, claimNextExport,
-      claimDueAcknowledgementCleanup, transitionExportState },
+      claimDueAcknowledgementCleanup, expireStalledHandshakes, markHandshakeTagsLeft,
+      transitionExportState },
     runs: { withVelocityReviewLock, loadVelocityReviewControl, listCompletedRunDates,
       createOrResumeRun, transitionRunStatus }, summary: { send: sendVelocityReviewRunSummary } };
 }

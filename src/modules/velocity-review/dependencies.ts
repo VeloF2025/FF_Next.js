@@ -4,6 +4,7 @@ import type { HighLevelContact, VelocityReviewContactInput } from './ghlClient';
 import type {
   VelocityReviewControl, VelocityReviewRun, VelocityReviewRunStatus,
 } from './runRepository';
+import type { StaleHandshakeRow } from './staleHandshakes';
 import type {
   CandidateDbRow, CandidateDecision, ExportState, PreparedCandidate, RunSummaryCounts,
 } from './types';
@@ -52,6 +53,8 @@ export interface ProcessorDependencies {
     claimNextExport(now: Date, eligibleExportIds: readonly string[]): Promise<VelocityReviewExport | null>;
     claimDueAcknowledgementCleanup(now: Date, eligibleExportIds: readonly string[],
       leaseUntil: Date): Promise<VelocityReviewExport | null>;
+    expireStalledHandshakes(cutoff: Date, now: Date): Promise<StaleHandshakeRow[]>;
+    markHandshakeTagsLeft(id: string): Promise<void>;
     transitionExportState(id: string, expected: ExportState, next: ExportState,
       updates?: ExportTransitionUpdates): Promise<VelocityReviewExport | null>;
   };
