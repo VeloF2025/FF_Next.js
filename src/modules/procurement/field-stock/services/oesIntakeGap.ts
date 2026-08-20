@@ -151,6 +151,12 @@ export async function closeOesIntakeGap(
   // Decide BEFORE receiving. The work this pass would have to promote is what
   // is already stuck plus what the receive is about to create; if that exceeds
   // the cap, receiving first would strand location-less issuable stock.
+  //
+  // `wouldPromote` is an ESTIMATE, not an authoritative preview: it assumes the
+  // receive inserts every row as in_stock and that nothing else becomes
+  // promotable in between. That is deliberate — it is a conservative tripwire,
+  // and the check inside promoteInStock catches any drift between here and
+  // there. Do not read this number as the exact set that will be promoted.
   const { rows: alreadyStuck } = await db.query<GapRow>(PROMOTABLE_SQL, [FT_ONT_ITEM_ID]);
   const wouldPromote = alreadyStuck.length + rows.length;
   if (wouldPromote > MAX_PROMOTIONS_PER_RUN) {
