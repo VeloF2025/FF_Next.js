@@ -26,7 +26,7 @@
  * before dispatching (`./driverNotifications.ts`).
  *
  * Delivery outcome (`delivery_attempted_count`/`_accepted_count`/
- * `_failed_count` — migration 506) is persisted after every notify
+ * `_failed_count` — migration 507) is persisted after every notify
  * attempt, including retries: each call is one attempt, `accepted`/
  * `failed` increment only when `notify()` actually reports that outcome
  * for this attempt. That persistence write runs after commit, outside the

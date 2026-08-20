@@ -1,14 +1,14 @@
 /**
- * Real-Postgres contract for migration 506 (Fleet incident driver input).
- * Mirrors 505's harness: apply the real migration SQL into a disposable
+ * Real-Postgres contract for migration 507 (Fleet incident driver input).
+ * Mirrors 506's harness: apply the real migration SQL into a disposable
  * schema, exercise it against a live Postgres, then roll back.
  *
  * Every assertion here is deliberately one a mocked-Postgres unit test cannot
  * make. The unit suite stubs `pg`, so column-level GRANTs, CHECK constraints
  * and silent identifier truncation are all invisible to it — three Criticals
- * during this work were exactly that class of defect. 506 is applied on top of
- * 505 rather than in isolation, because 506's whole visibility/actor extension
- * is an ALTER of 505's tables and the pair has to compose.
+ * during this work were exactly that class of defect. 507 is applied on top of
+ * 506 rather than in isolation, because 507's whole visibility/actor extension
+ * is an ALTER of 506's tables and the pair has to compose.
  */
 if (!process.env.TEST_DATABASE_URL) {
   throw new Error('Integration test needs TEST_DATABASE_URL set. See .env.local.example.');
@@ -19,13 +19,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool } from 'pg';
 
-const SCHEMA = 'mig506_fleet_incident_driver_input_scratch';
+const SCHEMA = 'mig507_fleet_incident_driver_input_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
 const SCOPED_URL = `${BASE_URL}${BASE_URL.includes('?') ? '&' : '?'}options=${encodeURIComponent(`-c search_path=${SCHEMA}`)}`;
 const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
-const FORWARD_505 = readFileSync(join(SQL_DIR, '505_fleet_operational_incidents.sql'), 'utf8');
-const FORWARD = readFileSync(join(SQL_DIR, '506_fleet_incident_driver_input.sql'), 'utf8');
-const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_506_fleet_incident_driver_input.sql'), 'utf8');
+const FORWARD_506 = readFileSync(join(SQL_DIR, '506_fleet_operational_incidents.sql'), 'utf8');
+const FORWARD = readFileSync(join(SQL_DIR, '507_fleet_incident_driver_input.sql'), 'utf8');
+const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_507_fleet_incident_driver_input.sql'), 'utf8');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
@@ -34,7 +34,7 @@ const PROJECT = '33333333-3333-4333-8333-333333333333';
 const admin = new Pool({ connectionString: BASE_URL, ssl: false, max: 1 });
 const db = new Pool({ connectionString: SCOPED_URL, ssl: false, max: 1 });
 
-/** The six lifecycle columns 506 deliberately makes writable — and only these. */
+/** The six lifecycle columns 507 deliberately makes writable — and only these. */
 const UPDATABLE_REQUEST_COLUMNS = [
   'superseded_at',
   'closed_at',
@@ -69,7 +69,7 @@ const PREREQUISITES = `
     permission_key VARCHAR(100) NOT NULL, override_type VARCHAR(10) NOT NULL, actions JSONB NOT NULL,
     UNIQUE (user_id, permission_key)
   );
-  INSERT INTO users (id, email) VALUES ('${USER}', 'migration-506@example.test');
+  INSERT INTO users (id, email) VALUES ('${USER}', 'migration-507@example.test');
   INSERT INTO staff (id, full_name) VALUES ('${STAFF}', 'Migration Test Driver');
   INSERT INTO projects (id, project_name) VALUES ('${PROJECT}', 'Migration Test Project');
   INSERT INTO access_permissions (type, key, label) VALUES ('module', 'fleet', 'Fleet');
@@ -78,7 +78,7 @@ const PREREQUISITES = `
 const REQUESTS_TABLE = `${SCHEMA}.fleet_incident_driver_input_requests`;
 
 let incidentId = '';
-/** An action row written under 505, before 506 existed. */
+/** An action row written under 506, before 507 existed. */
 let legacyActionId = '';
 
 beforeAll(async () => {
@@ -88,9 +88,9 @@ beforeAll(async () => {
   // btree_gist into a scratch schema ties its lifetime to this file's
   // DROP SCHEMA CASCADE and breaks whichever sibling test runs next.
   await admin.query('CREATE EXTENSION IF NOT EXISTS btree_gist SCHEMA public');
-  // 505 and 506 both end in GRANT/REVOKE against fibreflow_user, which exists
+  // 506 and 507 both end in GRANT/REVOKE against fibreflow_user, which exists
   // on the real database but not in a fresh cluster. Roles are cluster-global,
-  // so create it once and deliberately do not drop it — same approach as 505.
+  // so create it once and deliberately do not drop it — same approach as 506.
   await admin.query(`
     DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fibreflow_user') THEN
@@ -98,22 +98,22 @@ beforeAll(async () => {
       END IF;
     END $$;`);
   await db.query(PREREQUISITES);
-  await db.query(FORWARD_505);
+  await db.query(FORWARD_506);
 
-  // Seed a row that predates 506, so the "existing rows are not retroactively
+  // Seed a row that predates 507, so the "existing rows are not retroactively
   // disclosed" guarantee is tested on a genuinely pre-existing row rather than
   // on one written after the column already had its default.
   const incident = await db.query<{ id: string }>(
     `INSERT INTO fleet_operational_incidents
        (incident_reference, incident_type, severity, staff_id, detected_at, evidence_snapshot)
-     VALUES ('INC-MIG506-0001', 'late', 'high', $1, '2026-08-18T06:00:00.000Z', '{}'::jsonb)
+     VALUES ('INC-MIG507-0001', 'late', 'high', $1, '2026-08-18T06:00:00.000Z', '{}'::jsonb)
      RETURNING id`,
     [STAFF],
   );
   incidentId = incident.rows[0]!.id;
   const legacy = await db.query<{ id: string }>(
     `INSERT INTO fleet_operational_incident_actions (incident_id, action_type, actor_user_id, note)
-     VALUES ($1, 'commented', $2, 'Written before 506 was applied') RETURNING id`,
+     VALUES ($1, 'commented', $2, 'Written before 507 was applied') RETURNING id`,
     [incidentId, USER],
   );
   legacyActionId = legacy.rows[0]!.id;
@@ -127,7 +127,7 @@ afterAll(async () => {
   await admin.end();
 });
 
-describe('migration 506 identifier lengths', () => {
+describe('migration 507 identifier lengths', () => {
   it('keeps every constraint name under 63 bytes, unshortened by Postgres', async () => {
     const { rows } = await db.query<{ conname: string }>(
       `SELECT conname FROM pg_constraint
@@ -145,7 +145,7 @@ describe('migration 506 identifier lengths', () => {
   });
 });
 
-describe('migration 506 request table is append-only except its bookkeeping', () => {
+describe('migration 507 request table is append-only except its bookkeeping', () => {
   it('grants UPDATE on exactly the six lifecycle columns and no others', async () => {
     const { rows } = await db.query<{ column_name: string; updatable: boolean }>(
       `SELECT column_name,
@@ -181,7 +181,7 @@ describe('migration 506 request table is append-only except its bookkeeping', ()
   });
 });
 
-describe('migration 506 visibility', () => {
+describe('migration 507 visibility', () => {
   it('leaves rows written before it was applied internal', async () => {
     const { rows } = await db.query<{ visibility: string }>(
       'SELECT visibility FROM fleet_operational_incident_actions WHERE id = $1',
@@ -201,11 +201,11 @@ describe('migration 506 visibility', () => {
   });
 });
 
-describe('migration 506 driver response action', () => {
+describe('migration 507 driver response action', () => {
   it('accepts a driver response exactly as submissionService writes it', async () => {
     // The end-to-end proof of the defect the product-level review found: the
     // driver's own words are stored verbatim on an action row, attributed to a
-    // staff member who may have no user account at all. Under 505's original
+    // staff member who may have no user account at all. Under 506's original
     // actor CHECK this insert was impossible — actor_user_id was mandatory
     // whenever is_system_actor was false.
     const explanation = 'I was collecting materials from the depot before site.';
@@ -231,7 +231,7 @@ describe('migration 506 driver response action', () => {
   });
 });
 
-describe('migration 506 rollback', () => {
+describe('migration 507 rollback', () => {
   it('removes its tables and restores the narrower action-type constraint', async () => {
     await db.query(ROLLBACK);
     const { rows } = await db.query<{ present: boolean }>(

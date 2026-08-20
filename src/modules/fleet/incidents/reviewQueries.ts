@@ -82,7 +82,7 @@ interface CurrentRequestRow extends Record<string, unknown> {
   incident_id: string; requested_at: string | Date; respond_by: string | Date; delivery_failed_count: number;
 }
 
-/** The current (non-superseded) `fleet_incident_driver_input_requests` row per incident, batched via `= ANY($1::uuid[])` rather than one query per row. Column names verified against migration 506 (`requested_at`, `respond_by`, `superseded_at`, `delivery_failed_count`) — no query mocking hides a real schema mismatch here. */
+/** The current (non-superseded) `fleet_incident_driver_input_requests` row per incident, batched via `= ANY($1::uuid[])` rather than one query per row. Column names verified against migration 507 (`requested_at`, `respond_by`, `superseded_at`, `delivery_failed_count`) — no query mocking hides a real schema mismatch here. */
 async function loadCurrentDriverInputRequests(incidentIds: string[]): Promise<Map<string, CurrentRequestSummary>> {
   if (incidentIds.length === 0) return new Map();
   const rows = await query<CurrentRequestRow>(
@@ -101,7 +101,7 @@ async function loadCurrentDriverInputRequests(incidentIds: string[]): Promise<Ma
 
 interface LatestSubmissionRow extends Record<string, unknown> { incident_id: string; responded_at: string | Date }
 
-/** The most recent `fleet_incident_driver_submissions.created_at` per incident, batched the same way. Column names verified against migration 506 (`incident_id`, `created_at`). */
+/** The most recent `fleet_incident_driver_submissions.created_at` per incident, batched the same way. Column names verified against migration 507 (`incident_id`, `created_at`). */
 async function loadLatestSubmissionTimes(incidentIds: string[]): Promise<Map<string, string>> {
   if (incidentIds.length === 0) return new Map();
   const rows = await query<LatestSubmissionRow>(

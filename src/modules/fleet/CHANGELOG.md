@@ -10,7 +10,7 @@ Format: `## [Commit Hash] - YYYY-MM-DD - Author - Type`
 
 **feat(fleet): optional driver incident responses and Attendance correction linking**
 
-Migration 506 (unapplied pending deployment approval) gives a driver
+Migration 507 (unapplied pending deployment approval) gives a driver
 transparent, optional access to their own PR 6 operational incidents via
 `/my/fleet/incidents`, plus append-only explanations, follow-ups, evidence
 uploads, structured source-data concerns, and links to an existing Attendance
@@ -36,7 +36,7 @@ implemented (dead client plumbing for it was removed); `MAX_EXPLANATION_LENGTH
 **Files:** `src/modules/fleet/incidents/driver/**`,
 `pages/api/my/fleet/incidents/**`,
 `pages/api/fleet/incidents/[incidentId]/request-driver-input.ts`,
-`scripts/migrations/sql/506_fleet_incident_driver_input.sql`,
+`scripts/migrations/sql/507_fleet_incident_driver_input.sql`,
 `src/modules/attendance/portal/client/**` (hub tile, correction-form
 callback), `src/modules/notifications/constants/index.ts` (2 new events).
 

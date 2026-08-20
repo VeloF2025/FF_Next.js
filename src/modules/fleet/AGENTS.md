@@ -39,7 +39,7 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 | GET | `/api/fleet/analytics/index` | Fleet analytics summary |
 | GET | `/api/fleet/drivers/leaderboard` | Driver score leaderboard |
 | GET | `/api/fleet/expiring` | Expiring licences/documents |
-| GET | `/api/my/fleet/incidents` | Driver's own incident list (mig 506, PR 7) |
+| GET | `/api/my/fleet/incidents` | Driver's own incident list (mig 507, PR 7) |
 | GET | `/api/my/fleet/incidents/[incidentId]` | Driver's own redacted incident detail |
 | POST | `/api/my/fleet/incidents/[incidentId]/submissions` | Driver explanation/follow-up (append-only) |
 | POST | `/api/my/fleet/incidents/[incidentId]/evidence` | Driver evidence upload |
@@ -82,7 +82,7 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - A driver's explanation is stored twice on purpose: `fleet_incident_driver_submissions.explanation` (driver-scoped) and verbatim in the `driver_response_received` action's `note` (manager-visible audit timeline) — do not deduplicate
 - New evidence MIME types need a registered byte signature in `MIME_SIGNATURES` (`src/lib/vfStorageUpload.ts`) BEFORE they can be enabled in driver-input settings — `versionDriverInputSettings` fails closed otherwise
 - Manager queue does NOT filter by `driverInputState`/`attendanceCorrectionState` — dead client plumbing for this was deliberately removed; land server + client together if built
-- Migration 506 and its number are unapplied; migration numbering churned (490→496→499→503) as master advanced — always re-check the free number before adding a new Fleet migration
+- Migration 507 and its number are unapplied; migration numbering churned (490→496→499→503→506→507) as master advanced — always re-check the free number before adding a new Fleet migration
 
 ## Common Issues
 | Issue | Fix |

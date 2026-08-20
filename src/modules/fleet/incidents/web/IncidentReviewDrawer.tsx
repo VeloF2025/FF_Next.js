@@ -36,7 +36,7 @@ const MANAGER_DRIVER_INPUT_LABELS: Partial<Record<DriverInputState, string>> = {
 const DRIVER_ACTION_LABELS: Partial<Record<IncidentAction['actionType'], string>> = {
   driver_input_requested: 'Requested driver input', driver_response_received: 'Driver responded',
 };
-/** Migration 506's three-way classification (design §9) — rendered on every action/evidence
+/** Migration 507's three-way classification (design §9) — rendered on every action/evidence
  * row so a manager can never mistake an internal note for one the driver can see, or a
  * manager-authored row for one the driver actually submitted. */
 const VISIBILITY_LABELS: Record<IncidentVisibility, string> = {
