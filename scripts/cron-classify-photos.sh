@@ -42,7 +42,10 @@ if [ -z "$DB_URL" ]; then
 fi
 
 # Cron secret for authenticated API calls
-CRON_SECRET="${CRON_SECRET:-ad2bd65646c1e1242ade2bbcf0b0a684c3cce0c53f2684e8369d7bb9bc27a3d7}"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=scripts/lib/cron-secret.sh
+. "$SCRIPT_DIR/lib/cron-secret.sh"
+CRON_SECRET="$(resolve_cron_secret "$PROJECT_DIR" "${LOG_PREFIX:-[classify-photos]}")" || exit 1
 
 echo ""
 echo "========================================"

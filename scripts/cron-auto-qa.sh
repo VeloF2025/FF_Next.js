@@ -7,7 +7,11 @@
 set -euo pipefail
 
 LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')]"
-CRON_SECRET="ad2bd65646c1e1242ade2bbcf0b0a684c3cce0c53f2684e8369d7bb9bc27a3d7"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=scripts/lib/cron-secret.sh
+. "$SCRIPT_DIR/lib/cron-secret.sh"
+CRON_SECRET="$(resolve_cron_secret "$PROJECT_DIR" "$LOG_PREFIX")" || exit 1
 PROD_URL="http://localhost:3000"
 DEV_URL="http://localhost:3005"
 LIMIT=20
