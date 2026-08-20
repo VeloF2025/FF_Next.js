@@ -7,25 +7,21 @@
  *
  * Workbook shape (one tab per project plus ignored summary tabs):
  *   Col A: project name   Col B: ONT serial (ALCLB48…)   Col C: Gizzu serial (GU18…)
- * Row 0 is a header and is skipped. Sheets whose name is not a known project
- * (e.g. "info sheet", "All") are reported in `skippedSheets` and ignored.
+ * Row 0 is a header and is skipped. Each remaining tab is resolved onto a
+ * stock_location by NAME (see sheetLocation.ts) rather than a hardcoded UUID
+ * map — the old map silently dropped the "Tembelilhle" tab and its 504 ONT +
+ * 504 Gizzu serials for as long as it existed. Tabs that cannot be resolved are
+ * reported in `unresolvedSheets` WITH A REASON, so the next one cannot vanish
+ * the same way.
  */
 
 import type { SerialIntakeItem } from './serialIntake';
+import { resolveSheetLocation } from './sheetLocation';
+import type { LocationRef } from './sheetLocation';
 
 /** Known stock_items UUIDs for the two serialised FT consumables. */
 export const FT_ONT_ITEM_ID = '84cc2348-f8a9-486f-826a-6b8b20579765';
 export const FT_GIZZU_ITEM_ID = '22326fdc-9f65-4419-ade1-8bd7ebeb9826';
-
-/** Project (sheet) name → stock_location UUID. */
-export const PROJECT_LOCATIONS: Record<string, string> = {
-  lawley: 'cea9e957-7456-4dae-985f-60776d5adffc',
-  mohadin: 'dc0766e8-cbee-4eea-832d-4224deecfb83',
-  mamelodi: '99033765-ea92-4ce3-bb40-57a216fbf417',
-  thembisa: 'f41e0c7d-35c4-4e62-873c-185b6e2f09cb',
-  tembisa: 'f41e0c7d-35c4-4e62-873c-185b6e2f09cb',
-  etwatwa: '36cd41b9-28cc-4324-9da2-5cd717104aad',
-};
 
 /** Minimum length for a value to be treated as a real serial (filters blanks). */
 const MIN_SERIAL_LEN = 10;
@@ -37,9 +33,22 @@ export function cleanSerial(s: string): string {
   return cleaned;
 }
 
+/** A tab that produced no serials, and why — never a silent drop. */
+export interface UnresolvedSheet {
+  sheetName: string;
+  reason: 'not-a-project' | 'no-match' | 'ambiguous' | 'alias-target-missing';
+  /** Warehouse names considered, when the tab was ambiguous. */
+  candidates?: string[];
+  /** Serial-bearing rows lost because the tab could not be resolved. */
+  rowsLost: number;
+}
+
 export interface ParsedProject {
   /** Sheet (project) name as it appears in the workbook. */
   name: string;
+  /** The warehouse this tab resolved to, and how it was matched. */
+  locationName: string;
+  matchedBy: 'exact' | 'prefix' | 'fuzzy' | 'alias';
   /** ONT serials parsed from this project's sheet. */
   ontItems: SerialIntakeItem[];
   /** Gizzu/UPS serials parsed from this project's sheet. */
@@ -53,8 +62,10 @@ export interface ParsedWorkbook {
   gizzuItems: SerialIntakeItem[];
   /** Per-project grouping, so callers can report accurate per-project results. */
   projects: ParsedProject[];
-  /** Sheet names that did not map to a known project. */
+  /** Sheet names that did not map to a known project. Kept for callers/reporting. */
   skippedSheets: string[];
+  /** The same tabs with the reason each was not imported, and what it cost. */
+  unresolvedSheets: UnresolvedSheet[];
 }
 
 /**
@@ -66,21 +77,44 @@ export function parseOntGizzuWorkbook(
   workbook: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   XLSX: any,
+  /** Warehouse rows to resolve tab names against (from stock_locations). */
+  locations: LocationRef[],
 ): ParsedWorkbook {
-  const out: ParsedWorkbook = { ontItems: [], gizzuItems: [], projects: [], skippedSheets: [] };
+  const out: ParsedWorkbook = {
+    ontItems: [], gizzuItems: [], projects: [], skippedSheets: [], unresolvedSheets: [],
+  };
 
   for (const sheetName of workbook.SheetNames as string[]) {
-    const projectKey = sheetName.toLowerCase().trim();
-    const locationId = PROJECT_LOCATIONS[projectKey];
-    if (!locationId) {
-      out.skippedSheets.push(sheetName);
-      continue;
-    }
-
     const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 }) as unknown[][];
     const rows = data.slice(1); // drop header row
 
-    const project: ParsedProject = { name: sheetName, ontItems: [], gizzuItems: [] };
+    const resolved = resolveSheetLocation(sheetName, locations);
+    if (!resolved.ok) {
+      // Count what this tab WOULD have contributed, so an unresolved sheet
+      // reports its cost instead of just its name.
+      const rowsLost = rows.filter((row) => {
+        const ont = cleanSerial(String(row[1] ?? ''));
+        const ups = cleanSerial(String(row[2] ?? ''));
+        return ont.length >= MIN_SERIAL_LEN || ups.length >= MIN_SERIAL_LEN;
+      }).length;
+      out.skippedSheets.push(sheetName);
+      out.unresolvedSheets.push({
+        sheetName,
+        reason: resolved.reason,
+        ...(resolved.candidates ? { candidates: resolved.candidates } : {}),
+        rowsLost,
+      });
+      continue;
+    }
+    const locationId = resolved.locationId;
+
+    const project: ParsedProject = {
+      name: sheetName,
+      locationName: resolved.locationName,
+      matchedBy: resolved.how,
+      ontItems: [],
+      gizzuItems: [],
+    };
     for (const row of rows) {
       const ontSerial = cleanSerial(String(row[1] ?? ''));
       const upsSerial = cleanSerial(String(row[2] ?? ''));
