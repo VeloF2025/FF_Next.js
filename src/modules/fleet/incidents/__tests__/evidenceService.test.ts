@@ -46,6 +46,9 @@ const PROJECT = '44444444-4444-4444-8444-444444444444';
 
 const UPLOADED = { url: '/storage/fleet/incidents/key.jpg', key: 'fleet/incidents/key.jpg' };
 
+/** The row the final transaction re-reads under FOR UPDATE (see the closed-after-upload race below). */
+const txnQueryOne = vi.fn();
+
 function baseRequest(overrides: Partial<AddIncidentEvidenceRequest> = {}): AddIncidentEvidenceRequest {
   return {
     incidentId: INCIDENT, actorUserId: USER, evidenceType: 'photo', mimeType: 'image/jpeg',
@@ -62,7 +65,8 @@ function coreRecord(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.transaction.mockImplementation(async (cb: (txn: TxnClient) => unknown) => cb({} as TxnClient));
+  txnQueryOne.mockResolvedValue({ lifecycle_status: 'open' });
+  db.transaction.mockImplementation(async (cb: (txn: TxnClient) => unknown) => cb({ queryOne: txnQueryOne } as unknown as TxnClient));
   scope.resolveIncidentScope.mockResolvedValue(unrestrictedScope);
   scope.isProjectOwnedByScope.mockResolvedValue(true);
   queries.getIncidentCore.mockResolvedValue(coreRecord());
@@ -105,6 +109,97 @@ describe('authorization and scope', () => {
     queries.getIncidentCore.mockResolvedValue(coreRecord({ lifecycleStatus: 'resolved' }));
     await expect(addIncidentEvidence(baseRequest(), viewer)).rejects.toBeInstanceOf(IncidentEvidenceConflictError);
     expect(storage.uploadCategorizedFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('self-review', () => {
+  // A manager may not attach evidence to an incident about their own conduct — the same
+  // refusal every other state-changing path in this module now applies (../selfReviewGuard.ts).
+  it('refuses when the acting manager is the subject of the incident, before uploading', async () => {
+    queries.getIncidentCore.mockResolvedValue(coreRecord({ staffId: STAFF }));
+
+    await expect(addIncidentEvidence(baseRequest(), viewer)).rejects.toBeInstanceOf(IncidentEvidenceAccessDeniedError);
+    expect(storage.uploadCategorizedFile).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('says plainly why', async () => {
+    queries.getIncidentCore.mockResolvedValue(coreRecord({ staffId: STAFF }));
+
+    await expect(addIncidentEvidence(baseRequest(), viewer)).rejects.toThrow(/about you/i);
+  });
+
+  it('still lets a manager attach evidence to someone else\'s incident', async () => {
+    queries.getIncidentCore.mockResolvedValue(coreRecord({ staffId: 'a-different-staff-id' }));
+
+    await expect(addIncidentEvidence(baseRequest(), viewer)).resolves.toMatchObject({ actionId: 'action-1' });
+  });
+
+  it('does not lock a manager with no staff record out of an unassigned incident', async () => {
+    scope.resolveIncidentScope.mockResolvedValue({ unrestricted: true, pmUserId: USER, pmStaffId: null });
+    queries.getIncidentCore.mockResolvedValue(coreRecord({ staffId: null }));
+
+    await expect(addIncidentEvidence(baseRequest({}), { userId: USER, staffId: null, role: 'manager' }))
+      .resolves.toMatchObject({ actionId: 'action-1' });
+  });
+});
+
+describe('closed-after-upload race', () => {
+  /**
+   * The pre-upload terminal check is unlocked and a VF Storage round trip happens after it,
+   * so manager B can resolve the incident while manager A's upload is still in flight. The
+   * insert must therefore re-read the lifecycle status under FOR UPDATE inside its own
+   * transaction — the same shape reviewTransitions.lockIncident and
+   * driver/driverEvidenceService.verifyEligibility already use — or the module's stated
+   * invariant ("Evidence cannot be added to a closed incident") is only advisory.
+   */
+  it('refuses the insert when the incident reached a terminal state after the upload began', async () => {
+    txnQueryOne.mockResolvedValue({ lifecycle_status: 'resolved' });
+
+    await expect(addIncidentEvidence(baseRequest(), viewer)).rejects.toBeInstanceOf(IncidentEvidenceConflictError);
+    expect(storage.uploadCategorizedFile).toHaveBeenCalled();
+    expect(repo.insertIncidentEvidence).not.toHaveBeenCalled();
+    expect(repo.insertIncidentAction).not.toHaveBeenCalled();
+  });
+
+  it('reports the race as a conflict, not as an orphan/500 — the incident state is the real answer', async () => {
+    txnQueryOne.mockResolvedValue({ lifecycle_status: 'dismissed' });
+
+    let caught: unknown;
+    try { await addIncidentEvidence(baseRequest(), viewer); } catch (error) { caught = error; }
+
+    expect(caught).toBeInstanceOf(IncidentEvidenceConflictError);
+    expect(caught).not.toBeInstanceOf(IncidentEvidenceOrphanError);
+    expect((caught as IncidentEvidenceConflictError).lifecycleStatus).toBe('dismissed');
+  });
+
+  it('still records the orphaned upload, because the file is in storage with nothing pointing at it', async () => {
+    txnQueryOne.mockResolvedValue({ lifecycle_status: 'resolved' });
+
+    await expect(addIncidentEvidence(baseRequest(), viewer)).rejects.toBeInstanceOf(IncidentEvidenceConflictError);
+    expect(logger.log.error).toHaveBeenCalledWith(
+      expect.stringContaining('orphan'),
+      expect.objectContaining({ storageKey: UPLOADED.key }),
+      expect.any(String),
+    );
+  });
+
+  it('raises not found when the incident disappeared between the check and the insert', async () => {
+    txnQueryOne.mockResolvedValue(null);
+
+    await expect(addIncidentEvidence(baseRequest(), viewer)).rejects.toBeInstanceOf(IncidentNotFoundError);
+    expect(repo.insertIncidentEvidence).not.toHaveBeenCalled();
+  });
+
+  it('writes the lifecycle status it re-read under lock onto the action, not the stale pre-upload one', async () => {
+    queries.getIncidentCore.mockResolvedValue(coreRecord({ lifecycleStatus: 'acknowledged' }));
+    txnQueryOne.mockResolvedValue({ lifecycle_status: 'under_review' });
+
+    await addIncidentEvidence(baseRequest(), viewer);
+
+    expect(repo.insertIncidentAction).toHaveBeenCalledWith(expect.objectContaining({
+      beforeLifecycleStatus: 'under_review', afterLifecycleStatus: 'under_review',
+    }), expect.anything());
   });
 });
 

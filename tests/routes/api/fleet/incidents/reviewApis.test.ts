@@ -24,7 +24,7 @@ import actionsHandler from '@/pages/api/fleet/incidents/[incidentId]/actions';
 import bulkHandler from '@/pages/api/fleet/incidents/bulk-acknowledge';
 import { IncidentAccessDeniedError } from '@/modules/fleet/incidents/reviewService';
 import { IncidentNotFoundError } from '@/modules/fleet/incidents/incidentRepository';
-import { IncidentTransitionConflictError, IncidentTransitionValidationError } from '@/modules/fleet/incidents/reviewTransitions';
+import { IncidentTransitionConflictError, IncidentTransitionForbiddenError, IncidentTransitionValidationError } from '@/modules/fleet/incidents/reviewTransitions';
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
@@ -131,6 +131,17 @@ describe('POST /api/fleet/incidents/[incidentId]/actions', () => {
     expect(result.status).toBe(400); expect(mocks.transition).not.toHaveBeenCalled();
   });
 
+  it('returns 403 with the reason when the caller is the subject of the incident', async () => {
+    mocks.transition.mockRejectedValue(new IncidentAccessDeniedError(
+      'You cannot act on a Fleet incident that is about you — another oversight member must review it',
+    ));
+
+    const result = await call(actionsHandler, 'POST', { query: { incidentId: INCIDENT }, body: { actionType: 'acknowledged' } });
+
+    expect(result.status).toBe(403);
+    expect(JSON.stringify(result.body)).toMatch(/about you/i);
+  });
+
   it('maps validation, forbidden, not-found, and conflict errors to their status codes', async () => {
     const body = { actionType: 'commented', note: 'x' };
     mocks.transition.mockRejectedValue(new IncidentTransitionValidationError('bad outcome'));
@@ -154,6 +165,22 @@ describe('POST /api/fleet/incidents/bulk-acknowledge', () => {
     mocks.bulk.mockRejectedValue(new IncidentTransitionConflictError('one incident is already closed', 'resolved'));
     const result = await call(bulkHandler, 'POST', { body: { incidentIds: [INCIDENT] } });
     expect(result.status).toBe(409);
+  });
+
+  // A self-owned id fails the whole request before anything is acknowledged, so the caller
+  // must be able to read WHICH ids were refused and that nothing else went through —
+  // otherwise they have to re-submit blind to find out.
+  it('returns 403 naming the refused ids when one incident in the batch is about the caller', async () => {
+    mocks.bulk.mockRejectedValue(new IncidentTransitionForbiddenError(
+      `You cannot act on a Fleet incident that is about you. Refused: ${INCIDENT}. No incident in this request was acknowledged.`,
+    ));
+
+    const result = await call(bulkHandler, 'POST', { body: { incidentIds: [INCIDENT] } });
+
+    expect(result.status).toBe(403);
+    expect(JSON.stringify(result.body)).toContain(INCIDENT);
+    expect(JSON.stringify(result.body)).toMatch(/about you/i);
+    expect(JSON.stringify(result.body)).toMatch(/No incident in this request was acknowledged/i);
   });
 
   it('acknowledges every requested incident and returns their results', async () => {

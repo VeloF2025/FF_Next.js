@@ -15,6 +15,7 @@
 import { IncidentNotFoundError } from './incidentRepository';
 import { sendResolutionNotification } from './incidentNotifications';
 import { isProjectOwnedByScope, resolveIncidentScope } from './reviewScope';
+import { SELF_REVIEW_REFUSAL_MESSAGE, isIncidentSubject } from './selfReviewGuard';
 import {
   getIncidentActions, getIncidentCore, getIncidentCorrectionLinks, getIncidentDeliverySummary,
   getIncidentDriverInputSummary, getIncidentEvidence, listIncidents,
@@ -61,6 +62,9 @@ export async function transitionIncident(request: IncidentTransitionRequest, vie
   const core = await getIncidentCore(request.incidentId);
   if (!core) throw new IncidentNotFoundError(`No incident found for id ${request.incidentId}`);
   if (!scope.unrestricted && !await isProjectOwnedByScope(scope, core.projectId)) throw new IncidentAccessDeniedError('You cannot act on this Fleet incident');
+  // Independent of scope: nobody reviews their own incident, oversight included. Project
+  // scope answers "is this yours to manage?"; this answers "is this about you?".
+  if (isIncidentSubject(scope.pmStaffId, core.staffId)) throw new IncidentAccessDeniedError(SELF_REVIEW_REFUSAL_MESSAGE);
   const outcome = await runIncidentTransition(request);
   if (outcome.notify) await sendResolutionNotification(outcome.notify);
   return outcome.result;

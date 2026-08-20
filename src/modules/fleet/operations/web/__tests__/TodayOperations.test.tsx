@@ -307,6 +307,16 @@ describe('TodayOperations', () => {
     expect(row).not.toHaveTextContent('-26.2');
   });
 
+  it('discloses when the attention list is truncated below the true total', async () => {
+    installFetch({ overview: overview({
+      attention: { items: attentionRows, page: 1, limit: 25, total: 40, hasMore: true },
+    }) });
+    render(<TodayOperations />);
+    await screen.findByText('Late Driver');
+    expect(screen.getByText(/Showing 7 of 40/)).toBeInTheDocument();
+    expect(screen.getByText(/33 more not shown/)).toBeInTheDocument();
+  });
+
   it('does not disclose a protected detail error message', async () => {
     installFetch({ detailFailure: fail(403, 'FORBIDDEN', 'Secret scope detail') });
     render(<TodayOperations />);

@@ -203,6 +203,15 @@ describe('Fleet map page operational composition', () => {
     expect(await screen.findByRole('option', { name: 'Lawley' })).toBeInTheDocument();
   });
 
+  it('discloses when the map overlay fetch was truncated by the server limit', async () => {
+    pageMocks.layers = layerState({ overlayData: { ...overlay, total: 150, hasMore: true } });
+    render(<FleetMapPage />);
+    await waitFor(() => expect(pageMocks.operationsOptions).toHaveBeenCalled());
+
+    expect(await screen.findByText(/Showing 2 of 150/)).toBeInTheDocument();
+    expect(screen.getByText(/148 more not shown/)).toBeInTheDocument();
+  });
+
   it('explains an operational badge whose vehicle has no telemetry coordinate join', async () => {
     pageMocks.layers = layerState({ overlayData: {
       ...overlay,

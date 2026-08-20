@@ -56,6 +56,7 @@ import { parseStrictIsoInstant } from '../../operations/instantValidation';
 import { IncidentNotFoundError } from '../incidentRepository';
 import { isProjectOwnedByScope, resolveIncidentScope } from '../reviewScope';
 import { getIncidentCore } from '../reviewQueries';
+import { SELF_REVIEW_REFUSAL_MESSAGE, isIncidentSubject } from '../selfReviewGuard';
 import { neutralIncidentLabel } from './driverInputRepository';
 import { insertInputRequest } from './driverInputWriteRepository';
 import { notifyDriverInputRequested } from './driverNotifications';
@@ -203,6 +204,9 @@ export async function requestDriverInput(
     throw new DriverInputAccessDeniedError('You cannot act on this Fleet incident');
   }
   if (!core.staffId) throw new DriverInputRequestValidationError('Incident has no linked driver to request input from');
+  // A manager must not demand an explanation from themselves. Independent of scope: an
+  // oversight member is no more entitled to do that than a PM is (../selfReviewGuard.ts).
+  if (isIncidentSubject(scope.pmStaffId, core.staffId)) throw new DriverInputAccessDeniedError(SELF_REVIEW_REFUSAL_MESSAGE);
 
   const settings = await getEffectiveDriverInputSettings(nowIso);
   const respondBy = customRespondBy ?? calculateRespondBy({

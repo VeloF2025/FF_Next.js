@@ -18,6 +18,7 @@ import type { ResolutionNotificationInput } from './incidentNotifications';
 import type { IncidentLifecycleStatus, IncidentOutcome, IncidentTransitionRequest, IncidentTransitionResult } from './types';
 import type { IncidentScopeFilter } from './reviewScope';
 import { isProjectOwnedByScope } from './reviewScope';
+import { SELF_REVIEW_REFUSAL_MESSAGE, isIncidentSubject } from './selfReviewGuard';
 
 export class IncidentTransitionValidationError extends Error {
   constructor(message: string) { super(message); this.name = 'IncidentTransitionValidationError'; }
@@ -178,7 +179,7 @@ export interface BulkAcknowledgeItemResult { incidentId: string; lifecycleStatus
 export interface BulkAcknowledgeConflict { incidentId: string; lifecycleStatus: IncidentLifecycleStatus }
 export interface BulkAcknowledgeOutcome { results: BulkAcknowledgeItemResult[]; conflicts: BulkAcknowledgeConflict[] }
 
-interface BulkCandidateRow extends Record<string, unknown> { id: string; lifecycle_status: IncidentLifecycleStatus; project_id: string | null }
+interface BulkCandidateRow extends Record<string, unknown> { id: string; lifecycle_status: IncidentLifecycleStatus; project_id: string | null; staff_id: string | null }
 
 /**
  * Validates every requested incident (existence, not-already-terminal, and
@@ -190,9 +191,20 @@ export async function runBulkAcknowledge(
   incidentIds: string[], actorUserId: string, scope: IncidentScopeFilter, requestCorrelationId: string | null,
 ): Promise<BulkAcknowledgeOutcome> {
   const rows = await query<BulkCandidateRow>(
-    `SELECT id, lifecycle_status, project_id FROM fleet_operational_incidents WHERE id = ANY($1::uuid[])`, [incidentIds],
+    `SELECT id, lifecycle_status, project_id, staff_id FROM fleet_operational_incidents WHERE id = ANY($1::uuid[])`, [incidentIds],
   );
   const found = new Map(rows.map((row) => [row.id, row]));
+  // Self-review is checked in its own pass ahead of everything else so the refusal can name
+  // EVERY offending id at once: the loop below throws on the first problem it meets, which
+  // would report only one of several self-owned ids and leave the caller re-submitting to
+  // discover the rest. Like the rest of the pre-validation, this fails the whole request
+  // before any acknowledgement commits.
+  const selfOwned = incidentIds.filter((id) => isIncidentSubject(scope.pmStaffId, found.get(id)?.staff_id ?? null));
+  if (selfOwned.length > 0) {
+    throw new IncidentTransitionForbiddenError(
+      `${SELF_REVIEW_REFUSAL_MESSAGE}. Refused: ${selfOwned.join(', ')}. No incident in this request was acknowledged.`,
+    );
+  }
   for (const id of incidentIds) {
     const row = found.get(id);
     if (!row) throw new IncidentTransitionValidationError(`Incident ${id} was not found`);

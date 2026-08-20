@@ -1,6 +1,6 @@
 -- 511_fleet_incident_driver_input.sql
 -- Optional, append-only driver access to Fleet operational incidents (PR7).
--- No person is seeded here. Extends PR6 (migration 502) evidence/actions
+-- No person is seeded here. Extends PR6 (migration 510) evidence/actions
 -- with a visibility class and adds four durable tables: effective-dated
 -- driver-input settings, manager requests, driver submissions, and
 -- canonical Attendance correction links. Every application grant below is

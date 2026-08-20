@@ -82,6 +82,34 @@ beforeEach(() => {
   setHappyPathMocks();
 });
 
+describe('requestDriverInput — self-review', () => {
+  // A manager must not demand an explanation from themselves: the incident is about them,
+  // and a "driver response" they wrote is not independent evidence. Refused outright — the
+  // incident stays open for another oversight member.
+  it('refuses when the acting manager is the driver the incident is about', async () => {
+    reviewScope.resolveIncidentScope.mockResolvedValue({ unrestricted: true, pmUserId: MANAGER, pmStaffId: STAFF });
+
+    await expect(requestDriverInput(command, { userId: MANAGER, staffId: STAFF, role: 'manager' }))
+      .rejects.toBeInstanceOf(DriverInputAccessDeniedError);
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(notifications.notifyDriverInputRequested).not.toHaveBeenCalled();
+  });
+
+  it('says plainly why', async () => {
+    reviewScope.resolveIncidentScope.mockResolvedValue({ unrestricted: true, pmUserId: MANAGER, pmStaffId: STAFF });
+
+    await expect(requestDriverInput(command, { userId: MANAGER, staffId: STAFF, role: 'manager' }))
+      .rejects.toThrow(/about you/i);
+  });
+
+  it('still lets a manager request input from a different driver', async () => {
+    reviewScope.resolveIncidentScope.mockResolvedValue({ unrestricted: true, pmUserId: MANAGER, pmStaffId: 'a-different-staff-id' });
+
+    await expect(requestDriverInput(command, { userId: MANAGER, staffId: 'a-different-staff-id', role: 'manager' }))
+      .resolves.toMatchObject({ incidentId: INCIDENT });
+  });
+});
+
 describe('requestDriverInput — validation', () => {
   it('rejects a malformed incident id', async () => {
     await expect(requestDriverInput({ ...command, incidentId: 'not-a-uuid' }, actorScope))
