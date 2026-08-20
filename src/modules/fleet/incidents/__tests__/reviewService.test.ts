@@ -6,6 +6,7 @@ vi.mock('../reviewScope', () => ({ resolveIncidentScope: scope.resolveIncidentSc
 const queries = vi.hoisted(() => ({
   listIncidents: vi.fn(), getIncidentCore: vi.fn(), getIncidentActions: vi.fn(),
   getIncidentEvidence: vi.fn(), getIncidentDeliverySummary: vi.fn(),
+  getIncidentDriverInputSummary: vi.fn(), getIncidentCorrectionLinks: vi.fn(),
 }));
 vi.mock('../reviewQueries', () => queries);
 
@@ -24,7 +25,14 @@ const STAFF = '33333333-3333-4333-8333-333333333333';
 const viewer = { userId: USER, staffId: STAFF, role: 'manager' };
 const unrestrictedScope = { unrestricted: true, pmUserId: USER, pmStaffId: STAFF };
 
-beforeEach(() => { vi.clearAllMocks(); notifications.sendResolutionNotification.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 }); });
+const NOT_REQUESTED_DRIVER_INPUT = { state: 'not_requested' as const, respondBy: null, deliveryFailed: false };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  notifications.sendResolutionNotification.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
+  queries.getIncidentDriverInputSummary.mockResolvedValue(NOT_REQUESTED_DRIVER_INPUT);
+  queries.getIncidentCorrectionLinks.mockResolvedValue([]);
+});
 
 describe('listIncidentsForViewer', () => {
   it('denies without a resolvable scope', async () => {
@@ -98,6 +106,37 @@ describe('getIncidentDetailForViewer', () => {
     queries.getIncidentDeliverySummary.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
     const detail = await getIncidentDetailForViewer(INCIDENT, viewer);
     expect(detail).toMatchObject({ id: INCIDENT, actions: [{ id: 'a1' }], evidence: [{ id: 'e1' }], delivery: { delivered: 1 } });
+  });
+
+  /**
+   * PR7 review C1/I2/I3: `driverInput` and `correctionLinks` were entirely absent from the
+   * manager-facing detail before this fix. Proves both are composed into the returned detail,
+   * and — reusing the exact same project-scope gate proven above for actions/evidence —
+   * that neither read is reached once that gate denies access (C1: "reuse the existing
+   * enforcement ... rather than adding a second scope check").
+   */
+  it('composes driverInput and correctionLinks for an authorized viewer, behind the same project-scope gate as everything else', async () => {
+    scope.resolveIncidentScope.mockResolvedValue(unrestrictedScope);
+    queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: null, resolvedAt: null });
+    queries.getIncidentDriverInputSummary.mockResolvedValue({ state: 'requested', respondBy: '2026-08-20T21:59:59.999Z', deliveryFailed: false });
+    queries.getIncidentCorrectionLinks.mockResolvedValue([{ id: 'link-1', attendanceCorrectionId: 'adj-1', linkedAt: '2026-08-18T09:00:00.000Z', correctionState: 'pending' }]);
+
+    const detail = await getIncidentDetailForViewer(INCIDENT, viewer);
+
+    expect(detail.driverInput).toEqual({ state: 'requested', respondBy: '2026-08-20T21:59:59.999Z', deliveryFailed: false });
+    expect(detail.correctionLinks).toEqual([{ id: 'link-1', attendanceCorrectionId: 'adj-1', linkedAt: '2026-08-18T09:00:00.000Z', correctionState: 'pending' }]);
+    expect(queries.getIncidentDriverInputSummary).toHaveBeenCalledWith(INCIDENT, null, expect.any(String));
+  });
+
+  it('never reaches driverInput/correctionLinks either, once project scope denies access', async () => {
+    scope.resolveIncidentScope.mockResolvedValue({ unrestricted: false, pmUserId: USER, pmStaffId: STAFF });
+    queries.getIncidentCore.mockResolvedValue({ id: INCIDENT, projectId: 'another-pms-project' });
+    scope.isProjectOwnedByScope.mockResolvedValue(false);
+
+    await expect(getIncidentDetailForViewer(INCIDENT, viewer)).rejects.toBeInstanceOf(IncidentAccessDeniedError);
+
+    expect(queries.getIncidentDriverInputSummary).not.toHaveBeenCalled();
+    expect(queries.getIncidentCorrectionLinks).not.toHaveBeenCalled();
   });
 });
 

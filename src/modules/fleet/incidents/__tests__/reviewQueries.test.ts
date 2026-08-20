@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const db = vi.hoisted(() => ({ query: vi.fn(), queryOne: vi.fn() }));
 vi.mock('@/lib/db-pool', () => ({ query: db.query, queryOne: db.queryOne }));
 
-import { getIncidentActions, getIncidentCore, getIncidentDeliverySummary, getIncidentEvidence, listIncidents } from '../reviewQueries';
+import {
+  getIncidentActions, getIncidentCore, getIncidentCorrectionLinks, getIncidentDeliverySummary,
+  getIncidentDriverInputSummary, getIncidentEvidence, listIncidents,
+} from '../reviewQueries';
 import type { IncidentListRequest } from '../types';
 import type { IncidentScopeFilter } from '../reviewScope';
 
@@ -20,7 +23,17 @@ const listRow = {
   lifecycle_status: 'open', staff_id: STAFF, staff_name_snapshot: 'Jane', project_id: null,
   project_name_snapshot: null, operational_site_name_snapshot: null, opened_at: '2026-08-13T08:00:00.000Z',
   condition_last_seen_at: '2026-08-13T08:00:00.000Z', condition_cleared_at: null,
-  escalation_level: 0, next_escalation_at: null, evidence_count: 0,
+  escalation_level: 0, next_escalation_at: null, resolved_at: null, evidence_count: 0,
+};
+
+const settingsRow = {
+  version: 1, effective_from: '2026-08-01T00:00:00.000Z', effective_to: null,
+  response_window_workdays: 2, post_closure_response_enabled: false, post_closure_response_window_days: 0,
+  recent_window_days: 90, history_window_days: 365,
+  enabled_concern_categories: ['assignment_error', 'site_error', 'vehicle_error', 'geofence_error', 'other'],
+  evidence_allowed_mime_types: ['image/jpeg'], evidence_max_bytes: 15728640,
+  driver_input_requested_in_app: true, driver_input_requested_email: true, driver_input_requested_whatsapp: false,
+  driver_response_received_in_app: true, driver_response_received_email: true, driver_response_received_whatsapp: false,
 };
 
 beforeEach(() => {
@@ -156,5 +169,155 @@ describe('getIncidentDeliverySummary', () => {
     const [text, params] = db.queryOne.mock.calls[0]!;
     expect(text).not.toMatch(/latitude|longitude/i);
     expect(params).toEqual([INCIDENT]);
+  });
+});
+
+/**
+ * PR7 review C1: correction links were written by the driver-scoped `/my` portal
+ * (`attendanceCorrectionLinkService.ts`) and read only there — no manager surface read them
+ * at all. Column names asserted here are verified against migration 503
+ * (`fleet_incident_attendance_correction_links`: `attendance_correction_id`, `linked_at`) and
+ * migration 320 (`attendance_adjustments.status`) — the SQL risk this branch's review
+ * specifically warned about, since a mocked DB never catches a wrong column name.
+ */
+describe('getIncidentCorrectionLinks', () => {
+  it('joins the live Attendance status — never a cached one — for every correction linked to this incident', async () => {
+    db.query.mockResolvedValueOnce([
+      { id: 'link-1', attendance_correction_id: 'adj-1', linked_at: '2026-08-18T09:00:00.000Z', status: 'approved' },
+    ]);
+    const links = await getIncidentCorrectionLinks(INCIDENT);
+    expect(links).toEqual([{ id: 'link-1', attendanceCorrectionId: 'adj-1', linkedAt: '2026-08-18T09:00:00.000Z', correctionState: 'approved' }]);
+    const [text, params] = db.query.mock.calls[0]!;
+    expect(text).toContain('fleet_incident_attendance_correction_links');
+    expect(text).toContain('attendance_adjustments');
+    expect(text).toMatch(/\bl\.attendance_correction_id\b/);
+    expect(text).toMatch(/\bl\.linked_at\b/);
+    expect(text).toMatch(/\ba\.status\b/);
+    expect(text).toMatch(/l\.incident_id = \$1::uuid/);
+    expect(params).toEqual([INCIDENT]);
+  });
+
+  it('returns an empty array — not an error — when no correction is linked yet', async () => {
+    db.query.mockResolvedValueOnce([]);
+    expect(await getIncidentCorrectionLinks(INCIDENT)).toEqual([]);
+  });
+});
+
+/**
+ * PR7 review I2/I3: the manager badge previously derived from action-timeline ordering alone
+ * and could never report `expired`/`closed`, and `respond_by`/`delivery_failed_count` were
+ * durable columns nothing manager-facing read. This proves the single source of truth is
+ * `deriveDriverInputState` fed by the real `fleet_incident_driver_input_requests`/
+ * `fleet_incident_driver_submissions` columns (migration 503) — not a re-derived heuristic.
+ */
+describe('getIncidentDriverInputSummary', () => {
+  const currentRequestRow = {
+    incident_id: INCIDENT, requested_at: '2026-08-18T07:00:00.000Z', respond_by: '2026-08-20T21:59:59.999Z', delivery_failed_count: 0,
+  };
+
+  it('reads the current non-superseded request and surfaces respondBy, verified against migration 503 columns', async () => {
+    db.queryOne.mockResolvedValueOnce(settingsRow);
+    db.query.mockResolvedValueOnce([currentRequestRow]);
+    db.query.mockResolvedValueOnce([]);
+
+    const summary = await getIncidentDriverInputSummary(INCIDENT, null, '2026-08-19T00:00:00.000Z');
+
+    expect(summary).toEqual({ state: 'requested', respondBy: '2026-08-20T21:59:59.999Z', deliveryFailed: false });
+    const [requestsText, requestsParams] = db.query.mock.calls[0]!;
+    expect(requestsText).toContain('fleet_incident_driver_input_requests');
+    expect(requestsText).toContain('superseded_at IS NULL');
+    expect(requestsText).toMatch(/\brequested_at\b/);
+    expect(requestsText).toMatch(/\brespond_by\b/);
+    expect(requestsText).toMatch(/\bdelivery_failed_count\b/);
+    expect(requestsParams).toEqual([[INCIDENT]]);
+    const [submissionsText, submissionsParams] = db.query.mock.calls[1]!;
+    expect(submissionsText).toContain('fleet_incident_driver_submissions');
+    expect(submissionsText).toMatch(/\bcreated_at\b/);
+    expect(submissionsParams).toEqual([[INCIDENT]]);
+  });
+
+  it('reports deliveryFailed when the current request\'s delivery_failed_count is greater than zero', async () => {
+    db.queryOne.mockResolvedValueOnce(settingsRow);
+    db.query.mockResolvedValueOnce([{ ...currentRequestRow, delivery_failed_count: 1 }]);
+    db.query.mockResolvedValueOnce([]);
+    const summary = await getIncidentDriverInputSummary(INCIDENT, null, '2026-08-19T00:00:00.000Z');
+    expect(summary.deliveryFailed).toBe(true);
+  });
+
+  it('reports not_requested with no respondBy when no current request exists', async () => {
+    db.queryOne.mockResolvedValueOnce(settingsRow);
+    db.query.mockResolvedValueOnce([]);
+    db.query.mockResolvedValueOnce([]);
+    const summary = await getIncidentDriverInputSummary(INCIDENT, null, '2026-08-19T00:00:00.000Z');
+    expect(summary).toEqual({ state: 'not_requested', respondBy: null, deliveryFailed: false });
+  });
+
+  it('does NOT report responded when the latest submission predates the current request (a stale pre-supersession submission)', async () => {
+    db.queryOne.mockResolvedValueOnce(settingsRow);
+    db.query.mockResolvedValueOnce([currentRequestRow]);
+    db.query.mockResolvedValueOnce([{ incident_id: INCIDENT, responded_at: '2026-08-17T00:00:00.000Z' }]);
+    const summary = await getIncidentDriverInputSummary(INCIDENT, null, '2026-08-19T00:00:00.000Z');
+    expect(summary.state).toBe('requested');
+  });
+
+  it('DOES report responded when the latest submission is at/after the current request', async () => {
+    db.queryOne.mockResolvedValueOnce(settingsRow);
+    db.query.mockResolvedValueOnce([currentRequestRow]);
+    db.query.mockResolvedValueOnce([{ incident_id: INCIDENT, responded_at: '2026-08-18T09:00:00.000Z' }]);
+    const summary = await getIncidentDriverInputSummary(INCIDENT, null, '2026-08-19T00:00:00.000Z');
+    expect(summary.state).toBe('responded');
+  });
+
+  it('reports closed — not requested — when the incident is terminal and post-closure response was never enabled', async () => {
+    db.queryOne.mockResolvedValueOnce({ ...settingsRow, post_closure_response_enabled: false, post_closure_response_window_days: 0 });
+    db.query.mockResolvedValueOnce([currentRequestRow]);
+    db.query.mockResolvedValueOnce([]);
+    const summary = await getIncidentDriverInputSummary(INCIDENT, '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z');
+    expect(summary.state).toBe('closed');
+  });
+
+  it('remains requested when the incident is terminal but still within its post-closure response window', async () => {
+    db.queryOne.mockResolvedValueOnce({ ...settingsRow, post_closure_response_enabled: true, post_closure_response_window_days: 5 });
+    db.query.mockResolvedValueOnce([currentRequestRow]);
+    db.query.mockResolvedValueOnce([]);
+    const summary = await getIncidentDriverInputSummary(INCIDENT, '2026-08-19T00:00:00.000Z', '2026-08-19T12:00:00.000Z');
+    expect(summary.state).toBe('requested');
+  });
+});
+
+/**
+ * PR7 review I4: the queue previously had no driver-input surface at all. This proves the
+ * attachment is one settings read plus two BATCHED queries for the whole page — never one
+ * query per row — and that an empty page skips them entirely (no wasted reads).
+ */
+describe('listIncidents driverInput attachment', () => {
+  it('attaches driverInput using one settings read plus two batched queries for the whole page', async () => {
+    db.queryOne.mockResolvedValueOnce({ count: '1' });
+    db.query.mockResolvedValueOnce([listRow]);
+    db.queryOne.mockResolvedValueOnce(settingsRow);
+    db.query.mockResolvedValueOnce([]);
+    db.query.mockResolvedValueOnce([]);
+
+    const result = await listIncidents(baseRequest, unrestrictedScope);
+
+    expect(result.incidents[0]?.driverInput).toEqual({ state: 'not_requested', respondBy: null, deliveryFailed: false });
+    expect(db.query).toHaveBeenCalledTimes(3);
+    const [requestsText, requestsParams] = db.query.mock.calls[1]!;
+    expect(requestsText).toMatch(/= ANY\(\$1::uuid\[\]\)/);
+    expect(requestsParams).toEqual([[INCIDENT]]);
+  });
+
+  it('skips the settings and batched driver-input reads entirely when the page has no rows', async () => {
+    db.queryOne.mockResolvedValueOnce({ count: '0' });
+    db.query.mockResolvedValueOnce([]);
+
+    const result = await listIncidents(baseRequest, unrestrictedScope);
+
+    expect(result.incidents).toEqual([]);
+    expect(db.query).toHaveBeenCalledTimes(1);
+    // `queryOne` must also stay at exactly one call (the COUNT) — `getEffectiveDriverInputSettings`
+    // also uses `queryOne`, so a wasted settings read on an empty page would not show up in the
+    // `db.query` count above at all and would slip past that assertion alone.
+    expect(db.queryOne).toHaveBeenCalledTimes(1);
   });
 });

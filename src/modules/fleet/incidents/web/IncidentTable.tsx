@@ -3,8 +3,25 @@
  * filters/composition live in `IncidentQueue.tsx`, detail in
  * `IncidentReviewDrawer.tsx`). Status is never colour-only: the overdue and
  * condition badges always carry a text word, colour is a bonus.
+ *
+ * The "Driver input" column (PR7 review I4) is read-only — it renders
+ * `incident.driverInput.state`, computed server-side by
+ * `../reviewQueries.ts#attachDriverInputSummaries` via the same
+ * `deriveDriverInputState` the detail drawer's badge uses, so the queue and
+ * the drawer can never disagree. No filter control was added: a client-only
+ * `driverInputState` queue filter was already tried and removed from this
+ * branch once because the server never implemented it — this task adds a
+ * visible indicator only, per the review's explicit instruction not to
+ * reintroduce a filter without server-side enforcement in the same commit.
  */
 import type { IncidentListItem, IncidentLifecycleStatus, IncidentSeverity, IncidentType } from '../types';
+import type { DriverInputState } from '../driver/types';
+
+/** No cell text for `not_requested` — nothing to flag a manager's attention with yet, mirrors the drawer's own badge suppression for this state. */
+const DRIVER_INPUT_LABELS: Partial<Record<DriverInputState, string>> = {
+  requested: 'Awaiting driver', responded: 'Driver responded',
+  expired: 'Response expired', closed: 'Response closed',
+};
 
 const TERMINAL: readonly IncidentLifecycleStatus[] = ['resolved', 'dismissed'];
 
@@ -39,6 +56,12 @@ function ConditionState({ incident }: { incident: IncidentListItem }) {
     : <span className="font-medium">Active</span>;
 }
 
+function DriverInputCell({ incident }: { incident: IncidentListItem }) {
+  const label = DRIVER_INPUT_LABELS[incident.driverInput.state];
+  if (!label) return <span>—</span>;
+  return <span className={incident.driverInput.state === 'responded' ? 'font-medium' : undefined}>{label}</span>;
+}
+
 export interface IncidentTableProps {
   incidents: IncidentListItem[];
   canEdit: boolean;
@@ -63,6 +86,7 @@ export function IncidentTable({ incidents, canEdit, selected, onToggleSelect, on
           <th scope="col" className="p-2">Opened</th>
           <th scope="col" className="p-2">Acknowledgement</th>
           <th scope="col" className="p-2">Evidence</th>
+          <th scope="col" className="p-2">Driver input</th>
         </tr>
       </thead>
       <tbody>
@@ -91,6 +115,7 @@ export function IncidentTable({ incidents, canEdit, selected, onToggleSelect, on
               <td className="p-2">{sast(incident.openedAt)}</td>
               <td className="p-2"><AckState incident={incident} now={now} /></td>
               <td className="p-2">{incident.evidenceCount} attachment{incident.evidenceCount === 1 ? '' : 's'}</td>
+              <td className="p-2"><DriverInputCell incident={incident} /></td>
             </tr>
           );
         })}

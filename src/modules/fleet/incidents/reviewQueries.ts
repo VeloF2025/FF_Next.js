@@ -7,10 +7,13 @@
  * `staff`/`projects` is needed for the queue or detail views.
  */
 import { query, queryOne } from '@/lib/db-pool';
+import { deriveDriverInputState } from './driver/inputState';
+import { getEffectiveDriverInputSettings } from './driver/settingsRepository';
+import type { AttendanceCorrectionState, DriverInputState } from './driver/types';
 import type { IncidentScopeFilter } from './reviewScope';
 import type {
-  IncidentAction, IncidentActionType, IncidentDeliverySummary, IncidentDetail, IncidentEvidence,
-  IncidentEvidenceType, IncidentListItem, IncidentListRequest, IncidentListResult, IncidentLifecycleStatus,
+  IncidentAction, IncidentActionType, IncidentCorrectionLink, IncidentDeliverySummary, IncidentDetail, IncidentDriverInputSummary,
+  IncidentEvidence, IncidentEvidenceType, IncidentListItem, IncidentListRequest, IncidentListResult, IncidentLifecycleStatus,
   IncidentOutcome, IncidentSeverity, IncidentType, IncidentVisibility, SanitizedIncidentMetadata,
 } from './types';
 
@@ -21,16 +24,26 @@ const EVIDENCE_COUNT_SUBQUERY = `(SELECT COUNT(*)::int FROM fleet_operational_in
 
 const LIST_COLUMNS = `id, incident_reference, incident_type, severity, lifecycle_status, staff_id, staff_name_snapshot,
   project_id, project_name_snapshot, operational_site_name_snapshot, opened_at, condition_last_seen_at,
-  condition_cleared_at, escalation_level, next_escalation_at, ${EVIDENCE_COUNT_SUBQUERY} AS evidence_count`;
+  condition_cleared_at, escalation_level, next_escalation_at, resolved_at, ${EVIDENCE_COUNT_SUBQUERY} AS evidence_count`;
 
 interface ListRow extends Record<string, unknown> {
   id: string; incident_reference: string; incident_type: IncidentType; severity: IncidentSeverity; lifecycle_status: IncidentLifecycleStatus;
   staff_id: string | null; staff_name_snapshot: string | null; project_id: string | null; project_name_snapshot: string | null;
   operational_site_name_snapshot: string | null; opened_at: string | Date; condition_last_seen_at: string | Date | null;
-  condition_cleared_at: string | Date | null; escalation_level: number; next_escalation_at: string | Date | null; evidence_count: number;
+  condition_cleared_at: string | Date | null; escalation_level: number; next_escalation_at: string | Date | null;
+  // `resolved_at` is read here only to drive `driverInput`'s closed/expired distinction
+  // (PR7 review I2) — it is not itself part of `IncidentListItem`'s public shape.
+  resolved_at: string | Date | null; evidence_count: number;
 }
 
-function mapListRow(row: ListRow): IncidentListItem {
+/** Everything `mapListRow` can compute directly from one incident row — `driverInput` is
+ * deliberately excluded: it needs a second, batched read across
+ * `fleet_incident_driver_input_requests`/`fleet_incident_driver_submissions` (see
+ * `attachDriverInputSummaries` below), so a caller cannot forget to attach it by having
+ * this function's return type silently satisfy `IncidentListItem` without it. */
+type IncidentListItemCore = Omit<IncidentListItem, 'driverInput'>;
+
+function mapListRow(row: ListRow): IncidentListItemCore {
   return {
     id: row.id, incidentReference: row.incident_reference, incidentType: row.incident_type, severity: row.severity,
     lifecycleStatus: row.lifecycle_status, staffId: row.staff_id, staffName: row.staff_name_snapshot,
@@ -38,6 +51,88 @@ function mapListRow(row: ListRow): IncidentListItem {
     openedAt: iso(row.opened_at), conditionLastSeenAt: isoOrNull(row.condition_last_seen_at), conditionClearedAt: isoOrNull(row.condition_cleared_at),
     escalationLevel: row.escalation_level, nextEscalationAt: isoOrNull(row.next_escalation_at), evidenceCount: row.evidence_count,
   };
+}
+
+interface CurrentRequestSummary { requestedAt: string; respondBy: string; deliveryFailedCount: number }
+
+/**
+ * Pure state resolution shared by the queue (`attachDriverInputSummaries`) and the detail
+ * drawer (`getIncidentDriverInputSummary`) — the one place either caller decides
+ * `driverInput.state`, always via `deriveDriverInputState` (PR7 review I2: "reuse that
+ * function — do not write a second derivation"). `latestSubmissionAt` is only treated as a
+ * genuine response to `currentRequest` when it is at/after that request's `requestedAt` — an
+ * unprompted submission from a *previous* (now-superseded) request cycle must not be read as
+ * an answer to the current one.
+ */
+function resolveDriverInputSummary(
+  now: string, currentRequest: CurrentRequestSummary | null, latestSubmissionAt: string | null, incidentTerminalAt: string | null,
+  settings: { postClosureResponseEnabled: boolean; postClosureResponseWindowDays: number },
+): IncidentDriverInputSummary {
+  const respondedAt = latestSubmissionAt !== null && (!currentRequest || latestSubmissionAt >= currentRequest.requestedAt)
+    ? latestSubmissionAt : null;
+  const state: DriverInputState = deriveDriverInputState({
+    now, currentRequest: currentRequest ? { requestedAt: currentRequest.requestedAt, respondBy: currentRequest.respondBy } : null,
+    respondedAt, incidentTerminalAt,
+    postClosureResponseEnabled: settings.postClosureResponseEnabled, postClosureResponseWindowDays: settings.postClosureResponseWindowDays,
+  });
+  return { state, respondBy: currentRequest?.respondBy ?? null, deliveryFailed: (currentRequest?.deliveryFailedCount ?? 0) > 0 };
+}
+
+interface CurrentRequestRow extends Record<string, unknown> {
+  incident_id: string; requested_at: string | Date; respond_by: string | Date; delivery_failed_count: number;
+}
+
+/** The current (non-superseded) `fleet_incident_driver_input_requests` row per incident, batched via `= ANY($1::uuid[])` rather than one query per row. Column names verified against migration 503 (`requested_at`, `respond_by`, `superseded_at`, `delivery_failed_count`) — no query mocking hides a real schema mismatch here. */
+async function loadCurrentDriverInputRequests(incidentIds: string[]): Promise<Map<string, CurrentRequestSummary>> {
+  if (incidentIds.length === 0) return new Map();
+  const rows = await query<CurrentRequestRow>(
+    `SELECT DISTINCT ON (incident_id) incident_id, requested_at, respond_by, delivery_failed_count
+     FROM fleet_incident_driver_input_requests
+     WHERE incident_id = ANY($1::uuid[]) AND superseded_at IS NULL
+     ORDER BY incident_id, requested_at DESC`,
+    [incidentIds],
+  );
+  const map = new Map<string, CurrentRequestSummary>();
+  for (const row of rows) {
+    map.set(row.incident_id, { requestedAt: iso(row.requested_at), respondBy: iso(row.respond_by), deliveryFailedCount: row.delivery_failed_count });
+  }
+  return map;
+}
+
+interface LatestSubmissionRow extends Record<string, unknown> { incident_id: string; responded_at: string | Date }
+
+/** The most recent `fleet_incident_driver_submissions.created_at` per incident, batched the same way. Column names verified against migration 503 (`incident_id`, `created_at`). */
+async function loadLatestSubmissionTimes(incidentIds: string[]): Promise<Map<string, string>> {
+  if (incidentIds.length === 0) return new Map();
+  const rows = await query<LatestSubmissionRow>(
+    `SELECT incident_id, MAX(created_at) AS responded_at FROM fleet_incident_driver_submissions
+     WHERE incident_id = ANY($1::uuid[]) GROUP BY incident_id`,
+    [incidentIds],
+  );
+  const map = new Map<string, string>();
+  for (const row of rows) map.set(row.incident_id, iso(row.responded_at));
+  return map;
+}
+
+/**
+ * Attaches `driverInput` to every queue row with exactly two extra, batched queries (never
+ * one query per row) plus one settings read — not per row either. A coarser three-state
+ * signal would have been cheaper, but it would also have been the "second derivation" PR7
+ * review I2 flags: this reuses the identical `resolveDriverInputSummary`/
+ * `deriveDriverInputState` path the detail drawer uses, so the queue badge and the drawer
+ * badge can never disagree (PR7 review I4).
+ */
+async function attachDriverInputSummaries(rows: ListRow[]): Promise<IncidentListItem[]> {
+  if (rows.length === 0) return [];
+  const now = new Date().toISOString();
+  const ids = rows.map((row) => row.id);
+  const [settings, requests, submissions] = await Promise.all([
+    getEffectiveDriverInputSettings(now), loadCurrentDriverInputRequests(ids), loadLatestSubmissionTimes(ids),
+  ]);
+  return rows.map((row) => ({
+    ...mapListRow(row),
+    driverInput: resolveDriverInputSummary(now, requests.get(row.id) ?? null, submissions.get(row.id) ?? null, isoOrNull(row.resolved_at ?? null), settings),
+  }));
 }
 
 interface WhereBuild { clause: string; params: unknown[] }
@@ -82,10 +177,10 @@ export async function listIncidents(request: IncidentListRequest, scope: Inciden
     `SELECT ${LIST_COLUMNS} FROM fleet_operational_incidents ${clause} ORDER BY opened_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     [...params, request.limit, request.offset],
   );
-  return { incidents: rows.map(mapListRow), total };
+  return { incidents: await attachDriverInputSummaries(rows), total };
 }
 
-export type IncidentDetailCore = Omit<IncidentDetail, 'actions' | 'evidence' | 'delivery'>;
+export type IncidentDetailCore = Omit<IncidentDetail, 'actions' | 'evidence' | 'delivery' | 'driverInput' | 'correctionLinks'>;
 
 const DETAIL_COLUMNS = `id, incident_reference, incident_type, severity, lifecycle_status, staff_id, staff_name_snapshot,
   project_id, project_name_snapshot, operational_site_name_snapshot, source_event_id, evidence_snapshot,
@@ -117,6 +212,52 @@ function mapDetailRow(row: DetailRow): IncidentDetailCore {
 export async function getIncidentCore(incidentId: string): Promise<IncidentDetailCore | null> {
   const row = await queryOne<DetailRow>(`SELECT ${DETAIL_COLUMNS} FROM fleet_operational_incidents WHERE id = $1::uuid`, [incidentId]);
   return row ? mapDetailRow(row) : null;
+}
+
+/**
+ * The single incident's `driverInput` summary for the detail drawer (PR7 review C1/I2/I3).
+ * Self-sufficient (reads its own settings) rather than taking them as a parameter, so
+ * `reviewService.ts#getIncidentDetailForViewer` needs no `driver/settingsRepository` import
+ * of its own — reuses `loadCurrentDriverInputRequests`/`loadLatestSubmissionTimes` with a
+ * one-element id array rather than a bespoke single-incident query, so the queue and the
+ * drawer can never read this off two different SQL shapes.
+ */
+export async function getIncidentDriverInputSummary(
+  incidentId: string, incidentTerminalAt: string | null, now: string,
+): Promise<IncidentDriverInputSummary> {
+  const settings = await getEffectiveDriverInputSettings(now);
+  const [requests, submissions] = await Promise.all([
+    loadCurrentDriverInputRequests([incidentId]), loadLatestSubmissionTimes([incidentId]),
+  ]);
+  return resolveDriverInputSummary(now, requests.get(incidentId) ?? null, submissions.get(incidentId) ?? null, incidentTerminalAt, settings);
+}
+
+const CORRECTION_LINK_COLUMNS = `l.id, l.attendance_correction_id, l.linked_at, a.status`;
+
+interface CorrectionLinkRow extends Record<string, unknown> {
+  id: string; attendance_correction_id: string; linked_at: string | Date; status: AttendanceCorrectionState;
+}
+
+/**
+ * Every Attendance correction linked to `incidentId`, regardless of which driver it belongs
+ * to — the caller (`reviewService.ts#getIncidentDetailForViewer`) has already gated the
+ * whole detail read on manager project scope, so this deliberately does NOT repeat a
+ * per-driver `staff_id` filter the way `driverIncidentService.ts#loadOwnCorrectionLinks`
+ * does for the `/my` portal (PR7 review C1: "reuse the existing enforcement ... rather than
+ * adding a second scope check"). `correctionState` is `a.status`, read live off
+ * `attendance_adjustments` on every call — never cached (design §8).
+ */
+export async function getIncidentCorrectionLinks(incidentId: string): Promise<IncidentCorrectionLink[]> {
+  const rows = await query<CorrectionLinkRow>(
+    `SELECT ${CORRECTION_LINK_COLUMNS}
+     FROM fleet_incident_attendance_correction_links l
+     JOIN attendance_adjustments a ON a.id = l.attendance_correction_id
+     WHERE l.incident_id = $1::uuid ORDER BY l.linked_at ASC`,
+    [incidentId],
+  );
+  return rows.map((row) => ({
+    id: row.id, attendanceCorrectionId: row.attendance_correction_id, linkedAt: iso(row.linked_at), correctionState: row.status,
+  }));
 }
 
 const ACTION_COLUMNS = `id, action_type, actor_user_id, is_system_actor, occurred_at, note, visibility, before_lifecycle_status,

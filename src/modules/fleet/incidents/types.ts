@@ -1,4 +1,11 @@
 import type { NotificationChannel, NotifyResult } from '@/modules/notifications/types';
+// Type-only: `driver/types.ts` itself imports `IncidentSeverity`/`IncidentType` from this
+// file, so this is a type-level cycle by construction — safe because `import type` is fully
+// erased at compile time (no runtime module-init order exists to break). Reusing
+// `DriverInputState`/`AttendanceCorrectionState` here, rather than redeclaring the same
+// literal unions, is what lets `IncidentListItem.driverInput`/`IncidentCorrectionLink` and
+// the driver portal's own types stay a single source of truth (PR7 review C1/I2/I3).
+import type { AttendanceCorrectionState, DriverInputState } from './driver/types';
 
 export type IncidentType =
   | 'late' | 'wrong_site' | 'evidence_mismatch' | 'left_early'
@@ -163,6 +170,32 @@ export interface IncidentListRequest {
   offset: number;
 }
 
+/**
+ * Manager-facing view of the driver-input state machine on one incident
+ * (PR7 review I2/I3/I4). Always derived via `../driver/inputState.ts`'s
+ * `deriveDriverInputState` — never a second, independently-reasoned
+ * heuristic (the ordering-only badge this replaced could not tell
+ * "response window closed" from "driver hasn't answered yet"). `respondBy`
+ * and `deliveryFailed` are the durable `fleet_incident_driver_input_requests`
+ * columns (`respond_by`, `delivery_failed_count`) that were previously
+ * written but never read anywhere a manager could see them.
+ */
+export interface IncidentDriverInputSummary {
+  state: DriverInputState;
+  /** The current (non-superseded) request's due date, or `null` when no request currently governs this incident. */
+  respondBy: string | null;
+  /** `true` when the current request's `delivery_failed_count > 0` — the driver-input notification never reached the driver (design §13). */
+  deliveryFailed: boolean;
+}
+
+/** One durable `fleet_incident_attendance_correction_links` row, manager-visible (PR7 review C1). `correctionState` is read live from `attendance_adjustments.status` on every call — never a second, cached authoritative status (design §8). */
+export interface IncidentCorrectionLink {
+  id: string;
+  attendanceCorrectionId: string;
+  linkedAt: string;
+  correctionState: AttendanceCorrectionState;
+}
+
 export interface IncidentListItem {
   id: string;
   incidentReference: string;
@@ -180,6 +213,7 @@ export interface IncidentListItem {
   escalationLevel: number;
   nextEscalationAt: string | null;
   evidenceCount: number;
+  driverInput: IncidentDriverInputSummary;
 }
 
 export interface IncidentListResult {
@@ -204,6 +238,8 @@ export interface IncidentDetail extends IncidentListItem {
   actions: IncidentAction[];
   evidence: IncidentEvidence[];
   delivery: IncidentDeliverySummary;
+  /** Every Attendance correction linked to this incident, regardless of which driver submission (if any) started it — manager project scope already gates the whole detail read, so this is not separately staff-scoped (PR7 review C1). */
+  correctionLinks: IncidentCorrectionLink[];
 }
 
 export interface IncidentAction {

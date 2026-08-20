@@ -17,6 +17,8 @@ function detail(overrides: Partial<IncidentDetail> = {}): IncidentDetail {
     actions: [{ id: 'action-1', actionType: 'opened', actorUserId: null, isSystemActor: true, occurredAt: '2026-08-18T06:58:00.000Z', note: null, visibility: 'internal', beforeLifecycleStatus: null, afterLifecycleStatus: 'open', beforeEscalationLevel: null, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null }],
     evidence: [{ id: 'evidence-1', evidenceType: 'photo', storageUrl: '/storage/fleet/incidents/photo.jpg', storageKey: 'k', mimeType: 'image/jpeg', originalFilename: 'gate.jpg', uploadedBy: 'user-9', description: 'Gate photo', visibility: 'internal', createdAt: '2026-08-18T07:12:00.000Z' }],
     delivery: { delivered: 2, suppressed: 0, failed: 0 },
+    driverInput: { state: 'not_requested', respondBy: null, deliveryFailed: false },
+    correctionLinks: [],
     ...overrides,
   };
 }
@@ -147,7 +149,10 @@ describe('IncidentReviewDrawer', () => {
       beforeEscalationLevel: 0, afterEscalationLevel: 0, metadata: {}, requestCorrelationId: null,
     };
 
-    fetchMock.mockResolvedValueOnce(ok(detail({ actions: [requested, opened] })));
+    fetchMock.mockResolvedValueOnce(ok(detail({
+      actions: [requested, opened],
+      driverInput: { state: 'requested', respondBy: '2026-08-20T21:59:59.999Z', deliveryFailed: false },
+    })));
     const { unmount } = render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
     await flush();
     expect(screen.getByText('Awaiting driver')).toBeInTheDocument();
@@ -159,7 +164,10 @@ describe('IncidentReviewDrawer', () => {
     expect(within(screen.getByTestId('action-action-2')).getByText('[Shared with driver]')).toBeInTheDocument();
     unmount();
 
-    fetchMock.mockResolvedValueOnce(ok(detail({ actions: [responded, requested, opened] })));
+    fetchMock.mockResolvedValueOnce(ok(detail({
+      actions: [responded, requested, opened],
+      driverInput: { state: 'responded', respondBy: '2026-08-20T21:59:59.999Z', deliveryFailed: false },
+    })));
     render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
     await flush();
     expect(screen.getByText('Driver responded')).toBeInTheDocument();
@@ -177,6 +185,59 @@ describe('IncidentReviewDrawer', () => {
     await flush();
     expect(screen.queryByText('Awaiting driver')).not.toBeInTheDocument();
     expect(screen.queryByText('Driver responded')).not.toBeInTheDocument();
+  });
+
+  /**
+   * PR7 review I2: the previous badge derived only from action ordering and could not tell
+   * "response window closed" from "driver hasn't answered yet" — both rendered as "Awaiting
+   * driver". `driverInput.state` now comes straight from `deriveDriverInputState`, so expired
+   * and closed each get their own, distinct badge text.
+   */
+  it('distinguishes an expired response window and a closed incident from "Awaiting driver"', async () => {
+    fetchMock.mockResolvedValueOnce(ok(detail({ driverInput: { state: 'expired', respondBy: '2026-08-15T21:59:59.999Z', deliveryFailed: false } })));
+    const { unmount } = render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.getByText('Response window expired')).toBeInTheDocument();
+    expect(screen.queryByText('Awaiting driver')).not.toBeInTheDocument();
+    unmount();
+
+    fetchMock.mockResolvedValueOnce(ok(detail({ lifecycleStatus: 'resolved', outcome: 'confirmed', resolutionNote: 'Confirmed late arrival', driverInput: { state: 'closed', respondBy: null, deliveryFailed: false } })));
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.getByText('Response window closed')).toBeInTheDocument();
+    expect(screen.queryByText('Awaiting driver')).not.toBeInTheDocument();
+  });
+
+  /** PR7 review I3: `respond_by` and the delivery-failure counter were durably stored but never read anywhere a manager could see them. */
+  it('surfaces the response due date for an open request and a delivery-failure warning', async () => {
+    fetchMock.mockResolvedValueOnce(ok(detail({ driverInput: { state: 'requested', respondBy: '2026-08-20T21:59:59.999Z', deliveryFailed: false } })));
+    const { unmount } = render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.getByText(/Response due/)).toBeInTheDocument();
+    expect(screen.queryByText(/was not notified/)).not.toBeInTheDocument();
+    unmount();
+
+    fetchMock.mockResolvedValueOnce(ok(detail({ driverInput: { state: 'requested', respondBy: '2026-08-20T21:59:59.999Z', deliveryFailed: true } })));
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.getByRole('alert')).toHaveTextContent(/was not notified/);
+  });
+
+  /** PR7 review C1: correction links were written by the driver-scoped `/my` portal and read only there — no manager surface existed at all. */
+  it('renders correction-link status for a manager, read live from Attendance', async () => {
+    fetchMock.mockResolvedValue(ok(detail({
+      correctionLinks: [{ id: 'link-1', attendanceCorrectionId: 'adj-1', linkedAt: '2026-08-18T09:05:00.000Z', correctionState: 'approved' }],
+    })));
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(within(screen.getByTestId('correction-link-link-1')).getByText(/Approved/)).toBeInTheDocument();
+  });
+
+  it('renders nothing for the correction-links section when none exist', async () => {
+    fetchMock.mockResolvedValue(ok(detail({ correctionLinks: [] })));
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.queryByLabelText('Attendance corrections')).not.toBeInTheDocument();
   });
 
   it('lets an editor request driver input and confirms the response-due date only after the API confirms it', async () => {

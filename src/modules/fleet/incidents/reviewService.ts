@@ -16,7 +16,8 @@ import { IncidentNotFoundError } from './incidentRepository';
 import { sendResolutionNotification } from './incidentNotifications';
 import { isProjectOwnedByScope, resolveIncidentScope } from './reviewScope';
 import {
-  getIncidentActions, getIncidentCore, getIncidentDeliverySummary, getIncidentEvidence, listIncidents,
+  getIncidentActions, getIncidentCore, getIncidentCorrectionLinks, getIncidentDeliverySummary,
+  getIncidentDriverInputSummary, getIncidentEvidence, listIncidents,
 } from './reviewQueries';
 import { runBulkAcknowledge, runIncidentTransition, type BulkAcknowledgeOutcome } from './reviewTransitions';
 import type {
@@ -43,10 +44,15 @@ export async function getIncidentDetailForViewer(incidentId: string, viewer: Inc
   const core = await getIncidentCore(incidentId);
   if (!core) throw new IncidentNotFoundError(`No incident found for id ${incidentId}`);
   if (!scope.unrestricted && !await isProjectOwnedByScope(scope, core.projectId)) throw new IncidentAccessDeniedError('You cannot view this Fleet incident');
-  const [actions, evidence, delivery] = await Promise.all([
+  // Every read below runs behind the same project-scope gate just checked above — including
+  // `driverInput`/`correctionLinks` (PR7 review C1: "reuse the existing enforcement ...
+  // rather than adding a second scope check").
+  const now = new Date().toISOString();
+  const [actions, evidence, delivery, driverInput, correctionLinks] = await Promise.all([
     getIncidentActions(incidentId), getIncidentEvidence(incidentId), getIncidentDeliverySummary(incidentId),
+    getIncidentDriverInputSummary(incidentId, core.resolvedAt, now), getIncidentCorrectionLinks(incidentId),
   ]);
-  return { ...core, actions, evidence, delivery };
+  return { ...core, actions, evidence, delivery, driverInput, correctionLinks };
 }
 
 export async function transitionIncident(request: IncidentTransitionRequest, viewer: IncidentViewer): Promise<IncidentTransitionResult> {

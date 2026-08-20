@@ -12,6 +12,7 @@ function incident(overrides: Partial<IncidentListItem> = {}): IncidentListItem {
     staffId: 'staff-1', staffName: 'Jane Driver', projectId: 'project-1', projectName: 'Lawley',
     operationalSiteName: 'Zone A', openedAt: '2026-08-18T07:00:00.000Z', conditionLastSeenAt: '2026-08-18T07:55:00.000Z',
     conditionClearedAt: null, escalationLevel: 0, nextEscalationAt: '2026-08-18T08:15:00.000Z', evidenceCount: 0,
+    driverInput: { state: 'not_requested', respondBy: null, deliveryFailed: false },
     ...overrides,
   };
 }
