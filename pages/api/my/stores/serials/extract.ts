@@ -24,7 +24,7 @@ import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import { requireStoresActor } from '@/modules/field-stock-pwa/lib/storesActor';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import {
-  decodeSerialFromImage,
+  decodeSerialsFromImage,
   extractSerialWithVlm,
   validateSerialCandidate,
 } from './_extractCore';
@@ -103,13 +103,22 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
   }
 
   try {
-    // 1. Barcode pass on the ORIGINAL image.
-    const decoded = await decodeSerialFromImage(buffer);
-    const decodedValid = decoded ? validateSerialCandidate(decoded) : null;
-    if (decodedValid) {
-      log.info('serial extract: barcode hit', { family: decodedValid.family }, 'my/stores/serials/extract');
+    // 1. Barcode pass on the ORIGINAL image. A carton photo yields all nine
+    //    serials from the box DataMatrix; a unit label yields one.
+    const decoded = await decodeSerialsFromImage(buffer);
+    const decodedValid = decoded
+      .map((serial) => validateSerialCandidate(serial))
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+    if (decodedValid.length > 0) {
+      log.info(
+        'serial extract: barcode hit',
+        { family: decodedValid[0]!.family, count: decodedValid.length },
+        'my/stores/serials/extract',
+      );
       return apiResponse.success(res, {
-        serial: decodedValid.serial, family: decodedValid.family,
+        serial: decodedValid[0]!.serial,
+        serials: decodedValid.map((c) => c.serial),
+        family: decodedValid[0]!.family,
         method: 'barcode', confidence: 1, photoUrl,
       });
     }
@@ -123,11 +132,13 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
     const vlm = await extractSerialWithVlm(resized);
     if (vlm) {
       log.info('serial extract: VLM hit', { family: vlm.family, confidence: vlm.confidence }, 'my/stores/serials/extract');
-      return apiResponse.success(res, { ...vlm, method: 'vlm', photoUrl });
+      return apiResponse.success(res, { ...vlm, serials: [vlm.serial], method: 'vlm', photoUrl });
     }
 
     log.info('serial extract: no serial found', { staffId: actor.staffId }, 'my/stores/serials/extract');
-    return apiResponse.success(res, { serial: null, family: null, method: 'none', confidence: 0, photoUrl });
+    return apiResponse.success(res, {
+      serial: null, serials: [], family: null, method: 'none', confidence: 0, photoUrl,
+    });
   } catch (err) {
     log.error('serial extract failed', { err }, 'my/stores/serials/extract');
     return apiResponse.internalError(res, err);

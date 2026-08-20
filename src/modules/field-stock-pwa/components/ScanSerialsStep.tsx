@@ -147,6 +147,12 @@ export function ScanSerialsStep({
       {/* Photo-to-serial fallback */}
       <PhotoSerialFallback
         onSerial={(serial) => { setFallbackHint(null); setManualOpen(true); setManualInput(serial); }}
+        onSerials={(serials) => {
+          // Re-enter through the same parser the camera uses, so the photo path
+          // and the scan path share one code path and one set of tests.
+          setFallbackHint(null);
+          void handleRawSerial(serials.join(';'));
+        }}
         onNoSerial={(msg) => { setFallbackHint(msg); setManualOpen(true); }}
       />
       {fallbackHint && <p className="text-xs text-amber-400">{fallbackHint}</p>}

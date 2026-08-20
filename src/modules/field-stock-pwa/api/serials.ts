@@ -20,6 +20,8 @@ import { request, ApiError } from './request';
 
 export interface SerialExtractResult {
   serial: string | null;
+  /** Every serial the photo yielded. A carton gives nine; a unit label gives one. */
+  serials: string[];
   family: 'ont' | 'gizzu' | 'generic' | null;
   method: 'barcode' | 'vlm' | 'none';
   confidence: number;

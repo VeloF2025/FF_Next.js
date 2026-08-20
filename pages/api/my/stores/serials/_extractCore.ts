@@ -14,7 +14,7 @@
  */
 
 import sharp from 'sharp';
-import { extractScannedSerial } from '@/modules/field-stock-pwa/lib/scannedSerial';
+import { parseScanPayload } from '@/modules/field-stock-pwa/lib/boxScan';
 import {
   VLM_CHAT_ENDPOINT,
   VLM_EXTRACTION_MODEL,
@@ -53,13 +53,16 @@ export function validateSerialCandidate(
 }
 
 /**
- * Decode barcode from an image buffer.
+ * Decode every serial on an image.
+ *
+ * A photo of a Nokia carton yields NINE — the box DataMatrix carries the full
+ * serial list — while a unit label yields one. Returns [] when nothing decodes.
  *
  * Passes ImageData (not a Blob) to readBarcodes because jsdom's Blob polyfill
  * lacks .arrayBuffer(), which zxing needs internally for the Blob path. The
  * ImageData path works in both Node and test environments.
  */
-export async function decodeSerialFromImage(buffer: Buffer): Promise<string | null> {
+export async function decodeSerialsFromImage(buffer: Buffer): Promise<string[]> {
   try {
     const { readBarcodes } = await import('zxing-wasm/full');
 
@@ -89,22 +92,43 @@ export async function decodeSerialFromImage(buffer: Buffer): Promise<string | nu
       tryInvert: true,
     });
 
-    for (const r of results) {
-      // zxing-wasm renders ISO 15434 control bytes as Unicode Control Pictures
-      // (U+241D/241E/2404) rather than raw bytes. Normalise back so that
-      // extractScannedSerial (which splits on \x1d/\x1e/\x04) works correctly.
-      const normalised = r.text
-        .replace(/␝/g, '\x1d')
-        .replace(/␞/g, '\x1e')
-        .replace(/␄/g, '\x04');
-      const unwrapped = extractScannedSerial(normalised).toUpperCase();
-      if (validateSerialCandidate(unwrapped)) return unwrapped;
+    // zxing-wasm renders ISO 15434 control bytes as Unicode Control Pictures
+    // (U+241D/241E/2404) rather than raw bytes. Normalise back so the parser
+    // (which splits on \x1d/\x1e/\x04) sees a real envelope.
+    const payloads = results.map((r) =>
+      parseScanPayload(
+        r.text.replace(/␝/g, '\x1d').replace(/␞/g, '\x1e').replace(/␄/g, '\x04'),
+      ),
+    );
+
+    // A photo of a carton catches the box DataMatrix AND the per-unit Code128s
+    // printed below it. The box code is the richer read — prefer it, and fall
+    // back to individual serials only when no box code decoded.
+    const box = payloads.find((p) => p.kind === 'box');
+    if (box && box.kind === 'box') {
+      const valid = box.serials.filter((serial) => validateSerialCandidate(serial) !== null);
+      if (valid.length > 0) return valid;
     }
-    return null;
+
+    for (const payload of payloads) {
+      if (payload.kind !== 'single') continue;
+      const candidate = validateSerialCandidate(payload.serial);
+      if (candidate) return [candidate.serial];
+    }
+    return [];
   } catch (err) {
     log.warn('serial extract: zxing decode failed', { err }, 'my/stores/serials/extract');
-    return null;
+    return [];
   }
+}
+
+/**
+ * Single-serial convenience wrapper — the shape the VLM fallback path and the
+ * older callers expect. A carton photo yields its first serial here.
+ */
+export async function decodeSerialFromImage(buffer: Buffer): Promise<string | null> {
+  const serials = await decodeSerialsFromImage(buffer);
+  return serials[0] ?? null;
 }
 
 export const STORES_SERIAL_PROMPT = `You are reading an equipment label photo from a fibre-network warehouse.
