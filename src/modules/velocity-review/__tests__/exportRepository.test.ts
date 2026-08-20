@@ -17,7 +17,6 @@ import {
   claimDueAcknowledgementCleanup,
   claimNextExport,
   createExport,
-  expireStalledHandshakes,
   saveCandidateDecision,
   transitionExportState,
 } from '../exportRepository';
@@ -247,54 +246,5 @@ describe('Velocity review export persistence', () => {
     expect(beforeTx.queryOne).toHaveBeenCalledTimes(1);
     expect(afterTx.queryOne).toHaveBeenCalledTimes(2);
     expect(afterTx.queryOne.mock.calls[1]?.[1]).toEqual(['export-1', ['export-1'], restartAt, restartLease]);
-  });
-});
-
-
-describe('expireStalledHandshakes', () => {
-  beforeEach(() => {
-    mocks.query.mockReset();
-  });
-
-  it('resolves only ambiguous and ack_cleanup_pending rows older than the cutoff', async () => {
-    mocks.query.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
-    const cutoff = new Date('2026-08-19T09:00:00.000Z');
-
-    const now = new Date('2026-08-20T09:00:00.000Z');
-
-    const expired = await expireStalledHandshakes(cutoff, now);
-
-    expect(expired).toBe(2);
-    const [sql, params] = mocks.query.mock.calls[0];
-    // One injectable clock: the retry-due bound is a parameter, not SQL NOW().
-    expect(params).toEqual([cutoff, now]);
-    expect(sql).toContain("state IN ('ambiguous', 'ack_cleanup_pending')");
-    expect(sql).toContain('updated_at < $1');
-    expect(sql).toContain("state = 'permanent_failure'");
-  });
-
-  it('leaves a row alone while its own retry is still scheduled', async () => {
-    mocks.query.mockResolvedValue([]);
-
-    await expireStalledHandshakes(new Date('2026-08-19T09:00:00.000Z'), new Date());
-
-    // nextRetryAt honours an uncapped GHL Retry-After, so a pending next_attempt_at
-    // can outlive the stale window; expiring it would drop a live retry.
-    const [sql] = mocks.query.mock.calls[0];
-    expect(sql).toContain('next_attempt_at IS NULL OR next_attempt_at <= $2');
-  });
-
-  it('does not prefix a bare handshake code with a colon', async () => {
-    mocks.query.mockResolvedValue([]);
-
-    await expireStalledHandshakes(new Date(), new Date());
-
-    const [sql] = mocks.query.mock.calls[0];
-    expect(sql).toContain("COALESCE(error_code || ':', '') || 'handshake_expired'");
-  });
-
-  it('reports zero when nothing is stale', async () => {
-    mocks.query.mockResolvedValue([]);
-    await expect(expireStalledHandshakes(new Date(), new Date())).resolves.toBe(0);
   });
 });

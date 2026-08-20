@@ -7,6 +7,7 @@ import {
   type ProcessorDependencies,
 } from '../processor';
 import type { VelocityReviewExport } from '../exportRepository';
+import { ENROLLED_TAG, READY_TAG } from '../types';
 import type { CandidateDbRow, CandidateDecision, PreparedCandidate } from '../types';
 
 const NOW = new Date('2026-08-01T07:00:00.000Z');
@@ -213,7 +214,8 @@ function runDeps(values: PreparedCandidate[], control: Partial<{
       if (!ready) return null; const claimed = { ...ready, state: 'upserting' as const, attemptCount: ready.attemptCount + 1 };
       rows.set(claimed.id, claimed); events.push(`claim:${claimed.drNumber}`); return claimed;
     }), claimDueAcknowledgementCleanup: vi.fn(async () => null),
-    expireStalledHandshakes: vi.fn(async () => 0),
+    expireStalledHandshakes: vi.fn(async () => []),
+    markHandshakeTagsLeft: vi.fn(async () => undefined),
     transitionExportState: vi.fn(async (id, _expected, state, updates = {}) => {
       const changed = { ...rows.get(id)!, ...updates, state }; rows.set(id, changed); events.push(`${state}:${changed.drNumber}`); return changed;
     }) }, summary: { send: vi.fn(async () => true) },
@@ -237,6 +239,18 @@ describe('runVelocityReviewExport', () => {
       .invocationCallOrder[0];
     expect(events.length).toBeGreaterThan(0);
     expect(order).toBeLessThan(firstClaim);
+  });
+
+  it('takes both transient tags off a contact whose handshake it expires', async () => {
+    const { deps } = runDeps([candidate()]);
+    deps.exports.expireStalledHandshakes = vi.fn(async () => [{ id: 'stale-1', ghlContactId: 'contact-stale' }]);
+
+    await runVelocityReviewExport({}, deps);
+
+    // Expiry alone strands ENROLLED_TAG on the contact, and the next install at that
+    // number then parks itself `ambiguous` on `stale_transient_tag` — the same stall.
+    expect((deps.ghl.removeTags as ReturnType<typeof vi.fn>).mock.calls).toContainEqual(
+      ['contact-stale', [READY_TAG, ENROLLED_TAG]]);
   });
 
   it('still expires handshakes when the run is blocked', async () => {

@@ -3,9 +3,12 @@ import { prepareCandidate } from './candidateService';
 import { cleanupLeaseUntil, processAcknowledgementCleanup } from './acknowledgementCleanup';
 import { recordOneMapConsent } from './consentService';
 import {
-  claimDueAcknowledgementCleanup, claimNextExport, createExport, expireStalledHandshakes,
+  claimDueAcknowledgementCleanup, claimNextExport, createExport,
   saveCandidateDecision, transitionExportState, type VelocityReviewExport,
 } from './exportRepository';
+import {
+  expireStalledHandshakes, markHandshakeTagsLeft, sweepStalledHandshakes,
+} from './staleHandshakes';
 import {
   HighLevelClient, loadVelocityReviewGhlConfig,
 } from './ghlClient';
@@ -115,8 +118,8 @@ async function lockedRun(deps: ProcessorDependencies): Promise<VelocityReviewRun
   // outage messaging customers about installs from weeks ago; lifting it is a human
   // decision, which is why the cron summary now names the reason.
   const sweepNow = deps.now();
-  await deps.exports.expireStalledHandshakes(
-    new Date(sweepNow.getTime() - HANDSHAKE_STALE_MS), sweepNow);
+  await sweepStalledHandshakes(
+    new Date(sweepNow.getTime() - HANDSHAKE_STALE_MS), sweepNow, deps);
   const completed = await deps.runs.listCompletedRunDates();
   const due = selectDueDates(control, completed, previousDate(sastDate(deps.now())));
   if (due.status === 'disabled') return { status: 'disabled', counts: {}, dates: [] };
@@ -184,7 +187,8 @@ function defaultDependencies(dry: boolean): ProcessorDependencies {
     candidates: { listCandidateRows, prepareCandidate: (row) => prepareCandidate(row, secret) },
     consent: { recordOneMapConsent }, ghl: config ? new HighLevelClient(config) : unavailable,
     exports: { saveCandidateDecision, createExport, claimNextExport,
-      claimDueAcknowledgementCleanup, expireStalledHandshakes, transitionExportState },
+      claimDueAcknowledgementCleanup, expireStalledHandshakes, markHandshakeTagsLeft,
+      transitionExportState },
     runs: { withVelocityReviewLock, loadVelocityReviewControl, listCompletedRunDates,
       createOrResumeRun, transitionRunStatus }, summary: { send: sendVelocityReviewRunSummary } };
 }
