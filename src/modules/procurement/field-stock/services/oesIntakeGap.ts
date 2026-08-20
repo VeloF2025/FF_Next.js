@@ -63,7 +63,17 @@ import { FT_ONT_ITEM_ID } from './ontSerialWorkbook';
  * the backlog but below the ceiling turns "something is badly wrong" into a
  * refusal and a loud log, instead of a four-figure silent state change.
  *
- * Tripping this is not self-correcting: it needs a human to look.
+ * Tripping this is not self-correcting: it needs a human to look. The check runs
+ * BEFORE the receive, deliberately: receiving and then refusing to promote would
+ * leave hundreds of location-less `in_stock` rows — issuable from any warehouse —
+ * which is precisely the state this whole module exists to prevent. If the pass
+ * cannot finish the job, it does not start it.
+ *
+ * Before raising this number, check the spike is real: genuine ONT deliveries
+ * entered late into the workbook plus genuine OES activity, not a serial-number
+ * collision or a duplicated feed. The ceiling it sits under is not fixed — the
+ * same sync receives sheet rows into `in_stock` moments earlier, so a large real
+ * delivery moves it.
  */
 export const MAX_PROMOTIONS_PER_RUN = 2000;
 
@@ -138,6 +148,40 @@ export async function closeOesIntakeGap(
       ORDER BY upper(trim(oa.serial_number)), oa.activation_date DESC NULLS LAST`,
   );
 
+  // Decide BEFORE receiving. The work this pass would have to promote is what
+  // is already stuck plus what the receive is about to create; if that exceeds
+  // the cap, receiving first would strand location-less issuable stock.
+  //
+  // `wouldPromote` is an ESTIMATE, not an authoritative preview: it assumes the
+  // receive inserts every row as in_stock and that nothing else becomes
+  // promotable in between. That is deliberate — it is a conservative tripwire,
+  // and the check inside promoteInStock catches any drift between here and
+  // there. Do not read this number as the exact set that will be promoted.
+  const { rows: alreadyStuck } = await db.query<GapRow>(PROMOTABLE_SQL, [FT_ONT_ITEM_ID]);
+  const wouldPromote = alreadyStuck.length + rows.length;
+  if (wouldPromote > MAX_PROMOTIONS_PER_RUN) {
+    log.error(
+      'OES intake gap: pass would exceed the per-run cap — REFUSING to receive or promote. ' +
+        'Check the spike is real ONT deliveries plus real OES activity, not a serial collision ' +
+        'or a duplicated feed, before raising the cap.',
+      {
+        alreadyStuck: alreadyStuck.length,
+        wouldReceive: rows.length,
+        wouldPromote,
+        cap: MAX_PROMOTIONS_PER_RUN,
+      },
+      'oes-intake-gap',
+    );
+    return {
+      candidates: rows.length,
+      received: 0,
+      skipped: 0,
+      promoted: 0,
+      stillInStock: alreadyStuck.length,
+      promotionFailed: true,
+    };
+  }
+
   if (rows.length === 0) {
     // Nothing new to receive, but earlier runs or a sheet import may have left
     // OES-active serials sitting in_stock — still worth a promotion pass.
@@ -171,6 +215,9 @@ async function promoteInStock(
   const { rows } = await db.query<GapRow>(PROMOTABLE_SQL, [FT_ONT_ITEM_ID]);
   if (rows.length === 0) return { promoted: 0, stillInStock: 0 };
 
+  // Backstop. The primary gate runs before the receive; this only fires if the
+  // set grew between the two (a concurrent writer), and by then refusing is
+  // still better than an unbounded unattended promotion.
   if (rows.length > MAX_PROMOTIONS_PER_RUN) {
     log.error(
       'OES intake gap: promotable set exceeds the per-run cap — REFUSING to promote, needs a human',

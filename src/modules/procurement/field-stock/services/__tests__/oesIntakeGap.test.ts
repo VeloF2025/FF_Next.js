@@ -24,13 +24,14 @@ type Row = { serial_number: string; drop_number: string };
  * promotion query starts FROM stock_serials.
  */
 function querier(missing: Row[], promotable: Row[], leftOver: Row[] = []): GapQuerier {
-  // The promotable query runs TWICE: once to pick candidates, once afterwards
-  // to measure what actually moved. `leftOver` is what the second call sees.
+  // PROMOTABLE_SQL runs up to three times: the pre-receive cap check, the
+  // promote selection, then the re-measure. `leftOver` is what the LAST call
+  // sees — what failed to move.
   let promotableCalls = 0;
   const query = vi.fn(async (sql: string) => {
     if (sql.includes('FROM oes_activations')) return { rows: missing };
     promotableCalls += 1;
-    return { rows: promotableCalls === 1 ? promotable : leftOver };
+    return { rows: promotableCalls <= 2 ? promotable : leftOver };
   });
   return { query } as unknown as GapQuerier;
 }
@@ -162,9 +163,11 @@ describe('closeOesIntakeGap', () => {
     });
 
     const calls = (db.query as unknown as { mock: { calls: [string, unknown[]?][] } }).mock.calls;
-    // find-missing, find-promotable, re-measure
-    expect(calls).toHaveLength(3);
+    // find-missing, cap pre-check, find-promotable, re-measure
+    expect(calls).toHaveLength(4);
+    // The pre-check, the selection and the re-measure are the SAME query.
     expect(calls[2]![0]).toBe(calls[1]![0]);
+    expect(calls[3]![0]).toBe(calls[1]![0]);
   });
 
   it('recomputes the promotion set AFTER the receive, not before', async () => {
@@ -188,7 +191,11 @@ describe('closeOesIntakeGap', () => {
       }),
     });
 
-    expect(order).toEqual(['find-missing', 'receive', 'find-promotable', 'promote', 'find-promotable']);
+    // The cap pre-check runs BEFORE the receive: the pass must not create
+    // location-less stock it has already decided it cannot promote.
+    expect(order).toEqual([
+      'find-missing', 'find-promotable', 'receive', 'find-promotable', 'promote', 'find-promotable',
+    ]);
   });
 
   it('REFUSES to promote a set larger than the per-run cap', async () => {
@@ -209,6 +216,50 @@ describe('closeOesIntakeGap', () => {
     expect(report).toMatchObject({
       promoted: 0, stillInStock: MAX_PROMOTIONS_PER_RUN + 1, promotionFailed: true,
     });
+  });
+
+  it('does NOT receive when the pass would exceed the cap', async () => {
+    // Receiving and then refusing to promote would strand location-less
+    // in_stock rows — issuable from ANY warehouse — which is the exact state
+    // this module exists to prevent. If it cannot finish, it must not start.
+    const manyMissing: Row[] = Array.from({ length: MAX_PROMOTIONS_PER_RUN }, (_, i) => ({
+      serial_number: `ALCLB4A${String(i).padStart(5, '0')}`,
+      drop_number: `DR${i}`,
+    }));
+    const alreadyStuck: Row[] = [{ serial_number: 'ALCLB4A99999', drop_number: 'DR9' }];
+    const receive = vi.fn(async () => ({ received: 0, skipped: 0 }));
+    const promote = vi.fn(async () => {});
+
+    const report = await closeOesIntakeGap(querier(manyMissing, alreadyStuck), { receive, promote });
+
+    expect(receive).not.toHaveBeenCalled();
+    expect(promote).not.toHaveBeenCalled();
+    expect(report).toMatchObject({
+      candidates: MAX_PROMOTIONS_PER_RUN,
+      received: 0,
+      promoted: 0,
+      stillInStock: 1,
+      promotionFailed: true,
+    });
+  });
+
+  it('counts what is ALREADY stuck toward the cap, not just the new receives', async () => {
+    // The pass has to promote both, so both count.
+    const missing: Row[] = Array.from({ length: 10 }, (_, i) => ({
+      serial_number: `ALCLB4A0000${i}`, drop_number: `DR${i}`,
+    }));
+    const stuck: Row[] = Array.from({ length: MAX_PROMOTIONS_PER_RUN - 5 }, (_, i) => ({
+      serial_number: `ALCLB4B${String(i).padStart(5, '0')}`, drop_number: `DS${i}`,
+    }));
+    const receive = vi.fn(async () => ({ received: 10, skipped: 0 }));
+
+    const report = await closeOesIntakeGap(querier(missing, stuck), {
+      receive, promote: vi.fn(async () => {}),
+    });
+
+    // 10 + (cap - 5) > cap → refuse, without receiving.
+    expect(receive).not.toHaveBeenCalled();
+    expect(report.promotionFailed).toBe(true);
   });
 
   it('promotes a set exactly at the cap', async () => {
