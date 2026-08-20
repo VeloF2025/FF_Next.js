@@ -9,6 +9,10 @@
  * These mount the real page and drive it the way a person does — open the
  * picker from a line, choose an item, submit — then assert on the payload that
  * actually reaches the API.
+ *
+ * It lives under tests/ rather than beside the page: anything under pages/ is a
+ * route, and Next collects page data from it at build time. A test file there
+ * imports vitest during the build and fails it.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -52,7 +56,7 @@ vi.mock('@/components/procurement/StockItemSelector', () => ({
   ) : null),
 }));
 
-import NewRequisitionPage from '../new';
+import NewRequisitionPage from '@/../pages/procurement/requisitions/new';
 
 /** Last body posted to /api/procurement/requisitions. */
 function lastRequisitionBody(fetchMock: ReturnType<typeof vi.fn>) {
