@@ -65,7 +65,9 @@ export function classifyBridgeHealth(payload: BridgeHealthPayload | null): Bridg
   if (!payload) {
     return {
       verdict: 'unreachable',
-      detail: 'The bridge health endpoint did not respond. The VPS may be down or unreachable.',
+      detail:
+        'The bridge health endpoint did not answer repeated probes from velo. The ' +
+        'VPS may be down, or the network path from velo to it may be stalled.',
       phone: 'unknown',
       needsHuman: true,
     };
@@ -122,17 +124,58 @@ const REMEDY: Record<Exclude<BridgeVerdict, 'healthy'>, string[]> = {
     'on 2026-07-29.',
   ],
   unreachable: [
-    'Check the VPS itself first — this fires when the box is unreachable, not just',
-    'when the bridge is unhealthy:',
+    'Confirm the bridge is actually down before treating this as an outage. This',
+    'verdict means the probe on velo got no answer, which a network stall on the',
+    'velo -> VPS path produces just as readily as a dead box:',
     '',
+    '  # 1. Is the box up at all?',
     '  ping -c3 72.61.197.178',
+    '',
+    '  # 2. What does the bridge say about itself, on-box?',
     '  ssh root@72.61.197.178 systemctl status whatsapp-bridge',
+    '  ssh root@72.61.197.178 tail -5 /var/log/wa-healthcheck.log',
+    '',
+    '  # 3. Is WhatsApp traffic still being ingested? This is the question that',
+    '  #    actually decides whether work is being lost.',
+    '  tail -20 ~/.hermes/whatsapp-monitor/watchdog.log',
+    '',
+    'If the on-box healthcheck says healthy and the watchdog still shows recent',
+    'imports, this was the probe path, not the bridge, and nothing was lost.',
   ],
   disconnected: [
     'Usually self-heals. The VPS healthcheck restarts a paired-but-disconnected',
     'bridge within 5 minutes:',
     '',
     '  ssh root@72.61.197.178 tail -20 /var/log/wa-healthcheck.log',
+  ],
+};
+
+/**
+ * What this verdict means for field traffic.
+ *
+ * This used to be one blanket line on every alert: "DR submissions and photos
+ * from every monitored group are being dropped". For a logout that is true. For
+ * `unreachable` it is an unfounded claim — the bridge may be up and ingesting
+ * normally while only the probe path is broken, which is what all 128 of the
+ * `unreachable` verdicts between 2026-08-03 and 2026-08-20 turned out to be. An
+ * alert that overstates impact 89 times trains people to ignore the one that
+ * does not, so each verdict now states only what is actually known.
+ */
+const IMPACT: Record<Exclude<BridgeVerdict, 'healthy'>, string[]> = {
+  logged_out: [
+    'While it is logged out, DR submissions and photos from every monitored group',
+    'are being dropped — they are not queued and will not arrive late.',
+  ],
+  disconnected: [
+    'While the socket is down, DR submissions and photos are being dropped — they',
+    'are not queued and will not arrive late. This usually self-heals within one',
+    'healthcheck cycle.',
+  ],
+  unreachable: [
+    'IMPACT UNKNOWN. This says the probe could not reach the bridge from velo. It',
+    'does NOT establish that the bridge is down or that anything has been lost —',
+    'a stall on the network path between velo and the VPS produces exactly this',
+    'verdict while the bridge carries on ingesting normally.',
   ],
 };
 
@@ -173,8 +216,7 @@ export function buildBridgeAlert(
       '',
       status.detail,
       '',
-      'While it is down, DR submissions and photos from every monitored group are',
-      'being dropped — they are not queued and will not arrive late.',
+      ...IMPACT[status.verdict],
       '',
       ...REMEDY[status.verdict],
       '',

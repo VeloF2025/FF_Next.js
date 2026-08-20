@@ -31,10 +31,69 @@ import {
   type BridgeHealthPayload,
   type BridgeVerdict,
 } from '@/lib/wa-bridge-health/monitor';
+import { probeBridgeHealth } from '@/lib/wa-bridge-health/probe';
 
-const BRIDGE_HEALTH_URL =
-  process.env.WA_BRIDGE_HEALTH_URL ?? 'http://72.61.197.178:8083/health';
-const PROBE_TIMEOUT_MS = 8000;
+/**
+ * How many `unreachable` ticks inside UNREACHABLE_WINDOW_TICKS before paging.
+ *
+ * The retrying probe already absorbs a single stalled request. This gate covers
+ * the case where a whole tick's worth of attempts fails at once — still far more
+ * likely to be the velo -> VPS path than a dead bridge, on the evidence: 128
+ * `unreachable` verdicts between 2026-08-03 and 2026-08-20 — 89 of which paged —
+ * and the bridge's own on-box healthcheck logged `healthy` for every one of them.
+ *
+ * The cost is honest and must not be glossed over: a genuinely dead VPS is now
+ * reported two ticks later, 10 minutes. Set against the failures this monitor
+ * exists to catch — 80 minutes on 2026-07-30, a whole 06:00 window on
+ * 2026-07-28 — 10 minutes is cheap, and 89 false pages that each claimed field
+ * work was being lost is not.
+ *
+ * The gate applies to `unreachable` ALONE. `logged_out` and `disconnected` mean
+ * the bridge answered and described its own state, which is authoritative and
+ * pages on the first tick exactly as before.
+ *
+ * A WINDOW, not a consecutive run. Requiring consecutive ticks looks equivalent
+ * and is not: a bridge alternating unreachable/healthy every tick — genuinely
+ * half down — resets the run on every healthy tick, never reaches the threshold,
+ * and so would never page at all. That is a worse failure than the one being
+ * fixed, because the old code at least paged.
+ *
+ * These two numbers were not picked by taste. Replaying the 4,646 ticks in
+ * /tmp/wa-bridge-health.log (2026-08-03 to 2026-08-20, 128 `unreachable`
+ * verdicts, every one of them a false alarm) through each candidate gate:
+ *
+ * The two time columns are worst case, counted from when the bridge actually
+ * went down — which lands up to a full tick before the probe next looks. The
+ * unit tests measure the same scenarios tick-aligned, so they read one tick
+ * lower (a full outage pages at t+10 there, 15 here); both are right, they just
+ * start the clock in different places.
+ *
+ *   gate                    false pages   full outage   50% flap
+ *   no gate (old code)               89       5 min       5 min
+ *   2 consecutive                    25      10 min      never
+ *   2 within 3                       32      10 min      15 min
+ *   3 within 4                       18      15 min      never
+ *   3 within 5  <- this               23      15 min      25 min
+ *
+ * "2 within 3" is worse than the consecutive gate it replaces on the very axis
+ * this endpoint is being fixed for: the log holds 14 pairs of blips exactly one
+ * healthy tick apart, and that gate pages on every one of them. The gates that
+ * score better on false pages do it by reopening the flapping hole — a strict
+ * alternation never reaches 3 inside 4. "3 within 5" is the only setting that
+ * beats the consecutive gate on false alarms AND still catches a flap.
+ *
+ * The boundary this draws is a duty cycle, and it is worth stating plainly: a
+ * bridge unreachable half the ticks pages; one unreachable a third of them (the
+ * log's 16 gaps of 15 minutes) does not. That matches the evidence — every
+ * one-in-three pattern in this log was the velo -> VPS path, not the bridge.
+ */
+const UNREACHABLE_TICKS_BEFORE_ALERT = 3;
+
+/**
+ * How far back the gate counts. At the cron's 5-minute cadence this is a
+ * 25-minute window.
+ */
+export const UNREACHABLE_WINDOW_TICKS = 5;
 
 /**
  * Re-alert interval for a continuing outage. A logout is not self-healing, so a
@@ -45,10 +104,20 @@ const REALERT_MS = 30 * 60 * 1000;
 
 /**
  * Module-level, so it survives between cron invocations in the long-lived Next
- * server. A restart resets it, which costs one duplicate alert and — if the
- * bridge is already down at restart — reseeds `downSince` to the restart time,
- * so the recovery alert then under-reports total downtime. Both are acceptable;
- * neither can suppress an alert.
+ * server. A restart resets it, at three costs:
+ *
+ *   - one duplicate alert for an outage that was already being reported;
+ *   - if the bridge is already down at restart, `downSince` reseeds to the
+ *     restart time, so the recovery alert under-reports total downtime;
+ *   - the unreachable window empties, so an ongoing unreachable outage has to
+ *     re-earn its threshold — up to two extra ticks, 10 minutes, of delay per
+ *     restart.
+ *
+ * The third only exists since the confirmation gate was added and is the reason
+ * this comment no longer claims a restart cannot delay an alert: it can. It
+ * cannot suppress one indefinitely, because the window refills from the next
+ * tick onward. Deploys are the common cause and are not concurrent with outages
+ * often enough to justify persisting this to Postgres.
  */
 let lastVerdict: BridgeVerdict | null = null;
 let lastAlertAt = 0;
@@ -61,6 +130,11 @@ let lastAlertAt = 0;
  */
 let prevNeedsHuman = false;
 let downSince = 0;
+/**
+ * Whether each of the last UNREACHABLE_WINDOW_TICKS ticks was `unreachable`,
+ * oldest first. Bounded, so it cannot grow across a long-running process.
+ */
+let unreachableWindow: boolean[] = [];
 
 /** Exported for tests: module state must be resettable between cases. */
 export function __resetStateForTests(): void {
@@ -68,43 +142,27 @@ export function __resetStateForTests(): void {
   lastAlertAt = 0;
   prevNeedsHuman = false;
   downSince = 0;
+  unreachableWindow = [];
 }
 
-async function probe(): Promise<BridgeHealthPayload | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-  try {
-    const res = await fetch(BRIDGE_HEALTH_URL, { signal: controller.signal });
-    if (!res.ok) {
-      // A 500/502 from the bridge collapses into the same `unreachable` verdict
-      // as a dead VPS, so without this line the two are indistinguishable when
-      // someone comes to diagnose.
-      log.warn('WA bridge health endpoint returned non-OK', {
-        url: BRIDGE_HEALTH_URL, status: res.status,
-      }, 'WaBridgeHealth');
-      return null;
-    }
-    const body: unknown = await res.json();
-    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-      log.warn('WA bridge health returned an unexpected payload shape', {
-        url: BRIDGE_HEALTH_URL, received: typeof body,
-      }, 'WaBridgeHealth');
-      return null;
-    }
-    return body as BridgeHealthPayload;
-  } catch (err) {
-    // Unreachable is a verdict, not an error — the caller classifies null. Log
-    // the reason anyway: "timed out" vs "connection refused" vs DNS failure is
-    // the difference between a dead VPS, a stopped service and a routing
-    // problem, and it is the first thing anyone will want when diagnosing.
-    log.warn('WA bridge health probe failed', {
-      url: BRIDGE_HEALTH_URL,
-      error: err instanceof Error ? err.message : String(err),
+async function probe(): Promise<{ payload: BridgeHealthPayload | null; attempts: number }> {
+  const result = await probeBridgeHealth({
+    onAttemptFailure: ({ attempt, reason }) => {
+      // Logged per attempt, not just on the final verdict: "attempt 1 timed out,
+      // attempt 2 succeeded" is the signal that the path is degrading, and it is
+      // invisible if only the outcome is recorded.
+      log.warn('WA bridge health probe attempt failed', { attempt, reason }, 'WaBridgeHealth');
+    },
+  });
+
+  if (!result.payload) {
+    log.warn('WA bridge health probe exhausted every attempt', {
+      attempts: result.attempts,
+      lastFailure: result.lastFailure,
     }, 'WaBridgeHealth');
-    return null;
-  } finally {
-    clearTimeout(timer);
   }
+
+  return { payload: result.payload, attempts: result.attempts };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -126,18 +184,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Unauthorized');
   }
 
-  const status = classifyBridgeHealth(await probe());
+  const { payload, attempts: probeAttempts } = await probe();
+  const status = classifyBridgeHealth(payload);
   const now = Date.now();
-  const alerting = isAlerting(status.verdict);
+
+  unreachableWindow = [...unreachableWindow, status.verdict === 'unreachable'].slice(
+    -UNREACHABLE_WINDOW_TICKS,
+  );
+  const unreachableInWindow = unreachableWindow.filter(Boolean).length;
+
+  // A lone `unreachable` tick is observed and counted, but not announced.
+  const suppressed =
+    status.verdict === 'unreachable' && unreachableInWindow < UNREACHABLE_TICKS_BEFORE_ALERT;
+
+  const observedAlerting = isAlerting(status.verdict);
+  const alerting = observedAlerting && !suppressed;
   const wasAlerting = lastVerdict !== null && isAlerting(lastVerdict);
+
+  // Start the clock on the FIRST observation, including a suppressed one, so the
+  // recovery all-clear reports the real duration rather than under-reporting it
+  // by the length of the gate.
+  if (observedAlerting && !downSince) downSince = now;
+
+  if (suppressed) {
+    log.warn('WA bridge unreachable — holding the alert pending confirmation', {
+      unreachableInWindow,
+      windowTicks: UNREACHABLE_WINDOW_TICKS,
+      ticksBeforeAlert: UNREACHABLE_TICKS_BEFORE_ALERT,
+      probeAttempts,
+    }, 'WaBridgeHealth');
+  }
 
   let alerted = false;
   let alertChannels: string[] = [];
   let alertProblems: string[] = [];
 
   if (alerting) {
-    if (!downSince) downSince = now;
-
     // Fire immediately when the outage starts, and when it escalates to needing
     // a human for the first time. Otherwise respect REALERT_MS — keying off
     // "verdict changed" would let a flap between two alerting verdicts
@@ -159,8 +241,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
     }
-  } else if (wasAlerting) {
+  } else if (wasAlerting && !suppressed) {
     // Recovered — say so, so whoever got paged is not left checking manually.
+    // `!suppressed` matters: logged_out -> unreachable would otherwise fall into
+    // this branch and send an all-clear for an outage that is still running.
     const alert = buildBridgeAlert(status, {
       recovered: true,
       downtimeMs: downSince ? now - downSince : undefined,
@@ -175,18 +259,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     downSince = 0;
   }
 
-  lastVerdict = status.verdict;
-  // Every tick, unconditionally — this is "what we last observed", not
-  // "what we last alerted about".
-  prevNeedsHuman = status.needsHuman;
+  // A suppressed tick leaves both fields exactly as they were, which is the only
+  // option that behaves correctly from every prior state:
+  //   healthy     -> suppressed: stays healthy, so no all-clear is invented, and
+  //                  the tick that opens the gate still reads as a fresh outage.
+  //   logged_out  -> suppressed: stays logged_out, so the running outage is not
+  //                  forgotten and the all-clear still fires when it truly ends.
+  // Writing an effective verdict instead would break one or the other.
+  if (!suppressed) {
+    lastVerdict = status.verdict;
+    // This is "what we last observed", not "what we last alerted about".
+    prevNeedsHuman = status.needsHuman;
+  }
 
-  if (alerting) {
+  // Cleared here as well as in the recovery branch: a suppressed tick followed
+  // by a healthy one takes neither branch, and a stale downSince would inflate
+  // the duration reported by the next unrelated outage.
+  if (!observedAlerting) downSince = 0;
+
+  if (observedAlerting) {
     log.warn(`WA bridge ${status.verdict}`, {
       phone: status.phone, needsHuman: status.needsHuman, alerted, alertProblems,
+      alertSuppressed: suppressed, probeAttempts,
     }, 'WaBridgeHealth');
   }
 
-  return res.status(alerting ? 503 : 200).json({
+  // Keyed off what was OBSERVED, not off whether anyone was paged. The status
+  // code answers "is the bridge healthy"; the gate governs paging only, and
+  // `alerted` / `alertSuppressed` in the body answer that separately. Collapsing
+  // the two would log a held tick as http=200, which reads as "all clear" in
+  // /tmp/wa-bridge-health.log and hides the run-up to a real outage.
+  return res.status(observedAlerting ? 503 : 200).json({
     verdict: status.verdict,
     detail: status.detail,
     phone: status.phone,
@@ -196,6 +299,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // include SMTP host/port or auth text; those go to the log, not the body.
     alertChannels,
     alertProblemCount: alertProblems.length,
+    // Kept in the body because the velo cron appends it verbatim to
+    // /tmp/wa-bridge-health.log, which is the only durable record of how this
+    // monitor behaved. `probeAttempts: 3` on an otherwise healthy tick is the
+    // early warning that the path is degrading.
+    probeAttempts,
+    unreachableInWindow,
+    alertSuppressed: suppressed,
     timestamp: new Date().toISOString(),
   });
 }

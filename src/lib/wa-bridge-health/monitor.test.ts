@@ -155,3 +155,48 @@ describe('buildBridgeAlert', () => {
     expect(alert!.subject).toBe('[FibreFlow] WhatsApp bridge RECOVERED');
   });
 });
+
+// Regression, 2026-08-20. Between 2026-08-03 and 2026-08-20 this monitor sent
+// 124 `unreachable` pages. Every one was a false alarm: the bridge ran 20 days
+// with zero restarts and its on-box healthcheck logged `healthy` at the exact
+// minute of each page. Each of those 124 alerts asserted, in the body, that DR
+// submissions and photos were being dropped. They were not. An alert that
+// overstates impact 124 times is how a real one gets ignored.
+describe('buildBridgeAlert impact wording', () => {
+  const unreachable = () => buildBridgeAlert(classifyBridgeHealth(null))!;
+
+  it('does not claim data loss when it only failed to reach the bridge', () => {
+    const text = unreachable().text;
+    expect(text).toContain('IMPACT UNKNOWN');
+    expect(text).not.toContain('are being dropped');
+  });
+
+  it('names the probe path as a candidate cause, not just a dead box', () => {
+    expect(unreachable().text).toContain('between velo and the VPS');
+  });
+
+  it('tells the reader how to establish whether anything was actually lost', () => {
+    const text = unreachable().text;
+    // The two sources of truth that settle it, both of which said "healthy"
+    // throughout the false-alarm run.
+    expect(text).toContain('wa-healthcheck.log');
+    expect(text).toContain('watchdog.log');
+  });
+
+  // The flip side: where loss IS established, the alert must still say so
+  // plainly. Softening every verdict would trade one failure mode for another.
+  it('still states the loss plainly for a verdict where the bridge confirmed it', () => {
+    const text = buildBridgeAlert(classifyBridgeHealth(LOGGED_OUT_PAYLOAD))!.text;
+    expect(text).toContain('are being dropped');
+    expect(text).toContain('not queued');
+    expect(text).not.toContain('IMPACT UNKNOWN');
+  });
+
+  it('states the loss for a dropped socket too, while noting it self-heals', () => {
+    const text = buildBridgeAlert(
+      classifyBridgeHealth({ connected: false, session_valid: true, phone_number: '+27638412276' }),
+    )!.text;
+    expect(text).toContain('are being dropped');
+    expect(text).toContain('self-heals');
+  });
+});
