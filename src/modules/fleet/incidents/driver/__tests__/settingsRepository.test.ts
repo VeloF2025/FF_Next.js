@@ -126,13 +126,20 @@ describe('versionDriverInputSettings', () => {
     )).rejects.toThrow(/image\/heic/);
   });
 
-  it('accepts every MIME type the uploader actually registers a signature for', () => {
-    // Asserted against the real exported registry rather than a copied list, so the guard
-    // cannot drift from the thing it guards.
+  it('accepts every MIME type the uploader actually registers a signature for', async () => {
+    // This replaces a tautology. The previous version asserted
+    // `expect(arr.concat(x)).toContain(x)`, which is true for any input and never called
+    // versionDriverInputSettings at all — deleting the entire MIME validation left it green.
+    // It now drives the real validator with the real registry and requires it to accept.
     expect(SIGNATURE_REGISTERED_TYPES.length).toBeGreaterThan(0);
-    for (const mimeType of SIGNATURE_REGISTERED_TYPES) {
-      expect(changeRequest.evidenceAllowedMimeTypes.concat(mimeType)).toContain(mimeType);
-    }
+    db.txnQueryOne
+      .mockResolvedValueOnce(settingsRow)
+      .mockResolvedValueOnce({ ...settingsRow, version: 2, effective_from: changeRequest.effectiveFrom });
+    db.txnQuery.mockResolvedValue([]);
+
+    await expect(versionDriverInputSettings(
+      { ...changeRequest, evidenceAllowedMimeTypes: [...SIGNATURE_REGISTERED_TYPES] }, ACTOR,
+    )).resolves.toBeTruthy();
   });
 
   it('rejects an unknown concern category', async () => {
