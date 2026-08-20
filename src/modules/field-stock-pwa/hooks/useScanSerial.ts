@@ -11,7 +11,7 @@
  *  - Row remove helper
  */
 
-import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import { validateSerial, validateSerialBatch } from '@/modules/field-stock-pwa/api';
 import { parseScanPayload, MAX_BOX_SERIALS } from '@/modules/field-stock-pwa/lib/boxScan';
 import { verdictForSerial } from '@/modules/field-stock-pwa/lib/serialVerdict';
@@ -37,13 +37,6 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
-
-  // Memoised: two callbacks depend on it, and a fresh Set on every render would
-  // rebuild both of them every time.
-  const scannedSet = useMemo(
-    () => new Set(scanned.map((s) => s.serialNumber.toUpperCase())),
-    [scanned],
-  );
 
   /**
    * The freshest scanned list, readable from inside an in-flight callback.
@@ -84,6 +77,22 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
     [onChange],
   );
 
+  /**
+   * Serials already on the list, read from the ref at CALL time.
+   *
+   * Must not be memoised on the `scanned` prop: the camera fires onScan for
+   * every decoded frame — several per second — and React does not re-render
+   * between them. A prop-derived set is still empty on frames 2..N, so every
+   * frame passes the de-dup and adds another copy of the whole carton. That is
+   * how one 9-serial box became 27 and 36 rows on dev (2026-08-20).
+   *
+   * `commit()` updates the ref synchronously, so frame 2 sees frame 1's rows.
+   */
+  const alreadyScanned = useCallback(
+    () => new Set(scannedRef.current.map((s) => s.serialNumber.toUpperCase())),
+    [],
+  );
+
   /** Replace the given rows in the freshest list, matching on serial number. */
   const applyResolved = useCallback(
     (resolved: PwaScannedSerial[]) => {
@@ -105,11 +114,26 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms);
   };
 
+  /**
+   * The camera re-decodes a held label many times a second, so the
+   * already-scanned buzz would otherwise rattle continuously while the
+   * storeman lines up his next scan. One buzz per second is enough to say
+   * "yes, I already have that one".
+   */
+  const lastDuplicateBuzz = useRef(0);
+  const buzzDuplicate = useCallback(() => {
+    const now = Date.now();
+    if (now - lastDuplicateBuzz.current < 1000) return;
+    lastDuplicateBuzz.current = now;
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+  }, []);
+
   /** Expand one carton scan into grouped, batch-validated chips. */
   const handleBoxScan = useCallback(
     async (serials: string[]) => {
-      const fresh = serials.filter((s) => !scannedSet.has(s));
-      if (fresh.length === 0) { vibrate(30); return; }
+      const seen = alreadyScanned();
+      const fresh = serials.filter((s) => !seen.has(s));
+      if (fresh.length === 0) { buzzDuplicate(); return; }
       vibrate(50);
 
       groupSeq.current += 1;
@@ -172,7 +196,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
 
       applyResolved(resolved);
     },
-    [scannedSet, stockItem, sourceLocation, commit, applyResolved],
+    [stockItem, sourceLocation, commit, applyResolved, alreadyScanned, buzzDuplicate],
   );
 
   const handleRawSerial = useCallback(
@@ -213,8 +237,8 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
       setScanNotice(null);
       const serial = payload.serial;
 
-      if (scannedSet.has(serial)) {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+      if (alreadyScanned().has(serial)) {
+        buzzDuplicate();
         return;
       }
       if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
@@ -279,7 +303,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
 
       applyResolved([resolved]);
     },
-    [scannedSet, stockItem, sourceLocation, commit, handleBoxScan, applyResolved]
+    [stockItem, sourceLocation, commit, handleBoxScan, applyResolved, alreadyScanned, buzzDuplicate]
   );
 
   const handleRemove = useCallback(

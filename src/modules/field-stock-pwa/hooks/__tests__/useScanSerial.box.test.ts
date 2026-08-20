@@ -412,3 +412,103 @@ describe('useScanSerial overlapping scans', () => {
     expect(current[0]!.serialNumber).toBe('ALCLB49486FF');
   });
 });
+
+/**
+ * Repeat frames from the camera.
+ *
+ * html5-qrcode fires onScan for EVERY decoded frame while the symbol is in
+ * view — several times a second. Each fire must be recognised as the same
+ * carton, or one box becomes 18, 27, 36 serials. Reported from dev 2026-08-20.
+ */
+describe('useScanSerial repeat camera frames', () => {
+  beforeEach(() => {
+    validateSerialMock.mockReset();
+    validateSerialBatchMock.mockReset();
+  });
+
+  it('ignores repeat frames of the same carton with no render in between', async () => {
+    validateSerialBatchMock.mockResolvedValue({
+      results: [
+        { serialNumber: 'ALCLB49486FF', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+        { serialNumber: 'ALCLB4948758', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+        { serialNumber: 'ALCLB4948779', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+      ],
+    });
+
+    let current: PwaScannedSerial[] = [];
+    const onChange = vi.fn((next: PwaScannedSerial[]) => { current = next; });
+    const { result } = renderHook(
+      ({ scanned }) => useScanSerial({ stockItem: STOCK_ITEM, scanned, onChange, sourceLocation: GARSTFONTEIN }),
+      { initialProps: { scanned: current } },
+    );
+
+    // Four frames of the same box, no rerender between them — exactly what the
+    // camera does while the storeman holds the label steady.
+    await act(async () => {
+      await result.current.handleRawSerial(BOX);
+      await result.current.handleRawSerial(BOX);
+      await result.current.handleRawSerial(BOX);
+      await result.current.handleRawSerial(BOX);
+    });
+
+    expect(current).toHaveLength(3);
+    expect(new Set(current.map((r) => r.groupId)).size).toBe(1);
+    expect(validateSerialBatchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores repeat frames of the same single serial', async () => {
+    validateSerialMock.mockResolvedValue({
+      valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT',
+      currentLocationId: 'loc-garst', currentLocationName: 'Garstfontein DC',
+    });
+
+    let current: PwaScannedSerial[] = [];
+    const onChange = vi.fn((next: PwaScannedSerial[]) => { current = next; });
+    const { result } = renderHook(
+      ({ scanned }) => useScanSerial({ stockItem: STOCK_ITEM, scanned, onChange, sourceLocation: GARSTFONTEIN }),
+      { initialProps: { scanned: current } },
+    );
+
+    await act(async () => {
+      await result.current.handleRawSerial('ALCLB4949F3C');
+      await result.current.handleRawSerial('ALCLB4949F3C');
+      await result.current.handleRawSerial('ALCLB4949F3C');
+    });
+
+    expect(current).toHaveLength(1);
+    expect(validateSerialMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('still accepts a genuinely different carton scanned straight after', async () => {
+    validateSerialBatchMock
+      .mockResolvedValueOnce({
+        results: [
+          { serialNumber: 'ALCLB49486FF', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+          { serialNumber: 'ALCLB4948758', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+          { serialNumber: 'ALCLB4948779', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        results: [
+          { serialNumber: 'ALCLB4949DEF', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+          { serialNumber: 'ALCLB4949F2F', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+        ],
+      });
+
+    let current: PwaScannedSerial[] = [];
+    const onChange = vi.fn((next: PwaScannedSerial[]) => { current = next; });
+    const { result } = renderHook(
+      ({ scanned }) => useScanSerial({ stockItem: STOCK_ITEM, scanned, onChange, sourceLocation: GARSTFONTEIN }),
+      { initialProps: { scanned: current } },
+    );
+
+    await act(async () => {
+      await result.current.handleRawSerial(BOX);
+      await result.current.handleRawSerial(BOX);
+      await result.current.handleRawSerial('ALCLB4949DEF;ALCLB4949F2F');
+    });
+
+    expect(current).toHaveLength(5);
+    expect(new Set(current.map((r) => r.groupId)).size).toBe(2);
+  });
+});
