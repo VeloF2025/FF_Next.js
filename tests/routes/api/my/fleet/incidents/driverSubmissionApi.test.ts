@@ -32,7 +32,7 @@ const submissionService = vi.hoisted(() => ({
 }));
 vi.mock('@/modules/fleet/incidents/driver/submissionService', () => submissionService);
 
-import handler from '../[incidentId]/submissions';
+import handler from '@/pages/api/my/fleet/incidents/[incidentId]/submissions';
 
 function mockRes() {
   const res = {

@@ -18,10 +18,10 @@ vi.mock('@/modules/fleet/incidents/reviewService', async () => {
   };
 });
 
-import listHandler from '../index';
-import detailHandler from '../[incidentId]/index';
-import actionsHandler from '../[incidentId]/actions';
-import bulkHandler from '../bulk-acknowledge';
+import listHandler from '@/pages/api/fleet/incidents/index';
+import detailHandler from '@/pages/api/fleet/incidents/[incidentId]/index';
+import actionsHandler from '@/pages/api/fleet/incidents/[incidentId]/actions';
+import bulkHandler from '@/pages/api/fleet/incidents/bulk-acknowledge';
 import { IncidentAccessDeniedError } from '@/modules/fleet/incidents/reviewService';
 import { IncidentNotFoundError } from '@/modules/fleet/incidents/incidentRepository';
 import { IncidentTransitionConflictError, IncidentTransitionValidationError } from '@/modules/fleet/incidents/reviewTransitions';

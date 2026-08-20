@@ -22,8 +22,8 @@ const driverIncidentService = vi.hoisted(() => ({
 }));
 vi.mock('@/modules/fleet/incidents/driver/driverIncidentService', () => driverIncidentService);
 
-import listHandler from '../index';
-import detailHandler from '../[incidentId]/index';
+import listHandler from '@/pages/api/my/fleet/incidents/index';
+import detailHandler from '@/pages/api/my/fleet/incidents/[incidentId]/index';
 
 function mockRes() {
   const res = {

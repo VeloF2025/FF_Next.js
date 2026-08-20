@@ -12,7 +12,7 @@ vi.mock('@/modules/fleet/incidents/evidenceService', async () => {
   return { ...actual, addIncidentEvidence: mocks.addEvidence };
 });
 
-import evidenceHandler from '../[incidentId]/evidence';
+import evidenceHandler from '@/pages/api/fleet/incidents/[incidentId]/evidence';
 import { IncidentNotFoundError } from '@/modules/fleet/incidents/incidentRepository';
 import {
   IncidentEvidenceAccessDeniedError, IncidentEvidenceConflictError, IncidentEvidenceOrphanError, IncidentEvidenceValidationError,

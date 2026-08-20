@@ -14,7 +14,7 @@ vi.mock('@/modules/fleet/incidents/driver/requestInputService', async () => {
   return { ...actual, requestDriverInput: mocks.requestDriverInput };
 });
 
-import requestDriverInputHandler from '../[incidentId]/request-driver-input';
+import requestDriverInputHandler from '@/pages/api/fleet/incidents/[incidentId]/request-driver-input';
 import { IncidentNotFoundError } from '@/modules/fleet/incidents/incidentRepository';
 import {
   DriverInputAccessDeniedError, DriverInputRequestConflictError, DriverInputRequestValidationError,

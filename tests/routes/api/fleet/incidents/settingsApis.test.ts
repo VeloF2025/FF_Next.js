@@ -18,8 +18,8 @@ vi.mock('@/modules/fleet/incidents/settingsRepository', async () => {
 });
 vi.mock('@/modules/fleet/incidents/reviewScope', () => ({ isActiveFibreFlowUser: mocks.isActiveUser }));
 
-import rulesHandler from '../settings/rules';
-import oversightHandler from '../settings/oversight-members';
+import rulesHandler from '@/pages/api/fleet/incidents/settings/rules';
+import oversightHandler from '@/pages/api/fleet/incidents/settings/oversight-members';
 import { OversightMembershipConflictError, OversightMembershipNotFoundError } from '@/modules/fleet/incidents/settingsRepository';
 
 const USER = '11111111-1111-4111-8111-111111111111';

@@ -48,7 +48,7 @@ const driverEvidenceService = vi.hoisted(() => ({
 }));
 vi.mock('@/modules/fleet/incidents/driver/driverEvidenceService', () => driverEvidenceService);
 
-import handler from '../[incidentId]/evidence';
+import handler from '@/pages/api/my/fleet/incidents/[incidentId]/evidence';
 
 function mockRes() {
   const res = {

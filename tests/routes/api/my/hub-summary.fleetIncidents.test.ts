@@ -41,7 +41,7 @@ vi.mock('@/modules/receipts/queries', () => ({ findLatestReceiptForStaff: mocks.
 vi.mock('@/modules/attendance/workflow/requiredActionQueries', () => ({ findRequiredAttendanceAction: mocks.findRequiredAttendanceAction }));
 vi.mock('@/modules/fleet/incidents/driver/driverIncidentService', () => ({ listDriverIncidents: mocks.listDriverIncidents }));
 
-import handler from '../hub-summary';
+import handler from '@/pages/api/my/hub-summary';
 
 function mockRes() {
   const res = {

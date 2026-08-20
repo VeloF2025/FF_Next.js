@@ -38,7 +38,7 @@ const service = vi.hoisted(() => ({
 }));
 vi.mock('@/modules/fleet/incidents/driver/attendanceCorrectionLinkService', () => service);
 
-import handler from '../[incidentId]/attendance-correction-link';
+import handler from '@/pages/api/my/fleet/incidents/[incidentId]/attendance-correction-link';
 
 function mockRes() {
   const res = {

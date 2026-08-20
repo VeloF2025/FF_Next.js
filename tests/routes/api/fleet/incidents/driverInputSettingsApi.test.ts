@@ -15,7 +15,7 @@ vi.mock('@/modules/fleet/incidents/driver/settingsRepository', async () => {
   return { ...actual, getEffectiveDriverInputSettings: mocks.getEffective, versionDriverInputSettings: mocks.version };
 });
 
-import driverInputSettingsHandler from '../settings/driver-input';
+import driverInputSettingsHandler from '@/pages/api/fleet/incidents/settings/driver-input';
 import { DriverInputSettingsValidationError } from '@/modules/fleet/incidents/driver/settingsRepository';
 
 const USER = '11111111-1111-4111-8111-111111111111';

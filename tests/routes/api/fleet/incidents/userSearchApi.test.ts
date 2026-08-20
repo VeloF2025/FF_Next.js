@@ -37,7 +37,7 @@ vi.mock('@/modules/fleet/incidents/settingsRepository', () => ({
   resolveActiveUserNames: mocks.resolveActiveUserNames,
 }));
 
-import handler from '../settings/user-search';
+import handler from '@/pages/api/fleet/incidents/settings/user-search';
 
 interface TestUser { id: string; role: string }
 
