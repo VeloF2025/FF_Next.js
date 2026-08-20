@@ -24,6 +24,7 @@ import { BoxGroupChip } from '@/modules/field-stock-pwa/components/BoxGroupChip'
 import { ScanNoticeBanner } from '@/modules/field-stock-pwa/components/ScanNoticeBanner';
 import { PhotoSerialFallback } from '@/modules/field-stock-pwa/components/PhotoSerialFallback';
 import { buildScanRows } from '@/modules/field-stock-pwa/lib/scanRows';
+import { batchWarning } from '@/modules/field-stock-pwa/lib/batchWarning';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
 const SCANNER_ELEMENT_ID = 'serial-scanner-reader';
@@ -56,6 +57,7 @@ export function ScanSerialsStep({
   const validCount = scanned.filter((s) => s.state === 'valid').length;
   const hasPending = scanned.some((s) => s.state === 'pending-validation');
   const canDone = validCount > 0 && !hasPending;
+  const overBatchWarning = batchWarning(validCount);
 
   // Camera scanner.
   // Equipment serial labels (e.g. Nokia GPON ONT) carry the GPON SN in a
@@ -201,6 +203,8 @@ export function ScanSerialsStep({
           )}
         </ul>
       )}
+
+      {overBatchWarning && <p className="text-xs text-amber-400 px-1">{overBatchWarning}</p>}
 
       {/* Done button */}
       <button
