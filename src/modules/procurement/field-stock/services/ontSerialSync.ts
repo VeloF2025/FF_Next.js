@@ -19,6 +19,8 @@ import type { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { log } from '@/lib/logger';
 import { receiveSerials } from './serialIntake';
+import { closeOesIntakeGap, liveGapDeps } from './oesIntakeGap';
+import type { OesIntakeGapReport } from './oesIntakeGap';
 import { parseOntGizzuWorkbook } from './ontSerialWorkbook';
 import type { UnresolvedSheet } from './ontSerialWorkbook';
 import type { LocationRef } from './sheetLocation';
@@ -38,6 +40,8 @@ export interface OntSerialSyncReport {
   unresolvedSheets: UnresolvedSheet[];
   /** Serial-bearing rows lost across all unresolved project tabs. */
   rowsLostToUnresolvedSheets: number;
+  /** The #1864 receive-and-promote pass run before the gap was measured. */
+  oesIntakeGap: OesIntakeGapReport;
   /** OES-active ONT serials still not present in stock_serials after this run. */
   oesGapRemaining: number;
   /** True when oesGapRemaining exceeds the warn threshold (source likely stale/incomplete). */
@@ -144,6 +148,24 @@ export async function syncOntSerialsFromSharePoint(pool: Pool): Promise<OntSeria
     payload: { source: 'sharepoint_sync', kind: 'gizzu' },
   });
 
+  // Close the #1864 gap before measuring it: OES-active serials with no stock
+  // row are received and promoted to `activated` in the same pass, so they
+  // never sit as location-less `in_stock` rows that any warehouse could issue.
+  // The sync used to only ever report this number, which is why it never moved.
+  const oesIntakeGap = await closeOesIntakeGap(pool, liveGapDeps(pool));
+  if (oesIntakeGap.candidates > 0) {
+    log.info(
+      'OES intake gap closed',
+      {
+        candidates: oesIntakeGap.candidates,
+        received: oesIntakeGap.received,
+        promoted: oesIntakeGap.promoted,
+        promotionFailed: oesIntakeGap.promotionFailed ?? false,
+      },
+      'ont-serial-sync',
+    );
+  }
+
   const oesGapRemaining = await measureOesGap(pool);
   const sourceLikelyStale = oesGapRemaining > GAP_WARN_THRESHOLD;
 
@@ -153,6 +175,7 @@ export async function syncOntSerialsFromSharePoint(pool: Pool): Promise<OntSeria
     gizzuReceived: gizzu.received,
     gizzuSkipped: gizzu.skipped,
     skippedSheets: parsed.skippedSheets,
+    oesIntakeGap,
     unresolvedSheets: parsed.unresolvedSheets,
     rowsLostToUnresolvedSheets: costly.reduce((n, u) => n + u.rowsLost, 0),
     oesGapRemaining,
