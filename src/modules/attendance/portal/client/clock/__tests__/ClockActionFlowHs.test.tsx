@@ -1,9 +1,32 @@
 /** @vitest-environment jsdom */
+import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ClockActionFlow } from '../ClockActionFlow';
+import type { HsCheckinSteps as HsCheckinStepsType } from '../HsCheckinSteps';
+
+// A spy wrapper around the REAL HsCheckinSteps, not a stand-in for it. It
+// still mounts and behaves exactly like the production component (tests 1
+// and 4 exercise it end to end), but every render is also recorded here.
+// That gives the offline/clock-out tests a signal that does not depend on
+// HsCheckinSteps's own async bootstrap timing — "was the component asked to
+// mount at all" is decided synchronously by React, unlike its rendered
+// output, which stays an empty fragment until the bootstrap fetch settles.
+const hsStepsSpy = vi.hoisted(() => vi.fn());
+
+vi.mock('../HsCheckinSteps', async () => {
+  const actual = await vi.importActual<{ HsCheckinSteps: typeof HsCheckinStepsType }>(
+    '../HsCheckinSteps'
+  );
+  return {
+    HsCheckinSteps: (props: Parameters<typeof HsCheckinStepsType>[0]) => {
+      hsStepsSpy(props);
+      return React.createElement(actual.HsCheckinSteps, props);
+    },
+  };
+});
 
 const hookState = vi.hoisted(() => {
   return {
@@ -101,6 +124,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
+  hsStepsSpy.mockClear();
   hookState.submission.state = 'success';
   hookState.submission.queuedEventId = null;
   hookState.submission.successMessage = 'Clocked in at Lawley FTTH.';
@@ -139,6 +163,11 @@ describe('ClockActionFlow — H&S steps', () => {
 
   it('does NOT show them after a clock-OUT', async () => {
     hookState.submission.successMessage = 'Clocked out. Shift length: 8.0h.';
+    // Never resolves. If a future mutation lets HsCheckinSteps mount here,
+    // its bootstrap fetch hangs instead of crashing on an unconfigured
+    // mock's `undefined.then(...)` — so a regression fails on the
+    // assertions below, not on an unrelated TypeError.
+    fetchMock.mockImplementation(() => new Promise(() => {}));
     let container!: HTMLElement;
     await act(async () => {
       container = render(
@@ -147,12 +176,23 @@ describe('ClockActionFlow — H&S steps', () => {
     });
     expect(concatText(container)).not.toMatch(/where are you working/i);
     expect(fetchMock).not.toHaveBeenCalled();
+    // Timing-independent: HsCheckinSteps must never even be asked to mount
+    // for a clock-out, not just fail to have rendered visible text yet.
+    expect(hsStepsSpy).not.toHaveBeenCalled();
   });
 
   it('does NOT show them when the clock-in was queued offline', async () => {
     hookState.submission.state = 'queued';
     hookState.submission.queuedEventId = 'event-1';
     hookState.submission.successMessage = 'Clock-in saved on this phone.';
+    // Never resolves. There is genuinely no network in the offline-queued
+    // state, so this test intentionally never configures a real response —
+    // but an unconfigured vi.fn() call returns undefined, and if a
+    // regression lets HsCheckinSteps mount, its bootstrap fetch would crash
+    // on `undefined.then(...)` before the assertions below run, masking a
+    // real failure behind an unrelated TypeError. Hanging instead keeps the
+    // failure on the assertions, where it belongs.
+    fetchMock.mockImplementation(() => new Promise(() => {}));
     let container!: HTMLElement;
     await act(async () => {
       container = render(
@@ -162,6 +202,12 @@ describe('ClockActionFlow — H&S steps', () => {
     expect(concatText(container)).toMatch(/saved on this phone/i);
     expect(concatText(container)).not.toMatch(/where are you working/i);
     expect(fetchMock).not.toHaveBeenCalled();
+    // HsCheckinSteps starts loading=true and renders an empty fragment for
+    // its first tick regardless of whether the guard held — the text
+    // assertion above cannot tell "guard worked" from "hasn't fetched yet".
+    // This is the assertion that actually proves the guard: the component
+    // was never even instantiated for a queued (offline) clock-in.
+    expect(hsStepsSpy).not.toHaveBeenCalled();
   });
 
   it('reaches the normal success screen after the declaration is done', async () => {
