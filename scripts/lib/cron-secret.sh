@@ -30,7 +30,11 @@ resolve_cron_secret() {
     fi
     # Strip only WRAPPING quotes — `tr -d '"'` would mangle a value containing a
     # literal quote. `cut -f2-` keeps any '=' inside the value.
-    val=$(grep -m1 '^CRON_SECRET=' "$envfile" | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/' || true)
+    # Trim surrounding whitespace before stripping wrapping quotes: a hand-edited
+    # `CRON_SECRET= abc` would otherwise yield a leading space and fail auth with a
+    # 401 that looks like a wrong secret rather than a malformed line.
+    val=$(grep -m1 '^CRON_SECRET=' "$envfile" | cut -d= -f2- \
+          | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/^"(.*)"$/\1/' || true)
     if [ -n "$val" ]; then
       printf '%s' "$val"
       return 0
