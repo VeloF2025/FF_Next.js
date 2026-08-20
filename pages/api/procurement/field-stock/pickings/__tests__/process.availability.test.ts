@@ -133,7 +133,9 @@ describe('validateStockAvailability', () => {
  * now recorded to stock_quant_drift_log instead of failing the issue.
  */
 describe('validateStockAvailability — serial-tracked lines', () => {
-  const SERIAL_IDS = Array.from({ length: 9 }, (_, i) => `serial-${i}`);
+  // Real UUID shapes: the availability check refuses non-UUID ids outright so
+  // they can never reach the ::uuid[] cast.
+  const SERIAL_IDS = Array.from({ length: 9 }, (_, i) => `00000000-0000-4000-8000-00000000000${i}`);
   const SERIAL_LINE = {
     id: 'line-1',
     stock_item_id: ITEM_ID,
@@ -144,9 +146,15 @@ describe('validateStockAvailability — serial-tracked lines', () => {
   function serialTxn(opts: {
     serials?: Array<{ id: string; status: string; current_location_id: string | null }>;
     quants?: Array<{ quantity: number }>;
+    /** Make the drift INSERT throw, as a missing table or transient error would. */
+    driftInsertThrows?: boolean;
   }) {
     const query = vi.fn(async (sql: string) => {
-      if (sql.includes('INSERT INTO stock_quant_drift_log')) return [];
+      if (sql.includes('INSERT INTO stock_quant_drift_log')) {
+        if (opts.driftInsertThrows) throw new Error('relation "stock_quant_drift_log" does not exist');
+        return [];
+      }
+      if (sql.startsWith('SAVEPOINT') || sql.startsWith('RELEASE') || sql.startsWith('ROLLBACK TO')) return [];
       if (sql.includes('FROM stock_serials')) return opts.serials ?? [];
       if (sql.includes('FROM stock_quants')) return opts.quants ?? [];
       if (sql.includes('FROM stock_locations')) return [{ name: 'Garstfontein DC' }];
@@ -156,7 +164,8 @@ describe('validateStockAvailability — serial-tracked lines', () => {
     const txn = { query } as unknown as TxnClient;
     const driftInserts = () =>
       query.mock.calls.filter((c) => (c[0] as string).includes('INSERT INTO stock_quant_drift_log'));
-    return { txn, query, driftInserts };
+    const sqlTexts = () => query.mock.calls.map((c) => c[0] as string);
+    return { txn, query, driftInserts, sqlTexts };
   }
 
   const allInStock = SERIAL_IDS.map((id) => ({
@@ -187,7 +196,7 @@ describe('validateStockAvailability — serial-tracked lines', () => {
     const { txn } = serialTxn({
       serials: [
         ...allInStock.slice(0, 8),
-        { id: 'serial-8', status: 'issued', current_location_id: SOURCE_ID },
+        { id: SERIAL_IDS[8]!, status: 'issued', current_location_id: SOURCE_ID },
       ],
     });
     const result = await validateStockAvailability(txn, [SERIAL_LINE], SOURCE_ID);
@@ -231,5 +240,102 @@ describe('validateStockAvailability — serial-tracked lines', () => {
     const result = await validateStockAvailability(txn, [LINE], SOURCE_ID);
     expect(result.valid).toBe(false);
     expect(result.valid === false && result.errors[ITEM_ID]).toContain('No stock of');
+  });
+});
+
+/**
+ * Findings from blind review, each with a regression test.
+ */
+describe('validateStockAvailability — serial path hardening', () => {
+  const SERIAL_IDS = Array.from({ length: 9 }, (_, i) => `00000000-0000-4000-8000-00000000000${i}`);
+  const SERIAL_LINE = {
+    id: 'line-1',
+    stock_item_id: ITEM_ID,
+    planned_quantity: 9,
+    serial_ids: SERIAL_IDS,
+  };
+
+  function txnFor(opts: {
+    serials?: Array<{ id: string; status: string; current_location_id: string | null }>;
+    quants?: Array<{ quantity: number }>;
+    driftInsertThrows?: boolean;
+  }) {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('INSERT INTO stock_quant_drift_log')) {
+        if (opts.driftInsertThrows) throw new Error('relation "stock_quant_drift_log" does not exist');
+        return [];
+      }
+      if (sql.startsWith('SAVEPOINT') || sql.startsWith('RELEASE') || sql.startsWith('ROLLBACK TO')) return [];
+      if (sql.includes('FROM stock_serials')) return opts.serials ?? [];
+      if (sql.includes('FROM stock_quants')) return opts.quants ?? [];
+      if (sql.includes('FROM stock_locations')) return [{ name: 'Garstfontein DC' }];
+      if (sql.includes('FROM stock_items')) return [{ item_code: 'FT-ONT', name: 'FT-ONT' }];
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const txn = { query } as unknown as Parameters<typeof validateStockAvailability>[0];
+    const texts = () => query.mock.calls.map((c) => c[0] as string);
+    return { txn, query, texts };
+  }
+
+  const allInStock = (ids: string[]) =>
+    ids.map((id) => ({ id, status: 'in_stock', current_location_id: SOURCE_ID }));
+
+  it('a failing drift insert does NOT fail the issue — it rolls back to a savepoint', async () => {
+    const { txn, texts } = txnFor({
+      serials: allInStock(SERIAL_IDS),
+      quants: [{ quantity: 0 }],
+      driftInsertThrows: true,
+    });
+
+    const result = await validateStockAvailability(txn, [SERIAL_LINE], SOURCE_ID);
+
+    // The whole point: diagnostics must never refuse stock that is on the shelf.
+    expect(result.valid).toBe(true);
+    expect(texts()).toContain('SAVEPOINT drift_log');
+    expect(texts()).toContain('ROLLBACK TO SAVEPOINT drift_log');
+  });
+
+  it('releases the savepoint when the drift insert succeeds', async () => {
+    const { txn, texts } = txnFor({ serials: allInStock(SERIAL_IDS), quants: [{ quantity: 0 }] });
+    await validateStockAvailability(txn, [SERIAL_LINE], SOURCE_ID);
+    expect(texts()).toContain('RELEASE SAVEPOINT drift_log');
+    expect(texts()).not.toContain('ROLLBACK TO SAVEPOINT drift_log');
+  });
+
+  it('counts a duplicated serial id once, not twice', async () => {
+    const dupLine = {
+      ...SERIAL_LINE,
+      planned_quantity: 2,
+      serial_ids: [SERIAL_IDS[0]!, SERIAL_IDS[0]!],
+    };
+    const { txn } = txnFor({ serials: allInStock([SERIAL_IDS[0]!]), quants: [{ quantity: 9 }] });
+
+    const result = await validateStockAvailability(txn, [dupLine], SOURCE_ID);
+
+    // One physical serial cannot satisfy a two-unit line.
+    expect(result.valid).toBe(false);
+    expect(result.valid === false && result.errors[ITEM_ID]).toContain('required 2, scanned 1');
+  });
+
+  it('refuses a serial line with fewer distinct serials than planned', async () => {
+    const shortLine = { ...SERIAL_LINE, planned_quantity: 9, serial_ids: SERIAL_IDS.slice(0, 3) };
+    const { txn } = txnFor({ serials: allInStock(SERIAL_IDS.slice(0, 3)), quants: [{ quantity: 9 }] });
+
+    const result = await validateStockAvailability(txn, [shortLine], SOURCE_ID);
+
+    expect(result.valid).toBe(false);
+    expect(result.valid === false && result.errors[ITEM_ID]).toContain('required 9, scanned 3');
+  });
+
+  it('rejects a non-UUID serial id instead of throwing an opaque cast error', async () => {
+    const badLine = { ...SERIAL_LINE, planned_quantity: 1, serial_ids: ['not-a-uuid'] };
+    const { txn, texts } = txnFor({ serials: [], quants: [{ quantity: 9 }] });
+
+    const result = await validateStockAvailability(txn, [badLine], SOURCE_ID);
+
+    expect(result.valid).toBe(false);
+    expect(result.valid === false && result.errors[ITEM_ID]).toContain('1 of 1');
+    // The malformed id must never reach the ::uuid[] cast.
+    expect(texts().some((t) => t.includes('FROM stock_serials'))).toBe(false);
   });
 });

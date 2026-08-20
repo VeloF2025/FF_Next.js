@@ -122,6 +122,30 @@ describe('runBatchValidation', () => {
     expect(texts.some((t) => t.includes('FROM stock_quants'))).toBe(false);
   });
 
+  it('prefers the row for the item being issued when a serial exists under two items', async () => {
+    // stock_serials is unique on (stock_item_id, serial_number), so the same
+    // serial can legitimately belong to two SKUs. Returning the other item's row
+    // would wrongly reject a serial that is valid for this issue.
+    const db = querier([
+      row({ stock_item_id: 'item-gizzu', stock_item_name: 'FT-GIZZU' }),
+      row(),
+    ]);
+    const res = await runBatchValidation(db, {
+      serials: ['ALCLB49486FF'], stockItemId: 'item-ont', sourceLocationId: SOURCE_ID,
+    });
+    expect(res.results[0]!.valid).toBe(true);
+    expect(res.results[0]!.stockItemId).toBe('item-ont');
+  });
+
+  it('still reports wrong-item when the serial exists only under another item', async () => {
+    const db = querier([row({ stock_item_id: 'item-gizzu', stock_item_name: 'FT-GIZZU' })]);
+    const res = await runBatchValidation(db, {
+      serials: ['ALCLB49486FF'], stockItemId: 'item-ont', sourceLocationId: SOURCE_ID,
+    });
+    expect(res.results[0]!.valid).toBe(false);
+    expect(res.results[0]!.errorMessage).toContain('Wrong stock item');
+  });
+
   it('passes serials as a single parameterised array, never interpolated', async () => {
     const db = querier([row()]);
     await runBatchValidation(db, {

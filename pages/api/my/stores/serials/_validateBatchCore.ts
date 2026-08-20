@@ -73,8 +73,19 @@ export async function runBatchValidation(
     [serials],
   );
 
+  // stock_serials is unique on (stock_item_id, serial_number) — NOT on
+  // serial_number alone — so one scanned serial can legitimately return rows for
+  // two different items. Keep the row for the item being issued; only fall back
+  // to another item's row when the expected item has none, so the "wrong stock
+  // item" verdict still fires. Last-write-wins would silently misattribute.
   const byNumber = new Map<string, SerialQueryRow>();
-  for (const row of rows) byNumber.set(row.serial_number.trim().toUpperCase(), row);
+  for (const row of rows) {
+    const key = row.serial_number.trim().toUpperCase();
+    const existing = byNumber.get(key);
+    if (!existing || (existing.stock_item_id !== stockItemId && row.stock_item_id === stockItemId)) {
+      byNumber.set(key, row);
+    }
+  }
 
   let sourceLocationName = '';
   if (sourceLocationId) {

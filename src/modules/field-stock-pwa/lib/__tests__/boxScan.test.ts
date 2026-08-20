@@ -76,6 +76,26 @@ describe('parseScanPayload', () => {
     expect(parseScanPayload('hello world')).toEqual({ kind: 'unrecognised', raw: 'hello world' });
   });
 
+  it('recovers serials when a payload carries both semicolons and an envelope marker', () => {
+    // Not producible by one well-formed symbol, but the serials must never be
+    // silently swallowed by the envelope parser if it ever happens. The clean
+    // members survive; the member fused to the envelope is dropped as malformed.
+    const result = parseScanPayload('ALCLB49486FF;ALCLB4948758[)>\x1e06\x1d1P3TN01414BA\x1e\x04');
+    expect(result).toEqual({ kind: 'single', serial: 'ALCLB49486FF' });
+  });
+
+  it('reads all members when the envelope marker follows a complete serial list', () => {
+    const result = parseScanPayload('ALCLB49486FF;ALCLB4948758;[)>\x1e06\x1d1P3TN01414BA\x1e\x04');
+    expect(result.kind).toBe('box');
+    expect(result.kind === 'box' && result.serials).toEqual(['ALCLB49486FF', 'ALCLB4948758']);
+  });
+
+  it('still honours an envelope preceded by a stray byte when there are no semicolons', () => {
+    expect(parseScanPayload('\x02[)>\x1e06\x1d1P3TN01414BA\x1dSALCLB4918842\x1e\x04')).toEqual({
+      kind: 'single', serial: 'ALCLB4918842',
+    });
+  });
+
   it('returns every member of an oversized box — the cap is enforced by callers', () => {
     const many = Array.from({ length: 60 }, (_, i) => `ALCLB4948${String(i).padStart(4, '0')}`);
     const result = parseScanPayload(many.join(';'));

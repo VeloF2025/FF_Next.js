@@ -221,3 +221,109 @@ describe('useScanSerial carton scans', () => {
     expect(lastChange(onChange)[0]!.groupId).toBeUndefined();
   });
 });
+
+/**
+ * Overlapping scans — the lost-update regression.
+ *
+ * Validation is async. A storeman scanning a second carton while the first is
+ * still validating must not lose either one. This models the real component
+ * wiring: onChange feeds back into the hook's `scanned` prop, exactly as
+ * IssueOrchestrator's setFlow does.
+ */
+describe('useScanSerial overlapping scans', () => {
+  beforeEach(() => {
+    validateSerialMock.mockReset();
+    validateSerialBatchMock.mockReset();
+  });
+
+  it('keeps both cartons when a second box is scanned mid-validation', async () => {
+    let releaseBoxA: (v: unknown) => void = () => {};
+    const boxAPending = new Promise((resolve) => { releaseBoxA = resolve; });
+
+    validateSerialBatchMock
+      .mockImplementationOnce(async () => {
+        await boxAPending;
+        return {
+          results: [
+            { serialNumber: 'ALCLB49486FF', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+            { serialNumber: 'ALCLB4948758', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+          ],
+        };
+      })
+      .mockImplementationOnce(async () => ({
+        results: [
+          { serialNumber: 'ALCLB4949DEF', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+          { serialNumber: 'ALCLB4949F2F', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+        ],
+      }));
+
+    // Mirror the real component: onChange updates the prop the hook is re-rendered with.
+    let current: PwaScannedSerial[] = [];
+    const onChange = vi.fn((next: PwaScannedSerial[]) => { current = next; });
+
+    const { result, rerender } = renderHook(
+      ({ scanned }) => useScanSerial({ stockItem: STOCK_ITEM, scanned, onChange, sourceLocation: GARSTFONTEIN }),
+      { initialProps: { scanned: current } },
+    );
+
+    // Box A starts validating and does not resolve yet.
+    let boxAScan: Promise<void>;
+    await act(async () => {
+      boxAScan = result.current.handleRawSerial('ALCLB49486FF;ALCLB4948758');
+    });
+    rerender({ scanned: current });
+    expect(current).toHaveLength(2);
+
+    // Box B is scanned and completes while A is still in flight.
+    await act(async () => { await result.current.handleRawSerial('ALCLB4949DEF;ALCLB4949F2F'); });
+    rerender({ scanned: current });
+    expect(current).toHaveLength(4);
+
+    // Box A now resolves — it must not wipe box B.
+    await act(async () => { releaseBoxA(null); await boxAScan!; });
+    rerender({ scanned: current });
+
+    expect(current).toHaveLength(4);
+    expect(current.map((r) => r.serialNumber).sort()).toEqual(
+      ['ALCLB49486FF', 'ALCLB4948758', 'ALCLB4949DEF', 'ALCLB4949F2F'],
+    );
+    expect(current.every((r) => r.state === 'valid')).toBe(true);
+    // Two distinct cartons, still distinct.
+    expect(new Set(current.map((r) => r.groupId)).size).toBe(2);
+  });
+
+  it('does not resurrect a row the storeman removed while it was validating', async () => {
+    let release: (v: unknown) => void = () => {};
+    const pending = new Promise((resolve) => { release = resolve; });
+    validateSerialBatchMock.mockImplementationOnce(async () => {
+      await pending;
+      return {
+        results: [
+          { serialNumber: 'ALCLB49486FF', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+          { serialNumber: 'ALCLB4948758', valid: true, stockItemId: 'item-ont', stockItemName: 'FT-ONT' },
+        ],
+      };
+    });
+
+    let current: PwaScannedSerial[] = [];
+    const onChange = vi.fn((next: PwaScannedSerial[]) => { current = next; });
+    const { result, rerender } = renderHook(
+      ({ scanned }) => useScanSerial({ stockItem: STOCK_ITEM, scanned, onChange, sourceLocation: GARSTFONTEIN }),
+      { initialProps: { scanned: current } },
+    );
+
+    let scan: Promise<void>;
+    await act(async () => { scan = result.current.handleRawSerial('ALCLB49486FF;ALCLB4948758'); });
+    rerender({ scanned: current });
+
+    act(() => { result.current.handleRemove('ALCLB4948758'); });
+    rerender({ scanned: current });
+    expect(current).toHaveLength(1);
+
+    await act(async () => { release(null); await scan!; });
+    rerender({ scanned: current });
+
+    expect(current).toHaveLength(1);
+    expect(current[0]!.serialNumber).toBe('ALCLB49486FF');
+  });
+});

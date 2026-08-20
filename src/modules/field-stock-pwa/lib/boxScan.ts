@@ -81,7 +81,15 @@ export function parseScanPayload(raw: string): ScanPayload {
   const text = (raw ?? '').trim();
   if (!text) return { kind: 'unrecognised', raw: '' };
 
-  if (text.includes(FORMAT_ENVELOPE)) return parseIsoEnvelope(text);
+  // An ISO envelope is only honoured when it OPENS the payload, or when the
+  // payload has no semicolons at all. A string that carries both a serial list
+  // and an envelope marker is a carton list first — routing it into the
+  // envelope parser would silently discard the serials, which is worse than
+  // either alternative. `includes` (rather than `startsWith` alone) is kept for
+  // the no-semicolon case because some scanners prefix a stray byte.
+  const isEnvelope =
+    text.startsWith(FORMAT_ENVELOPE) || (!text.includes(';') && text.includes(FORMAT_ENVELOPE));
+  if (isEnvelope) return parseIsoEnvelope(text);
 
   if (text.includes(';')) {
     const serials: string[] = [];

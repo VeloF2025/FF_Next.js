@@ -45,6 +45,32 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
     [scanned],
   );
 
+  /**
+   * The freshest scanned list, readable from inside an in-flight callback.
+   *
+   * Validation is async, so a callback that captured `scanned` at creation is
+   * working from a stale snapshot by the time its request resolves. Writing
+   * `[...scanned, ...resolved]` at that point would discard anything scanned
+   * during the wait — a whole second carton, silently. Every post-await write
+   * therefore rebuilds from this ref, replacing rows by serial number rather
+   * than appending to a remembered array.
+   */
+  const scannedRef = useRef(scanned);
+  useEffect(() => { scannedRef.current = scanned; }, [scanned]);
+
+  /** Replace the given rows in the freshest list, matching on serial number. */
+  const applyResolved = useCallback(
+    (resolved: PwaScannedSerial[]) => {
+      const byNumber = new Map(resolved.map((r) => [r.serialNumber, r]));
+      const latest = scannedRef.current;
+      const merged = latest.map((row) => byNumber.get(row.serialNumber) ?? row);
+      // Anything not already present (the row was removed mid-flight) is dropped
+      // rather than resurrected — the storeman's removal wins.
+      onChange(merged);
+    },
+    [onChange],
+  );
+
   const [scanNotice, setScanNotice] = useState<string | null>(null);
   const clearScanNotice = useCallback(() => setScanNotice(null), []);
   const groupSeq = useRef(0);
@@ -71,7 +97,9 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         serialNumber, stockItemId: '', stockItemName: '', scannedAt,
         state: 'pending-validation', groupId, groupLabel,
       }));
-      onChange([...scanned, ...pending]);
+      const withPending = [...scannedRef.current, ...pending];
+      scannedRef.current = withPending;
+      onChange(withPending);
 
       let response: Awaited<ReturnType<typeof validateSerialBatch>>;
       try {
@@ -83,10 +111,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
       } catch (err) {
         if (!mountedRef.current) return;
         const msg = err instanceof Error ? err.message : 'Validation request failed';
-        onChange([
-          ...scanned,
-          ...pending.map((p) => ({ ...p, state: 'invalid' as const, errorMessage: msg })),
-        ]);
+        applyResolved(pending.map((p) => ({ ...p, state: 'invalid' as const, errorMessage: msg })));
         return;
       }
 
@@ -123,9 +148,9 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         setScanNotice((prev) => (prev ? `${prev} ${drift}` : drift));
       }
 
-      onChange([...scanned, ...resolved]);
+      applyResolved(resolved);
     },
-    [scanned, scannedSet, stockItem, onChange, sourceLocation],
+    [scannedSet, stockItem, sourceLocation, onChange, applyResolved],
   );
 
   const handleRawSerial = useCallback(
@@ -179,7 +204,9 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         scannedAt: Date.now(),
         state: 'pending-validation',
       };
-      onChange([...scanned, optimistic]);
+      const withOptimistic = [...scannedRef.current, optimistic];
+      scannedRef.current = withOptimistic;
+      onChange(withOptimistic);
 
       let result: Awaited<ReturnType<typeof validateSerial>>;
       try {
@@ -187,7 +214,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
       } catch (err) {
         if (!mountedRef.current) return;
         const msg = err instanceof Error ? err.message : 'Validation request failed';
-        onChange(scanned.concat({ ...optimistic, state: 'invalid', errorMessage: msg }));
+        applyResolved([{ ...optimistic, state: 'invalid', errorMessage: msg }]);
         return;
       }
 
@@ -230,13 +257,9 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
               : (result.errorMessage ?? verdict.errorMessage),
           };
 
-      onChange(
-        scanned
-          .filter((s) => !(s.serialNumber === serial && s.state === 'pending-validation'))
-          .concat(resolved)
-      );
+      applyResolved([resolved]);
     },
-    [scanned, scannedSet, stockItem, onChange, sourceLocation, handleBoxScan]
+    [scannedSet, stockItem, sourceLocation, onChange, handleBoxScan, applyResolved]
   );
 
   const handleRemove = useCallback(
