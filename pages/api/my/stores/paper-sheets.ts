@@ -6,6 +6,18 @@
  * Its ONT column is barcode stickers, so scanning beats the VLM path outright:
  * on the 21 sheets captured in May 2026 the VLM read 190 of 224 ONT serials.
  *
+ * ONE BATCH = ONE RECEIVER, ONE DATE (Hein, 2026-08-21). A batch spanning
+ * several days cannot carry an honest date: entries have no date of their own,
+ * so every serial would inherit the batch's, and a handover on the 4th would
+ * record as the 11th. Since these feed reconciliation against OES, a wrong date
+ * becomes a wrong answer later. A receiver with sheets across four days is four
+ * batches — which costs a tap each, and keeps every date true.
+ *
+ * The receiver is a STAFF ID, not a typed name. It is the batch key, and typed
+ * names give you 'Tshepo', 'T. Mahlangu' and 'Tshepo Mahlangu' as three
+ * different receivers. The name is read from the staff row, never from the
+ * client.
+ *
  * WHAT THIS DOES NOT DO: it does not touch stock_serials. A serial on an old
  * sheet is a claim about the past, not a receipt — the ONT left the shelf
  * months ago. Measured on those same sheets, 72% of serials are already
@@ -32,23 +44,33 @@ import { createHash } from 'node:crypto';
 /** Postgres unique-violation. The duplicate answer, not an error. */
 const UNIQUE_VIOLATION = '23505';
 
-/** What identifies a paper sheet: its date and its exact set of serials. */
-function contentHashFor(sheetDate: string, sortedSerials: string[]): string {
+/**
+ * What identifies a batch: its receiver, its date, and its exact serial set.
+ *
+ * The receiver is part of the identity because the batch is defined by it —
+ * without it, two receivers who happened to get the same serials on the same
+ * day would collide, and the second would be silently discarded as a duplicate.
+ */
+function contentHashFor(
+  receiverStaffId: string,
+  sheetDate: string,
+  sortedSerials: string[],
+): string {
   return createHash('sha256')
-    .update(`${sheetDate}\u0000${sortedSerials.join(',')}`)
+    .update(`${receiverStaffId}\u0000${sheetDate}\u0000${sortedSerials.join(',')}`)
     .digest('hex');
 }
 
 /** One page of the form holds 10 rows; allow a generous multiple, not unlimited. */
 const MAX_SERIALS_PER_SHEET = 60;
 const SERIAL_SHAPE = /^[A-Z0-9]{8,20}$/;
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: StoresActor) {
   const body = (req.body ?? {}) as {
     sheetDate?: unknown;
-    technicianId?: unknown;
-    technicianName?: unknown;
+    receiverStaffId?: unknown;
     serials?: unknown;
   };
 
@@ -62,6 +84,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
   if (body.sheetDate > new Date().toISOString().slice(0, 10)) {
     return apiResponse.validationError(res, { sheetDate: 'A sheet cannot be dated in the future' });
   }
+  // The receiver defines the batch, so it is required — not an optional note.
+  if (typeof body.receiverStaffId !== 'string' || !UUID_SHAPE.test(body.receiverStaffId)) {
+    return apiResponse.validationError(res, {
+      receiverStaffId: 'Choose who received the stock',
+    });
+  }
+
   if (!Array.isArray(body.serials) || body.serials.length === 0) {
     return apiResponse.validationError(res, { serials: 'Scan at least one serial' });
   }
@@ -76,6 +105,18 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
   )];
   if (!serials.every((s) => SERIAL_SHAPE.test(s))) {
     return apiResponse.validationError(res, { serials: 'One or more serials are malformed' });
+  }
+
+  // Resolve the receiver's name from the staff row rather than trusting a
+  // client-supplied string: the name is what a person reads on the report, and
+  // three spellings of one technician would read as three receivers.
+  const receiverRows = await sql`
+    SELECT id, first_name || ' ' || last_name AS name
+    FROM staff WHERE id = ${body.receiverStaffId} LIMIT 1
+  `;
+  const receiver = (receiverRows as Array<{ id: string; name: string }>)[0];
+  if (!receiver) {
+    return apiResponse.validationError(res, { receiverStaffId: 'That person was not found' });
   }
 
   // What stock currently believes about each scanned serial.
@@ -103,7 +144,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
   // the likeliest real cause) can both read "none" and both insert. The unique
   // index from migration 517 is what actually closes it, and the insert below
   // treats its violation as the answer.
-  const contentHash = contentHashFor(body.sheetDate, [...serials].sort());
+  const contentHash = contentHashFor(receiver.id, body.sheetDate, [...serials].sort());
   const existing = await sql`
     SELECT id FROM eod_install_sheets WHERE content_hash = ${contentHash} LIMIT 1
   `;
@@ -131,8 +172,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
     contentHash,
     velocityRepName: null,
     velocityRepId: null,
-    technicianName: typeof body.technicianName === 'string' ? body.technicianName : null,
-    technicianId: typeof body.technicianId === 'string' ? body.technicianId : null,
+    technicianName: receiver.name,
+    technicianId: receiver.id,
     // No photograph on this path — the serials came off the stickers. The
     // column is nullable, and photo_hash is what dedupes the VLM path.
     photoUrl: null,

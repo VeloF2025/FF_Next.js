@@ -32,6 +32,11 @@ const PaperSheetPage: NextPage = () => {
   const [serials, setSerials] = useState<string[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // Carried between sheets in one sitting: a stack is usually one receiver and
+  // one date, or a short run of days. Re-typing both per page is where wrong
+  // dates come from.
+  const [lastUsed, setLastUsed] = useState<{ sheetDate: string; receiverStaffId: string } | null>(null);
+  const [recordedCount, setRecordedCount] = useState(0);
   // Freshest list at scan time: the camera fires per decoded frame and React
   // does not re-render between them, so reading the state variable would drop
   // every serial after the first (the 27/36 bug, 2026-08-21).
@@ -140,7 +145,26 @@ const PaperSheetPage: NextPage = () => {
           </ul>
         )}
 
-        <PaperSheetCapture serials={serials} onBack={() => void router.push('/my/stores')} />
+        <PaperSheetCapture
+          serials={serials}
+          initialDate={lastUsed?.sheetDate}
+          initialReceiverId={lastUsed?.receiverStaffId}
+          onRecorded={(used) => {
+            setLastUsed(used);
+            setRecordedCount((n) => n + 1);
+            // Clear the scanned list so the next page starts empty — leaving
+            // it would silently merge two pages into one batch.
+            serialsRef.current = [];
+            setSerials([]);
+          }}
+          onBack={() => void router.push('/my/stores')}
+        />
+
+        {recordedCount > 0 && (
+          <p className="text-[11px] text-neutral-500 text-center">
+            {recordedCount} sheet{recordedCount === 1 ? '' : 's'} recorded in this session
+          </p>
+        )}
       </div>
     </MyPortalShell>
   );
