@@ -15,6 +15,7 @@ import { useCallback, useRef, useEffect, useState } from 'react';
 import { validateSerial, validateSerialBatch } from '@/modules/field-stock-pwa/api';
 import { parseScanPayload, MAX_BOX_SERIALS } from '@/modules/field-stock-pwa/lib/boxScan';
 import { verdictForSerial } from '@/modules/field-stock-pwa/lib/serialVerdict';
+import { serialsEligibleForIntake } from '@/modules/field-stock-pwa/lib/boxScan';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
 interface UseScanSerialOptions {
@@ -279,24 +280,40 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
 
       if (!mountedRef.current) return;
 
-      const verdict = verdictForSerial(
-        result.valid
-          ? {
-              serialNumber: serial,
-              stockItemId: result.stockItemId ?? stockItem.id,
-              stockItemName: result.stockItemName ?? null,
-              status: 'in_stock', // validateSerial already applied the status gate
-              currentLocationId: result.currentLocationId ?? null,
-              currentLocationName: result.currentLocationName ?? null,
-            }
-          : null,
-        {
-          expectedItemId: stockItem.id,
-          expectedItemName: stockItem.name,
-          sourceLocation: sourceLocation ?? null,
-          scanSource,
-        },
-      );
+      // A serial that EXISTS but is not issuable must keep its real status.
+      // Collapsing every failure to `null` told verdictForSerial "no such
+      // serial", which — for a machine read — made it offer to take the serial
+      // into stock as new. An ONT already issued to another technician was
+      // therefore shown with a green tick and "Not on the stock sheet yet"
+      // (field report 2026-08-21, ALCLB465A813: status 'issued', provenance
+      // 'sheet', already in someone's hands).
+      //
+      // `status` is present whenever the row exists, absent only on a genuine
+      // 404 — that is the distinction the old code threw away.
+      const exists = result.valid || result.status !== undefined;
+      const record = exists
+        ? {
+            serialNumber: serial,
+            stockItemId: result.stockItemId ?? stockItem.id,
+            stockItemName: result.stockItemName ?? null,
+            // The REAL status, not an assumed one.
+            status: result.status ?? 'in_stock',
+            currentLocationId: result.currentLocationId ?? null,
+            currentLocationName: result.currentLocationName ?? null,
+          }
+        : null;
+
+      const verdict = verdictForSerial(record, {
+        expectedItemId: stockItem.id,
+        expectedItemName: stockItem.name,
+        sourceLocation: sourceLocation ?? null,
+        // ONE rule, client and server. Eligibility is derived from the payload
+        // itself — exactly as pickings/_validation.ts does it — so the tick the
+        // storeman sees matches what the server will accept. A single scanned
+        // code corroborates nothing, so it can never be taken in; previously
+        // the client claimed it could and the submit then failed.
+        scanSource: serialsEligibleForIntake(rawSerial).has(serial) ? 'machine' : 'manual',
+      });
 
       const resolved: PwaScannedSerial = verdict.valid
         ? {

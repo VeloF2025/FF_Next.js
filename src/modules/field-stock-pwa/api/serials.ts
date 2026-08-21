@@ -92,6 +92,15 @@ export async function validateSerial(serialNumber: string): Promise<{
   currentLocationId?: string | null;
   currentLocationName?: string | null;
   errorMessage?: string;
+  /**
+   * The serial's REAL status when the row exists ('issued', 'installed', …),
+   * absent when the serial genuinely does not exist.
+   *
+   * Callers must distinguish those two cases. Collapsing "exists but not
+   * issuable" into "not found" is how an already-issued ONT came to be
+   * reported as "not on the stock sheet yet" (field report 2026-08-21).
+   */
+  status?: string;
 }> {
   try {
     const serial = await request<SerialRow>(
@@ -105,6 +114,7 @@ export async function validateSerial(serialNumber: string): Promise<{
         stockItemName: serial.itemName,
         currentLocationId: serial.currentLocationId,
         currentLocationName: serial.currentLocationName,
+        status: serial.status,
         errorMessage: `Serial is not available (status: ${serial.status})`,
       };
     }
@@ -115,6 +125,7 @@ export async function validateSerial(serialNumber: string): Promise<{
       stockItemName: serial.itemName,
       currentLocationId: serial.currentLocationId,
       currentLocationName: serial.currentLocationName,
+      status: serial.status,
     };
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
