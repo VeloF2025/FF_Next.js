@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { X, Plus, Trash2, Package } from 'lucide-react';
+import { StockItemPicker } from '../items/StockItemPicker';
 import type {
   StockLocation,
   StockItem,
@@ -199,19 +200,14 @@ export function CreateReturnModal({
                         <label className="mb-1 block text-xs font-medium text-muted-foreground">
                           Item
                         </label>
-                        <select
-                          value={line.stockItemId}
-                          onChange={(e) => handleLineChange(index, 'stockItemId', e.target.value)}
-                          required
-                          className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        >
-                          <option value="">Select item...</option>
-                          {stockItems.map(item => (
-                            <option key={item.id} value={item.id}>
-                              {item.name} ({item.itemCode})
-                            </option>
-                          ))}
-                        </select>
+                        <StockItemPicker
+                          instanceId={`return-line-${index}`}
+                          items={stockItems}
+                          selectedItemId={line.stockItemId}
+                          onSelect={(itemId: string) =>
+                            handleLineChange(index, 'stockItemId', itemId)
+                          }
+                        />
                       </div>
 
                       <div>

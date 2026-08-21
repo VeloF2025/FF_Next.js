@@ -30,7 +30,7 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
   try {
     const trackingType = req.query.trackingType as string | undefined;
     const rawSearch = req.query.search as string | undefined;
-      const limit = resolveItemLimit(req.query.limit);
+    const limit = resolveItemLimit(req.query.limit);
     const search = rawSearch ? `%${rawSearch}%` : undefined;
 
     let rows: Record<string, unknown>[];

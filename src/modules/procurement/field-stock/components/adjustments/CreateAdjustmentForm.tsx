@@ -8,6 +8,7 @@ import { X, Plus, Minus } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { useLocations, useStockItems } from '../../hooks';
+import { StockItemPicker } from '../items/StockItemPicker';
 import type { AdjustmentReason } from '@/types/procurement/stockTake.types';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
@@ -39,16 +40,10 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
-  const [itemSearch, setItemSearch] = useState('');
   const [locationSearch, setLocationSearch] = useState('');
 
   if (!isOpen) return null;
 
-  const filteredItems = stockItems.filter(
-    (i) =>
-      i.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
-      i.itemCode.toLowerCase().includes(itemSearch.toLowerCase())
-  );
 
   const filteredLocations = locations.filter(
     (l) =>
@@ -94,7 +89,6 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
         reason_code: '',
         notes: '',
       });
-      setItemSearch('');
       setLocationSearch('');
       onClose();
     } catch (err) {
@@ -150,30 +144,14 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
           {/* Stock Item */}
           <div>
             <label htmlFor="adj-stock-item-id" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Stock Item *</label>
-            <input
-              id="adj-item-search"
-              name="item-search"
-              type="text"
-              placeholder="Search items..."
-              value={itemSearch}
-              onChange={(e) => setItemSearch(e.target.value)}
-              aria-label="Search stock items"
-              className="w-full px-3 py-2 mb-1 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] text-sm"
+            <StockItemPicker
+              instanceId="adjustment"
+              triggerId="adj-stock-item-id"
+              items={stockItems}
+              selectedItemId={formData.stock_item_id}
+              onSelect={(itemId: string) => setFormData({ ...formData, stock_item_id: itemId })}
+              placeholder="Select item"
             />
-            <select
-              id="adj-stock-item-id"
-              name="stock_item_id"
-              value={formData.stock_item_id}
-              onChange={(e) => setFormData({ ...formData, stock_item_id: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
-            >
-              <option value="">Select item</option>
-              {filteredItems.slice(0, 100).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.itemCode} - {item.name}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Adjustment Type Toggle */}

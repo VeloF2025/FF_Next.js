@@ -26,6 +26,8 @@ interface Props {
   placeholder?: string;
   /** Distinguishes the listbox ids when several pickers share a page. */
   instanceId: string;
+  /** DOM id for the trigger, so an existing <label htmlFor> still binds. */
+  triggerId?: string;
 }
 
 export function StockItemPicker({
@@ -35,6 +37,7 @@ export function StockItemPicker({
   disabled = false,
   placeholder = 'Select item…',
   instanceId,
+  triggerId,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -108,6 +111,7 @@ export function StockItemPicker({
     <div ref={containerRef} className="relative" onKeyDown={onKeyDown}>
       <button
         ref={triggerRef}
+        id={triggerId}
         type="button"
         onClick={() => !disabled && (open ? close() : setOpen(true))}
         disabled={disabled}

@@ -123,6 +123,23 @@ describe('StockItemPicker', () => {
     expect(screen.getByRole('button', { name: /OPT-116BF - 1:16 Bare Fibre Splitter/ })).toBeTruthy();
   });
 
+  it('binds an existing <label htmlFor> via triggerId', () => {
+    render(
+      <div>
+        <label htmlFor="bound-trigger">Stock Item</label>
+        <StockItemPicker
+          instanceId="t"
+          triggerId="bound-trigger"
+          items={[SPLITTER]}
+          selectedItemId=""
+          onSelect={vi.fn()}
+        />
+      </div>
+    );
+    // getByLabelText resolves through htmlFor -> id, so this fails if the id is dropped.
+    expect(screen.getByLabelText('Stock Item').tagName).toBe('BUTTON');
+  });
+
   it('gives each instance its own listbox id so sibling rows do not collide', () => {
     const { container } = render(
       <div>
