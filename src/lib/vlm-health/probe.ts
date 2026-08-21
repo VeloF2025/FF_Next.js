@@ -12,8 +12,11 @@
  * @module lib/vlm-health/probe
  */
 
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { log } from '@/lib/logger';
+
+const execFileAsync = promisify(execFile);
 
 export const DEFAULT_VLM_MODELS_URL = 'http://localhost:8100/v1/models';
 
@@ -37,7 +40,7 @@ export interface VlmProbeOptions {
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
   /** Injectable for tests; returns service uptime in ms, or null if unknown. */
-  serviceUptimeMs?: () => number | null;
+  serviceUptimeMs?: () => Promise<number | null>;
 }
 
 export interface VlmProbeResult {
@@ -56,14 +59,21 @@ interface ModelsResponse {
   data?: Array<{ id?: string }>;
 }
 
-/** Real uptime lookup via systemd. Read-only `systemctl show`, no sudo needed. */
-function defaultServiceUptimeMs(): number | null {
+/**
+ * Real uptime lookup via systemd. Read-only `systemctl show`, no sudo needed.
+ *
+ * Async (`execFile`, not `execFileSync`): this runs inside a shared Node
+ * server handling concurrent requests, and a stalled `systemctl` (up to its
+ * 2s timeout) must not block the event loop for everyone else on the box.
+ */
+async function defaultServiceUptimeMs(): Promise<number | null> {
   try {
-    const value = execFileSync(
+    const { stdout } = await execFileAsync(
       'systemctl',
       ['show', SERVICE_NAME, '--property=ActiveEnterTimestamp', '--value'],
-      { timeout: 2000, encoding: 'utf8' },
-    ).trim();
+      { timeout: 2000 },
+    );
+    const value = stdout.trim();
     if (!value || value === 'n/a') return null;
     const enteredAt = new Date(value).getTime();
     if (Number.isNaN(enteredAt)) return null;
@@ -104,13 +114,17 @@ export async function probeVlmHealth(opts: VlmProbeOptions = {}): Promise<VlmPro
   const url = opts.url ?? DEFAULT_VLM_MODELS_URL;
   const timeoutMs = opts.timeoutMs ?? PROBE_TIMEOUT_MS;
   const fetchImpl = opts.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
-  const uptimeMs = (opts.serviceUptimeMs ?? defaultServiceUptimeMs)();
+  const getServiceUptimeMs = opts.serviceUptimeMs ?? defaultServiceUptimeMs;
 
   try {
     const modelId = await fetchModelId(url, timeoutMs, fetchImpl);
     return { modelId, withinStartupGrace: false, failureReason: null };
   } catch (err) {
     const failureReason = err instanceof Error ? err.message : String(err);
+    // Only shell out to systemctl on the failure path — the common healthy
+    // tick never needs it, and this is a shared server handling concurrent
+    // requests.
+    const uptimeMs = await getServiceUptimeMs();
     const withinStartupGrace = uptimeMs !== null && uptimeMs < STARTUP_GRACE_MS;
     return { modelId: null, withinStartupGrace, failureReason };
   }

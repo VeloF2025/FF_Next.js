@@ -20,6 +20,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { cronSecretMatches } from '@/lib/cronAuth';
 import { log } from '@/lib/logger';
 import { dispatchVlmAlert } from '@/lib/vlm-health/alert';
 import { buildVlmAlert, classifyVlmHealth, isAlerting, type VlmVerdict } from '@/lib/vlm-health/monitor';
@@ -64,7 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     log.error('CRON_SECRET not configured — rejecting vlm-health request', undefined, 'VlmHealth');
     return apiResponse.error(res, ErrorCode.SERVICE_UNAVAILABLE, 'Cron endpoint misconfigured');
   }
-  if (req.headers['x-cron-secret'] !== cronSecret) {
+  if (!cronSecretMatches(req.headers['x-cron-secret'], cronSecret)) {
     return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Unauthorized');
   }
 

@@ -34,6 +34,11 @@ function alertRecipient(): string | undefined {
  * Cap how long a channel may block. This runs on a 5-minute cron against a
  * long-lived server; an SMTP connection that hangs would otherwise stall the
  * invocation and can overlap the next tick.
+ *
+ * This only stops the CALLER from waiting — it does not cancel `work` itself,
+ * which keeps running in the background after "timing out". That is fine
+ * here: both callers discard the result on timeout and neither send has a
+ * side effect worth aborting.
  */
 async function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
