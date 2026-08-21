@@ -8,7 +8,7 @@
  * Fixtures mirror production rows read on 2026-08-21.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, within, cleanup } from '@testing-library/react';
+import { render, screen, within, cleanup, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PurchaseOrderPicker } from '../PurchaseOrderPicker';
 import type { PickerPurchaseOrder } from '../../lib/poPickerOptions';
@@ -217,6 +217,73 @@ describe('PurchaseOrderPicker', () => {
     const option = screen.getAllByRole('option').find((o) => o.getAttribute('aria-disabled') === 'true');
     expect(option).toBeTruthy();
     expect(within(option!).getByText('Fully received')).toBeTruthy();
+  });
+
+  /**
+   * Fires ONLY mousedown, deliberately.
+   *
+   * A full user.click() also moves focus, and the blur handler would close the
+   * panel on its own — so the test would still pass with the outside-click
+   * listener deleted, proving nothing. Dispatching the bare mousedown isolates
+   * the document listener as the only thing that can close the panel.
+   */
+  it('closes when the user presses the mouse outside it', async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <PurchaseOrderPicker purchaseOrders={[INCIDENT]} selectedPOId="" onSelect={vi.fn()} />
+        <div data-testid="outside">elsewhere on the page</div>
+      </div>
+    );
+    await user.click(screen.getByRole('button', { name: /standalone receipt/i }));
+    expect(screen.getByLabelText('Search purchase orders')).toBeTruthy();
+
+    fireEvent.mouseDown(screen.getByTestId('outside'));
+    expect(screen.queryByLabelText('Search purchase orders')).toBeNull();
+  });
+
+  it('stays open when the mouse is pressed inside its own panel', async () => {
+    const user = userEvent.setup();
+    render(<PurchaseOrderPicker purchaseOrders={[INCIDENT]} selectedPOId="" onSelect={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: /standalone receipt/i }));
+
+    fireEvent.mouseDown(screen.getByLabelText('Search purchase orders'));
+    expect(screen.queryByLabelText('Search purchase orders')).toBeTruthy();
+  });
+
+  it('does not yank focus back to the trigger when the user clicks another field', async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <PurchaseOrderPicker purchaseOrders={[INCIDENT]} selectedPOId="" onSelect={vi.fn()} />
+        <button type="button">somewhere else on the form</button>
+      </div>
+    );
+    const trigger = screen.getByRole('button', { name: /standalone receipt/i });
+    await user.click(trigger);
+    const elsewhere = screen.getByRole('button', { name: /somewhere else/i });
+    await user.click(elsewhere);
+
+    // The user asked to go elsewhere — stealing focus back would fight them.
+    expect(document.activeElement).toBe(elsewhere);
+    expect(document.activeElement).not.toBe(trigger);
+  });
+
+  it('forgets the previous search when reopened', async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <PurchaseOrderPicker purchaseOrders={[INCIDENT]} selectedPOId="" onSelect={vi.fn()} />
+        <div data-testid="outside">elsewhere on the page</div>
+      </div>
+    );
+    const trigger = screen.getByRole('button', { name: /standalone receipt/i });
+    await user.click(trigger);
+    await user.type(screen.getByLabelText('Search purchase orders'), 'zzzz');
+    await user.click(screen.getByTestId('outside'));
+    await user.click(trigger);
+
+    expect((screen.getByLabelText('Search purchase orders') as HTMLInputElement).value).toBe('');
   });
 
   it('does not open at all when disabled by a pre-linked PO', async () => {

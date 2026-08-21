@@ -122,10 +122,14 @@ export function PurchaseOrderPicker({
   );
 
   /**
-   * Tab-away closes the panel rather than leaving stale UI behind. A null
-   * relatedTarget is ignored: a mousedown on a row blurs the input with no
-   * relatedTarget, and closing there would unmount the row before its click
-   * fired. Outside clicks are handled by the mousedown listener above.
+   * Tab-away closes the panel rather than leaving stale UI behind.
+   *
+   * A null relatedTarget is ignored so that pressing the mouse on inert panel
+   * chrome (the empty-state line, padding) does not close the panel underneath
+   * the pointer. NOT covered by a test: jsdom reports body rather than null
+   * here, so the branch cannot be distinguished from the outside-click
+   * listener without asserting on jsdom's own quirk. Outside clicks are
+   * covered — see the mousedown tests.
    */
   const onBlurCapture = useCallback(
     (e: React.FocusEvent) => {
