@@ -15,7 +15,6 @@ import { useCallback, useRef, useEffect, useState } from 'react';
 import { validateSerial, validateSerialBatch } from '@/modules/field-stock-pwa/api';
 import { parseScanPayload, MAX_BOX_SERIALS } from '@/modules/field-stock-pwa/lib/boxScan';
 import { verdictForSerial } from '@/modules/field-stock-pwa/lib/serialVerdict';
-import { serialsEligibleForIntake } from '@/modules/field-stock-pwa/lib/boxScan';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
 interface UseScanSerialOptions {
@@ -212,7 +211,13 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
   );
 
   const handleRawSerial = useCallback(
-    async (rawSerial: string, scanSource: 'machine' | 'manual' = 'manual') => {
+    async (
+      rawSerial: string,
+      // Tags the row for display only. It does NOT decide whether an unknown
+      // serial can be taken into stock — that is recomputed below from the
+      // payload itself, so passing 'machine' here cannot grant eligibility.
+      scanSource: 'machine' | 'manual' = 'manual',
+    ) => {
       // A scanned payload is a carton serial list, the carton's ISO data code,
       // a single serial (bare or ISO-wrapped), or junk. parseScanPayload sorts
       // them out; only the single-serial case falls through to the old path.
@@ -307,12 +312,24 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         expectedItemId: stockItem.id,
         expectedItemName: stockItem.name,
         sourceLocation: sourceLocation ?? null,
-        // ONE rule, client and server. Eligibility is derived from the payload
-        // itself — exactly as pickings/_validation.ts does it — so the tick the
-        // storeman sees matches what the server will accept. A single scanned
-        // code corroborates nothing, so it can never be taken in; previously
-        // the client claimed it could and the submit then failed.
-        scanSource: serialsEligibleForIntake(rawSerial).has(serial) ? 'machine' : 'manual',
+        // Always 'manual', and deliberately so rather than by omission.
+        //
+        // This branch is only reached when parseScanPayload returned `single`
+        // (a `box` returned earlier, to handleBoxScan). The server grants
+        // intake eligibility ONLY for a box payload — see
+        // serialsEligibleForIntake, and its two callers in
+        // pickings/_validation.ts and _validateBatchCore.ts — so a lone code
+        // corroborates nothing no matter how it was captured. Claiming
+        // 'machine' here would show the storeman a tick the server then
+        // refuses at submit, which is what this hotfix removes.
+        //
+        // NOTE: an earlier version computed
+        // `serialsEligibleForIntake(rawSerial).has(serial)` here. That is
+        // always false for the reason above — a live-looking branch that
+        // cannot fire. If single-unit intake is ever wanted (a Gizzu has no
+        // carton), it needs a real decision about how a typed serial is told
+        // apart from a scanned one, not a change to this line alone.
+        scanSource: 'manual',
       });
 
       const resolved: PwaScannedSerial = verdict.valid
