@@ -23,6 +23,12 @@ export interface PwaScannedSerial {
   scannedAt: number; // epoch ms; used for sort + audit
   state: 'pending-validation' | 'valid' | 'invalid';
   errorMessage?: string;
+  /**
+   * Set on a VALID row that is worth flagging — today, a serial recorded at a
+   * different warehouse than the one it is being issued from. Usable, recorded,
+   * not blocked.
+   */
+  warning?: string;
   /** Set on every member of one carton scan; absent for individually scanned units. */
   groupId?: string;
   /** Human label for the group header, e.g. 'Box · 9 serials'. Set on every member. */

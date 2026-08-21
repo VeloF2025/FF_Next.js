@@ -131,11 +131,27 @@ export async function validateStockAvailability(
       const unusable = serialIds.filter((id) => {
         const row = byId.get(id);
         if (!row) return true;
-        if (row.status !== 'available' && row.status !== 'in_stock') return true;
-        // A serial with no recorded location is allowed — missing data is not a
-        // contradiction, the same rule the scan step applies.
-        return row.current_location_id !== null && row.current_location_id !== sourceLocationId;
+        return row.status !== 'available' && row.status !== 'in_stock';
       });
+
+      // Being recorded at a DIFFERENT warehouse no longer blocks. That location
+      // is an assumption from a workbook tab that denotes allocation, not
+      // presence (27.5% accurate, measured 2026-08-21), and stock legitimately
+      // moves between sites. Refusing here is what produced the 2026-07 dead
+      // end: the technician had already signed. Counted so the divergence is
+      // visible instead of silent — the scan step warns the storeman.
+      const elsewhere = serialIds.filter((id) => {
+        const row = byId.get(id);
+        return !!row && row.current_location_id !== null
+          && row.current_location_id !== sourceLocationId;
+      });
+      if (elsewhere.length > 0) {
+        log.warn(
+          'issue: serials recorded at another warehouse — allowed, not blocked',
+          { count: elsewhere.length, of: serialIds.length, sourceLocationId, lineId: line.id },
+          'field-stock/availability',
+        );
+      }
 
       if (unusable.length > 0) {
         errors[line.stock_item_id] =

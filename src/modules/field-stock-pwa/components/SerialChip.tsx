@@ -18,8 +18,11 @@ export interface SerialChipProps {
   onRemove: (serialNumber: string) => void;
 }
 
-function borderClass(state: PwaScannedSerial['state']): string {
-  if (state === 'valid') return 'border-emerald-800 bg-emerald-950/30';
+function borderClass(state: PwaScannedSerial['state'], warned = false): string {
+  if (state === 'valid') {
+    // Usable, but recorded elsewhere — amber says "note this", not "stop".
+    return warned ? 'border-amber-700 bg-amber-950/25' : 'border-emerald-800 bg-emerald-950/30';
+  }
   if (state === 'invalid') return 'border-rose-800 bg-rose-950/30';
   return 'border-amber-800 bg-amber-950/30';
 }
@@ -35,13 +38,16 @@ function StateIcon({ state }: { state: PwaScannedSerial['state'] }) {
 export function SerialChip({ serial, onRemove }: SerialChipProps) {
   return (
     <li
-      className={`px-3 py-2.5 rounded-lg border flex items-start gap-2 ${borderClass(serial.state)}`}
+      className={`px-3 py-2.5 rounded-lg border flex items-start gap-2 ${borderClass(serial.state, !!serial.warning)}`}
     >
       <StateIcon state={serial.state} />
       <div className="flex-1 min-w-0">
         <div className="text-sm font-mono text-white truncate">{serial.serialNumber}</div>
         {serial.state === 'invalid' && serial.errorMessage && (
           <div className="text-xs text-rose-300 mt-0.5">{serial.errorMessage}</div>
+        )}
+        {serial.state === 'valid' && serial.warning && (
+          <div className="text-xs text-amber-300 mt-0.5">{serial.warning}</div>
         )}
       </div>
       {serial.state === 'invalid' && (
