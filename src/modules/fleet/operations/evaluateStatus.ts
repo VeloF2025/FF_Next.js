@@ -7,7 +7,7 @@ import {
   type ContinuityResult,
 } from './continuity';
 import { pointsWithinMismatchTolerance } from './geometry';
-import { operationalWindow, timePhase } from './timeRules';
+import { hasScheduleWindow, operationalWindow, timePhase } from './timeRules';
 import type {
   OperationalEvaluation, OperationalEvidence, OperationalFlag, OperationalStatus, OperationalVehiclePoint,
 } from './types';
@@ -26,7 +26,7 @@ function elapsedSeconds(from: string, to: string): number { return (Date.parse(t
 function usableVehiclePoints(evidence: OperationalEvidence): OperationalVehiclePoint[] {
   const asOf = Date.parse(evidence.asOf);
   let evaluationEnd = asOf;
-  if (evidence.schedule) evaluationEnd = Math.min(asOf,
+  if (hasScheduleWindow(evidence.schedule)) evaluationEnd = Math.min(asOf,
     Date.parse(operationalWindow(evidence.schedule, evidence.rule).monitoringEnd));
   return evidence.vehicle.positions.filter((point) => point.valid && Number.isFinite(Date.parse(point.recordedAt))
     && Date.parse(point.recordedAt) <= evaluationEnd)
@@ -42,7 +42,7 @@ function freshVehiclePoints(
   if (!usable.length) { flags.add('gps_missing'); return []; }
   const threshold = evidence.vehicle.staleAfterSeconds;
   if (threshold === null || !Number.isFinite(threshold) || threshold < 0) { flags.add('evidence_source_error'); return []; }
-  const asOf = evidence.schedule ? Math.min(Date.parse(evidence.asOf),
+  const asOf = hasScheduleWindow(evidence.schedule) ? Math.min(Date.parse(evidence.asOf),
     Date.parse(operationalWindow(evidence.schedule, evidence.rule).monitoringEnd)) : Date.parse(evidence.asOf);
   const fresh = usable.filter((point) => asOf - Date.parse(point.recordedAt) <= threshold * 1_000);
   if (!fresh.length) flags.add('gps_stale');
@@ -67,7 +67,7 @@ function buildContext(evidence: OperationalEvidence): EvaluationContext {
   const vehicleOutside = staleAfter === null ? null : continuousHistoricalOutside(historicalFixes,
     evidence.rule.earlyDepartureConfirmationMinutes * 60, staleAfter, historicalAsOf);
   if (vehicleArrival?.pending && !vehicleArrival.confirmed) flags.add('arrival_dwell_pending');
-  return { evidence, flags, phase: evidence.schedule ? timePhase(evidence.asOf, evidence.schedule, evidence.rule) : null,
+  return { evidence, flags, phase: hasScheduleWindow(evidence.schedule) ? timePhase(evidence.asOf, evidence.schedule, evidence.rule) : null,
     usableVehicle, freshVehicle, vehicleArrival, vehicleOutside,
     attendanceInside: Boolean(evidence.attendance.clockInAt && evidence.attendance.requiredSite?.valid && evidence.attendance.requiredSite.inside) };
 }
@@ -77,6 +77,9 @@ function evaluateGates(context: EvaluationContext): Decision | null {
   if (!evidence.schedule) return decision('unverifiable', 'schedule_missing');
   if (evidence.sourceErrors.length) return decision('unverifiable', 'evidence_source_error');
   if (!evidence.schedule.scheduled && !evidence.schedule.explicitWork) return decision('off_duty', 'not_scheduled');
+  // Explicitly rostered, but the policy gives this day no window. Say so rather
+  // than inventing one — an invented window manufactures a `late` finding.
+  if (!hasScheduleWindow(evidence.schedule)) return decision('unverifiable', 'schedule_missing');
   if (phase === 'off_duty') { flags.add('outside_monitoring_window'); return decision('off_duty', 'outside_monitoring_window'); }
   if (evidence.assignment.ambiguous) { flags.add('assignment_ambiguous'); return decision('unverifiable', 'assignment_ambiguous'); }
   if (!evidence.assignment.operationalSiteId) return decision('unassigned', 'operational_site_missing');
@@ -134,7 +137,7 @@ function evaluateSiteConflict(context: EvaluationContext): Decision | null {
 
 function evaluateDeparture(context: EvaluationContext): Decision | null {
   const { evidence, vehicleOutside } = context; const schedule = evidence.schedule;
-  if (!schedule) return null;
+  if (!hasScheduleWindow(schedule)) return null;
   const window = operationalWindow(schedule, evidence.rule);
   if (evidence.attendance.clockOutAt) {
     return Date.parse(evidence.attendance.clockOutAt) >= Date.parse(window.scheduledEnd)

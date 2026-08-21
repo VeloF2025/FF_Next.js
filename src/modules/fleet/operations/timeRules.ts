@@ -48,8 +48,20 @@ function validate(schedule: OperationalSchedule | null, rule: OperationalRule): 
   return schedule;
 }
 
+/**
+ * True when the policy gives this day a concrete shift window. A day without
+ * one has no monitoring window at all, which is different from a day the
+ * person was simply not scheduled for.
+ */
+export function hasScheduleWindow(
+  schedule: OperationalSchedule | null,
+): schedule is OperationalSchedule & { startTime: string; endTime: string } {
+  return schedule !== null && schedule.startTime !== null && schedule.endTime !== null;
+}
+
 export function operationalWindow(schedule: OperationalSchedule | null, rule: OperationalRule): OperationalWindow {
   const resolved = validate(schedule, rule);
+  if (!hasScheduleWindow(resolved)) throw new Error('Attendance schedule has no shift window for this day');
   const date = parseDate(resolved.workDate);
   const scheduledStart = sastInstant(date, parseTime(resolved.startTime));
   const scheduledEnd = sastInstant(date, parseTime(resolved.endTime));
@@ -68,6 +80,7 @@ export function timePhase(asOf: string, schedule: OperationalSchedule | null, ru
   if (instant === null) throw new Error('Evaluation instant is malformed');
   const resolved = validate(schedule, rule);
   if (!resolved.scheduled && !resolved.explicitWork) return 'off_duty';
+  if (!hasScheduleWindow(resolved)) return 'off_duty';
   const window = operationalWindow(resolved, rule);
   if (instant < Date.parse(window.monitoringStart) || instant > Date.parse(window.monitoringEnd)) return 'off_duty';
   if (instant < Date.parse(window.scheduledStart)) return 'before_start';

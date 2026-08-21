@@ -33,6 +33,24 @@ describe('status service validation and privacy', () => {
     expect(result.items[1]).toMatchObject({ status: 'unverifiable', flags: ['evidence_source_error'] });
   });
 
+  /**
+   * Guards `windowFor`. A day with no shift window (Sunday, or an untracked
+   * driver) has no monitoring instants to report. `summary()` is NOT wrapped by
+   * safelyEvaluate, so dropping that guard makes operationalWindow throw and
+   * takes down the whole roster response, not just one row.
+   */
+  it('reports null window instants for a schedule that has no shift window', async () => {
+    mocks.load.mockResolvedValue({
+      items: [{ ...evidence, schedule: { ...evidence.schedule, scheduled: false, startTime: null, endTime: null } }],
+      total: 1,
+    });
+    const result = await getOperationalRosterStatus({ projectId: 'p', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 });
+    expect(result.items[0]).toMatchObject({
+      monitoringStart: null, scheduledStart: null, graceEnd: null,
+      scheduledEnd: null, monitoringEnd: null,
+    });
+  });
+
   it('preserves labels, exact window instants, pagination, and GPS freshness metadata', async () => {
     mocks.load.mockResolvedValue({
       items: [{ ...evidence, vehicle: { ...evidence.vehicle, staleAfterSeconds: 7200 } }],

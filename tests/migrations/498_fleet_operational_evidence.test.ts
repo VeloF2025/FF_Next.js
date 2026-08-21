@@ -36,7 +36,8 @@ let loadOperationalEvidence: typeof import('@/modules/fleet/operations/evidenceQ
 const SCHEMA_SQL = `
   CREATE EXTENSION IF NOT EXISTS postgis;
   CREATE TABLE staff (id UUID PRIMARY KEY, first_name TEXT, last_name TEXT, home_site_id UUID,
-    status TEXT DEFAULT 'active', is_active BOOLEAN DEFAULT true);
+    status TEXT DEFAULT 'active', is_active BOOLEAN DEFAULT true,
+    attendance_tracked BOOLEAN NOT NULL DEFAULT true);
   CREATE TABLE projects (id UUID PRIMARY KEY, project_name TEXT NOT NULL);
   CREATE TABLE fleet_authorized_locations (id UUID PRIMARY KEY, name TEXT NOT NULL, lat NUMERIC NOT NULL,
     lon NUMERIC NOT NULL, radius_km NUMERIC NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true);
@@ -45,7 +46,7 @@ const SCHEMA_SQL = `
   CREATE TABLE fleet_project_operational_sites (id UUID PRIMARY KEY, project_id UUID NOT NULL,
     display_name TEXT NOT NULL, project_aoi_id UUID, authorized_location_id UUID,
     is_active BOOLEAN NOT NULL DEFAULT true, is_default BOOLEAN NOT NULL DEFAULT false);
-  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration_number TEXT, status TEXT);
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration TEXT, status TEXT);
   CREATE TABLE vehicle_assignments (id UUID PRIMARY KEY, staff_id UUID NOT NULL, fleet_vehicle_id UUID NOT NULL,
     assignment_start DATE NOT NULL, assignment_end DATE);
   CREATE TABLE fleet_vehicle_project_assignments (id UUID PRIMARY KEY, vehicle_id UUID, project_id UUID,
@@ -53,11 +54,13 @@ const SCHEMA_SQL = `
   CREATE TABLE fleet_operational_assignments (id UUID PRIMARY KEY, staff_id UUID NOT NULL, project_id UUID NOT NULL,
     operational_site_id UUID NOT NULL, start_date DATE NOT NULL, end_date DATE NOT NULL,
     assignment_kind TEXT NOT NULL, vehicle_assignment_id UUID, status TEXT NOT NULL);
-  CREATE TABLE attendance_policies (id UUID PRIMARY KEY, is_active BOOLEAN, start_time TIME, end_time TIME,
-    work_days JSONB);
-  CREATE TABLE attendance_policy_assignments (staff_id UUID, policy_id UUID, effective_from DATE, effective_to DATE);
-  CREATE TABLE attendance_schedule_policies (id UUID PRIMARY KEY, timezone TEXT, active_from DATE, active_to DATE,
-    late_alert_minutes INTEGER);
+  CREATE TABLE attendance_schedule_policies (id UUID PRIMARY KEY, timezone TEXT NOT NULL DEFAULT 'Africa/Johannesburg',
+    active_from DATE NOT NULL, active_to DATE,
+    weekday_start TIME NOT NULL DEFAULT '08:00', weekday_end TIME NOT NULL DEFAULT '17:00',
+    weekday_unpaid_break_minutes INTEGER NOT NULL DEFAULT 60, weekday_paid_cap_hrs NUMERIC(4,2) NOT NULL DEFAULT 8,
+    saturday_start TIME NOT NULL DEFAULT '08:00', saturday_end TIME NOT NULL DEFAULT '13:00',
+    saturday_paid_cap_hrs NUMERIC(4,2) NOT NULL DEFAULT 5, sunday_scheduled BOOLEAN NOT NULL DEFAULT false,
+    sunday_missing_out_cap_hrs NUMERIC(4,2) NOT NULL DEFAULT 5, late_alert_minutes INTEGER NOT NULL DEFAULT 15);
   CREATE TABLE attendance_entries (id UUID PRIMARY KEY, staff_id UUID, work_date DATE, clock_in_at TIMESTAMPTZ,
     clock_out_at TIMESTAMPTZ, clock_in_lat NUMERIC, clock_in_lon NUMERIC, clock_out_lat NUMERIC,
     clock_out_lon NUMERIC, site_geofence_id UUID);
@@ -103,9 +106,7 @@ const FIXTURES_SQL = `
     ('10000000-0000-4000-8000-000000000021','${SELECTED_STAFF}','${PROJECT}','${REQUIRED_SITE}','2026-08-17','2026-08-17','roster','${SELECTED_ASSIGNMENT}','active'),
     ('10000000-0000-4000-8000-000000000022','${AMBIGUOUS_STAFF}','${PROJECT}','${REQUIRED_SITE}','2026-08-17','2026-08-17','roster',NULL,'active'),
     ('10000000-0000-4000-8000-000000000023','${INVALID_STAFF}','${PROJECT}','${RETIRED_SITE}','2026-08-17','2026-08-17','roster',NULL,'active');
-  INSERT INTO attendance_policies VALUES ('10000000-0000-4000-8000-000000000024',true,'08:00','17:00','{"monday":true}');
-  INSERT INTO attendance_policy_assignments SELECT id,'10000000-0000-4000-8000-000000000024','2026-01-01',NULL FROM staff;
-  INSERT INTO attendance_schedule_policies VALUES ('10000000-0000-4000-8000-000000000025','Africa/Johannesburg','2026-01-01',NULL,15);
+  INSERT INTO attendance_schedule_policies (id, active_from) VALUES ('10000000-0000-4000-8000-000000000025','2026-01-01');
   INSERT INTO attendance_entries VALUES
     ('10000000-0000-4000-8000-000000000026','${SELECTED_STAFF}','2026-08-17','2026-08-17T05:00:00Z','2026-08-17T05:30:00Z',-26,28,NULL,NULL,'${REQUIRED_LOCATION}'),
     ('10000000-0000-4000-8000-000000000027','${SELECTED_STAFF}','2026-08-17','2026-08-17T06:10:00Z','2026-08-17T15:00:00Z',-27,29,-27,29,NULL),

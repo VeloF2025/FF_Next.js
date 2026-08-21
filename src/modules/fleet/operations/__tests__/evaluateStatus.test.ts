@@ -34,6 +34,52 @@ const vehicleInside = {
 
 function status(input: OperationalEvidence): OperationalStatus { return evaluateOperationalStatus(input).status; }
 
+/**
+ * A day the policy gives no shift window: Sunday, or a staff member who is not
+ * `attendance_tracked`. `startTime`/`endTime` are NULL and must stay NULL — the
+ * roster's expected start feeds `late` and `left_early` findings against a named
+ * driver, so an invented 08:00 here becomes an invented accusation.
+ */
+const noWindow = {
+  policyId: 'policy-1', workDate: '2026-08-14', timezone: 'Africa/Johannesburg',
+  scheduled: false, explicitWork: false, startTime: null, endTime: null, graceMinutes: 15,
+};
+
+describe('a schedule with no shift window', () => {
+  /**
+   * Guards `evaluateGates`. Explicitly rostered, so the not_scheduled gate above
+   * does NOT fire and evaluation continues — with no window to continue against.
+   * Removing that guard lets this reach the phase and arrival logic, which either
+   * throws or invents a verdict; either way this assertion fails.
+   */
+  it('reports an explicitly rostered driver as unverifiable rather than judging them', () => {
+    expect(evaluateOperationalStatus(evidence({
+      schedule: { ...noWindow, explicitWork: true },
+    }))).toMatchObject({ status: 'unverifiable', reasonCodes: ['schedule_missing'] });
+  });
+
+  /** Not rostered and not scheduled is simply off duty — not an error. */
+  it('reports an unscheduled, untracked driver as off duty', () => {
+    expect(evaluateOperationalStatus(evidence({ schedule: noWindow })))
+      .toMatchObject({ status: 'off_duty', reasonCodes: ['not_scheduled'] });
+  });
+
+  /**
+   * Guards the three window reads in `buildContext` — `usableVehiclePoints`,
+   * `freshVehiclePoints`, and the `timePhase` call. All three run BEFORE
+   * evaluateGates, so they execute even though the verdict is schedule_missing.
+   * Each one computes `operationalWindow`, which throws without a window; drop
+   * any of their guards and this stops returning and starts throwing.
+   */
+  it('evaluates a driver with GPS fixes without computing a window that does not exist', () => {
+    const input = evidence({ schedule: { ...noWindow, explicitWork: true }, vehicle: vehicleInside });
+    expect(() => evaluateOperationalStatus(input)).not.toThrow();
+    expect(evaluateOperationalStatus(input)).toMatchObject({
+      status: 'unverifiable', reasonCodes: ['schedule_missing'],
+    });
+  });
+});
+
 describe('evaluateOperationalStatus', () => {
   it('covers the gate statuses and explicit unscheduled work', () => {
     expect(status(evidence({ asOf: '2026-08-14T16:00:01Z' }))).toBe('off_duty');

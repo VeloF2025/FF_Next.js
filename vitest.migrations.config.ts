@@ -80,6 +80,11 @@ export default defineConfig({
       // approvalQueries measures how far a driver moved their address, so the
       // parking approval test's closure reaches haversineDistanceM.
       { find: '@/lib/geo', replacement: path.resolve(__dirname, './src/lib/geo') },
+      // The roster's schedule resolver reaches services/attendance/reconcileQueries,
+      // whose closure includes employmentUniverse -> @/lib/staff/hrVisibilityFilters.
+      // That one lives under src/lib, not lib, so the generic @/lib fallback below
+      // would send it to the wrong tree.
+      { find: '@/lib/staff', replacement: path.resolve(__dirname, './src/lib/staff') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@', replacement: path.resolve(__dirname, './src') },
     ],
