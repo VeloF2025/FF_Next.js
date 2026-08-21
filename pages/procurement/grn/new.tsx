@@ -17,6 +17,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { isReceivableLocation } from '@/modules/procurement/field-stock/lib/receivableLocations';
 
 // UOM Options
 const UOM_OPTIONS = [
@@ -137,11 +138,10 @@ export default function NewGRNPage() {
 
         const locationsData = await locationsRes.json();
         if (locationsData.success) {
-          // Filter for real warehouse locations; exclude virtual bins (e.g. Faulty
-          // Equipment Bin) — you can't receive a delivery into a virtual location.
-          const warehouses = (locationsData.data || []).filter(
-            (l: Location) =>
-              (l.locationType === 'warehouse' || l.locationType === 'internal') && !l.isVirtual
+          // Shared with the transfer form so both site dropdowns agree — see
+          // isReceivableLocation for why they used to disagree.
+          const warehouses = (locationsData.data || []).filter((l: Location) =>
+            isReceivableLocation(l)
           );
           setLocations(warehouses);
         }
