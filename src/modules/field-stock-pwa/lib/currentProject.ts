@@ -22,9 +22,20 @@
  * role. Roles do not carry the answer here: 89 of the staff rows have a NULL
  * role, and 18 of those — plus 9 `casual` and even one `admin` — have real
  * project check-ins, while `stores` and `supervisor` have none (2026-08-21).
- * A role allow-list would both miss real field workers and prompt office staff.
- * Having ever checked in against a project, or carrying a standing declaration,
- * is direct evidence that the question means something to this person.
+ * A role allow-list ALONE would both miss real field workers and prompt office
+ * staff. Having ever checked in against a project, or carrying a standing
+ * declaration, is direct evidence that the question means something.
+ *
+ * But evidence alone strands a new starter: someone hired outside the
+ * self-registration flow (which sets a declaration on day one) has neither
+ * signal, is therefore never asked, and so never acquires one — the original
+ * staleness bug, reproduced permanently for exactly the people it hurts most.
+ * A real case: a technician active since 2026-07-28 with no evidence at all.
+ *
+ * So an explicit `technician`/`casual` role is accepted as a THIRD signal. It is
+ * additive, never a replacement: those two roles are 23/26 and 10/10 evidenced
+ * (so the role is near-certain proof of field work), while `stores`, `supervisor`
+ * and `admin` are not on the list and are still judged on evidence alone.
  */
 
 export type ProjectSource = 'checkin-today' | 'declared-today' | 'stale-declaration' | 'none';
@@ -38,10 +49,16 @@ export interface ProjectSignals {
   standingDeclarationProjectId?: string | null;
   /**
    * Has this person ever checked in against a project? Direct evidence that
-   * they do field work, and the only thing that makes the question meaningful.
-   * Someone who never has is not asked at all.
+   * they do field work.
    */
   hasEverCheckedInOnProject?: boolean;
+  /**
+   * Is their role explicitly `technician` or `casual`? Accepted as evidence in
+   * its own right so a new starter with no history is still asked. NOT a
+   * general role gate — office roles are absent from this list and fall back to
+   * behavioural evidence.
+   */
+  hasFieldRole?: boolean;
 }
 
 export interface CurrentProject {
@@ -63,7 +80,9 @@ export function resolveCurrentProject(signals: ProjectSignals): CurrentProject {
   // be interrogated about a project — and must not be able to write junk into
   // the field the stores flow depends on.
   const doesFieldWork =
-    signals.hasEverCheckedInOnProject === true || !!signals.standingDeclarationProjectId;
+    signals.hasEverCheckedInOnProject === true ||
+    !!signals.standingDeclarationProjectId ||
+    signals.hasFieldRole === true;
 
   if (signals.checkinTodayProjectId) {
     // Already answered this morning. Asking again is nagging.

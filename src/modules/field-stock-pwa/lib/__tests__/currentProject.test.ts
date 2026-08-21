@@ -65,7 +65,23 @@ describe('resolveCurrentProject', () => {
     });
   });
 
-  it('does not gate on ROLE, which is unreliable here', () => {
+  it('ASKS a brand-new technician who has no history at all', () => {
+    // The bootstrap gap: someone hired outside self-registration has neither a
+    // check-in nor a declaration, so evidence alone would never ask them and
+    // they would never acquire one — the staleness bug made permanent. A real
+    // case existed: a technician active since 2026-07-28 with no evidence.
+    expect(resolveCurrentProject({ hasFieldRole: true })).toEqual({
+      projectId: null, source: 'none', shouldAsk: true,
+    });
+  });
+
+  it('does NOT treat an office role as field work', () => {
+    // stores/supervisor/admin are absent from the field-role list, so they
+    // arrive here with hasFieldRole false and are judged on evidence alone.
+    expect(resolveCurrentProject({ hasFieldRole: false })).toMatchObject({ shouldAsk: false });
+  });
+
+  it('does not gate on ROLE ALONE, which is unreliable here', () => {
     // 89 staff rows have a NULL role, 18 of them do field work; `stores` and
     // `supervisor` do none. Behaviour decides, and this function is never told
     // a role at all — asserted by the absence of any role field in the input.
@@ -92,6 +108,7 @@ describe('resolveCurrentProject', () => {
     // and nobody was ever asked to fix that.
     const cases: Array<[Record<string, unknown>, boolean]> = [
       [{}, false],                                        // office: silent, no project — fine
+      [{ hasFieldRole: true }, true],                      // new starter: must be asked
       [{ hasEverCheckedInOnProject: true }, true],         // field worker: must be asked
       [{ standingDeclarationProjectId: 'p' }, true],
       [{ checkinTodayProjectId: 'p' }, false],
@@ -101,7 +118,9 @@ describe('resolveCurrentProject', () => {
       const r = resolveCurrentProject(signals);
       expect(r.shouldAsk).toBe(expectAsk);
       const doesFieldWork =
-        signals.hasEverCheckedInOnProject === true || !!signals.standingDeclarationProjectId;
+        signals.hasEverCheckedInOnProject === true ||
+        !!signals.standingDeclarationProjectId ||
+        signals.hasFieldRole === true;
       if (!r.shouldAsk && doesFieldWork) expect(r.projectId).not.toBeNull();
     }
   });

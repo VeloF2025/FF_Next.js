@@ -27,12 +27,20 @@ import { resolveCurrentProject } from '@/modules/field-stock-pwa/lib/currentProj
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Roles accepted as evidence of field work in their own right, so a new starter
+ * with no history is still asked. Deliberately excludes `stores`, `supervisor`
+ * and `admin`, which are judged on behavioural evidence alone.
+ */
+const FIELD_ROLES = ['technician', 'casual'];
+
 interface SignalRow extends Record<string, unknown> {
   checkin_today_project_id: string | null;
   declared_today_project_id: string | null;
   standing_declaration_project_id: string | null;
   standing_project_name: string | null;
   has_ever_checked_in: boolean;
+  has_field_role: boolean;
 }
 
 export default withMySession(async (req: NextApiRequest, res: NextApiResponse, session) => {
@@ -61,8 +69,11 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
              WHERE s.id = $1) AS standing_project_name,
            EXISTS (SELECT 1 FROM hs_daily_checkins h
                     WHERE h.staff_id = $1 AND h.project_id IS NOT NULL)
-             AS has_ever_checked_in`,
-        [staffId],
+             AS has_ever_checked_in,
+           EXISTS (SELECT 1 FROM staff s WHERE s.id = $1
+                    AND s.role = ANY($2::text[]))
+             AS has_field_role`,
+        [staffId, FIELD_ROLES],
       );
 
       const r = rows[0];
@@ -71,6 +82,7 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
         declaredTodayProjectId: r?.declared_today_project_id ?? null,
         standingDeclarationProjectId: r?.standing_declaration_project_id ?? null,
         hasEverCheckedInOnProject: r?.has_ever_checked_in === true,
+        hasFieldRole: r?.has_field_role === true,
       });
 
       // Skip the option list entirely for someone who will not be asked — the
@@ -122,8 +134,10 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
         `SELECT (EXISTS (SELECT 1 FROM hs_daily_checkins h
                           WHERE h.staff_id = $1 AND h.project_id IS NOT NULL)
                  OR EXISTS (SELECT 1 FROM staff s
-                             WHERE s.id = $1 AND s.declared_project_id IS NOT NULL)) AS ok`,
-        [staffId],
+                             WHERE s.id = $1
+                               AND (s.declared_project_id IS NOT NULL
+                                    OR s.role = ANY($2::text[])))) AS ok`,
+        [staffId, FIELD_ROLES],
       );
       if (evidence[0]?.ok !== true) {
         log.warn('project declaration refused: no field-work evidence', { staffId }, 'my/project');

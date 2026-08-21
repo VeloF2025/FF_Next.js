@@ -20,6 +20,12 @@
  * sessionStorage for the day once it is known. Without that, an office worker
  * who will never be asked still pays a round trip on every payslip and receipt
  * page they open.
+ *
+ * That cache is a COURTESY, not a correctness mechanism — do not harden it into
+ * one. It keys off the device clock, so a phone whose clock has drifted may
+ * suppress a reminder for a day or show it a few hours early. The server route
+ * remains the only authority on whether to ask and on every write, so a skewed
+ * clock can never produce a wrong record — only a missed or early nudge.
  */
 
 import { useCallback, useEffect, useState } from 'react';
