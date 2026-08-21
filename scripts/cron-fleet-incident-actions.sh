@@ -52,8 +52,6 @@ URL="http://localhost:${PORT}/api/cron/fleet-incident-actions"
 
 echo "$LOG_PREFIX === Fleet incident-actions start (port ${PORT}) ==="
 
-# -sS keeps it quiet on success but prints the error on failure; -f makes an
-# HTTP 4xx/5xx a non-zero exit so a rejected secret is not logged as a success.
 # This endpoint authenticates on x-cron-secret, not Authorization: Bearer.
 # -sS keeps it quiet on success but prints the error on failure; -f makes an
 # HTTP 4xx/5xx a non-zero exit so a rejected secret is not logged as a success.
