@@ -21,6 +21,22 @@
  * That is at least as good as the old region in both dimensions on every
  * viewfinder large enough to offer it, and clamps to the frame when it is not —
  * a box larger than the video cannot be scanned at all.
+ *
+ * MEASURED, not assumed (2026-08-21, real carton photo through zxing):
+ *
+ *   region 300x140, symbol 285x260 visible as 285x140 : FAILS   <- the old bug
+ *   region 300x260, symbol 285x260 filling it exactly  : FAILS
+ *   region 300x300, same symbol with ~20px of margin   : DECODES
+ *
+ * The second row is the one worth knowing. A DataMatrix needs a QUIET ZONE: a
+ * symbol that fills the decode region edge to edge fails even though every
+ * module of it is visible. So the region being merely big enough is not enough —
+ * it has to be bigger than the symbol as the user frames it. That is why the
+ * scanner hint tells the storeman to leave space around the code rather than to
+ * fill the frame, which was the advice this file originally shipped with.
+ *
+ * A complete, well-lit symbol decodes even at 140px when it is not cropped, so
+ * region size alone was never the whole story — cropping and quiet zone are.
  */
 
 /** Fraction of each viewfinder edge the decode region should span. */
@@ -53,7 +69,7 @@ export interface ScanBox {
  * A square decode region for the given viewfinder, clamped to sane bounds and
  * never exceeding the frame itself.
  */
-export function squareScanBox(viewfinderWidth: number, viewfinderHeight: number): ScanBox {
+export function scanRegionFor(viewfinderWidth: number, viewfinderHeight: number): ScanBox {
   return {
     width: edgeFor(viewfinderWidth, viewfinderHeight, MIN_EDGE),
     height: edgeFor(viewfinderHeight, viewfinderWidth, MIN_HEIGHT),

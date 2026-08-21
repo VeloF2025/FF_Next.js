@@ -65,8 +65,9 @@ export interface ScannerConfig {
    * Decode region. html5-qrcode only reads INSIDE this box.
    *
    * A function receives the live viewfinder dimensions and is the right choice
-   * for dense 2D symbols, which need a SQUARE region sized to the actual frame —
-   * a fixed wide/short box crops them (see field-stock-pwa/lib/scanBox.ts).
+   * for dense 2D symbols, which need a region tall enough not to crop them and
+   * larger than the symbol itself — a fixed wide/short box cuts them in half
+   * (see field-stock-pwa/lib/scanBox.ts).
    */
   qrboxSize?:
     | number
