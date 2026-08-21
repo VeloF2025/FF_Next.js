@@ -173,6 +173,9 @@ export default defineConfig({
       // @/lib/wa-bridge-health/* lives at src/lib/ — without this it falls through
       // to the generic @/lib → ./lib fallback and fails to resolve under Vitest.
       { find: /^@\/lib\/wa-bridge-health/, replacement: path.resolve(__dirname, 'src/lib/wa-bridge-health') },
+      // @/lib/vlm-health/* lives at src/lib/ — without this it falls through
+      // to the generic @/lib → ./lib fallback and fails to resolve under Vitest.
+      { find: /^@\/lib\/vlm-health/, replacement: path.resolve(__dirname, 'src/lib/vlm-health') },
       // @/lib/cronAuth lives at src/lib/ — without this it falls through to the generic
       // @/lib -> ./lib fallback below and fails to resolve under Vitest.
       { find: '@/lib/cronAuth', replacement: path.resolve(__dirname, './src/lib/cronAuth') },
