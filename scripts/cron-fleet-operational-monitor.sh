@@ -19,6 +19,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=scripts/lib/cron-run-status.sh
+. "$SCRIPT_DIR/lib/cron-run-status.sh"
 cd "$PROJECT_DIR"
 
 LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')]"
@@ -51,11 +53,19 @@ echo "$LOG_PREFIX === Fleet operational monitor start (port ${PORT}) ==="
 # -sS keeps it quiet on success but prints the error on failure; -f makes an
 # HTTP 4xx/5xx a non-zero exit so a rejected secret is not logged as a success.
 # This endpoint authenticates on x-cron-secret, not Authorization: Bearer.
-if ! curl -sS -f -m 120 -X POST -H "x-cron-secret: ${CRON_SECRET}" "$URL"; then
-  echo ""
+# -sS keeps it quiet on success but prints the error on failure; -f makes an
+# HTTP 4xx/5xx a non-zero exit so a rejected secret is not logged as a success.
+# The body is then inspected because these endpoints answer 200 even when the
+# RUN failed -- see scripts/lib/cron-run-status.sh.
+# `if !` rather than capturing $? — under `set -e` an assignment from a
+# failing command substitution aborts the script before $? can be read,
+# which would make the check below dead code.
+if ! RESPONSE=$(curl -sS -f -m 120 -X POST -H "x-cron-secret: ${CRON_SECRET}" "$URL"); then
   echo "$LOG_PREFIX ERROR: operational monitor request failed" >&2
   exit 1
 fi
+echo "$RESPONSE"
+report_run_status "operational monitor" "$RESPONSE" "$LOG_PREFIX" || exit 1
 
 echo ""
 echo "$LOG_PREFIX === Fleet operational monitor done ==="
