@@ -389,10 +389,21 @@ CREATE INDEX IF NOT EXISTS ix_fleet_operational_retention_items_run_stage
 -- ---------------------------------------------------------------------------
 -- INVARIANT 2. Nothing active or held can be deleted.
 --
--- Race note: both the hold service and the purge take a row lock on the
--- incident (SELECT ... FOR UPDATE / DELETE), so a hold raised concurrently
--- with a purge serialises against it rather than slipping between the check
--- and the delete.
+-- Race note: a hold raised concurrently with a purge serialises against it
+-- WITHOUT any application-level locking. Inserting into
+-- fleet_incident_retention_holds takes an implicit FOR KEY SHARE lock on the
+-- referenced fleet_operational_incidents row as part of the FK check, and that
+-- conflicts with the row lock a concurrent DELETE needs. Either the hold
+-- commits first and this trigger then refuses the delete, or the delete
+-- commits first and the hold insert fails with a foreign-key violation. There
+-- is no interleaving in which an active hold is deleted out from under itself,
+-- and no orphaned hold.
+--
+-- Verified empirically against PostgreSQL 15, not assumed: a DELETE held
+-- uncommitted on the parent row blocks a concurrent child INSERT with
+-- "canceling statement due to lock timeout ... while locking tuple in relation".
+-- Do NOT remove the FK in favour of a soft reference; the FK is load-bearing
+-- for this guarantee, not merely for referential tidiness.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fleet_assert_incident_purgeable(target_incident_id UUID)
 RETURNS void AS $$
