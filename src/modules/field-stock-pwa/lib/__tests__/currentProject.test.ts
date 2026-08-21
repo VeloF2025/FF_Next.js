@@ -42,10 +42,37 @@ describe('resolveCurrentProject', () => {
     });
   });
 
-  it('ASKS when nothing is known at all', () => {
-    expect(resolveCurrentProject({})).toEqual({
+  it('ASKS a field worker when nothing is known today', () => {
+    expect(resolveCurrentProject({ hasEverCheckedInOnProject: true })).toEqual({
       projectId: null, source: 'none', shouldAsk: true,
     });
+  });
+
+  it('does NOT ask someone who does no field work', () => {
+    // The shell renders this on EVERY /my page for EVERY role. An office worker
+    // fetching a payslip must not be asked which project they are on, nor be
+    // able to write junk into the field the stores flow depends on.
+    expect(resolveCurrentProject({})).toEqual({
+      projectId: null, source: 'none', shouldAsk: false,
+    });
+  });
+
+  it('treats a standing declaration as evidence of field work', () => {
+    // Someone declared a project at registration: the question means something
+    // to them even if they have never used the H&S check-in.
+    expect(resolveCurrentProject({ standingDeclarationProjectId: 'p-lawley' })).toMatchObject({
+      shouldAsk: true,
+    });
+  });
+
+  it('does not gate on ROLE, which is unreliable here', () => {
+    // 89 staff rows have a NULL role, 18 of them do field work; `stores` and
+    // `supervisor` do none. Behaviour decides, and this function is never told
+    // a role at all — asserted by the absence of any role field in the input.
+    const asked = resolveCurrentProject({ hasEverCheckedInOnProject: true });
+    const notAsked = resolveCurrentProject({ hasEverCheckedInOnProject: false });
+    expect(asked.shouldAsk).toBe(true);
+    expect(notAsked.shouldAsk).toBe(false);
   });
 
   it('treats null and undefined signals the same as absent', () => {
@@ -54,18 +81,28 @@ describe('resolveCurrentProject', () => {
         checkinTodayProjectId: null,
         declaredTodayProjectId: null,
         standingDeclarationProjectId: null,
+        hasEverCheckedInOnProject: true,
       }),
     ).toMatchObject({ projectId: null, shouldAsk: true });
   });
 
-  it('never reports shouldAsk=false without a project to show for it', () => {
-    // A silent prompt AND no project would leave the picker with nothing.
-    for (const signals of [
-      {}, { standingDeclarationProjectId: 'p' }, { checkinTodayProjectId: 'p' },
-      { declaredTodayProjectId: 'p' },
-    ]) {
+  it('stays silent with no project ONLY for someone who does no field work', () => {
+    // Staying quiet while holding no project is correct for office staff and
+    // wrong for a field worker — for them it would mean the picker has nothing
+    // and nobody was ever asked to fix that.
+    const cases: Array<[Record<string, unknown>, boolean]> = [
+      [{}, false],                                        // office: silent, no project — fine
+      [{ hasEverCheckedInOnProject: true }, true],         // field worker: must be asked
+      [{ standingDeclarationProjectId: 'p' }, true],
+      [{ checkinTodayProjectId: 'p' }, false],
+      [{ declaredTodayProjectId: 'p' }, false],
+    ];
+    for (const [signals, expectAsk] of cases) {
       const r = resolveCurrentProject(signals);
-      if (!r.shouldAsk) expect(r.projectId).not.toBeNull();
+      expect(r.shouldAsk).toBe(expectAsk);
+      const doesFieldWork =
+        signals.hasEverCheckedInOnProject === true || !!signals.standingDeclarationProjectId;
+      if (!r.shouldAsk && doesFieldWork) expect(r.projectId).not.toBeNull();
     }
   });
 });

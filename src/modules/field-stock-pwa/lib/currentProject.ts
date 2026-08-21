@@ -17,6 +17,14 @@
  *
  * Field workers move between sites, so "today" is the right window: a project
  * declared last week says nothing about where someone is standing now.
+ *
+ * Only FIELD workers are asked, and that is decided by behaviour rather than by
+ * role. Roles do not carry the answer here: 89 of the staff rows have a NULL
+ * role, and 18 of those — plus 9 `casual` and even one `admin` — have real
+ * project check-ins, while `stores` and `supervisor` have none (2026-08-21).
+ * A role allow-list would both miss real field workers and prompt office staff.
+ * Having ever checked in against a project, or carrying a standing declaration,
+ * is direct evidence that the question means something to this person.
  */
 
 export type ProjectSource = 'checkin-today' | 'declared-today' | 'stale-declaration' | 'none';
@@ -28,6 +36,12 @@ export interface ProjectSignals {
   declaredTodayProjectId?: string | null;
   /** staff.declared_project_id — possibly months old. */
   standingDeclarationProjectId?: string | null;
+  /**
+   * Has this person ever checked in against a project? Direct evidence that
+   * they do field work, and the only thing that makes the question meaningful.
+   * Someone who never has is not asked at all.
+   */
+  hasEverCheckedInOnProject?: boolean;
 }
 
 export interface CurrentProject {
@@ -44,6 +58,13 @@ export interface CurrentProject {
 }
 
 export function resolveCurrentProject(signals: ProjectSignals): CurrentProject {
+  // Not a field worker: never ask. The portal shell renders this for every
+  // /my page and every role, so an office worker fetching a payslip must not
+  // be interrogated about a project — and must not be able to write junk into
+  // the field the stores flow depends on.
+  const doesFieldWork =
+    signals.hasEverCheckedInOnProject === true || !!signals.standingDeclarationProjectId;
+
   if (signals.checkinTodayProjectId) {
     // Already answered this morning. Asking again is nagging.
     return { projectId: signals.checkinTodayProjectId, source: 'checkin-today', shouldAsk: false };
@@ -60,5 +81,5 @@ export function resolveCurrentProject(signals: ProjectSignals): CurrentProject {
       shouldAsk: true,
     };
   }
-  return { projectId: null, source: 'none', shouldAsk: true };
+  return { projectId: null, source: 'none', shouldAsk: doesFieldWork };
 }

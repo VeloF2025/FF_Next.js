@@ -26,7 +26,12 @@ function mockStatus(over: Record<string, unknown>) {
 
 describe('ProjectDeclarationPrompt', () => {
   const realFetch = global.fetch;
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    // The component caches "settled for today" in sessionStorage so the shell
+    // does not refetch on every /my page. Clear it or tests leak into each other.
+    sessionStorage.clear();
+  });
   afterEach(() => { global.fetch = realFetch; });
 
   it('asks when the server says nothing is known today', async () => {
@@ -76,6 +81,32 @@ describe('ProjectDeclarationPrompt', () => {
     await screen.findByText('Which project are you on today?');
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
     await waitFor(() => expect(screen.queryByText('Which project are you on today?')).toBeNull());
+  });
+
+  it('does not call the server again once today is settled', async () => {
+    // The shell renders this on EVERY /my page. Without the cache an office
+    // worker who will never be asked pays a round trip on every page.
+    mockStatus({ shouldAsk: false, source: 'checkin-today', projectId: OPTIONS[0]!.id });
+
+    const first = render(<ProjectDeclarationPrompt />);
+    // Wait for the RESPONSE to be handled, not merely for the request to fire —
+    // the cache is written after the await, and unmounting earlier would race.
+    await waitFor(() => expect(Object.keys(sessionStorage)).toHaveLength(1));
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    render(<ProjectDeclarationPrompt />);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(global.fetch).toHaveBeenCalledTimes(1); // still one — not two
+  });
+
+  it('remembers a dismissal for the rest of the day', async () => {
+    mockStatus({});
+    render(<ProjectDeclarationPrompt />);
+    await screen.findByText('Which project are you on today?');
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    await waitFor(() => expect(screen.queryByText('Which project are you on today?')).toBeNull());
+    expect(Object.keys(sessionStorage)).toHaveLength(1);
   });
 
   it('never blocks the portal when the status call fails', async () => {

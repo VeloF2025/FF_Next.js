@@ -32,6 +32,7 @@ interface SignalRow extends Record<string, unknown> {
   declared_today_project_id: string | null;
   standing_declaration_project_id: string | null;
   standing_project_name: string | null;
+  has_ever_checked_in: boolean;
 }
 
 export default withMySession(async (req: NextApiRequest, res: NextApiResponse, session) => {
@@ -57,7 +58,10 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
              AS standing_declaration_project_id,
            (SELECT p.project_name FROM staff s
               JOIN projects p ON p.id = s.declared_project_id
-             WHERE s.id = $1) AS standing_project_name`,
+             WHERE s.id = $1) AS standing_project_name,
+           EXISTS (SELECT 1 FROM hs_daily_checkins h
+                    WHERE h.staff_id = $1 AND h.project_id IS NOT NULL)
+             AS has_ever_checked_in`,
         [staffId],
       );
 
@@ -66,15 +70,22 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
         checkinTodayProjectId: r?.checkin_today_project_id ?? null,
         declaredTodayProjectId: r?.declared_today_project_id ?? null,
         standingDeclarationProjectId: r?.standing_declaration_project_id ?? null,
+        hasEverCheckedInOnProject: r?.has_ever_checked_in === true,
       });
 
+      // Skip the option list entirely for someone who will not be asked — the
+      // shell calls this on every /my page for every role, and most callers are
+      // office staff who need nothing back.
+      //
       // Options come back with the status rather than from a second endpoint:
-      // /api/my/stores/projects is gated to stores actors, and the worker being
-      // asked here is a technician, who is not one.
-      const options = await query<{ id: string; name: string }>(
-        `SELECT id, project_name AS name FROM projects
-          WHERE status = 'active' ORDER BY project_name`,
-      );
+      // /api/my/stores/projects is gated to stores actors, and a field worker
+      // is not one.
+      const options = current.shouldAsk
+        ? await query<{ id: string; name: string }>(
+            `SELECT id, project_name AS name FROM projects
+              WHERE status = 'active' ORDER BY project_name`,
+          )
+        : [];
 
       return apiResponse.success(res, {
         ...current,
@@ -102,6 +113,23 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
       );
       if (ok.length === 0) {
         return apiResponse.validationError(res, { projectId: 'Unknown project' });
+      }
+
+      // Refuse a declaration from someone who does no field work. Without this
+      // any /my user could write into the field the stores flow reads, and the
+      // GET is only advisory — a client can always POST directly.
+      const evidence = await query<{ ok: boolean }>(
+        `SELECT (EXISTS (SELECT 1 FROM hs_daily_checkins h
+                          WHERE h.staff_id = $1 AND h.project_id IS NOT NULL)
+                 OR EXISTS (SELECT 1 FROM staff s
+                             WHERE s.id = $1 AND s.declared_project_id IS NOT NULL)) AS ok`,
+        [staffId],
+      );
+      if (evidence[0]?.ok !== true) {
+        log.warn('project declaration refused: no field-work evidence', { staffId }, 'my/project');
+        return apiResponse.validationError(res, {
+          projectId: 'Only field staff declare a project',
+        });
       }
 
       await query(

@@ -15,6 +15,11 @@
  * Dismissible. A worker who taps "Not now" gets on with their job and is asked
  * again tomorrow: a prompt that cannot be escaped becomes a prompt people learn
  * to click through without reading.
+ *
+ * The shell renders this on EVERY /my page, so the answer is cached in
+ * sessionStorage for the day once it is known. Without that, an office worker
+ * who will never be asked still pays a round trip on every payslip and receipt
+ * page they open.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -34,6 +39,13 @@ interface ProjectStatus {
   options: ProjectOption[];
 }
 
+/** Session cache key, dated so it naturally expires at midnight. */
+function settledKey(): string {
+  // SAST day, matching the server's notion of "today".
+  const sast = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
+  return `my.project.settled.${sast}`;
+}
+
 export function ProjectDeclarationPrompt() {
   const [status, setStatus] = useState<ProjectStatus | null>(null);
   const [choice, setChoice] = useState('');
@@ -45,10 +57,17 @@ export function ProjectDeclarationPrompt() {
     let cancelled = false;
     void (async () => {
       try {
+        // Already settled today (answered, dismissed, or never applicable) —
+        // do not call the server again on every page in the portal.
+        if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(settledKey())) return;
         const res = await fetch('/api/my/project', { credentials: 'include' });
         if (!res.ok) return; // Never block the portal on this — it is a nicety.
         const json = (await res.json()) as { success: boolean; data?: ProjectStatus };
         if (!cancelled && json.success && json.data) {
+          if (!json.data.shouldAsk && typeof sessionStorage !== 'undefined') {
+            // Nothing to ask today: remember, so the rest of the portal is free.
+            sessionStorage.setItem(settledKey(), 'not-applicable');
+          }
           setStatus(json.data);
           // Pre-select the standing declaration so confirming is one tap.
           setChoice(json.data.projectId ?? '');
@@ -72,6 +91,7 @@ export function ProjectDeclarationPrompt() {
         body: JSON.stringify({ projectId: choice }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(settledKey(), 'answered');
       setDismissed(true);
     } catch (err) {
       log.warn('project prompt: save failed', { err }, 'ProjectDeclarationPrompt');
@@ -121,7 +141,12 @@ export function ProjectDeclarationPrompt() {
             </button>
             <button
               type="button"
-              onClick={() => setDismissed(true)}
+              onClick={() => {
+                if (typeof sessionStorage !== 'undefined') {
+                  sessionStorage.setItem(settledKey(), 'dismissed');
+                }
+                setDismissed(true);
+              }}
               className="rounded-lg px-3 py-2 text-sm text-neutral-400 hover:text-neutral-200"
             >
               Not now
