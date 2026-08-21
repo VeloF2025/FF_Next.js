@@ -41,27 +41,43 @@ CREATE INDEX IF NOT EXISTS idx_staff_assigned_project
 -- Warehouse -> project, confirmed 2026-08-21. Matched on the stable `code`,
 -- never on name. Each statement is independently safe to re-run and a warehouse
 -- whose code is absent simply updates nothing.
+--
+-- `projects.project_name` is NOT unique — only `project_code` carries a unique
+-- index. UPDATE ... FROM with two matching rows does not error; it picks one
+-- nondeterministically, which would map a warehouse to the wrong site in
+-- silence. Every statement therefore requires the name to resolve to EXACTLY
+-- one project. If it ever resolves to two, the warehouse stays unmapped, the
+-- picker shows everyone, and a human has to decide — the same refuse-on-
+-- ambiguity rule the sheet importer uses for 'Tembisa 1/2/3'.
 UPDATE stock_locations l SET project_id = p.id
 FROM projects p
-WHERE l.code = 'WH-Law'   AND p.project_name = 'Lawley'                 AND l.project_id IS DISTINCT FROM p.id;
+WHERE l.code = 'WH-Law'   AND p.project_name = 'Lawley'                 AND l.project_id IS DISTINCT FROM p.id
+  AND (SELECT count(*) FROM projects WHERE project_name = 'Lawley') = 1;
 UPDATE stock_locations l SET project_id = p.id
 FROM projects p
-WHERE l.code = 'WH-ETW'   AND p.project_name = 'Etwatwa'                AND l.project_id IS DISTINCT FROM p.id;
+WHERE l.code = 'WH-ETW'   AND p.project_name = 'Etwatwa'                AND l.project_id IS DISTINCT FROM p.id
+  AND (SELECT count(*) FROM projects WHERE project_name = 'Etwatwa') = 1;
 UPDATE stock_locations l SET project_id = p.id
 FROM projects p
-WHERE l.code = 'WH-MamP1' AND p.project_name = 'Mamelodi'               AND l.project_id IS DISTINCT FROM p.id;
+WHERE l.code = 'WH-MamP1' AND p.project_name = 'Mamelodi'               AND l.project_id IS DISTINCT FROM p.id
+  AND (SELECT count(*) FROM projects WHERE project_name = 'Mamelodi') = 1;
 UPDATE stock_locations l SET project_id = p.id
 FROM projects p
-WHERE l.code = 'WH-TBL'   AND p.project_name = 'Themb''elihle'          AND l.project_id IS DISTINCT FROM p.id;
+WHERE l.code = 'WH-TBL'   AND p.project_name = 'Themb''elihle'          AND l.project_id IS DISTINCT FROM p.id
+  AND (SELECT count(*) FROM projects WHERE project_name = 'Themb''elihle') = 1;
 UPDATE stock_locations l SET project_id = p.id
 FROM projects p
-WHERE l.code = 'WH-Moh'   AND p.project_name = 'Mohadin'                AND l.project_id IS DISTINCT FROM p.id;
+WHERE l.code = 'WH-Moh'   AND p.project_name = 'Mohadin'                AND l.project_id IS DISTINCT FROM p.id
+  AND (SELECT count(*) FROM projects WHERE project_name = 'Mohadin') = 1;
 UPDATE stock_locations l SET project_id = p.id
 FROM projects p
-WHERE l.code = 'WH-Tem1'  AND p.project_name = 'Thembisa POP 1'         AND l.project_id IS DISTINCT FROM p.id;
+WHERE l.code = 'WH-Tem1'  AND p.project_name = 'Thembisa POP 1'         AND l.project_id IS DISTINCT FROM p.id
+  AND (SELECT count(*) FROM projects WHERE project_name = 'Thembisa POP 1') = 1;
 UPDATE stock_locations l SET project_id = p.id
 FROM projects p
-WHERE l.code = 'WH-Tem2'  AND p.project_name = 'Thembisa POP 2'         AND l.project_id IS DISTINCT FROM p.id;
+WHERE l.code = 'WH-Tem2'  AND p.project_name = 'Thembisa POP 2'         AND l.project_id IS DISTINCT FROM p.id
+  AND (SELECT count(*) FROM projects WHERE project_name = 'Thembisa POP 2') = 1;
 UPDATE stock_locations l SET project_id = p.id
 FROM projects p
-WHERE l.code = 'WH-Tem3'  AND p.project_name = 'Thembisa POP 3'         AND l.project_id IS DISTINCT FROM p.id;
+WHERE l.code = 'WH-Tem3'  AND p.project_name = 'Thembisa POP 3'         AND l.project_id IS DISTINCT FROM p.id
+  AND (SELECT count(*) FROM projects WHERE project_name = 'Thembisa POP 3') = 1;

@@ -36,11 +36,21 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   // `roles` (csv) supersedes the older single `role`. The picker needs BOTH
   // technicians and casuals: casuals receive stock like anyone else, and the
   // single-role param silently excluded all ten of them from the list.
-  const roleList = roles
+  //
+  // An EMPTY filter must mean "no filter", never "match nothing". `roles=','`
+  // parses to [], and `role = ANY(ARRAY[]::text[])` is false for every row —
+  // the caller would get zero people and no error. Collapse empty to null so
+  // it takes the IS NULL branch, matching the old `if (accountStatus)` shape.
+  const parsedRoles = roles
     ? roles.split(',').map((r) => r.trim()).filter(Boolean)
     : role
-      ? [role]
-      : null;
+      ? [role.trim()].filter(Boolean)
+      : [];
+  const roleList = parsedRoles.length > 0 ? parsedRoles : null;
+
+  // Same trap: `accountStatus=''` is not nullish, so `?? null` keeps the empty
+  // string and `account_status = ''` matches nobody. Normalise to null.
+  const accountStatusFilter = accountStatus && accountStatus.trim() ? accountStatus.trim() : null;
 
   // Resolve the store's site HERE rather than trusting a client-supplied
   // project id: the server owns the warehouse->project mapping, and a caller
@@ -67,7 +77,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     LEFT JOIN projects ap ON ap.id = s.assigned_project_id
     LEFT JOIN projects dp ON dp.id = s.declared_project_id
     WHERE (${roleList}::text[] IS NULL OR s.role = ANY(${roleList}::text[]))
-      AND (${accountStatus ?? null}::text IS NULL OR s.account_status = ${accountStatus ?? null})
+      AND (${accountStatusFilter}::text IS NULL OR s.account_status = ${accountStatusFilter})
     ORDER BY s.created_at DESC
     LIMIT 200
   `;

@@ -20,11 +20,12 @@
  * matching /my/attendance/clock step components.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, UserPlus } from 'lucide-react';
 import { fetchTechnicians } from '@/modules/field-stock-pwa/api';
 import type { PwaTechSummary } from '@/modules/field-stock-pwa/types';
 import { InlineAddTech } from './InlineAddTech';
+import { isVisibleByDefault } from '@/modules/field-stock-pwa/lib/staffSite';
 
 // ⚪ UNTESTED: no integration tests yet (Task 2.9)
 
@@ -77,18 +78,32 @@ export function PickTechStep({ onPick, storeLocationId, storeName }: PickTechSte
   const [showAdd, setShowAdd] = useState(false);
   const [showEveryone, setShowEveryone] = useState(false);
 
+  // Generation guard. Each load claims a number; only the newest may write.
+  // Without it a slower earlier request (the immediate mount fetch, or a fetch
+  // for the previous store) can resolve last and overwrite the current list —
+  // leaving rows whose siteMatch was computed against a DIFFERENT warehouse,
+  // which is precisely the wrong-site display this feature exists to prevent.
+  const loadGeneration = useRef(0);
+
   const loadTechs = useCallback(async (term: string) => {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setFetchError(null);
     try {
       const result = await fetchTechnicians({ search: term, storeLocationId });
+      if (generation !== loadGeneration.current) return; // superseded
       setTechs(result);
     } catch (err) {
+      if (generation !== loadGeneration.current) return;
       setFetchError(err instanceof Error ? err.message : 'Failed to load technicians');
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }, [storeLocationId]);
+
+  // A different store means a different filter; revealing everyone should not
+  // silently carry over to it.
+  useEffect(() => { setShowEveryone(false); }, [storeLocationId]);
 
   // Initial load + debounced reload on search change (300 ms, matching PickItemStep).
   useEffect(() => {
@@ -98,9 +113,12 @@ export function PickTechStep({ onPick, storeLocationId, storeName }: PickTechSte
     return () => clearTimeout(timer);
   }, [search, loadTechs]);
 
-  // Only people known to work at another site are hidden.
-  const visible = showEveryone ? techs : techs.filter((t) => t.siteMatch !== 'elsewhere');
-  const hiddenCount = techs.length - techs.filter((t) => t.siteMatch !== 'elsewhere').length;
+  // Visibility policy comes from staffSite.ts — the same function the server
+  // annotates with — so the two cannot drift on what "works at this site"
+  // means. Re-implementing the predicate here is exactly how that drift starts.
+  const defaultVisible = techs.filter((t) => isVisibleByDefault(t.siteMatch));
+  const visible = showEveryone ? techs : defaultVisible;
+  const hiddenCount = techs.length - defaultVisible.length;
 
   const handleCreated = useCallback(
     (tech: PwaTechSummary) => {
