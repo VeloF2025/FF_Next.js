@@ -211,7 +211,13 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
   );
 
   const handleRawSerial = useCallback(
-    async (rawSerial: string, scanSource: 'machine' | 'manual' = 'manual') => {
+    async (
+      rawSerial: string,
+      // Tags the row for display only. It does NOT decide whether an unknown
+      // serial can be taken into stock — that is recomputed below from the
+      // payload itself, so passing 'machine' here cannot grant eligibility.
+      scanSource: 'machine' | 'manual' = 'manual',
+    ) => {
       // A scanned payload is a carton serial list, the carton's ISO data code,
       // a single serial (bare or ISO-wrapped), or junk. parseScanPayload sorts
       // them out; only the single-serial case falls through to the old path.
@@ -279,24 +285,52 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
 
       if (!mountedRef.current) return;
 
-      const verdict = verdictForSerial(
-        result.valid
-          ? {
-              serialNumber: serial,
-              stockItemId: result.stockItemId ?? stockItem.id,
-              stockItemName: result.stockItemName ?? null,
-              status: 'in_stock', // validateSerial already applied the status gate
-              currentLocationId: result.currentLocationId ?? null,
-              currentLocationName: result.currentLocationName ?? null,
-            }
-          : null,
-        {
-          expectedItemId: stockItem.id,
-          expectedItemName: stockItem.name,
-          sourceLocation: sourceLocation ?? null,
-          scanSource,
-        },
-      );
+      // A serial that EXISTS but is not issuable must keep its real status.
+      // Collapsing every failure to `null` told verdictForSerial "no such
+      // serial", which — for a machine read — made it offer to take the serial
+      // into stock as new. An ONT already issued to another technician was
+      // therefore shown with a green tick and "Not on the stock sheet yet"
+      // (field report 2026-08-21, ALCLB465A813: status 'issued', provenance
+      // 'sheet', already in someone's hands).
+      //
+      // `status` is present whenever the row exists, absent only on a genuine
+      // 404 — that is the distinction the old code threw away.
+      const exists = result.valid || result.status !== undefined;
+      const record = exists
+        ? {
+            serialNumber: serial,
+            stockItemId: result.stockItemId ?? stockItem.id,
+            stockItemName: result.stockItemName ?? null,
+            // The REAL status, not an assumed one.
+            status: result.status ?? 'in_stock',
+            currentLocationId: result.currentLocationId ?? null,
+            currentLocationName: result.currentLocationName ?? null,
+          }
+        : null;
+
+      const verdict = verdictForSerial(record, {
+        expectedItemId: stockItem.id,
+        expectedItemName: stockItem.name,
+        sourceLocation: sourceLocation ?? null,
+        // Always 'manual', and deliberately so rather than by omission.
+        //
+        // This branch is only reached when parseScanPayload returned `single`
+        // (a `box` returned earlier, to handleBoxScan). The server grants
+        // intake eligibility ONLY for a box payload — see
+        // serialsEligibleForIntake, and its two callers in
+        // pickings/_validation.ts and _validateBatchCore.ts — so a lone code
+        // corroborates nothing no matter how it was captured. Claiming
+        // 'machine' here would show the storeman a tick the server then
+        // refuses at submit, which is what this hotfix removes.
+        //
+        // NOTE: an earlier version computed
+        // `serialsEligibleForIntake(rawSerial).has(serial)` here. That is
+        // always false for the reason above — a live-looking branch that
+        // cannot fire. If single-unit intake is ever wanted (a Gizzu has no
+        // carton), it needs a real decision about how a typed serial is told
+        // apart from a scanned one, not a change to this line alone.
+        scanSource: 'manual',
+      });
 
       const resolved: PwaScannedSerial = verdict.valid
         ? {
