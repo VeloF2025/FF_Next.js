@@ -38,6 +38,12 @@
  *     indistinguishable from a silent success and would leave every clock-in
  *     unmatched. See `feedback_guard_false_negative_direction` — bias to
  *     shouting.
+ *   - Since migration 523 the refresh also scores each hull for outlier
+ *     distortion. This script reads that score back and WhatsApps the ops group
+ *     when any project has an out-of-place pole — a column nobody queries is the
+ *     same silence that let one pole 145 km out of its site inflate a geofence
+ *     63x for months. The alert is best-effort and NEVER changes the exit code:
+ *     the refresh itself has already succeeded by then.
  */
 
 import * as dotenv from 'dotenv';
@@ -71,6 +77,85 @@ interface AoiRow extends Record<string, unknown> {
   project_name: string | null;
   pole_count: number;
   computed_at: string;
+}
+
+/** Migration 523's distortion scoring, read back after the refresh. */
+interface AoiHealthRow extends Record<string, unknown> {
+  project_name: string | null;
+  aoi_status: string;
+  pole_count: number;
+  outlier_pole_count: number;
+  aoi_area_m2: string | null;
+  robust_aoi_area_m2: string | null;
+  aoi_area_ratio: string | null;
+  furthest_outlier_m: string | null;
+}
+
+// Defaults match the convention in the sibling attendance cron
+// (attendance-cartrack-reconcile.ts) so an unconfigured install still routes
+// somewhere visible rather than nowhere.
+const DEFAULT_OPS_WA_GROUP_JID = '120363421664266245@g.us';
+
+/** numeric columns arrive as strings from pg; null stays null. */
+function num(value: string | null): number | null {
+  if (value === null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Best-effort. A send failure MUST NOT change the exit code — the refresh has
+ * already succeeded, and a red cron job over an undelivered message trains
+ * people to ignore the job.
+ */
+async function alertOnDistortedAois(): Promise<void> {
+  try {
+    const { sql } = await import('../../src/lib/db-pool');
+    const rows = await sql.query<AoiHealthRow>(
+      `SELECT pr.project_name, a.aoi_status, a.pole_count, a.outlier_pole_count,
+              a.aoi_area_m2::text, a.robust_aoi_area_m2::text,
+              a.aoi_area_ratio::text, a.furthest_outlier_m::text
+         FROM project_aois a LEFT JOIN projects pr ON pr.id = a.project_id
+        ORDER BY a.aoi_status, pr.project_name`,
+      [],
+    );
+    const { sendProjectAoiDistortionAlert } = await import(
+      '../../src/modules/attendance/alerts/projectAoiAlert'
+    );
+    const { sendWhatsAppGroup } = await import(
+      '../../src/modules/notifications/services/whatsappDelivery'
+    );
+    const groupJid =
+      process.env.ATTENDANCE_OPS_WA_GROUP_JID ||
+      process.env.WA_INFRA_GROUP_JID ||
+      DEFAULT_OPS_WA_GROUP_JID;
+    if (groupJid === DEFAULT_OPS_WA_GROUP_JID) {
+      stderr(
+        '[project-aoi-refresh] no ATTENDANCE_OPS_WA_GROUP_JID / WA_INFRA_GROUP_JID set — routing the alert to the default ops group',
+      );
+    }
+    await sendProjectAoiDistortionAlert({
+      rows: rows.map((r) => ({
+        projectName: r.project_name,
+        aoiStatus: r.aoi_status,
+        poleCount: Number(r.pole_count),
+        outlierPoleCount: Number(r.outlier_pole_count),
+        aoiAreaM2: num(r.aoi_area_m2),
+        robustAoiAreaM2: num(r.robust_aoi_area_m2),
+        aoiAreaRatio: num(r.aoi_area_ratio),
+        furthestOutlierM: num(r.furthest_outlier_m),
+      })),
+      groupJid,
+      send: sendWhatsAppGroup,
+      logger: { info: (msg) => stderr(msg), error: (msg) => stderr(msg) },
+    });
+  } catch (alertErr) {
+    stderr(
+      `[project-aoi-refresh] AOI distortion alerter crashed (non-fatal): ${
+        alertErr instanceof Error ? alertErr.message : String(alertErr)
+      }`,
+    );
+  }
 }
 
 async function main(): Promise<void> {
@@ -117,6 +202,10 @@ async function main(): Promise<void> {
   if (after.length === 0) {
     throw new Error('refresh produced zero AOIs — every clock-in would record no project');
   }
+
+  // After the zero-AOI guard on purpose: with no AOIs at all there is nothing
+  // to score, and the thrown error above is the louder signal.
+  await alertOnDistortedAois();
 }
 
 main()
