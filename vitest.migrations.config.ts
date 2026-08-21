@@ -85,6 +85,9 @@ export default defineConfig({
       // That one lives under src/lib, not lib, so the generic @/lib fallback below
       // would send it to the wrong tree.
       { find: '@/lib/staff', replacement: path.resolve(__dirname, './src/lib/staff') },
+      // Hold-authority recipient resolution defers the decision to
+      // userHasPermission, which lives under src/lib, not lib.
+      { find: '@/lib/permissions', replacement: path.resolve(__dirname, './src/lib/permissions') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@', replacement: path.resolve(__dirname, './src') },
     ],
