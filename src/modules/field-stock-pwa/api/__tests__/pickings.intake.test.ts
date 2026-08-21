@@ -103,3 +103,41 @@ describe('submitIssue carton payloads', () => {
     expect(sentPayloads()).toEqual([CARTON_A]);
   });
 });
+
+describe('label photos for single unlisted units', () => {
+  /** intakePhotos on the single line of the CREATE call. */
+  function sentPhotos() {
+    const create = request.mock.calls.find(([url]) => url === '/api/my/stores/pickings');
+    const body = JSON.parse((create![1] as { body: string }).body);
+    return body.lines[0].intakePhotos;
+  }
+
+  it('sends the photo for a Gizzu the sheet has never listed', async () => {
+    // GU18W12V2601016741 was refused outright on 2026-08-21: the 2601 batch is
+    // in stock but its range is ...037025-...058200, and a Gizzu has no carton
+    // to corroborate it. The photo is what admits it.
+    await submitIssue(draftWith([
+      { ...serial('GU18W12V2601016741'), intakePhotoKey: 'k1', intakePhotoUrl: 'u1' },
+    ]));
+    expect(sentPhotos()).toEqual([
+      { serialNumber: 'GU18W12V2601016741', photoKey: 'k1', photoUrl: 'u1' },
+    ]);
+  });
+
+  it('sends nothing for serials with no photo', async () => {
+    await submitIssue(draftWith([serial('ALCLB49486FF', CARTON_A)]));
+    expect(sentPhotos()).toEqual([]);
+  });
+
+  it('keeps each photo tied to ITS OWN serial', async () => {
+    // A photo attached to one serial must not admit another — the server
+    // matches on the serial, and the body has to carry that pairing.
+    await submitIssue(draftWith([
+      { ...serial('GU18W12V2601016741'), intakePhotoKey: 'k1' },
+      { ...serial('GU18W12V2601016745'), intakePhotoKey: 'k2' },
+    ]));
+    const photos = sentPhotos() as Array<{ serialNumber: string; photoKey: string }>;
+    expect(photos.find((p) => p.serialNumber === 'GU18W12V2601016741')!.photoKey).toBe('k1');
+    expect(photos.find((p) => p.serialNumber === 'GU18W12V2601016745')!.photoKey).toBe('k2');
+  });
+});

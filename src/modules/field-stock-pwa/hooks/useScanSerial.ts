@@ -345,11 +345,18 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
             stockItemId: verdict.stockItemId ?? '',
             stockItemName: verdict.stockItemName ?? '',
             state: 'invalid',
-            // validateSerial's own message (404, bad status) is more specific
-            // than the generic not-found the verdict produces from a null record.
-            errorMessage: result.valid
-              ? verdict.errorMessage
-              : (result.errorMessage ?? verdict.errorMessage),
+            // Whichever message actually helps.
+            //
+            // When the serial EXISTS, validateSerial's message is the specific
+            // one ("not available (status: issued)"). When it does NOT exist,
+            // its message is the bare "Serial number not found" — the dead end
+            // that left two real Gizzu handouts unrecorded on 2026-08-21 —
+            // whereas the verdict names what would admit it. Prefer the
+            // verdict there.
+            errorMessage: exists
+              ? (result.errorMessage ?? verdict.errorMessage)
+              : (verdict.errorMessage ?? result.errorMessage),
+            ...(verdict.valid ? {} : { canPhotograph: verdict.canPhotograph === true }),
           };
 
       applyResolved([resolved]);
@@ -368,5 +375,44 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
     [commit]
   );
 
-  return { handleRawSerial, handleRemove, handleRemoveGroup, scanNotice, clearScanNotice };
+  /**
+   * Attach a label photograph to a serial the stock sheet has never listed,
+   * turning the refusal into a provisional acceptance.
+   *
+   * No re-validation call: nothing about the serial changed, only the evidence
+   * we hold for it, and verdictForSerial is the same pure rule the server
+   * applies. Re-asking would be a round trip for an answer we already have.
+   */
+  const attachIntakePhoto = useCallback(
+    (serialNumber: string, photo: { photoKey: string; photoUrl: string }) => {
+      const verdict = verdictForSerial(null, {
+        expectedItemId: stockItem.id,
+        expectedItemName: stockItem.name,
+        sourceLocation: sourceLocation ?? null,
+        hasIntakePhoto: true,
+      });
+      if (!verdict.valid) return;
+
+      commit(scannedRef.current.map((row) => (
+        row.serialNumber === serialNumber
+          ? {
+              ...row,
+              state: 'valid' as const,
+              stockItemId: verdict.stockItemId,
+              stockItemName: verdict.stockItemName,
+              errorMessage: undefined,
+              warning: verdict.warning,
+              intakePhotoKey: photo.photoKey,
+              intakePhotoUrl: photo.photoUrl,
+            }
+          : row
+      )));
+    },
+    [stockItem, sourceLocation, commit],
+  );
+
+  return {
+    handleRawSerial, handleRemove, handleRemoveGroup, scanNotice, clearScanNotice,
+    attachIntakePhoto,
+  };
 }

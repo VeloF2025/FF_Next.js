@@ -22,6 +22,9 @@ import { FIELD_DEFAULT_LOCATION_ID } from '@/modules/field-stock-pwa/lib/locatio
 import { log } from '@/lib/logger';
 import { serialsEligibleForIntake } from '@/modules/field-stock-pwa/lib/boxScan';
 
+/** Postgres unique-violation: a duplicate is an answer here, not a crash. */
+const UNIQUE_VIOLATION = '23505';
+
 // ---------------------------------------------------------------------------
 // Shape contract
 // ---------------------------------------------------------------------------
@@ -61,6 +64,21 @@ export interface PickingLine {
   intakeScanPayloads?: string[] | null;
   /** The carton's package id, so a box's serials stay traceable together. */
   intakeCartonId?: string | null;
+  /**
+   * Label photographs for SINGLE units the sheet has never listed, keyed by
+   * serial.
+   *
+   * A carton corroborates itself — nine serials and a declared count. A lone
+   * unit does not, and a Gizzu has no carton, so without this a Gizzu the
+   * workbook lacks could not be issued at all (field report 2026-08-21). The
+   * photo is the substitute evidence.
+   *
+   * What it proves: a real unit with a label existed, tied to a named storeman
+   * at a known time, checkable afterwards. What it does NOT prove: that the
+   * typed digits match the label. It makes an unverifiable claim auditable, it
+   * does not make it verified.
+   */
+  intakePhotos?: Array<{ serialNumber: string; photoKey: string; photoUrl?: string | null }>;
 }
 
 /** Context the serial validator needs in order to take unlisted stock in. */
@@ -177,6 +195,8 @@ export async function validateSerialsAvailable(
   const unavailableSerials: string[] = [];
   // Maps serial_number (client-supplied label) → stock_serials.id (uuid)
   const resolvedSerialIds = new Map<string, string>();
+  // Computed once for the whole request — see photoUsageAcrossLines.
+  const photoUsage = photoUsageAcrossLines(lines);
 
   for (const line of lines) {
     if (!Array.isArray(line.serialIds) || line.serialIds.length === 0) continue;
@@ -204,16 +224,21 @@ export async function validateSerialsAvailable(
       // carton scanned on 2026-08-21 had all 9 of its serials refused because
       // the workbook lacked that consignment. Refusing does not prevent the
       // handout, only its recording.
-      // Derived from the payloads, not asserted by the caller. A serial no
-      // payload lists cannot be taken in, however the request is shaped —
-      // including one smuggled into the line but absent from every scan.
-      if (corroboratedFor(line).has(serialNumber)) {
+      // Two ways an unlisted serial may be taken in, and no third:
+      //   - a CARTON payload lists it (derived server-side, never asserted by
+      //     the caller, so a serial smuggled into the line but absent from
+      //     every scan cannot get through), or
+      //   - a LABEL PHOTOGRAPH was captured for it.
+      const photo = photoFor(line, serialNumber, photoUsage);
+      if (corroboratedFor(line).has(serialNumber) || photo) {
         const createdId = await takeSerialIntoStock(sql, {
           serialNumber,
           stockItemId: line.stockItemId,
           locationId: ctx.sourceLocationId ?? null,
           cartonId: line.intakeCartonId ?? null,
           actorStaffId: ctx.actorStaffId ?? null,
+          photoKey: photo?.photoKey ?? null,
+          photoUrl: photo?.photoUrl ?? null,
         });
         if (createdId) {
           resolvedSerialIds.set(serialNumber, createdId);
@@ -239,6 +264,58 @@ export async function validateSerialsAvailable(
   }
 
   return { ok: true, resolvedSerialIds };
+}
+
+/**
+ * The label photograph captured for one serial, if any.
+ *
+ * Matched on the serial itself, so a photo attached to a DIFFERENT serial
+ * cannot be reused to admit this one.
+ *
+ * ONE PHOTO, ONE UNIT. A key that appears against more than one serial admits
+ * NEITHER. The feature's whole claim is that a photograph evidences a specific
+ * physical unit; a single picture standing for ten Gizzus is not evidence, it
+ * is a formality. Refusing both rather than the later one keeps the outcome
+ * independent of array order, so the same request cannot admit different
+ * serials depending on how the client happened to sort them — and the client
+ * does not guarantee that order, so first-wins would let an idempotent replay
+ * admit different serials on different attempts.
+ *
+ * Counted across EVERY line, not within one. Two lines of the same request
+ * are the same submission by the same person at the same moment; letting a key
+ * repeat between them would leave the unique index (migration 520) to catch it
+ * as a raw database error instead of a clear refusal.
+ */
+function photoUsageAcrossLines(lines: PickingLine[]): Map<string, string[]> {
+  const usage = new Map<string, string[]>();
+  for (const line of lines) {
+    for (const p of line.intakePhotos ?? []) {
+      if (!p || typeof p.photoKey !== 'string' || p.photoKey.trim().length === 0) continue;
+      usage.set(p.photoKey, [...(usage.get(p.photoKey) ?? []), p.serialNumber]);
+    }
+  }
+  return usage;
+}
+
+function photoFor(
+  line: PickingLine,
+  serialNumber: string,
+  usage: Map<string, string[]>,
+): { photoKey: string; photoUrl?: string | null } | null {
+  const match = (line.intakePhotos ?? []).find(
+    (p) => p && typeof p.photoKey === 'string' && p.photoKey.trim().length > 0
+      && p.serialNumber === serialNumber,
+  );
+  if (!match) return null;
+
+  const usedFor = usage.get(match.photoKey) ?? [];
+  if (usedFor.length > 1) {
+    log.warn('label photo offered for more than one serial — refusing all of them', {
+      photoKey: match.photoKey, serialNumber, usedFor,
+    }, 'pickings/_validation');
+    return null;
+  }
+  return { photoKey: match.photoKey, photoUrl: match.photoUrl ?? null };
 }
 
 /**
@@ -293,20 +370,39 @@ async function takeSerialIntoStock(
     locationId: string | null;
     cartonId: string | null;
     actorStaffId: string | null;
+    photoKey: string | null;
+    photoUrl: string | null;
   },
 ): Promise<string | null> {
-  const inserted = await sql`
+  let inserted: unknown;
+  try {
+    inserted = await sql`
     INSERT INTO stock_serials
       (stock_item_id, serial_number, status, condition, current_location_id,
        provenance, intake_carton_id, intake_by_staff_id, intake_at,
+       intake_photo_key, intake_photo_url,
        received_date, received_reference)
     VALUES
       (${opts.stockItemId}, ${opts.serialNumber}, 'in_stock', 'new', ${opts.locationId},
        'field_intake', ${opts.cartonId}, ${opts.actorStaffId}, NOW(),
+       ${opts.photoKey}, ${opts.photoUrl},
        NOW(), 'FIELD-INTAKE')
     ON CONFLICT (stock_item_id, serial_number) DO NOTHING
     RETURNING id
   `;
+  } catch (err) {
+    // The ON CONFLICT arm covers only (stock_item_id, serial_number). A photo
+    // key already used for ANOTHER unit violates the separate unique index
+    // from migration 520, and would otherwise escape as an uncaught throw —
+    // reaching the storeman as a generic 500 rather than a refusal naming the
+    // serial. Returning null drops it into unavailableSerials, which is the
+    // ordinary 400 path.
+    if ((err as { code?: string })?.code !== UNIQUE_VIOLATION) throw err;
+    log.warn('label photo already used for another unit — refusing this serial', {
+      serialNumber: opts.serialNumber, photoKey: opts.photoKey,
+    }, 'pickings/_validation');
+    return null;
+  }
   const createdId = (inserted as Array<{ id: string }>)[0]?.id;
   if (createdId) {
     log.warn('serial taken into stock from a scanned carton the sheet does not list', {
@@ -315,6 +411,8 @@ async function takeSerialIntoStock(
       cartonId: opts.cartonId,
       locationId: opts.locationId,
       actorStaffId: opts.actorStaffId,
+      // Which evidence admitted it: a carton listing, or a label photo.
+      evidence: opts.cartonId ? 'carton' : opts.photoKey ? 'label-photo' : 'none',
     }, 'pickings/_validation');
     return createdId;
   }

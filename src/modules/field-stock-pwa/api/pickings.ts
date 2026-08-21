@@ -69,6 +69,18 @@ export async function submitIssue(
         // same item into one handout, and corroborating the second against the
         // first carton's payload would refuse genuinely scanned stock — the
         // very failure this feature exists to fix.
+        // Label photos for single units the sheet has never listed. Without
+        // these the server refuses them — a carton corroborates itself, a lone
+        // unit does not, and a Gizzu has no carton.
+        intakePhotos: isSerialIssue
+          ? draft.serials
+              .filter((s) => s.intakePhotoKey)
+              .map((s) => ({
+                serialNumber: s.serialNumber,
+                photoKey: s.intakePhotoKey!,
+                photoUrl: s.intakePhotoUrl ?? null,
+              }))
+          : undefined,
         intakeScanPayloads: isSerialIssue
           ? [...new Set(draft.serials.map((s) => s.scanPayload).filter((p): p is string => !!p))]
           : undefined,

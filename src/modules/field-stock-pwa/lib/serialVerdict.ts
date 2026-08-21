@@ -21,11 +21,15 @@
  * is created as `field_intake` (migration 515) and reconciled when the sheet
  * catches up.
  *
- * A HAND-TYPED unknown serial is still refused. A machine read comes from a
- * real printed code and a carton cross-checks its own count; a typo does not,
- * and would become a permanent phantom ONT issued to a named technician that
- * can never reconcile. The sheet already carries junk like '2ALCLB4922CF2',
- * so that is a demonstrated failure, not a hypothetical one.
+ * A SINGLE unknown unit — typed or scanned — needs a PHOTOGRAPH of its label
+ * instead. A carton cross-checks itself; a lone unit carries nothing to check
+ * against, and a Gizzu has no carton at all, so on 2026-08-21 two real Gizzu
+ * serials were refused outright and the handout went unrecorded. The photo is
+ * the substitute evidence: it does not prove the typed digits match the label,
+ * but it ties a real unit to a named storeman at a known time and lets a human
+ * check afterwards. Without it the serial is still refused — a bare typo must
+ * not mint a phantom unit, and the sheet already carries junk like
+ * '2ALCLB4922CF2'.
  *
  * A serial recorded at a DIFFERENT warehouse also passes — with a warning.
  * That location is an assumption: it comes from a SharePoint workbook tab that
@@ -55,11 +59,18 @@ export interface VerdictContext {
   /**
    * How the serial reached us. 'machine' means it was decoded from a printed
    * barcode (carton DataMatrix, photo decode, or live camera); 'manual' means
-   * a person typed it. Only a machine read may create stock the sheet has
-   * never listed. Defaults to 'manual' — the safe direction, so a caller that
-   * forgets to pass it cannot accidentally mint serials.
+   * a person typed it. Defaults to 'manual' — the safe direction, so a caller
+   * that forgets to pass it cannot accidentally mint serials.
+   *
+   * Note this alone no longer decides intake: a carton listing or a label
+   * photograph does. It still distinguishes the two for the message shown.
    */
   scanSource?: 'machine' | 'manual';
+  /**
+   * True when a label photograph has been captured for THIS serial. It is what
+   * admits a single unlisted unit, typed or scanned — see the note above.
+   */
+  hasIntakePhoto?: boolean;
 }
 
 export type SerialVerdict =
@@ -79,21 +90,44 @@ export type SerialVerdict =
        */
       provisional?: true;
     }
-  | { valid: false; errorMessage: string; stockItemId?: string; stockItemName?: string };
+  | {
+      valid: false;
+      errorMessage: string;
+      stockItemId?: string;
+      stockItemName?: string;
+      /**
+       * True when a label photograph WOULD admit this serial — i.e. it is
+       * simply unknown to stock, not refused for its status or for being the
+       * wrong item, neither of which any photograph fixes.
+       *
+       * A structured signal on purpose. The UI previously decided by
+       * regex-matching the error copy, which silently loses the camera button
+       * the moment anyone rewords or translates the message.
+       */
+      canPhotograph?: true;
+    };
 
 export function verdictForSerial(record: SerialRecord | null, ctx: VerdictContext): SerialVerdict {
   if (!record) {
-    // Machine-read but unlisted: take it in rather than block the handout.
-    if (ctx.scanSource === 'machine') {
+    // Corroborated by a carton listing, or evidenced by a label photo.
+    if (ctx.scanSource === 'machine' || ctx.hasIntakePhoto) {
       return {
         valid: true,
         stockItemId: ctx.expectedItemId,
         stockItemName: ctx.expectedItemName,
         provisional: true,
-        warning: 'Not on the stock sheet yet — recorded from the carton and flagged',
+        warning: ctx.hasIntakePhoto
+          ? 'Not on the stock sheet yet — recorded from your photo and flagged'
+          : 'Not on the stock sheet yet — recorded from the carton and flagged',
       };
     }
-    return { valid: false, errorMessage: 'Serial number not found' };
+    // Unlisted with no evidence at all. The message says what would admit it,
+    // rather than leaving the storeman at a dead end as it did for the Gizzus.
+    return {
+      valid: false,
+      errorMessage: 'Not in the system — take a photo of the label to record it',
+      canPhotograph: true,
+    };
   }
 
   const stockItemName = record.stockItemName ?? '';
