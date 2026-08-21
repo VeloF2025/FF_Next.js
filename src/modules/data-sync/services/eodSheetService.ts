@@ -10,6 +10,13 @@ import { logSerialChange } from '@/modules/activate/services/activity-log/serial
 
 interface CreateSheetInput {
   sheetDate: string;
+  /**
+   * How the serials were read. 'vlm' (default) = extracted from a photo;
+   * 'scanned' = read from the barcode stickers in the stores PWA. Migration
+   * 516. A reconciler must be able to tell them apart — the VLM managed 85%
+   * of the ONT column on the May sheets, a barcode read is effectively exact.
+   */
+  source?: 'vlm' | 'scanned';
   velocityRepName: string | null;
   velocityRepId: string | null;
   technicianName: string | null;
@@ -117,12 +124,13 @@ export async function createSheet(input: CreateSheetInput): Promise<EodInstallSh
     INSERT INTO eod_install_sheets (
       sheet_date, velocity_rep_name, velocity_rep_id,
       technician_name, technician_id,
-      photo_url, photo_hash, entry_count, vlm_raw_json, uploaded_by
+      photo_url, photo_hash, entry_count, vlm_raw_json, uploaded_by, source
     ) VALUES (
       ${input.sheetDate}, ${input.velocityRepName}, ${input.velocityRepId},
       ${input.technicianName}, ${input.technicianId},
       ${input.photoUrl}, ${input.photoHash}, ${input.entries.length},
-      ${JSON.stringify(input.vlmRawJson)}::jsonb, ${input.uploadedBy}
+      ${JSON.stringify(input.vlmRawJson)}::jsonb, ${input.uploadedBy},
+      ${input.source ?? 'vlm'}
     )
     RETURNING *
   `;

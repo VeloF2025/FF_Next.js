@@ -18,6 +18,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ClipboardCheck,
+  FileText,
   LayoutDashboard,
   Loader2,
   AlertCircle,
@@ -44,13 +45,15 @@ export interface StoresHubProps {
   onReturn: () => void;
   onInspect: () => void;
   onToday: () => void;
+  /** Opens the historical paper-sheet backfill tool. */
+  onPaperSheet: () => void;
 }
 
 // =============================================================================
 // Component
 // =============================================================================
 
-export function StoresHub({ profile, onIssue, onReturn, onInspect, onToday }: StoresHubProps) {
+export function StoresHub({ profile, onIssue, onReturn, onInspect, onToday, onPaperSheet }: StoresHubProps) {
   const { pendingCount, abandonedIssuesCount, abandonedReturnsCount, syncing, dismissAbandoned } = useStockSync();
   const isPending = profile.accountStatus === 'pending';
   const todayUnaccounted = useStoresTodayUnaccounted();
@@ -145,6 +148,22 @@ export function StoresHub({ profile, onIssue, onReturn, onInspect, onToday }: St
             subtitle="Disposition and restock"
             onClick={onInspect}
           />
+        )}
+
+        {/* Old paper sheets — a BACKFILL tool, not a handout. Amber and set
+            apart from the issue tile on purpose: recording a live handout as a
+            historical sheet would back-date real stock movement. */}
+        {isReturnInspector(profile.role, profile.authRole) && (
+          <div className="col-span-2">
+            <StoreTile
+              icon={<FileText className="w-5 h-5" />}
+              iconClass="bg-amber-500/15 text-amber-300"
+              title="Record an old paper sheet"
+              subtitle="Scan serials off a sheet already filled in"
+              onClick={onPaperSheet}
+              fullWidth
+            />
+          </div>
         )}
 
         {/* Today's summary — Phase 4, full width */}
