@@ -15,6 +15,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { createLogger } from '@/lib/logger';
+import { checkVlmHealth } from '@/lib/vlm/config';
 
 const log = createLogger('RetryCategorizations');
 
@@ -169,6 +170,34 @@ export default async function handler(
     // That's intentional: by then the DR has already been through the post-QA
     // reset path; Q3's gentler retry is the correct follow-up.
     log.info(`Found ${failedDRs.length} failed + ${badDRs.length} all-error + ${partialDRs.length} partial-error + ${postQaDRs.length} post-qa-error DRs to retry`);
+
+    // Infrastructure outages must not consume a DR's retry budget.
+    //
+    // Every attempt below increments vlm_retry_count, and the selection queries
+    // above only match `vlm_retry_count < MAX_RETRY_ATTEMPTS`. So when the VLM
+    // itself is down, this cron burns all 5 attempts against a dead service and
+    // the DR is then excluded from retry *permanently* — it never recovers even
+    // after the VLM comes back. That is exactly what stranded 95 DRs during the
+    // 2026-08-20 vLLM outage (service down 09:16 -> next day 08:40), leaving
+    // technicians with no feedback for a full day.
+    //
+    // Bail out before touching any counters: no work is better than work that
+    // silently destroys the ability to retry later.
+    const health = await checkVlmHealth();
+    if (!health.available) {
+      log.error(
+        `VLM unavailable (${health.error ?? 'no models served'}) — skipping ${allDRs.length} DRs without consuming retry budget`
+      );
+      return apiResponse.success(res, {
+        processed: 0,
+        succeeded: 0,
+        failed: 0,
+        skipped: allDRs.length,
+        skipReason: 'vlm_unavailable',
+        results: [] as RetryResult[],
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     const results: RetryResult[] = [];
 
