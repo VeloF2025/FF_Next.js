@@ -165,6 +165,14 @@ const PaperSheetPage: NextPage = () => {
             // would silently merge two pages into one batch.
             serialsRef.current = [];
             setSerials([]);
+            // STOP the scanner, not just hide it. useBarcodeScanner lives on
+            // this PAGE, so the key-based remount of PaperSheetCapture never
+            // touches it, and its only other cleanup is page unmount. Hiding
+            // the div while the html5-qrcode instance runs leaves the camera
+            // live against a detached DOM node. Nothing gates saving on the
+            // scanner being closed, so this is reachable: scan the last
+            // serial, save, tap next.
+            void stop();
             setScannerOpen(false);
             setNotice(null);
             setSheetSeq((n) => n + 1);
