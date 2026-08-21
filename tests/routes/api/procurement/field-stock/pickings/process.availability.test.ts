@@ -205,17 +205,32 @@ describe('validateStockAvailability — serial-tracked lines', () => {
     expect(result.valid === false && result.errors[ITEM_ID]).toContain('Garstfontein DC');
   });
 
-  it('fails when a serial sits at another warehouse', async () => {
+  it('ALLOWS a serial recorded at another warehouse', async () => {
+    // Was a hard refusal. The recorded location is an assumption from a
+    // workbook tab that predicts the real site 27.5% of the time, and stock
+    // genuinely moves between sites — blocking here produced the 2026-07 dead
+    // end where the technician had already signed.
+    //
+    // NOTE: this must use the REAL uuid. It previously read `id: 'serial-8'`,
+    // which matched no row, so the case passed on "serial not found" and never
+    // exercised the location rule at all.
     const { txn } = serialTxn({
       serials: [
         ...allInStock.slice(0, 8),
-        { id: 'serial-8', status: 'in_stock', current_location_id: 'somewhere-else' },
+        { id: SERIAL_IDS[8]!, status: 'in_stock', current_location_id: 'somewhere-else' },
       ],
+      quants: [{ quantity: 9 }],
     });
     const result = await validateStockAvailability(txn, [SERIAL_LINE], SOURCE_ID);
+    expect(result.valid).toBe(true);
+  });
+
+  it('still fails when a serial is genuinely absent from stock', async () => {
+    // The case the broken test above was accidentally covering. Keep it, on
+    // purpose this time.
+    const { txn } = serialTxn({ serials: allInStock.slice(0, 8) });
+    const result = await validateStockAvailability(txn, [SERIAL_LINE], SOURCE_ID);
     expect(result.valid).toBe(false);
-    // Must fail via the SERIAL path, not the old quants path — otherwise this
-    // assertion would pass for the wrong reason.
     expect(result.valid === false && result.errors[ITEM_ID]).toContain('1 of 9');
   });
 

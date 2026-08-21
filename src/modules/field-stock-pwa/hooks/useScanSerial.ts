@@ -288,6 +288,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
             stockItemId: verdict.stockItemId,
             stockItemName: verdict.stockItemName,
             state: 'valid',
+            ...(verdict.warning ? { warning: verdict.warning } : {}),
           }
         : {
             ...optimistic,

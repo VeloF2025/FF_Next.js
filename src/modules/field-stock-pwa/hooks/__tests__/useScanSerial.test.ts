@@ -1,9 +1,14 @@
 /**
  * Tests for useScanSerial — scan-time location cross-check.
  *
- * A serial registered at a different warehouse than the selected source must
- * resolve to an invalid chip at scan time (naming both locations), instead of
- * sailing through and 422-ing at the final process step after the tech signed.
+ * A serial recorded at a different warehouse than the selected source is
+ * ALLOWED and flagged, naming both locations. It used to be refused, but that
+ * location is an assumption from a workbook tab which predicts the real site
+ * 27.5% of the time (measured 2026-08-21), and stock genuinely moves between
+ * sites — refusing blocked real work over a guess.
+ *
+ * The original reason for checking at scan time still holds: the storeman must
+ * learn about it BEFORE the technician signs, not via a 422 afterwards.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -31,7 +36,7 @@ describe('useScanSerial location cross-check', () => {
     validateSerialMock.mockReset();
   });
 
-  it('marks a serial invalid when it is registered at another warehouse', async () => {
+  it('allows and FLAGS a serial recorded at another warehouse', async () => {
     validateSerialMock.mockResolvedValueOnce({
       valid: true,
       stockItemId: 'item-ont',
@@ -50,9 +55,11 @@ describe('useScanSerial location cross-check', () => {
 
     const rows = lastChange(onChange);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.state).toBe('invalid');
-    expect(rows[0]!.errorMessage).toContain('Lawley');
-    expect(rows[0]!.errorMessage).toContain('Garstfontein DC');
+    expect(rows[0]!.state).toBe('valid');
+    // Flagged, not blocked — and it still names both sites, before signing.
+    expect(rows[0]!.warning).toContain('Lawley');
+    expect(rows[0]!.warning).toContain('Garstfontein DC');
+    expect(rows[0]!.errorMessage).toBeUndefined();
   });
 
   it('marks a serial valid when its location matches the source warehouse', async () => {

@@ -63,13 +63,18 @@ describe('verdictForSerial', () => {
     );
   });
 
-  it('rejects a serial registered at another warehouse, naming both', () => {
+  it('ALLOWS a serial recorded at another warehouse, and flags it', () => {
+    // The recorded location is an assumption from a workbook tab that predicts
+    // the real site 27.5% of the time. Stock genuinely moves between sites;
+    // refusing the handout blocks real work over a guess (PCK-000009/10).
     const verdict = verdictForSerial(
       record({ currentLocationId: 'loc-lawley', currentLocationName: 'Lawley' }), CTX,
     );
-    expect(verdict.valid === false && verdict.errorMessage).toBe(
-      'Serial is at Lawley, not Garstfontein DC',
+    expect(verdict.valid).toBe(true);
+    expect(verdict.valid === true && verdict.warning).toBe(
+      'Expected at Lawley — issuing from Garstfontein DC',
     );
+    expect(verdict.valid === true && verdict.expectedLocationName).toBe('Lawley');
   });
 
   it('allows a serial with no recorded location — missing data is not a contradiction', () => {
@@ -102,8 +107,31 @@ describe('verdictForSerial', () => {
     const verdict = verdictForSerial(
       record({ currentLocationId: 'loc-lawley', currentLocationName: null }), CTX,
     );
-    expect(verdict.valid === false && verdict.errorMessage).toBe(
-      'Serial is at another warehouse, not Garstfontein DC',
+    expect(verdict.valid).toBe(true);
+    expect(verdict.valid === true && verdict.warning).toBe(
+      'Expected at another warehouse — issuing from Garstfontein DC',
     );
+  });
+
+  it('carries NO warning when the serial is where it was expected', () => {
+    const verdict = verdictForSerial(record(), CTX);
+    expect(verdict.valid === true && verdict.warning).toBeUndefined();
+  });
+
+  it('still REFUSES the wrong stock item — that is a mistake, not a movement', () => {
+    // Only location softens. Scanning a Gizzu into an ONT line is an error.
+    const verdict = verdictForSerial(
+      record({ stockItemId: 'item-gizzu', stockItemName: 'FT-GIZZU' }), CTX,
+    );
+    expect(verdict.valid).toBe(false);
+  });
+
+  it('still REFUSES an already-issued serial, wherever it sits', () => {
+    const verdict = verdictForSerial(
+      record({ status: 'issued', currentLocationId: 'loc-lawley', currentLocationName: 'Lawley' }),
+      CTX,
+    );
+    expect(verdict.valid).toBe(false);
+    expect(verdict.valid === false && verdict.errorMessage).toContain('status: issued');
   });
 });
