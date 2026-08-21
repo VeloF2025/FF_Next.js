@@ -12,7 +12,10 @@
  */
 
 import { useCallback, useState } from 'react';
+import { useEffect } from 'react';
 import { FileText, Loader2 } from 'lucide-react';
+import { fetchTechnicians } from '@/modules/field-stock-pwa/api';
+import type { PwaTechSummary } from '@/modules/field-stock-pwa/types';
 import { request } from '@/modules/field-stock-pwa/api/request';
 import { PaperSheetResult } from './PaperSheetResult';
 import type { SheetSummary } from './paperSheetTypes';
@@ -22,16 +25,44 @@ export interface PaperSheetCaptureProps {
   /** Serials already scanned, owned by the page so the scanner can add to them. */
   serials: string[];
   onBack: () => void;
+  /**
+   * Date used for the previous sheet in this session, carried forward as the
+   * default. A stack of sheets is mostly one date or a short run of days, so
+   * re-typing it per page is where fat-fingered dates come from.
+   */
+  initialDate?: string;
+  /** Receiver used for the previous sheet — a stack is usually one person. */
+  initialReceiverId?: string;
+  /** Reports what this sheet used, so the next one can start from it. */
+  onRecorded?: (used: { sheetDate: string; receiverStaffId: string }) => void;
+  /** Start a fresh sheet, keeping the date and receiver. */
+  onNextSheet?: () => void;
 }
 
-export function PaperSheetCapture({ serials, onBack }: PaperSheetCaptureProps) {
-  const [sheetDate, setSheetDate] = useState('');
-  const [technicianName, setTechnicianName] = useState('');
+export function PaperSheetCapture({
+  serials, onBack, initialDate, initialReceiverId, onRecorded, onNextSheet,
+}: PaperSheetCaptureProps) {
+  const [sheetDate, setSheetDate] = useState(initialDate ?? '');
+  const [receiverStaffId, setReceiverStaffId] = useState(initialReceiverId ?? '');
+  const [receivers, setReceivers] = useState<PwaTechSummary[]>([]);
+  const [receiversError, setReceiversError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<SheetSummary | null>(null);
 
-  const canSave = sheetDate !== '' && serials.length > 0 && !saving;
+  // Deliberately NOT site-filtered: these are historical sheets, and the
+  // receiver may have worked at a site the storeman is not standing in.
+  useEffect(() => {
+    let live = true;
+    fetchTechnicians()
+      .then((rows) => { if (live) setReceivers(rows); })
+      .catch((err) => {
+        if (live) setReceiversError(err instanceof Error ? err.message : 'Could not load people');
+      });
+    return () => { live = false; };
+  }, []);
+
+  const canSave = sheetDate !== '' && receiverStaffId !== '' && serials.length > 0 && !saving;
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -39,22 +70,25 @@ export function PaperSheetCapture({ serials, onBack }: PaperSheetCaptureProps) {
     try {
       const result = await request<SheetSummary>('/api/my/stores/paper-sheets', {
         method: 'POST',
-        body: JSON.stringify({
-          sheetDate,
-          technicianName: technicianName || null,
-          serials,
-        }),
+        body: JSON.stringify({ sheetDate, receiverStaffId, serials }),
       });
       setSummary(result);
+      onRecorded?.({ sheetDate, receiverStaffId });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the sheet');
     } finally {
       setSaving(false);
     }
-  }, [sheetDate, technicianName, serials]);
+  }, [sheetDate, receiverStaffId, serials, onRecorded]);
 
   if (summary) {
-    return <PaperSheetResult summary={summary} onBack={onBack} />;
+    return (
+      <PaperSheetResult
+        summary={summary}
+        onBack={onBack}
+        onNextSheet={() => { setSummary(null); onNextSheet?.(); }}
+      />
+    );
   }
 
   return (
@@ -70,7 +104,10 @@ export function PaperSheetCapture({ serials, onBack }: PaperSheetCaptureProps) {
       </div>
 
       <label className="block">
-        <span className="text-xs text-neutral-400">Date written on the sheet</span>
+        <span className="text-xs text-neutral-400">
+          Date written on the sheet
+          {initialDate ? ' (carried over — change it if this page differs)' : ''}
+        </span>
         <input
           type="date"
           value={sheetDate}
@@ -81,15 +118,21 @@ export function PaperSheetCapture({ serials, onBack }: PaperSheetCaptureProps) {
       </label>
 
       <label className="block">
-        <span className="text-xs text-neutral-400">Name signed on the sheet (optional)</span>
-        <input
-          type="text"
-          value={technicianName}
-          onChange={(e) => setTechnicianName(e.target.value)}
-          placeholder="Who took the stock"
-          className="mt-1 w-full px-3 py-3 rounded-lg bg-neutral-900 border border-neutral-700 text-white placeholder:text-neutral-500"
-        />
+        <span className="text-xs text-neutral-400">Who received the stock</span>
+        <select
+          value={receiverStaffId}
+          onChange={(e) => setReceiverStaffId(e.target.value)}
+          className="mt-1 w-full px-3 py-3 rounded-lg bg-neutral-900 border border-neutral-700 text-white"
+        >
+          <option value="">Choose the person who signed…</option>
+          {receivers.map((r) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+        </select>
       </label>
+      {receiversError && (
+        <p className="text-xs text-red-300 px-1">{receiversError}</p>
+      )}
 
       <div className="rounded-lg bg-neutral-950 border border-neutral-800 px-4 py-3">
         <p className="text-sm text-neutral-300">
@@ -110,7 +153,11 @@ export function PaperSheetCapture({ serials, onBack }: PaperSheetCaptureProps) {
         className="w-full min-h-[48px] rounded-lg bg-amber-700 disabled:bg-neutral-800 disabled:text-neutral-500 text-white text-sm font-medium inline-flex items-center justify-center gap-2"
       >
         {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-        {sheetDate ? 'Record this sheet' : 'Enter the sheet date first'}
+        {!sheetDate
+          ? 'Enter the sheet date first'
+          : !receiverStaffId
+            ? 'Choose who received the stock'
+            : 'Record this sheet'}
       </button>
     </div>
   );

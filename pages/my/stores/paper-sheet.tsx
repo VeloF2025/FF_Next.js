@@ -32,6 +32,15 @@ const PaperSheetPage: NextPage = () => {
   const [serials, setSerials] = useState<string[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // Carried between sheets in one sitting: a stack is usually one receiver and
+  // one date, or a short run of days. Re-typing both per page is where wrong
+  // dates come from.
+  const [lastUsed, setLastUsed] = useState<{ sheetDate: string; receiverStaffId: string } | null>(null);
+  const [recordedCount, setRecordedCount] = useState(0);
+  // Remount key. initialDate/initialReceiverId are useState INITIALISERS, so
+  // they apply on mount and never again — changing the key is what makes the
+  // next sheet actually start from the carried values instead of blank.
+  const [sheetSeq, setSheetSeq] = useState(0);
   // Freshest list at scan time: the camera fires per decoded frame and React
   // does not re-render between them, so reading the state variable would drop
   // every serial after the first (the 27/36 bug, 2026-08-21).
@@ -140,7 +149,42 @@ const PaperSheetPage: NextPage = () => {
           </ul>
         )}
 
-        <PaperSheetCapture serials={serials} onBack={() => void router.push('/my/stores')} />
+        <PaperSheetCapture
+          key={sheetSeq}
+          serials={serials}
+          initialDate={lastUsed?.sheetDate}
+          initialReceiverId={lastUsed?.receiverStaffId}
+          onRecorded={(used) => {
+            // Remember what this sheet used, but do NOT clear anything yet —
+            // the storeman is still reading the findings.
+            setLastUsed(used);
+            setRecordedCount((n) => n + 1);
+          }}
+          onNextSheet={() => {
+            // Clear the scanned list so the next page starts empty; leaving it
+            // would silently merge two pages into one batch.
+            serialsRef.current = [];
+            setSerials([]);
+            // STOP the scanner, not just hide it. useBarcodeScanner lives on
+            // this PAGE, so the key-based remount of PaperSheetCapture never
+            // touches it, and its only other cleanup is page unmount. Hiding
+            // the div while the html5-qrcode instance runs leaves the camera
+            // live against a detached DOM node. Nothing gates saving on the
+            // scanner being closed, so this is reachable: scan the last
+            // serial, save, tap next.
+            void stop();
+            setScannerOpen(false);
+            setNotice(null);
+            setSheetSeq((n) => n + 1);
+          }}
+          onBack={() => void router.push('/my/stores')}
+        />
+
+        {recordedCount > 0 && (
+          <p className="text-[11px] text-neutral-500 text-center">
+            {recordedCount} sheet{recordedCount === 1 ? '' : 's'} recorded in this session
+          </p>
+        )}
       </div>
     </MyPortalShell>
   );

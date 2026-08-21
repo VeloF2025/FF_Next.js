@@ -11,10 +11,20 @@ import type { SheetSummary } from './paperSheetTypes';
 
 export interface PaperSheetResultProps {
   summary: SheetSummary;
+  /** Leaves the tool entirely. */
   onBack: () => void;
+  /**
+   * Starts a fresh sheet, keeping the date and receiver as defaults.
+   *
+   * Without this the tool could record exactly ONE sheet per visit: the result
+   * view has no reason to clear itself, so the only way onward was the button
+   * that navigates away — which remounts the page and discards the carried
+   * date and receiver. A stack of sheets was unusable.
+   */
+  onNextSheet: () => void;
 }
 
-export function PaperSheetResult({ summary, onBack }: PaperSheetResultProps) {
+export function PaperSheetResult({ summary, onBack, onNextSheet }: PaperSheetResultProps) {
   const flagged = summary.serials.filter((s) => s.verdict === 'contradicts-stock');
   const unclear = summary.serials.filter((s) => s.verdict === 'unclassified');
   return (
@@ -81,9 +91,14 @@ export function PaperSheetResult({ summary, onBack }: PaperSheetResultProps) {
         Nothing was moved in or out of stock. This is a record of what the paper says.
       </p>
 
+      <button type="button" onClick={onNextSheet}
+        className="w-full min-h-[48px] rounded-lg bg-amber-700 text-white text-sm font-medium">
+        Record the next sheet
+      </button>
+
       <button type="button" onClick={onBack}
         className="w-full min-h-[48px] rounded-lg bg-neutral-800 text-neutral-200 text-sm font-medium">
-        Done
+        Done — back to stores
       </button>
     </div>
   );
