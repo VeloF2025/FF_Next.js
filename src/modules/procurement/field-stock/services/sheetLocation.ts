@@ -22,11 +22,14 @@
  * them. Ambiguity needs an explicit alias — a human decision, recorded once.
  */
 
-/** The subset of a stock_locations row this resolver needs. */
-export interface LocationRef {
+/** The subset of a row this resolver needs — a stock_location OR a project. */
+export interface NamedRef {
   id: string;
   name: string;
 }
+
+/** Back-compat alias: warehouses were the original and only target. */
+export type LocationRef = NamedRef;
 
 export type SheetLocationResult =
   | { ok: true; locationId: string; locationName: string; how: 'exact' | 'prefix' | 'fuzzy' | 'alias' }
@@ -58,6 +61,20 @@ export const SHEET_ALIASES: Record<string, string> = {
   tembisa: 'Tembisa 1',
 };
 
+/**
+ * Tab -> PROJECT aliases. Deliberately EMPTY.
+ *
+ * Two tabs cannot be resolved to a project from their names, and neither has an
+ * answer this code is entitled to invent:
+ *   - `Thembisa` matches Thembisa POP 1, POP 2 and POP 3.
+ *   - `Tembelilhle` matches nothing — no such project exists, and its stock is
+ *     observed installing on Thembisa POP 1 and Etwatwa, so there is no single
+ *     right answer.
+ * Both are refused and reported, leaving the allocation unset rather than wrong.
+ * Add an entry here only when someone decides which project a tab means.
+ */
+export const PROJECT_ALIASES: Record<string, string> = {};
+
 /** Shortest tab name eligible for fuzzy matching — below this an edit budget of 2 is most of the word. */
 const MIN_FUZZY_LEN = 6;
 const MAX_EDIT_DISTANCE = 2;
@@ -84,10 +101,34 @@ export function editDistance(a: string, b: string): number {
   return prev[b.length]!;
 }
 
+/**
+ * Resolve a tab name onto one of `candidates` by name.
+ *
+ * Used for two different target sets: the WAREHOUSE a tab's stock is held at,
+ * and the PROJECT it is allocated to. The rules are identical — the tab names
+ * mismatch their targets the same way in both directions — so the logic lives
+ * once and takes the candidate list as a parameter.
+ */
+export function resolveSheetTarget(
+  sheetName: string,
+  candidates: NamedRef[],
+  aliases: Record<string, string> = {},
+): SheetLocationResult {
+  return resolveAgainst(sheetName, candidates, aliases);
+}
+
 export function resolveSheetLocation(
   sheetName: string,
   locations: LocationRef[],
   aliases: Record<string, string> = SHEET_ALIASES,
+): SheetLocationResult {
+  return resolveAgainst(sheetName, locations, aliases);
+}
+
+function resolveAgainst(
+  sheetName: string,
+  locations: NamedRef[],
+  aliases: Record<string, string>,
 ): SheetLocationResult {
   const key = normalise(sheetName);
 

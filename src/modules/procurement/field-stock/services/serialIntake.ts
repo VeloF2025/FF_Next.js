@@ -27,8 +27,21 @@ export interface SerialIntakeItem {
   stockItemId: string;
   /** Cleaned serial number. */
   serialNumber: string;
-  /** Warehouse / project stock_location UUID, or null. */
+  /**
+   * Warehouse stock_location UUID, or null.
+   *
+   * When it comes from a SharePoint workbook tab this is PROVISIONAL — the tab
+   * denotes allocation, not physical presence, so the row is written with
+   * location_confirmed = false (migration 512) until a physical receipt
+   * confirms it.
+   */
   locationId: string | null;
+  /**
+   * projects.id this stock is EARMARKED for, or null when the tab could not be
+   * resolved to exactly one project. This is what the workbook tab actually
+   * means; it is not a claim about where the unit is.
+   */
+  allocatedToProjectId?: string | null;
   /** Physical condition; defaults to 'new'. */
   condition?: string;
 }
@@ -85,17 +98,21 @@ export async function receiveSerials(
           const res = await client.query(
             `INSERT INTO stock_serials
                (id, stock_item_id, serial_number, current_location_id,
+                allocated_to_project_id,
                 status, received_reference, received_date, condition)
              SELECT
                gen_random_uuid(), incoming.stock_item_id, incoming.serial_number,
-               incoming.location_id, 'in_stock', $5, NOW(), incoming.condition
-             FROM unnest($1::uuid[], $2::text[], $3::uuid[], $4::text[])
-               AS incoming(stock_item_id, serial_number, location_id, condition)
+               incoming.location_id, incoming.allocated_to_project_id,
+               'in_stock', $6, NOW(), incoming.condition
+             FROM unnest($1::uuid[], $2::text[], $3::uuid[], $4::uuid[], $5::text[])
+               AS incoming(stock_item_id, serial_number, location_id,
+                           allocated_to_project_id, condition)
              ON CONFLICT (stock_item_id, serial_number) DO NOTHING`,
             [
               chunk.map((item) => item.stockItemId),
               chunk.map((item) => item.serialNumber),
               chunk.map((item) => item.locationId),
+              chunk.map((item) => item.allocatedToProjectId ?? null),
               chunk.map((item) => item.condition ?? 'new'),
               ctx.receivedReference,
             ],

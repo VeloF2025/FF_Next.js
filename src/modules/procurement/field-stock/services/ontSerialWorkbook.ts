@@ -16,8 +16,8 @@
  */
 
 import type { SerialIntakeItem } from './serialIntake';
-import { resolveSheetLocation } from './sheetLocation';
-import type { LocationRef } from './sheetLocation';
+import { resolveSheetLocation, resolveSheetTarget, PROJECT_ALIASES } from './sheetLocation';
+import type { LocationRef, NamedRef, SheetLocationResult } from './sheetLocation';
 
 /** Known stock_items UUIDs for the two serialised FT consumables. */
 export const FT_ONT_ITEM_ID = '84cc2348-f8a9-486f-826a-6b8b20579765';
@@ -49,6 +49,10 @@ export interface ParsedProject {
   /** The warehouse this tab resolved to, and how it was matched. */
   locationName: string;
   matchedBy: 'exact' | 'prefix' | 'fuzzy' | 'alias';
+  /** The project this tab ALLOCATES to, when the name resolves to exactly one. */
+  allocatedProjectName?: string;
+  /** Why no project was assigned, when it could not be resolved. */
+  allocationUnresolved?: 'not-a-project' | 'no-match' | 'ambiguous' | 'alias-target-missing';
   /** ONT serials parsed from this project's sheet. */
   ontItems: SerialIntakeItem[];
   /** Gizzu/UPS serials parsed from this project's sheet. */
@@ -66,6 +70,13 @@ export interface ParsedWorkbook {
   skippedSheets: string[];
   /** The same tabs with the reason each was not imported, and what it cost. */
   unresolvedSheets: UnresolvedSheet[];
+  /** Tabs that imported as stock but could NOT be tied to a project. */
+  unallocatedSheets: Array<{
+    sheetName: string;
+    reason: 'not-a-project' | 'no-match' | 'ambiguous' | 'alias-target-missing';
+    candidates?: string[];
+    serialsUnallocated: number;
+  }>;
 }
 
 /**
@@ -79,9 +90,15 @@ export function parseOntGizzuWorkbook(
   XLSX: any,
   /** Warehouse rows to resolve tab names against (from stock_locations). */
   locations: LocationRef[],
+  /**
+   * Project rows to resolve the ALLOCATION against (from projects). Optional so
+   * existing callers keep working; without it nothing is allocated.
+   */
+  projects: NamedRef[] = [],
 ): ParsedWorkbook {
   const out: ParsedWorkbook = {
-    ontItems: [], gizzuItems: [], projects: [], skippedSheets: [], unresolvedSheets: [],
+    ontItems: [], gizzuItems: [], projects: [], skippedSheets: [],
+    unresolvedSheets: [], unallocatedSheets: [],
   };
 
   for (const sheetName of workbook.SheetNames as string[]) {
@@ -108,10 +125,21 @@ export function parseOntGizzuWorkbook(
     }
     const locationId = resolved.locationId;
 
+    // The tab also names the PROJECT the stock is earmarked for. That is what
+    // the workbook actually means; the warehouse above is only where we assume
+    // it sits. Refused when the name does not resolve to exactly one project —
+    // an unset allocation is honest, a guessed one is not.
+    const allocation: SheetLocationResult = projects.length
+      ? resolveSheetTarget(sheetName, projects, PROJECT_ALIASES)
+      : { ok: false, reason: 'no-match' };
+    const allocatedToProjectId = allocation.ok ? allocation.locationId : null;
+
     const project: ParsedProject = {
       name: sheetName,
       locationName: resolved.locationName,
       matchedBy: resolved.how,
+      ...(allocation.ok ? { allocatedProjectName: allocation.locationName } : {}),
+      ...(allocation.ok ? {} : { allocationUnresolved: allocation.reason }),
       ontItems: [],
       gizzuItems: [],
     };
@@ -119,12 +147,25 @@ export function parseOntGizzuWorkbook(
       const ontSerial = cleanSerial(String(row[1] ?? ''));
       const upsSerial = cleanSerial(String(row[2] ?? ''));
       if (ontSerial.length >= MIN_SERIAL_LEN) {
-        project.ontItems.push({ stockItemId: FT_ONT_ITEM_ID, serialNumber: ontSerial, locationId });
+        project.ontItems.push({
+          stockItemId: FT_ONT_ITEM_ID, serialNumber: ontSerial, locationId, allocatedToProjectId,
+        });
       }
       if (upsSerial.length >= MIN_SERIAL_LEN) {
-        project.gizzuItems.push({ stockItemId: FT_GIZZU_ITEM_ID, serialNumber: upsSerial, locationId });
+        project.gizzuItems.push({
+          stockItemId: FT_GIZZU_ITEM_ID, serialNumber: upsSerial, locationId, allocatedToProjectId,
+        });
       }
     }
+    if (!allocation.ok && projects.length) {
+      out.unallocatedSheets.push({
+        sheetName,
+        reason: allocation.reason,
+        ...(allocation.candidates ? { candidates: allocation.candidates } : {}),
+        serialsUnallocated: project.ontItems.length + project.gizzuItems.length,
+      });
+    }
+
     out.projects.push(project);
     out.ontItems.push(...project.ontItems);
     out.gizzuItems.push(...project.gizzuItems);

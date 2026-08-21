@@ -91,7 +91,10 @@ async function handleImport(res: NextApiResponse, workbook: any, XLSX: any): Pro
   const locRows = await pool.query<{ id: string; name: string }>(
     `SELECT id, name FROM stock_locations WHERE location_type = 'warehouse'`,
   );
-  const parsed = parseOntGizzuWorkbook(workbook, XLSX, locRows.rows);
+  const projRows = await pool.query<{ id: string; name: string }>(
+    `SELECT id, project_name AS name FROM projects`,
+  );
+  const parsed = parseOntGizzuWorkbook(workbook, XLSX, locRows.rows, projRows.rows);
   const result: ImportResult = {
     ontImported: 0,
     upsImported: 0,
