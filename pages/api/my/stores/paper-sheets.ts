@@ -110,13 +110,32 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
   // Resolve the receiver's name from the staff row rather than trusting a
   // client-supplied string: the name is what a person reads on the report, and
   // three spellings of one technician would read as three receivers.
+  //
+  // The name is built defensively. In the live database first_name and
+  // last_name are both NOT NULL (checked 2026-08-21), but the test seed has
+  // them nullable, and `a || ' ' || b` yields NULL in Postgres if either side
+  // is NULL — which would store a nameless receiver on a report whose whole
+  // point is naming one. An empty string would give a name of just a space.
+  // concat_ws skips nulls, and a blank result is refused rather than stored.
+  //
+  // Deliberately NOT filtered by role or account_status. These are historical
+  // sheets: a receiver may since have left the company (2 staff are non-active
+  // today) or changed role, and filtering would refuse to record a handover
+  // that really happened. The UI offers technicians and casuals; the server
+  // accepts any staff row that resolves to a name, and that difference is
+  // intentional rather than an oversight.
   const receiverRows = await sql`
-    SELECT id, first_name || ' ' || last_name AS name
+    SELECT id, nullif(trim(concat_ws(' ', first_name, last_name)), '') AS name
     FROM staff WHERE id = ${body.receiverStaffId} LIMIT 1
   `;
-  const receiver = (receiverRows as Array<{ id: string; name: string }>)[0];
+  const receiver = (receiverRows as Array<{ id: string; name: string | null }>)[0];
   if (!receiver) {
     return apiResponse.validationError(res, { receiverStaffId: 'That person was not found' });
+  }
+  if (!receiver.name) {
+    return apiResponse.validationError(res, {
+      receiverStaffId: 'That person has no name on record — fix the staff record first',
+    });
   }
 
   // What stock currently believes about each scanned serial.

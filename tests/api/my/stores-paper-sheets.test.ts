@@ -292,6 +292,32 @@ describe('the receiver defines the batch', () => {
     expect(mockCreateSheet).not.toHaveBeenCalled();
   });
 
+  it('refuses a receiver whose staff row has no usable name', async () => {
+    // `first || ' ' || last` yields NULL in Postgres if either side is NULL,
+    // and an empty pair yields a lone space. Either would put a nameless
+    // receiver on a report whose whole point is naming one. The query uses
+    // concat_ws + nullif(trim(...)) so both arrive here as null.
+    mockSql.mockImplementation(async (strings: unknown) => {
+      const text = Array.isArray(strings) ? strings.join(' ') : String(strings);
+      if (/FROM staff/i.test(text)) return [{ id: RECEIVER, name: null }];
+      return [];
+    });
+    const res = makeRes();
+    await handler(post({ sheetDate: '2026-05-11', serials: ['A1B2C3D4'] }), res);
+    expect(res.statusCode).toBe(422);
+    expect(mockCreateSheet).not.toHaveBeenCalled();
+  });
+
+  it('asks Postgres for a trimmed, null-safe name', async () => {
+    // Pins the query shape: plain `a || ' ' || b` reintroduces the null.
+    await handler(post({ sheetDate: '2026-05-11', serials: ['A1B2C3D4'] }), makeRes());
+    const staffQuery = mockSql.mock.calls
+      .map((c) => (Array.isArray(c[0]) ? c[0].join(' ') : String(c[0])))
+      .find((t) => /FROM staff/i.test(t))!;
+    expect(staffQuery).toMatch(/concat_ws/i);
+    expect(staffQuery).toMatch(/nullif\(trim\(/i);
+  });
+
   it('takes the name from the staff row, never from the client', async () => {
     // Typed names give 'Tshepo', 'T. Mahlangu' and 'Tshepo Mahlangu' as three
     // receivers. The batch key has to be the id, and the name has to be ours.

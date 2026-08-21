@@ -37,6 +37,10 @@ const PaperSheetPage: NextPage = () => {
   // dates come from.
   const [lastUsed, setLastUsed] = useState<{ sheetDate: string; receiverStaffId: string } | null>(null);
   const [recordedCount, setRecordedCount] = useState(0);
+  // Remount key. initialDate/initialReceiverId are useState INITIALISERS, so
+  // they apply on mount and never again — changing the key is what makes the
+  // next sheet actually start from the carried values instead of blank.
+  const [sheetSeq, setSheetSeq] = useState(0);
   // Freshest list at scan time: the camera fires per decoded frame and React
   // does not re-render between them, so reading the state variable would drop
   // every serial after the first (the 27/36 bug, 2026-08-21).
@@ -146,16 +150,24 @@ const PaperSheetPage: NextPage = () => {
         )}
 
         <PaperSheetCapture
+          key={sheetSeq}
           serials={serials}
           initialDate={lastUsed?.sheetDate}
           initialReceiverId={lastUsed?.receiverStaffId}
           onRecorded={(used) => {
+            // Remember what this sheet used, but do NOT clear anything yet —
+            // the storeman is still reading the findings.
             setLastUsed(used);
             setRecordedCount((n) => n + 1);
-            // Clear the scanned list so the next page starts empty — leaving
-            // it would silently merge two pages into one batch.
+          }}
+          onNextSheet={() => {
+            // Clear the scanned list so the next page starts empty; leaving it
+            // would silently merge two pages into one batch.
             serialsRef.current = [];
             setSerials([]);
+            setScannerOpen(false);
+            setNotice(null);
+            setSheetSeq((n) => n + 1);
           }}
           onBack={() => void router.push('/my/stores')}
         />

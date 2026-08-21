@@ -35,10 +35,12 @@ export interface PaperSheetCaptureProps {
   initialReceiverId?: string;
   /** Reports what this sheet used, so the next one can start from it. */
   onRecorded?: (used: { sheetDate: string; receiverStaffId: string }) => void;
+  /** Start a fresh sheet, keeping the date and receiver. */
+  onNextSheet?: () => void;
 }
 
 export function PaperSheetCapture({
-  serials, onBack, initialDate, initialReceiverId, onRecorded,
+  serials, onBack, initialDate, initialReceiverId, onRecorded, onNextSheet,
 }: PaperSheetCaptureProps) {
   const [sheetDate, setSheetDate] = useState(initialDate ?? '');
   const [receiverStaffId, setReceiverStaffId] = useState(initialReceiverId ?? '');
@@ -80,7 +82,13 @@ export function PaperSheetCapture({
   }, [sheetDate, receiverStaffId, serials, onRecorded]);
 
   if (summary) {
-    return <PaperSheetResult summary={summary} onBack={onBack} />;
+    return (
+      <PaperSheetResult
+        summary={summary}
+        onBack={onBack}
+        onNextSheet={() => { setSummary(null); onNextSheet?.(); }}
+      />
+    );
   }
 
   return (
