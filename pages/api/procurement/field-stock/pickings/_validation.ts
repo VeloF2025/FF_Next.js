@@ -22,6 +22,9 @@ import { FIELD_DEFAULT_LOCATION_ID } from '@/modules/field-stock-pwa/lib/locatio
 import { log } from '@/lib/logger';
 import { serialsEligibleForIntake } from '@/modules/field-stock-pwa/lib/boxScan';
 
+/** Postgres unique-violation: a duplicate is an answer here, not a crash. */
+const UNIQUE_VIOLATION = '23505';
+
 // ---------------------------------------------------------------------------
 // Shape contract
 // ---------------------------------------------------------------------------
@@ -192,6 +195,8 @@ export async function validateSerialsAvailable(
   const unavailableSerials: string[] = [];
   // Maps serial_number (client-supplied label) → stock_serials.id (uuid)
   const resolvedSerialIds = new Map<string, string>();
+  // Computed once for the whole request — see photoUsageAcrossLines.
+  const photoUsage = photoUsageAcrossLines(lines);
 
   for (const line of lines) {
     if (!Array.isArray(line.serialIds) || line.serialIds.length === 0) continue;
@@ -224,7 +229,7 @@ export async function validateSerialsAvailable(
       //     the caller, so a serial smuggled into the line but absent from
       //     every scan cannot get through), or
       //   - a LABEL PHOTOGRAPH was captured for it.
-      const photo = photoFor(line, serialNumber);
+      const photo = photoFor(line, serialNumber, photoUsage);
       if (corroboratedFor(line).has(serialNumber) || photo) {
         const createdId = await takeSerialIntoStock(sql, {
           serialNumber,
@@ -272,30 +277,41 @@ export async function validateSerialsAvailable(
  * physical unit; a single picture standing for ten Gizzus is not evidence, it
  * is a formality. Refusing both rather than the later one keeps the outcome
  * independent of array order, so the same request cannot admit different
- * serials depending on how the client happened to sort them.
+ * serials depending on how the client happened to sort them — and the client
+ * does not guarantee that order, so first-wins would let an idempotent replay
+ * admit different serials on different attempts.
  *
- * A unique index (migration 520) enforces this across requests as well. This
- * check exists so a reused key fails as a clear refusal here rather than as a
- * database error deep in the picking chain.
+ * Counted across EVERY line, not within one. Two lines of the same request
+ * are the same submission by the same person at the same moment; letting a key
+ * repeat between them would leave the unique index (migration 520) to catch it
+ * as a raw database error instead of a clear refusal.
  */
+function photoUsageAcrossLines(lines: PickingLine[]): Map<string, string[]> {
+  const usage = new Map<string, string[]>();
+  for (const line of lines) {
+    for (const p of line.intakePhotos ?? []) {
+      if (!p || typeof p.photoKey !== 'string' || p.photoKey.trim().length === 0) continue;
+      usage.set(p.photoKey, [...(usage.get(p.photoKey) ?? []), p.serialNumber]);
+    }
+  }
+  return usage;
+}
+
 function photoFor(
   line: PickingLine,
   serialNumber: string,
+  usage: Map<string, string[]>,
 ): { photoKey: string; photoUrl?: string | null } | null {
-  const photos = (Array.isArray(line.intakePhotos) ? line.intakePhotos : []).filter(
-    (p) => p && typeof p.photoKey === 'string' && p.photoKey.trim().length > 0,
+  const match = (line.intakePhotos ?? []).find(
+    (p) => p && typeof p.photoKey === 'string' && p.photoKey.trim().length > 0
+      && p.serialNumber === serialNumber,
   );
-
-  const timesUsed = new Map<string, number>();
-  for (const p of photos) timesUsed.set(p.photoKey, (timesUsed.get(p.photoKey) ?? 0) + 1);
-
-  const match = photos.find((p) => p.serialNumber === serialNumber);
   if (!match) return null;
-  if ((timesUsed.get(match.photoKey) ?? 0) > 1) {
+
+  const usedFor = usage.get(match.photoKey) ?? [];
+  if (usedFor.length > 1) {
     log.warn('label photo offered for more than one serial — refusing all of them', {
-      photoKey: match.photoKey,
-      serialNumber,
-      usedFor: photos.filter((p) => p.photoKey === match.photoKey).map((p) => p.serialNumber),
+      photoKey: match.photoKey, serialNumber, usedFor,
     }, 'pickings/_validation');
     return null;
   }
@@ -358,7 +374,9 @@ async function takeSerialIntoStock(
     photoUrl: string | null;
   },
 ): Promise<string | null> {
-  const inserted = await sql`
+  let inserted: unknown;
+  try {
+    inserted = await sql`
     INSERT INTO stock_serials
       (stock_item_id, serial_number, status, condition, current_location_id,
        provenance, intake_carton_id, intake_by_staff_id, intake_at,
@@ -372,6 +390,19 @@ async function takeSerialIntoStock(
     ON CONFLICT (stock_item_id, serial_number) DO NOTHING
     RETURNING id
   `;
+  } catch (err) {
+    // The ON CONFLICT arm covers only (stock_item_id, serial_number). A photo
+    // key already used for ANOTHER unit violates the separate unique index
+    // from migration 520, and would otherwise escape as an uncaught throw —
+    // reaching the storeman as a generic 500 rather than a refusal naming the
+    // serial. Returning null drops it into unavailableSerials, which is the
+    // ordinary 400 path.
+    if ((err as { code?: string })?.code !== UNIQUE_VIOLATION) throw err;
+    log.warn('label photo already used for another unit — refusing this serial', {
+      serialNumber: opts.serialNumber, photoKey: opts.photoKey,
+    }, 'pickings/_validation');
+    return null;
+  }
   const createdId = (inserted as Array<{ id: string }>)[0]?.id;
   if (createdId) {
     log.warn('serial taken into stock from a scanned carton the sheet does not list', {

@@ -137,3 +137,64 @@ describe('one photo, one unit', () => {
     }
   });
 });
+
+describe('the rough edges that would have reached a storeman as a 500', () => {
+  it('refuses a key reused across TWO LINES of the same request', async () => {
+    // Two lines are the same submission by the same person at the same moment.
+    // Counting only within a line would leave this to the unique index, which
+    // surfaces as a raw database error rather than a refusal naming the serial.
+    const OTHER_ITEM = '11111111-2222-4333-8444-555555555555';
+    const result = await run([
+      line({ serialIds: [GIZZU], intakePhotos: [{ serialNumber: GIZZU, photoKey: 'same' }] }),
+      line({
+        stockItemId: OTHER_ITEM,
+        serialIds: [GIZZU_2],
+        intakePhotos: [{ serialNumber: GIZZU_2, photoKey: 'same' }],
+      }),
+    ]);
+    expect(result.ok).toBe(false);
+    expect(statements().some((s) => /INSERT INTO stock_serials/i.test(s))).toBe(false);
+  });
+
+  it('still admits both when the two lines use different keys', async () => {
+    const OTHER_ITEM = '11111111-2222-4333-8444-555555555555';
+    const result = await run([
+      line({ serialIds: [GIZZU], intakePhotos: [{ serialNumber: GIZZU, photoKey: 'k1' }] }),
+      line({
+        stockItemId: OTHER_ITEM,
+        serialIds: [GIZZU_2],
+        intakePhotos: [{ serialNumber: GIZZU_2, photoKey: 'k2' }],
+      }),
+    ]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('turns a key already used in an EARLIER request into a refusal, not a crash', async () => {
+    // The unique index from migration 520 fires on the INSERT. Uncaught, it
+    // reaches the storeman as a generic 500 instead of naming the serial.
+    mockSql.mockImplementation(async (strings: unknown) => {
+      const text = Array.isArray(strings) ? strings.join(' ') : String(strings);
+      if (/INSERT INTO stock_serials/i.test(text)) {
+        throw Object.assign(new Error('duplicate key'), { code: '23505' });
+      }
+      return [];
+    });
+    const result = await run([line({ intakePhotos: [{ serialNumber: GIZZU, photoKey: 'used' }] })]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(400);
+  });
+
+  it('does NOT swallow an unrelated database error', async () => {
+    mockSql.mockImplementation(async (strings: unknown) => {
+      const text = Array.isArray(strings) ? strings.join(' ') : String(strings);
+      if (/INSERT INTO stock_serials/i.test(text)) {
+        throw Object.assign(new Error('relation missing'), { code: '42P01' });
+      }
+      return [];
+    });
+    await expect(
+      run([line({ intakePhotos: [{ serialNumber: GIZZU, photoKey: 'k1' }] })]),
+    ).rejects.toThrow('relation missing');
+  });
+});
+
