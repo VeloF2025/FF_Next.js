@@ -63,7 +63,7 @@ const PREREQUISITES = `
     id UUID PRIMARY KEY, first_name VARCHAR(100) NOT NULL, last_name VARCHAR(100) NOT NULL
   );
   CREATE TABLE projects (id UUID PRIMARY KEY, project_name VARCHAR(255) NOT NULL);
-  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(20));
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(20) NOT NULL);
   CREATE TABLE fleet_project_operational_sites (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_status_rules (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_assignments (id UUID PRIMARY KEY);
@@ -391,26 +391,14 @@ describe('a hold landing after the claim', () => {
     return { itemId: item.id, incidentId: seeded.incidentId };
   }
 
-  it('refuses the storage-progress update', async () => {
+  it('refuses the storage re-baseline — the last write before anything is deleted', async () => {
     const { itemId } = await claimThenHold();
-    await expect(repo.recordStorageObjectDeleted(itemId)).rejects.toMatchObject({ code: '23514' });
+    await expect(repo.rebaselineStoragePlan(itemId, 1)).rejects.toMatchObject({ code: '23514' });
   });
 
-  // The counter guard has an escape: once storage_objects_deleted reaches the
-  // total recorded at CLAIM time, the UPDATE matches no row, no trigger fires,
-  // and a loop over a grown evidence set would keep deleting unguarded. It has
-  // to fail loudly instead of matching nothing.
-  it('raises rather than silently matching nothing when the evidence set grew after the claim', async () => {
-    const seeded = await seedIncident();
-    const runId = await repo.insertRetentionRun({ dryRun: false, cutoffWorkDate: '2025-08-21', policyMonths: 12, triggerSource: 'cron' });
-    const item = await transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId: seeded.incidentId, storageObjectsTotal: 1 }));
-    await repo.recordStorageObjectDeleted(item.id);
-    await expect(repo.recordStorageObjectDeleted(item.id)).rejects.toThrow(/storage object count/i);
-  });
-
-  it('refuses the failure-recording update — the failure path itself is blocked', async () => {
+  it('refuses the post-deletion progress write too', async () => {
     const { itemId } = await claimThenHold();
-    await expect(repo.markItemFailed(itemId, 'storage_failed')).rejects.toMatchObject({ code: '23514' });
+    await expect(repo.recordStorageProgress(itemId, 1)).rejects.toMatchObject({ code: '23514' });
   });
 
   it('refuses the attempt counter the resume path increments', async () => {
@@ -465,6 +453,54 @@ describe('a hold landing after the claim', () => {
   });
 });
 
+describe('resuming a partially deleted item', () => {
+  // The failure this whole phase split exists to stop. A first attempt deleted
+  // one of two objects and failed; the resume re-lists BOTH objects, and the
+  // counter guard rejects the second increment because the counter has already
+  // reached the total recorded at claim time. A legitimate resume becomes a
+  // failed item, and on the next run its storage objects are orphaned while
+  // the evidence rows are purged.
+  it('a resumed item can account for its whole object set without raising', async () => {
+    const seeded = await seedIncident({ evidenceCount: 2 });
+    const runId = await repo.insertRetentionRun({ dryRun: false, cutoffWorkDate: '2025-08-21', policyMonths: 12, triggerSource: 'cron' });
+    const item = await transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId: seeded.incidentId, storageObjectsTotal: 2 }));
+
+    // First attempt: one object deleted, then the process died.
+    await repo.rebaselineStoragePlan(item.id, 2);
+    await repo.recordStorageProgress(item.id, 1);
+
+    // The resume re-plans the whole set and must be able to record all of it.
+    const resumed = (await repo.getItem(item.id))!;
+    await repo.rebaselineStoragePlan(resumed.id, 2);
+    await expect(repo.recordStorageProgress(resumed.id, 2)).resolves.toBeUndefined();
+    expect((await repo.getItem(item.id))?.storageObjectsDeleted).toBe(2);
+  });
+
+  // The re-baseline is the LAST write before anything is deleted, so it is
+  // also the last point at which the guard can refuse cheaply.
+  it('re-baselining is refused for a held incident, before any deletion', async () => {
+    const seeded = await seedIncident({ evidenceCount: 2 });
+    const runId = await repo.insertRetentionRun({ dryRun: false, cutoffWorkDate: '2025-08-21', policyMonths: 12, triggerSource: 'cron' });
+    const item = await transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId: seeded.incidentId, storageObjectsTotal: 2 }));
+    await seedActiveHold(seeded.incidentId);
+    await expect(repo.rebaselineStoragePlan(item.id, 2)).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('re-baselining adopts an evidence set that grew after the claim', async () => {
+    const seeded = await seedIncident({ evidenceCount: 1 });
+    const runId = await repo.insertRetentionRun({ dryRun: false, cutoffWorkDate: '2025-08-21', policyMonths: 12, triggerSource: 'cron' });
+    const item = await transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId: seeded.incidentId, storageObjectsTotal: 1 }));
+    await db.query(
+      `INSERT INTO fleet_operational_incident_evidence (incident_id, storage_url, storage_key, evidence_type, uploaded_by)
+       VALUES ($1, '/storage/fleet/incidents/late.jpg', 'fleet/incidents/late.jpg', 'photo', $2)`,
+      [seeded.incidentId, USER],
+    );
+    await repo.rebaselineStoragePlan(item.id, 2);
+    const rebaselined = await repo.getItem(item.id);
+    expect(rebaselined).toMatchObject({ storageObjectsTotal: 2, storageObjectsDeleted: 0 });
+  });
+});
+
 describe('aggregate coverage gate', () => {
   it('reports no coverage before the month has been aggregated', async () => {
     expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(false);
@@ -494,8 +530,8 @@ describe('purge', () => {
     const survivor = await seedIncident();
     const runId = await repo.insertRetentionRun({ dryRun: false, cutoffWorkDate: '2025-08-21', policyMonths: 12, triggerSource: 'cron' });
     const item = await transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId: seeded.incidentId, storageObjectsTotal: 1 }));
-    await repo.recordStorageObjectDeleted(item.id);
-    await repo.markStorageComplete(item.id);
+    await repo.rebaselineStoragePlan(item.id, 1);
+    await repo.recordStorageProgress(item.id, 1);
 
     await purge.purgeIncidentRecords({ itemId: item.id, incidentId: seeded.incidentId });
 
@@ -569,10 +605,11 @@ describe('purge', () => {
   });
 
   it('refuses to complete an item while a storage object is still unaccounted for', async () => {
-    const seeded = await seedIncident();
+    const seeded = await seedIncident({ evidenceCount: 2 });
     const runId = await repo.insertRetentionRun({ dryRun: false, cutoffWorkDate: '2025-08-21', policyMonths: 12, triggerSource: 'cron' });
     const item = await transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId: seeded.incidentId, storageObjectsTotal: 2 }));
-    await repo.recordStorageObjectDeleted(item.id);
+    await repo.rebaselineStoragePlan(item.id, 2);
+    await repo.recordStorageProgress(item.id, 1);
     await expect(purge.purgeIncidentRecords({ itemId: item.id, incidentId: seeded.incidentId }))
       .rejects.toMatchObject({ code: '23514' });
     expect(await count('fleet_operational_incidents', 'id = $1', [seeded.incidentId])).toBe(1);

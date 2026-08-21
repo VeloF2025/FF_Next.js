@@ -63,7 +63,7 @@ const PREREQUISITES = `
   CREATE TABLE projects (
     id UUID PRIMARY KEY, project_name VARCHAR(255) NOT NULL, project_manager UUID
   );
-  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(20));
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(20) NOT NULL);
   CREATE TABLE fleet_project_operational_sites (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_status_rules (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_assignments (id UUID PRIMARY KEY);

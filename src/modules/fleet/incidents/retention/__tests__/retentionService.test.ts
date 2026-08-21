@@ -10,7 +10,7 @@ const repo = vi.hoisted(() => ({
   listPurgeCandidates: vi.fn(), countCandidatesHeld: vi.fn(), listIncidentStorageObjects: vi.fn(),
   hasCompleteAggregateCoverage: vi.fn(), insertRetentionRun: vi.fn(), finalizeRetentionRun: vi.fn(),
   getIncidentPurgeState: vi.fn(),
-  claimIncident: vi.fn(), recordStorageObjectDeleted: vi.fn(), markStorageComplete: vi.fn(),
+  claimIncident: vi.fn(), rebaselineStoragePlan: vi.fn(), recordStorageProgress: vi.fn(),
   markItemFailed: vi.fn(), recordItemAttempt: vi.fn(), listResumableItems: vi.fn(), getItem: vi.fn(),
 }));
 // One mock object behind both repository modules: the service's callers do not
@@ -65,8 +65,8 @@ function happyPath(): void {
   // implementations, so a mockRejectedValue set by one test would otherwise
   // leak into every test after it.
   repo.markItemFailed.mockResolvedValue(undefined);
-  repo.markStorageComplete.mockResolvedValue(undefined);
-  repo.recordStorageObjectDeleted.mockResolvedValue(undefined);
+  repo.rebaselineStoragePlan.mockResolvedValue(undefined);
+  repo.recordStorageProgress.mockResolvedValue(undefined);
   repo.recordItemAttempt.mockResolvedValue(undefined);
   repo.finalizeRetentionRun.mockResolvedValue(undefined);
   repo.listResumableItems.mockResolvedValue([]);
@@ -187,7 +187,7 @@ describe('live run', () => {
   it('deletes storage first, then the database records, and completes the item', async () => {
     const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
     expect(storage.deleteIncidentStorageObject).toHaveBeenCalledWith('fleet/incidents/a.jpg');
-    expect(repo.markStorageComplete).toHaveBeenCalledWith('item-a');
+    expect(repo.recordStorageProgress).toHaveBeenCalledWith('item-a', 1);
     expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'item-a', incidentId: INCIDENT_A });
     expect(result).toMatchObject({ status: 'succeeded', itemsClaimed: 1, itemsCompleted: 1, storageObjectsDeleted: 1 });
   });
@@ -253,11 +253,18 @@ describe('live run', () => {
     expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'stale-1', incidentId: INCIDENT_A });
   });
 
-  it('skips the storage stage for an item that already finished it', async () => {
+  // A resumed item re-plans and re-issues its deletions rather than trusting a
+  // stage that markItemFailed may have overwritten. The re-issued deletes come
+  // back already_absent, so this costs one HTTP call per object and is not
+  // counted as a deletion this run performed. Trusting the stage instead is
+  // what made a partial attempt unrecoverable.
+  it('re-issues deletions for an item that had already finished storage, counting none of them', async () => {
     repo.listResumableItems.mockResolvedValue([{ ...itemA, id: 'stale-2', stage: 'storage_complete', storageObjectsDeleted: 1 }]);
     repo.listPurgeCandidates.mockResolvedValue([]);
-    await runOperationalRetention({ dryRun: false, requestedAt: NOW });
-    expect(storage.deleteIncidentStorageObject).not.toHaveBeenCalled();
+    storage.deleteIncidentStorageObject.mockResolvedValue('already_absent');
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(storage.deleteIncidentStorageObject).toHaveBeenCalledTimes(1);
+    expect(result.storageObjectsDeleted).toBe(0);
     expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'stale-2', incidentId: INCIDENT_A });
   });
 
@@ -287,6 +294,25 @@ describe('a hold landing between the claim and the storage deletion', () => {
     expect(checkOrder).toBeLessThan(deleteOrder);
   });
 
+  // The ordering half of the invariant (the containment half lives in
+  // storageDeletionRunner.test.ts). Every write that can be refused for a
+  // run-level or item-level reason has to happen BEFORE the first deletion,
+  // where failing is free.
+  it('does every fallible write before the first deletion', async () => {
+    await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    const firstDelete = storage.deleteIncidentStorageObject.mock.invocationCallOrder[0]!;
+    for (const [label, spy] of [
+      ['purge state check', repo.getIncidentPurgeState],
+      ['object listing', repo.listIncidentStorageObjects],
+      ['storage re-baseline', repo.rebaselineStoragePlan],
+    ] as const) {
+      expect(spy.mock.invocationCallOrder[0], label).toBeLessThan(firstDelete);
+    }
+    // And the only writes after it are the accounting and the purge itself.
+    expect(repo.recordStorageProgress.mock.invocationCallOrder[0]!).toBeGreaterThan(firstDelete);
+    expect(purge.purgeIncidentRecords.mock.invocationCallOrder[0]!).toBeGreaterThan(firstDelete);
+  });
+
   it('destroys nothing when the incident is held by the time storage would run', async () => {
     repo.getIncidentPurgeState.mockResolvedValue('held');
     const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
@@ -302,8 +328,8 @@ describe('a hold landing between the claim and the storage deletion', () => {
     repo.getIncidentPurgeState.mockResolvedValue('held');
     await runOperationalRetention({ dryRun: false, requestedAt: NOW });
     expect(repo.markItemFailed).not.toHaveBeenCalled();
-    expect(repo.recordStorageObjectDeleted).not.toHaveBeenCalled();
-    expect(repo.markStorageComplete).not.toHaveBeenCalled();
+    expect(repo.rebaselineStoragePlan).not.toHaveBeenCalled();
+    expect(repo.recordStorageProgress).not.toHaveBeenCalled();
   });
 
   it('keeps processing the rest of the batch when one item is held', async () => {
@@ -320,7 +346,7 @@ describe('a hold landing between the claim and the storage deletion', () => {
   // a crash, and the failure path must not try to record it — that write is
   // refused too.
   it('treats a guard refusal raised mid-item as a skip, not a failure', async () => {
-    repo.recordStorageObjectDeleted.mockRejectedValue(Object.assign(new Error('purge guard'), { code: '23514' }));
+    repo.rebaselineStoragePlan.mockRejectedValue(Object.assign(new Error('purge guard'), { code: '23514' }));
     const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
     expect(repo.markItemFailed).not.toHaveBeenCalled();
     expect(result).toMatchObject({ itemsSkippedHold: 1, itemsFailed: 0, status: 'succeeded' });
@@ -328,7 +354,7 @@ describe('a hold landing between the claim and the storage deletion', () => {
 
   it('never lets a refused bookkeeping write abort the whole run', async () => {
     repo.listPurgeCandidates.mockResolvedValue([candidateA, candidateB]);
-    repo.markStorageComplete.mockRejectedValueOnce(Object.assign(new Error('purge guard'), { code: '23514' }));
+    repo.recordStorageProgress.mockRejectedValueOnce(Object.assign(new Error('purge guard'), { code: '23514' }));
     const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
     expect(result.itemsCompleted).toBe(1);
     expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'item-b', incidentId: INCIDENT_B });
@@ -362,16 +388,41 @@ describe('a hold landing between the claim and the storage deletion', () => {
     expect(result.itemsCompleted).toBe(1);
   });
 
-  // A resumed item that had already finished storage must not re-run it: the
-  // stage is overwritten by markItemFailed, so the durable counters decide.
-  it('does not re-run storage for an item whose objects are all accounted for', async () => {
+  // A resume re-plans from the CURRENT object set rather than trusting the
+  // counters from a previous attempt. Re-deleting an object that is already
+  // gone is free (already_absent) and is what makes a partial attempt
+  // recoverable at all.
+  it('re-plans the whole object set on a resume rather than trusting stale counters', async () => {
     repo.listResumableItems.mockResolvedValue([
       { ...itemA, id: 'stale-4', stage: 'failed', storageObjectsTotal: 1, storageObjectsDeleted: 1 },
     ]);
     repo.listPurgeCandidates.mockResolvedValue([]);
-    await runOperationalRetention({ dryRun: false, requestedAt: NOW });
-    expect(storage.deleteIncidentStorageObject).not.toHaveBeenCalled();
+    storage.deleteIncidentStorageObject.mockResolvedValue('already_absent');
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(repo.rebaselineStoragePlan).toHaveBeenCalledWith('stale-4', 1);
+    expect(storage.deleteIncidentStorageObject).toHaveBeenCalledTimes(1);
+    expect(result.storageObjectsDeleted).toBe(0);
     expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'stale-4', incidentId: INCIDENT_A });
+  });
+
+  // The bug this phase split retired: a partially deleted item resumed, the
+  // counter hit the claim-time total mid-loop, the increment matched no row,
+  // and a legitimate resume became a failed item with orphaned files.
+  it('resumes a partially deleted item without failing it', async () => {
+    repo.listResumableItems.mockResolvedValue([
+      { ...itemA, id: 'stale-5', stage: 'failed', storageObjectsTotal: 2, storageObjectsDeleted: 1 },
+    ]);
+    repo.listPurgeCandidates.mockResolvedValue([]);
+    repo.listIncidentStorageObjects.mockResolvedValue([
+      { evidenceId: 'ev-1', storagePath: 'fleet/incidents/a.jpg' },
+      { evidenceId: 'ev-2', storagePath: 'fleet/incidents/b.jpg' },
+    ]);
+    storage.deleteIncidentStorageObject
+      .mockResolvedValueOnce('already_absent')
+      .mockResolvedValueOnce('deleted');
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(repo.recordStorageProgress).toHaveBeenCalledWith('stale-5', 2);
+    expect(result).toMatchObject({ itemsCompleted: 1, itemsFailed: 0, storageObjectsDeleted: 1 });
   });
 
   it('skips a resumable item that is now held without recording an attempt', async () => {

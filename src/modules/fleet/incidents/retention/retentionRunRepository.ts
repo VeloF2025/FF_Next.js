@@ -99,40 +99,61 @@ export async function claimIncident(
 }
 
 /**
- * One more object accounted for. Called per object so a crash mid-batch loses
- * at most the current one.
+ * Re-baselines an item's storage plan to the object set this attempt is about
+ * to delete, and resets the accounting to zero.
  *
- * The `< storage_objects_total` guard keeps the counter inside the table's
- * CHECK, but on its own it turns an overflow into a no-op: the UPDATE matches
- * nothing, no trigger fires, and a loop over an evidence set that GREW after
- * the claim would keep deleting files unguarded. Matching no row is therefore
- * an error, not a silent success — the caller stops, and the mismatch is
- * visible instead of costing files.
+ * This is the LAST database write before anything is destroyed, and it does
+ * three jobs at once:
+ *
+ *   1. It adopts the CURRENT object set. The total recorded at claim time goes
+ *      stale the moment evidence is added, and a stale total is what turned a
+ *      legitimate resume into a failed item — the counter hit the old total
+ *      mid-loop and the increment matched no row.
+ *   2. It resets `storage_objects_deleted`, so the count means "objects of
+ *      THIS attempt's plan that are accounted for" rather than a cumulative
+ *      total that can never be reconciled against a changing set.
+ *   3. It gives `trg_fleet_retention_item_guard` its final say. A hold that
+ *      landed since the claim refuses this write with 23514 — before a single
+ *      object has been deleted.
+ *
+ * Both columns are set in one statement so the table's
+ * `storage_objects_deleted BETWEEN 0 AND storage_objects_total` CHECK can
+ * never see a half-applied state.
  */
-export async function recordStorageObjectDeleted(itemId: string): Promise<void> {
+export async function rebaselineStoragePlan(itemId: string, plannedObjects: number): Promise<void> {
+  const rows = await query<IdRow>(
+    `/* fleet-retention:rebaseline-plan */
+     UPDATE fleet_operational_retention_items
+        SET storage_objects_total = $2::int, storage_objects_deleted = 0,
+            stage = 'pending_storage', updated_at = now()
+      WHERE id = $1::uuid
+      RETURNING id`,
+    [itemId, plannedObjects],
+  );
+  if (rows.length === 0) throw new Error(`Retention item ${itemId} no longer exists`);
+}
+
+/**
+ * Records how many of the planned objects were accounted for, once, AFTER the
+ * destructive loop has finished.
+ *
+ * Deliberately not per-object. A per-object write puts N database calls inside
+ * the destructive region, and every one of them is a place that can throw for
+ * a reason that has nothing to do with the object being deleted. It bought
+ * almost nothing in exchange: re-deleting an object that is already gone
+ * returns `already_absent`, so a crash mid-loop costs a few redundant HTTP
+ * calls on the next attempt and no correctness.
+ */
+export async function recordStorageProgress(itemId: string, accountedFor: number): Promise<void> {
   const rows = await query<IdRow>(
     `/* fleet-retention:storage-progress */
      UPDATE fleet_operational_retention_items
-        SET storage_objects_deleted = storage_objects_deleted + 1, updated_at = now()
-      WHERE id = $1::uuid AND storage_objects_deleted < storage_objects_total
+        SET storage_objects_deleted = LEAST($2::int, storage_objects_total), updated_at = now()
+      WHERE id = $1::uuid
       RETURNING id`,
-    [itemId],
+    [itemId, accountedFor],
   );
-  if (rows.length === 0) {
-    throw new Error(
-      `Retention item ${itemId}: storage object count exceeded the total recorded at claim time — the evidence set changed under the run`,
-    );
-  }
-}
-
-export async function markStorageComplete(itemId: string): Promise<void> {
-  await query(
-    `/* fleet-retention:storage-complete */
-     UPDATE fleet_operational_retention_items
-        SET stage = 'storage_complete', last_error_code = NULL, updated_at = now()
-      WHERE id = $1::uuid`,
-    [itemId],
-  );
+  if (rows.length === 0) throw new Error(`Retention item ${itemId} no longer exists`);
 }
 
 /** Records a failure WITHOUT touching the incident's records — they stay for the retry. */
