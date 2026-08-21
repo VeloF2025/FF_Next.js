@@ -16,6 +16,7 @@ import { logout } from './api';
 import { clearAttendanceEligibilitySnapshots } from './clock/attendanceEligibilitySnapshot';
 import { clearMyPortalSessionCache } from './serviceWorkerSessionCache';
 import { useMyServiceWorker } from './useServiceWorker';
+import { ProjectDeclarationPrompt } from '@/modules/field-stock-pwa/components/ProjectDeclarationPrompt';
 
 export interface MyPortalShellProps {
   title: string;
@@ -163,6 +164,11 @@ export function MyPortalShell({
       )}
 
       <main className="w-full max-w-lg mx-auto px-4 py-4 pb-24">
+        {/* Asks once a day which project the worker is on, and only when the
+            server says we do not already know from today's H&S check-in. The
+            stores flow needs it to offer the right technicians; it renders
+            nothing at all in the common case. */}
+        <ProjectDeclarationPrompt />
         {children}
       </main>
 
