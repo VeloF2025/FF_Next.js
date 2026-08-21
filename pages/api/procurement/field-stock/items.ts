@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { resolveItemLimit } from '@/modules/procurement/field-stock/lib/itemQueryLimit';
 import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -18,6 +19,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const category = req.query.category as string | undefined;
       const trackingType = req.query.trackingType as string | undefined;
       const rawSearch = req.query.search as string | undefined;
+      const limit = resolveItemLimit(req.query.limit);
       const search = rawSearch ? `%${rawSearch}%` : undefined;
 
       // Explicit query branches — no conditional SQL fragments
@@ -37,7 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             AND tracking_type = ${trackingType}
             AND (name ILIKE ${search} OR item_code ILIKE ${search})
           ORDER BY category, name
-          LIMIT 100
+          LIMIT ${limit}
         `;
       } else if (category && search) {
         // Branch 2: category AND search
@@ -52,7 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             AND category = ${category}
             AND (name ILIKE ${search} OR item_code ILIKE ${search})
           ORDER BY category, name
-          LIMIT 100
+          LIMIT ${limit}
         `;
       } else if (trackingType && search) {
         // Branch 3: trackingType AND search
@@ -67,7 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             AND tracking_type = ${trackingType}
             AND (name ILIKE ${search} OR item_code ILIKE ${search})
           ORDER BY category, name
-          LIMIT 100
+          LIMIT ${limit}
         `;
       } else if (category) {
         // Branch 4: category only
@@ -81,7 +83,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           WHERE is_active = true
             AND category = ${category}
           ORDER BY category, name
-          LIMIT 100
+          LIMIT ${limit}
         `;
       } else if (trackingType) {
         // Branch 5: trackingType only
@@ -95,7 +97,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           WHERE is_active = true
             AND tracking_type = ${trackingType}
           ORDER BY category, name
-          LIMIT 100
+          LIMIT ${limit}
         `;
       } else if (search) {
         // Branch 6: search only
@@ -109,7 +111,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           WHERE is_active = true
             AND (name ILIKE ${search} OR item_code ILIKE ${search})
           ORDER BY category, name
-          LIMIT 100
+          LIMIT ${limit}
         `;
       } else {
         // Branch 7: no filters
@@ -122,7 +124,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           FROM stock_items
           WHERE is_active = true
           ORDER BY category, name
-          LIMIT 100
+          LIMIT ${limit}
         `;
       }
 

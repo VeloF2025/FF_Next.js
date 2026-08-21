@@ -6,6 +6,7 @@
 'use client';
 
 import { useState } from 'react';
+import { StockItemPicker } from '../items/StockItemPicker';
 import { Package, Check, X, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useConsumptions, useStockItems } from '../../hooks';
@@ -195,21 +196,14 @@ export function ConsumptionRecorder({
               <LoadingSpinner className="h-32" label="" />
             ) : (
               <div className="space-y-4">
-                <select
-                  value={selectedItem?.id || ''}
-                  onChange={(e) => {
-                    const item = quantityItems.find((i) => i.id === e.target.value);
-                    setSelectedItem(item || null);
+                <StockItemPicker
+                  instanceId="consumption"
+                  items={quantityItems}
+                  selectedItemId={selectedItem?.id || ''}
+                  onSelect={(itemId) => {
+                    setSelectedItem(quantityItems.find((i) => i.id === itemId) || null);
                   }}
-                  className="w-full rounded-lg border border-border bg-card py-2 px-3 text-foreground focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="">Select item...</option>
-                  {quantityItems.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.itemCode} - {item.name}
-                    </option>
-                  ))}
-                </select>
+                />
 
                 {selectedItem && (
                   <div className="flex items-center gap-4">

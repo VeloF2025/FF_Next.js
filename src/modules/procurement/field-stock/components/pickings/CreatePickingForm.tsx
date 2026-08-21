@@ -19,6 +19,7 @@ import { usePickings } from '../../hooks/usePickings';
 import { useLocations } from '../../hooks/useLocations';
 import { useStockItems } from '../../hooks/useStockItems';
 import { SignatureCapture } from './SignatureCapture';
+import { StockItemPicker } from '../items/StockItemPicker';
 import type {
   CreatePickingInput,
   PickingType,
@@ -357,19 +358,12 @@ export function CreatePickingForm({
                     <label className="mb-1 block text-xs font-medium text-muted-foreground">
                       Item
                     </label>
-                    <select
-                      value={line.stockItemId}
-                      onChange={(e) => updateLine(line.id, { stockItemId: e.target.value })}
-                      className="w-full rounded-lg border border-border bg-card py-2 px-3 text-sm text-foreground focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value="">Select item...</option>
-                      {stockItems.map(item => (
-                        <option key={item.id} value={item.id}>
-                          {item.itemCode} - {item.name}
-                          {item.trackingType === 'serial' && ' (Serial)'}
-                        </option>
-                      ))}
-                    </select>
+                    <StockItemPicker
+                      instanceId={line.id}
+                      items={stockItems}
+                      selectedItemId={line.stockItemId}
+                      onSelect={(itemId) => updateLine(line.id, { stockItemId: itemId })}
+                    />
                   </div>
 
                   <div>
