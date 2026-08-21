@@ -59,6 +59,22 @@ export async function submitIssue(
         stockItemId: draft.stockItemId,
         plannedQuantity: isSerialIssue ? draft.serials.length : (draft.quantity ?? 0),
         serialIds: isSerialIssue ? draft.serials.map((s) => s.serialNumber) : undefined,
+        // EVERY raw carton payload in the draft, so the server can re-derive
+        // which serials the scans corroborate. Deliberately not a list of
+        // "trust these": a typed serial must not be able to mint a phantom ONT
+        // issued to a named technician, and a flag the client sets cannot
+        // prevent that.
+        //
+        // All of them, not the first: a storeman can scan two cartons of the
+        // same item into one handout, and corroborating the second against the
+        // first carton's payload would refuse genuinely scanned stock — the
+        // very failure this feature exists to fix.
+        intakeScanPayloads: isSerialIssue
+          ? [...new Set(draft.serials.map((s) => s.scanPayload).filter((p): p is string => !!p))]
+          : undefined,
+        intakeCartonId: isSerialIssue
+          ? (draft.serials.find((s) => s.cartonId)?.cartonId ?? null)
+          : undefined,
         notes: draft.notes || undefined,
       },
     ],

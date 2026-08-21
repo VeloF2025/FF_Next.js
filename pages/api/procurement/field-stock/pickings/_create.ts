@@ -218,7 +218,10 @@ export async function createPicking(
     // The validator also resolves each serial_number to its stock_serials.id UUID
     // so the INSERT into stock_picking_lines.serial_ids (uuid[]) receives the
     // correct type — not the human-readable label string from the client.
-    const serialCheck = await validateSerialsAvailable(sql, lines as PickingLine[]);
+    const serialCheck = await validateSerialsAvailable(sql, lines as PickingLine[], {
+      sourceLocationId,
+      actorStaffId: createdByStaffId,
+    });
     if (!serialCheck.ok) {
       return res.status(serialCheck.status).json(serialCheck.body);
     }

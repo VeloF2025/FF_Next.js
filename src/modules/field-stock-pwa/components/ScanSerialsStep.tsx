@@ -81,7 +81,9 @@ export function ScanSerialsStep({
       qrboxSize: scanRegionFor,
       videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
     },
-    onScan: (result) => { handleRawSerial(result.decodedText); },
+    // Live camera: read from a printed barcode, so it may take in a serial
+    // the stock sheet has never listed.
+    onScan: (result) => { handleRawSerial(result.decodedText, 'machine'); },
   });
 
   const openScanner = useCallback(async () => { setScannerOpen(true); await start(); }, [start]);
@@ -91,7 +93,10 @@ export function ScanSerialsStep({
     (e: React.FormEvent) => {
       e.preventDefault();
       if (!manualInput.trim()) return;
-      handleRawSerial(manualInput);
+      // Typed by hand: NOT machine-read. An unknown serial here is refused,
+      // because a typo would become a permanent phantom ONT issued to a named
+      // technician and could never reconcile against the sheet.
+      handleRawSerial(manualInput, 'manual');
       setManualInput('');
     },
     [manualInput, handleRawSerial]
@@ -158,7 +163,8 @@ export function ScanSerialsStep({
           // Re-enter through the same parser the camera uses, so the photo path
           // and the scan path share one code path and one set of tests.
           setFallbackHint(null);
-          void handleRawSerial(serials.join(';'));
+          // Photo decode: still a machine read of a printed code.
+          void handleRawSerial(serials.join(';'), 'machine');
         }}
         onNoSerial={(msg) => { setFallbackHint(msg); setManualOpen(true); }}
       />

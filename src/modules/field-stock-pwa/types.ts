@@ -38,6 +38,20 @@ export interface PwaScannedSerial {
    * not blocked.
    */
   warning?: string;
+  /**
+   * How this serial reached us: 'machine' from a printed barcode (carton
+   * DataMatrix, photo decode, live camera), 'manual' when typed by hand.
+   * Only a machine read may take stock in that the sheet has never listed.
+   */
+  scanSource?: 'machine' | 'manual';
+  /** Carton package id, when the serial came from a box scan. */
+  cartonId?: string;
+  /**
+   * The RAW decoded payload this serial came from, when it was scanned. Sent
+   * to the server so it can re-derive what the scan corroborates, rather than
+   * being told. Absent for typed serials.
+   */
+  scanPayload?: string;
   /** Set on every member of one carton scan; absent for individually scanned units. */
   groupId?: string;
   /** Human label for the group header, e.g. 'Box · 9 serials'. Set on every member. */

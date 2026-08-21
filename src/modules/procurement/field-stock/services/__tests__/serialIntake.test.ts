@@ -10,6 +10,8 @@ vi.mock('@/lib/logger', () => ({
   log: {
     info: vi.fn(),
     error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
@@ -17,11 +19,29 @@ import { receiveSerials } from '../serialIntake';
 
 const STOCK_ITEM_ID = '84cc2348-f8a9-486f-826a-6b8b20579765';
 
-function makePool(insertedPerChunk: number[]) {
+/**
+ * @param insertedPerChunk rows genuinely INSERTed per chunk
+ * @param confirmedPerChunk field_intake rows the sheet caught up with per chunk
+ *
+ * The statement now RETURNs one row per affected serial with `was_insert`
+ * (`xmax = 0`), because ON CONFLICT DO UPDATE makes rowCount count
+ * confirmations too. Verified against real Postgres 2026-08-21: a genuine
+ * insert returns true, a confirmed field_intake row returns false, and an
+ * ordinary already-present serial is not returned at all.
+ */
+function makePool(insertedPerChunk: number[], confirmedPerChunk: number[] = []) {
   const remaining = [...insertedPerChunk];
-  const query = vi.fn(async (sql: string) => ({
-    rowCount: sql.includes('INSERT INTO stock_serials') ? remaining.shift() ?? 0 : null,
-  }));
+  const remainingConfirmed = [...confirmedPerChunk];
+  const query = vi.fn(async (sql: string) => {
+    if (!sql.includes('INSERT INTO stock_serials')) return { rowCount: null, rows: [] };
+    const inserts = remaining.shift() ?? 0;
+    const confirms = remainingConfirmed.shift() ?? 0;
+    const rows = [
+      ...Array.from({ length: inserts }, () => ({ was_insert: true })),
+      ...Array.from({ length: confirms }, () => ({ was_insert: false })),
+    ];
+    return { rowCount: rows.length, rows };
+  });
   const client = {
     query,
     release: vi.fn(),
@@ -47,7 +67,7 @@ describe('receiveSerials batching', () => {
       receivedReference: 'TEST',
     });
 
-    expect(result).toEqual({ received: 501, skipped: 0 });
+    expect(result).toEqual({ received: 501, skipped: 0, confirmed: 0 });
     expect(pool.connect).toHaveBeenCalledTimes(2);
 
     const inserts = client.query.mock.calls.filter(([sql]) =>
@@ -55,7 +75,15 @@ describe('receiveSerials batching', () => {
     );
     expect(inserts).toHaveLength(2);
     expect(inserts[0]?.[0]).toMatch(/unnest\(/i);
-    expect(inserts[0]?.[0]).toMatch(/ON CONFLICT \(stock_item_id, serial_number\) DO NOTHING/);
+    // Still upserting on the composite key, but DO UPDATE now — narrowly, so
+    // it confirms an unlisted field_intake serial and touches nothing else.
+    expect(inserts[0]?.[0]).toMatch(/ON CONFLICT \(stock_item_id, serial_number\) DO UPDATE/);
+    expect(inserts[0]?.[0]).toMatch(/provenance = 'field_intake'/);
+    expect(inserts[0]?.[0]).toMatch(/source_confirmed_at IS NULL/);
+    // The confirmation must not disturb a serial already issued to a
+    // technician: only the timestamps are written.
+    expect(inserts[0]?.[0]).not.toMatch(/DO UPDATE[\s\S]*SET[\s\S]*status\s*=/);
+    expect(inserts[0]?.[0]).not.toMatch(/DO UPDATE[\s\S]*SET[\s\S]*current_location_id\s*=/);
 
     const firstParams = inserts[0]?.[1] as unknown[];
     expect(firstParams[0]).toHaveLength(500);
@@ -80,6 +108,114 @@ describe('receiveSerials batching', () => {
       },
     );
 
-    expect(result).toEqual({ received: 1, skipped: 1 });
+    expect(result).toEqual({ received: 1, skipped: 1, confirmed: 0 });
   });
 });
+
+describe('reconciling serials taken in from the field', () => {
+  // Migration 515: a serial issued from a scanned carton before the workbook
+  // listed it is `field_intake` with source_confirmed_at NULL. When the sheet
+  // finally lists it, this import is what confirms it — otherwise every one
+  // would sit on the unconfirmed ageing report forever.
+  it('counts a confirmation apart from a genuine insert', async () => {
+    const { pool } = makePool([2], [3]);
+    const items = Array.from({ length: 5 }, (_, i) => ({
+      stockItemId: STOCK_ITEM_ID,
+      serialNumber: `ALCLB4948${String(i).padStart(3, '0')}`,
+      locationId: null,
+    }));
+
+    const result = await receiveSerials(pool, items, {
+      sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF',
+    });
+
+    // 2 new + 3 confirmed. Counting confirmations as `received` would make a
+    // sync that imported nothing look like it imported three ONTs.
+    expect(result).toEqual({ received: 2, skipped: 0, confirmed: 3 });
+  });
+
+  it('does not report a confirmation when the sheet brings only new serials', async () => {
+    const { pool } = makePool([4], [0]);
+    const items = Array.from({ length: 4 }, (_, i) => ({
+      stockItemId: STOCK_ITEM_ID, serialNumber: `NEW${i}`, locationId: null,
+    }));
+    const result = await receiveSerials(pool, items, {
+      sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF',
+    });
+    expect(result).toEqual({ received: 4, skipped: 0, confirmed: 0 });
+  });
+
+  it('still counts an ordinary already-present serial as skipped', async () => {
+    // An ordinary 'sheet' serial matches the DO UPDATE's WHERE clause not at
+    // all, so Postgres returns no row for it — it must land in `skipped`, not
+    // be silently lost from the totals.
+    const { pool } = makePool([0], [0]);
+    const items = Array.from({ length: 3 }, (_, i) => ({
+      stockItemId: STOCK_ITEM_ID, serialNumber: `OLD${i}`, locationId: null,
+    }));
+    const result = await receiveSerials(pool, items, {
+      sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF',
+    });
+    expect(result).toEqual({ received: 0, skipped: 3, confirmed: 0 });
+  });
+});
+
+describe('duplicate serials in the source', () => {
+  // ON CONFLICT DO UPDATE raises "command cannot affect row a second time" if
+  // one statement proposes the same (stock_item_id, serial_number) twice —
+  // which aborts the chunk and, because the error is rethrown, the whole run.
+  // The previous DO NOTHING tolerated it, so this hazard arrived with the
+  // confirmation logic. Verified against real Postgres 2026-08-21.
+  it('never proposes the same serial twice in one statement', async () => {
+    const { pool, client } = makePool([2]);
+    const dup = 'ALCLB49486FF';
+    const items = [
+      { stockItemId: STOCK_ITEM_ID, serialNumber: dup, locationId: null },
+      { stockItemId: STOCK_ITEM_ID, serialNumber: dup, locationId: null },
+      { stockItemId: STOCK_ITEM_ID, serialNumber: 'ALCLB4948758', locationId: null },
+    ];
+
+    await receiveSerials(pool, items, {
+      sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF',
+    });
+
+    const insert = client.query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO stock_serials'),
+    );
+    const serialParam = (insert?.[1] as unknown[])[1] as string[];
+    expect(serialParam).toHaveLength(2);
+    expect(new Set(serialParam).size).toBe(2);
+    expect(serialParam.filter((x) => x === dup)).toHaveLength(1);
+  });
+
+  it('counts a dropped duplicate as skipped so the totals still add up', async () => {
+    const { pool } = makePool([1]);
+    const items = [
+      { stockItemId: STOCK_ITEM_ID, serialNumber: 'A', locationId: null },
+      { stockItemId: STOCK_ITEM_ID, serialNumber: 'A', locationId: null },
+    ];
+    const result = await receiveSerials(pool, items, {
+      sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF',
+    });
+    // 2 in, 1 inserted, 1 dropped as a duplicate.
+    expect(result.received + result.skipped + result.confirmed).toBe(2);
+    expect(result.skipped).toBe(1);
+  });
+
+  it('keeps the same serial when it belongs to a DIFFERENT stock item', async () => {
+    // The unique constraint is composite, so the same printed label on two
+    // product types is legitimate and must not be deduplicated away.
+    const OTHER_ITEM = '11111111-2222-4333-8444-555555555555';
+    const { pool, client } = makePool([2]);
+    await receiveSerials(pool, [
+      { stockItemId: STOCK_ITEM_ID, serialNumber: 'SHARED', locationId: null },
+      { stockItemId: OTHER_ITEM, serialNumber: 'SHARED', locationId: null },
+    ], { sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF' });
+
+    const insert = client.query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO stock_serials'),
+    );
+    expect((insert?.[1] as unknown[])[1] as string[]).toHaveLength(2);
+  });
+});
+

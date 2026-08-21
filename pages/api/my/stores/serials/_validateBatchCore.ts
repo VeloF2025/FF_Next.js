@@ -13,6 +13,7 @@
  */
 
 import { verdictForSerial } from '@/modules/field-stock-pwa/lib/serialVerdict';
+import { serialsEligibleForIntake } from '@/modules/field-stock-pwa/lib/boxScan';
 import type { SerialRecord } from '@/modules/field-stock-pwa/lib/serialVerdict';
 
 /**
@@ -28,6 +29,10 @@ export interface BatchResult {
   serialNumber: string;
   valid: boolean;
   errorMessage?: string;
+  /** Set on a valid row worth flagging — e.g. not on the stock sheet yet. */
+  warning?: string;
+  /** True when no stock row exists and one will be created at picking time. */
+  provisional?: true;
   stockItemId?: string;
   stockItemName?: string;
   currentLocationId?: string | null;
@@ -50,9 +55,21 @@ interface SerialQueryRow extends Record<string, unknown> {
 
 export async function runBatchValidation(
   db: BatchQuerier,
-  input: { serials: string[]; stockItemId: string; sourceLocationId: string | null },
+  input: {
+    serials: string[];
+    stockItemId: string;
+    sourceLocationId: string | null;
+    /**
+     * The RAW decoded scan payload, when there was one. The server re-derives
+     * which serials it corroborates rather than trusting a client flag — see
+     * serialsEligibleForIntake. Absent means nothing may be taken in.
+     */
+    scanPayload?: string | null;
+  },
 ): Promise<BatchResponse> {
-  const { serials, stockItemId, sourceLocationId } = input;
+  const { serials, stockItemId, sourceLocationId, scanPayload } = input;
+  // Derived here, from the payload itself — never taken on the caller's word.
+  const intakeEligible = serialsEligibleForIntake(scanPayload);
 
   // Plain equality, not UPPER(TRIM(...)): it matches the single-serial route
   // (serialService.getSerialByNumber) exactly, and it can use
@@ -124,11 +141,20 @@ export async function runBatchValidation(
         }
       : null;
 
-    const verdict = verdictForSerial(record, ctx);
+    // Per-serial: only a serial the payload actually lists may be taken in.
+    const verdict = verdictForSerial(record, {
+      ...ctx,
+      scanSource: intakeEligible.has(serialNumber) ? 'machine' : 'manual',
+    });
     return {
       serialNumber,
       valid: verdict.valid,
-      ...(verdict.valid ? {} : { errorMessage: verdict.errorMessage }),
+      ...(verdict.valid
+        ? {
+            ...(verdict.warning ? { warning: verdict.warning } : {}),
+            ...(verdict.provisional ? { provisional: true as const } : {}),
+          }
+        : { errorMessage: verdict.errorMessage }),
       stockItemId: verdict.stockItemId,
       stockItemName: verdict.stockItemName,
       currentLocationId: row?.current_location_id ?? null,

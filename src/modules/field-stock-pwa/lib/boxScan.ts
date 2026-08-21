@@ -109,3 +109,31 @@ export function parseScanPayload(raw: string): ScanPayload {
   const serial = toSerial(text);
   return serial ? { kind: 'single', serial } : { kind: 'unrecognised', raw: text };
 }
+
+/**
+ * The serials a raw scan payload actually corroborates, for the purpose of
+ * taking stock in that the sheet has never listed.
+ *
+ * The point is to stop "this was machine-read" being a bare client assertion.
+ * A caller cannot simply claim a serial was scanned: it must supply the raw
+ * decoded payload, and the server re-derives the serials from it with the same
+ * parser the scanner uses. A typed serial — or a typo — cannot be a carton
+ * payload, because that requires several semicolon-separated serial-shaped
+ * tokens or a well-formed ISO envelope.
+ *
+ * This is CORROBORATION, not proof. A determined caller with a valid stores
+ * session could synthesise a payload; nothing short of a signed scanner could
+ * prevent that, and such a caller can already issue any real serial. What this
+ * does eliminate is the accidental path — a mistyped serial silently becoming
+ * permanent phantom stock — which is the failure this rule exists to prevent.
+ *
+ * Only a `box` payload qualifies. A single scanned serial is NOT enough: one
+ * bare code carries nothing to cross-check, whereas a carton lists its
+ * siblings and declares its own count.
+ */
+export function serialsEligibleForIntake(rawPayload: string | null | undefined): Set<string> {
+  if (!rawPayload || typeof rawPayload !== 'string') return new Set();
+  const parsed = parseScanPayload(rawPayload);
+  if (parsed.kind !== 'box') return new Set();
+  return new Set(parsed.serials);
+}

@@ -109,6 +109,8 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
   const groupSeq = useRef(0);
   /** Quantity declared by the carton's ISO data code, when the storeman scanned it. */
   const declaredQuantity = useRef<number | null>(null);
+  /** Carton package id (ISO 3S), when the data code was scanned. */
+  const declaredPackageId = useRef<string | null>(null);
 
   const vibrate = (ms: number) => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms);
@@ -130,7 +132,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
 
   /** Expand one carton scan into grouped, batch-validated chips. */
   const handleBoxScan = useCallback(
-    async (serials: string[]) => {
+    async (serials: string[], cartonId?: string | null, rawPayload?: string) => {
       const seen = alreadyScanned();
       const fresh = serials.filter((s) => !seen.has(s));
       if (fresh.length === 0) { buzzDuplicate(); return; }
@@ -141,9 +143,15 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
       const groupLabel = `Box · ${fresh.length} serial${fresh.length === 1 ? '' : 's'}`;
       const scannedAt = Date.now();
 
+      // A carton's serials are read from its printed DataMatrix, so they are
+      // machine-read by definition and may be taken into stock if the sheet
+      // has never listed them.
       const pending: PwaScannedSerial[] = fresh.map((serialNumber) => ({
         serialNumber, stockItemId: '', stockItemName: '', scannedAt,
         state: 'pending-validation', groupId, groupLabel,
+        scanSource: 'machine' as const,
+        ...(cartonId ? { cartonId } : {}),
+        ...(rawPayload ? { scanPayload: rawPayload } : {}),
       }));
       commit([...scannedRef.current, ...pending]);
 
@@ -153,6 +161,8 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
           serials: fresh,
           stockItemId: stockItem.id,
           sourceLocationId: sourceLocation?.id ?? null,
+          // The payload itself — the server decides what it corroborates.
+          scanPayload: rawPayload ?? null,
         });
       } catch (err) {
         if (!mountedRef.current) return;
@@ -175,6 +185,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
               stockItemId: result.stockItemId ?? stockItem.id,
               stockItemName: result.stockItemName ?? stockItem.name,
               state: 'valid' as const,
+              ...(result.warning ? { warning: result.warning } : {}),
             }
           : {
               ...p,
@@ -200,7 +211,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
   );
 
   const handleRawSerial = useCallback(
-    async (rawSerial: string) => {
+    async (rawSerial: string, scanSource: 'machine' | 'manual' = 'manual') => {
       // A scanned payload is a carton serial list, the carton's ISO data code,
       // a single serial (bare or ISO-wrapped), or junk. parseScanPayload sorts
       // them out; only the single-serial case falls through to the old path.
@@ -210,6 +221,9 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         // No serials here — but the declared quantity is worth keeping: if the
         // box code then reads short (a partial decode), we can prove it.
         declaredQuantity.current = payload.quantity ?? null;
+        // Keep the package id too: it is what ties a carton's 9 serials
+        // together if any of them have to be taken into stock unlisted.
+        declaredPackageId.current = payload.packageId ?? null;
         setScanNotice("That's the data code. Scan the large square marked FULL SERIAL NUMBER LIST.");
         return;
       }
@@ -230,7 +244,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
             ? `Label says ${declared}, read ${payload.serials.length} — rescan the box.`
             : null,
         );
-        await handleBoxScan(payload.serials);
+        await handleBoxScan(payload.serials, declaredPackageId.current, rawSerial);
         return;
       }
 
@@ -249,6 +263,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         stockItemName: '',
         scannedAt: Date.now(),
         state: 'pending-validation',
+        scanSource,
       };
       commit([...scannedRef.current, optimistic]);
 
@@ -279,6 +294,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
           expectedItemId: stockItem.id,
           expectedItemName: stockItem.name,
           sourceLocation: sourceLocation ?? null,
+          scanSource,
         },
       );
 

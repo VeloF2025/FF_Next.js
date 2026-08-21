@@ -133,6 +133,10 @@ export interface BatchSerialResult {
   serialNumber: string;
   valid: boolean;
   errorMessage?: string;
+  /** Set on a valid row worth flagging — e.g. not on the stock sheet yet. */
+  warning?: string;
+  /** True when the serial will be taken into stock at picking time. */
+  provisional?: true;
   stockItemId?: string;
   stockItemName?: string;
   currentLocationId?: string | null;
@@ -155,6 +159,11 @@ export async function validateSerialBatch(input: {
   serials: string[];
   stockItemId: string;
   sourceLocationId?: string | null;
+  /**
+   * The RAW decoded scan payload. The server re-derives which serials it
+   * corroborates; there is deliberately no client flag saying "trust me".
+   */
+  scanPayload?: string | null;
 }): Promise<BatchSerialResponse> {
   return request<BatchSerialResponse>('/api/my/stores/serials/validate-batch', {
     method: 'POST',
@@ -162,6 +171,7 @@ export async function validateSerialBatch(input: {
       serials: input.serials,
       stockItemId: input.stockItemId,
       sourceLocationId: input.sourceLocationId ?? null,
+      scanPayload: input.scanPayload ?? null,
     }),
   });
 }

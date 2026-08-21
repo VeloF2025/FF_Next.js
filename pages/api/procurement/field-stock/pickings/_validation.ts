@@ -19,6 +19,8 @@
 import { neon } from '@neondatabase/serverless';
 import { ErrorCode } from '@/lib/apiResponse';
 import { FIELD_DEFAULT_LOCATION_ID } from '@/modules/field-stock-pwa/lib/locationDefaults';
+import { log } from '@/lib/logger';
+import { serialsEligibleForIntake } from '@/modules/field-stock-pwa/lib/boxScan';
 
 // ---------------------------------------------------------------------------
 // Shape contract
@@ -42,6 +44,31 @@ export interface PickingLine {
   serialIds?: string[];
   lotNumber?: string;
   notes?: string;
+  /**
+   * The RAW decoded carton payloads for this line — one per carton scanned.
+   *
+   * The server re-derives which serials they corroborate
+   * (serialsEligibleForIntake) instead of trusting a client-supplied "this was
+   * machine-read" list. Only serials a payload itself lists may be taken into
+   * stock when the sheet has never listed them; anything else is refused,
+   * because a typo must not become a permanent phantom ONT issued to a named
+   * technician.
+   *
+   * An ARRAY, because one handout can contain more than one carton of the same
+   * item. Checking against only the first would refuse the second carton's
+   * genuinely scanned serials.
+   */
+  intakeScanPayloads?: string[] | null;
+  /** The carton's package id, so a box's serials stay traceable together. */
+  intakeCartonId?: string | null;
+}
+
+/** Context the serial validator needs in order to take unlisted stock in. */
+export interface SerialValidationContext {
+  /** Warehouse the handout is FROM — where a newly-taken-in serial now lives. */
+  sourceLocationId?: string | null;
+  /** The storeman scanning it in. */
+  actorStaffId?: string | null;
 }
 
 /** The subset of the POST body relevant to the FIELD-DEFAULT guard. */
@@ -145,6 +172,7 @@ export async function validateFieldDefaultDestination(
 export async function validateSerialsAvailable(
   sql: ReturnType<typeof neon<false, false>>,
   lines: PickingLine[],
+  ctx: SerialValidationContext = {},
 ): Promise<ValidationResult> {
   const unavailableSerials: string[] = [];
   // Maps serial_number (client-supplied label) → stock_serials.id (uuid)
@@ -166,11 +194,36 @@ export async function validateSerialsAvailable(
         LIMIT 1
       `;
       const row = (serialRows as Array<{ id: string; serial_number: string }>)[0];
-      if (!row) {
-        unavailableSerials.push(serialNumber);
-      } else {
+      if (row) {
         resolvedSerialIds.set(serialNumber, row.id);
+        continue;
       }
+
+      // Unlisted, but read from a printed barcode: take it in rather than
+      // refuse the handout. The stock is physically on the shelf — a real
+      // carton scanned on 2026-08-21 had all 9 of its serials refused because
+      // the workbook lacked that consignment. Refusing does not prevent the
+      // handout, only its recording.
+      // Derived from the payloads, not asserted by the caller. A serial no
+      // payload lists cannot be taken in, however the request is shaped —
+      // including one smuggled into the line but absent from every scan.
+      if (corroboratedFor(line).has(serialNumber)) {
+        const createdId = await takeSerialIntoStock(sql, {
+          serialNumber,
+          stockItemId: line.stockItemId,
+          locationId: ctx.sourceLocationId ?? null,
+          cartonId: line.intakeCartonId ?? null,
+          actorStaffId: ctx.actorStaffId ?? null,
+        });
+        if (createdId) {
+          resolvedSerialIds.set(serialNumber, createdId);
+          continue;
+        }
+        // Creation lost a race or the serial exists in a non-issuable state.
+        // Fall through and refuse rather than issue something unresolved.
+      }
+
+      unavailableSerials.push(serialNumber);
     }
   }
 
@@ -186,4 +239,93 @@ export async function validateSerialsAvailable(
   }
 
   return { ok: true, resolvedSerialIds };
+}
+
+/**
+ * Every serial the line's carton scans corroborate, unioned across payloads.
+ *
+ * Computed per line rather than per serial so a 9-serial carton parses once
+ * instead of nine times.
+ */
+function corroboratedFor(line: PickingLine): Set<string> {
+  const payloads = Array.isArray(line.intakeScanPayloads) ? line.intakeScanPayloads : [];
+  const all = new Set<string>();
+  for (const payload of payloads) {
+    for (const serial of serialsEligibleForIntake(payload)) all.add(serial);
+  }
+  return all;
+}
+
+/**
+ * Create a serial the stock sheet has never listed, as `field_intake`
+ * (migration 515), and return its id.
+ *
+ * Created `in_stock` at the source warehouse and NOT as 'issued': a trigger
+ * (trg_stock_serial_holder_validate) refuses `issued` without a holder, and
+ * the picking's own process step is what assigns the holder. So this row
+ * joins the ordinary flow at the ordinary place and every downstream path —
+ * custody, promotion, the mig-387 event triggers — treats it like any other.
+ *
+ * NOT transactional with the picking — and note that createPicking has no
+ * transaction at all: its `sql` is a bare neon() HTTP client, so the header
+ * insert, the line inserts and this one each autocommit independently. An
+ * earlier version of this comment said the intake was "deliberately outside
+ * the transaction", which implied one existed.
+ *
+ * So if a later step fails, this row stays committed as available stock at the
+ * source warehouse with provenance='field_intake', not linked to any picking
+ * or holder. That is a real orphan, and worth being plain about rather than
+ * calling it deliberate: it is TRUE in the sense that the carton really is on
+ * the shelf, and it is discoverable (the unconfirmed intake report lists it
+ * with its carton id and who took it in) — but nothing records which handout
+ * failed to use it, so it can look like ordinary available stock to the next
+ * storeman. Making it atomic needs createPicking to gain a transaction, which
+ * is a larger change than this one.
+ *
+ * ON CONFLICT DO NOTHING + re-select makes a retry idempotent: a second
+ * attempt resolves the row the first one created rather than erroring.
+ */
+async function takeSerialIntoStock(
+  sql: ReturnType<typeof neon<false, false>>,
+  opts: {
+    serialNumber: string;
+    stockItemId: string;
+    locationId: string | null;
+    cartonId: string | null;
+    actorStaffId: string | null;
+  },
+): Promise<string | null> {
+  const inserted = await sql`
+    INSERT INTO stock_serials
+      (stock_item_id, serial_number, status, condition, current_location_id,
+       provenance, intake_carton_id, intake_by_staff_id, intake_at,
+       received_date, received_reference)
+    VALUES
+      (${opts.stockItemId}, ${opts.serialNumber}, 'in_stock', 'new', ${opts.locationId},
+       'field_intake', ${opts.cartonId}, ${opts.actorStaffId}, NOW(),
+       NOW(), 'FIELD-INTAKE')
+    ON CONFLICT (stock_item_id, serial_number) DO NOTHING
+    RETURNING id
+  `;
+  const createdId = (inserted as Array<{ id: string }>)[0]?.id;
+  if (createdId) {
+    log.warn('serial taken into stock from a scanned carton the sheet does not list', {
+      serialNumber: opts.serialNumber,
+      stockItemId: opts.stockItemId,
+      cartonId: opts.cartonId,
+      locationId: opts.locationId,
+      actorStaffId: opts.actorStaffId,
+    }, 'pickings/_validation');
+    return createdId;
+  }
+
+  // Conflict: someone created it between the SELECT and here. Resolve theirs.
+  const existing = await sql`
+    SELECT id FROM stock_serials
+    WHERE stock_item_id = ${opts.stockItemId}
+      AND serial_number = ${opts.serialNumber}
+      AND status IN ('available', 'in_stock')
+    LIMIT 1
+  `;
+  return (existing as Array<{ id: string }>)[0]?.id ?? null;
 }

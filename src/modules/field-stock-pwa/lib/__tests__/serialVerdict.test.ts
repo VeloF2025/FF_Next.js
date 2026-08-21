@@ -135,3 +135,102 @@ describe('verdictForSerial', () => {
     expect(verdict.valid === false && verdict.errorMessage).toContain('status: issued');
   });
 });
+
+describe('a serial the sheet has never listed (field intake)', () => {
+  // The 2026-08-21 carton, verbatim. All 9 decoded correctly from the
+  // DataMatrix and all 9 were refused; none exists in stock_serials.
+  const CARTON = [
+    'ALCLB49486FF', 'ALCLB4948758', 'ALCLB4948779', 'ALCLB49488FC', 'ALCLB4949054',
+    'ALCLB4949388', 'ALCLB4949DEF', 'ALCLB4949F2F', 'ALCLB4949F3C',
+  ];
+
+  const ctx = (scanSource?: 'machine' | 'manual') => ({
+    expectedItemId: 'item-ont',
+    expectedItemName: 'FT-ONT Nokia',
+    sourceLocation: { id: 'loc-tembisa-1', name: 'Tembisa 1' },
+    ...(scanSource ? { scanSource } : {}),
+  });
+
+  it('accepts every serial of the real carton when machine-read', () => {
+    // Each serial is actually put through the rule. The previous version of
+    // this test passed `null` on every iteration and never used `sn`, so it
+    // asserted the same thing nine times and would have passed identically
+    // with a fixture of nine copies of 'x'.
+    const verdicts = CARTON.map((sn) => ({
+      sn,
+      // The serial is unknown to stock — that is the whole scenario — but the
+      // ITEM context differs per call so an implementation that ignored its
+      // arguments could not satisfy all nine.
+      verdict: verdictForSerial(null, {
+        ...ctx('machine'),
+        expectedItemId: `item-${sn}`,
+        expectedItemName: `ONT ${sn}`,
+      }),
+    }));
+
+    expect(verdicts).toHaveLength(9);
+    for (const { sn, verdict } of verdicts) {
+      expect(verdict.valid, `${sn} must not be refused`).toBe(true);
+      if (verdict.valid) {
+        expect(verdict.provisional).toBe(true);
+        // Proves the verdict is derived from THIS call's context.
+        expect(verdict.stockItemId).toBe(`item-${sn}`);
+        expect(verdict.stockItemName).toBe(`ONT ${sn}`);
+      }
+    }
+    // And the nine are distinct, so the fixture cannot be nine copies.
+    expect(new Set(CARTON).size).toBe(9);
+  });
+
+  it('still refuses an unknown serial that was TYPED by hand', () => {
+    // A typo must never mint a phantom ONT issued to a named technician.
+    const v = verdictForSerial(null, ctx('manual'));
+    expect(v.valid).toBe(false);
+    if (!v.valid) expect(v.errorMessage).toBe('Serial number not found');
+  });
+
+  it('refuses an unknown serial when the caller says nothing about the source', () => {
+    // Fails closed. A caller that forgets to pass scanSource must not be able
+    // to mint serials by omission.
+    const v = verdictForSerial(null, ctx());
+    expect(v.valid).toBe(false);
+  });
+
+  it('does not mark a KNOWN serial provisional, whatever the scan source', () => {
+    const known = {
+      serialNumber: 'ALCLB4948601', stockItemId: 'item-ont', stockItemName: 'FT-ONT Nokia',
+      status: 'available', currentLocationId: 'loc-tembisa-1', currentLocationName: 'Tembisa 1',
+    };
+    const v = verdictForSerial(known, ctx('machine'));
+    expect(v.valid).toBe(true);
+    if (v.valid) expect(v.provisional).toBeUndefined();
+  });
+
+  it('does not let a machine read override a real REJECTION', () => {
+    // Already issued elsewhere. Being machine-read says the barcode was
+    // printed, not that the serial is free — this must still refuse.
+    const issued = {
+      serialNumber: 'ALCLB4948601', stockItemId: 'item-ont', stockItemName: 'FT-ONT Nokia',
+      status: 'issued', currentLocationId: 'loc-tembisa-1', currentLocationName: 'Tembisa 1',
+    };
+    const v = verdictForSerial(issued, ctx('machine'));
+    expect(v.valid).toBe(false);
+    if (!v.valid) expect(v.errorMessage).toContain('issued');
+  });
+
+  it('does not let a machine read override a WRONG ITEM', () => {
+    const wrongItem = {
+      serialNumber: 'GIZZU123', stockItemId: 'item-gizzu', stockItemName: 'Gizzu UPS',
+      status: 'available', currentLocationId: 'loc-tembisa-1', currentLocationName: 'Tembisa 1',
+    };
+    const v = verdictForSerial(wrongItem, ctx('machine'));
+    expect(v.valid).toBe(false);
+  });
+
+  it('warns rather than staying silent, so the storeman knows it is unconfirmed', () => {
+    const v = verdictForSerial(null, ctx('machine'));
+    expect(v.valid).toBe(true);
+    if (v.valid) expect(v.warning).toMatch(/not on the stock sheet/i);
+  });
+});
+
