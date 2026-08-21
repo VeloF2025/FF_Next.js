@@ -353,7 +353,10 @@ export async function sendMonitorFailedNotification(input: MonitorFailedNotifica
   const occurrenceRef = sourceId ?? input.occurrenceKey ?? `unreferenced:${input.runId ?? 'missing'}`;
   return safeNotify({
     event_type: 'fleet.operational_monitor_failed',
-    title: `Fleet ${humanizeCode(input.runKind)} monitor failure`,
+    // `humanizeCode('status_monitor')` is already "status monitor", so appending
+    // " monitor failure" read as "Fleet status monitor monitor failure" in every
+    // alert delivered on 2026-08-21.
+    title: `Fleet ${humanizeCode(input.runKind)} failure`,
     body: input.reason,
     action_url: '/fleet/incidents',
     source_module: 'fleet-incidents',
