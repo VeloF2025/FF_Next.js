@@ -210,6 +210,43 @@ describe('PurchaseOrderPicker', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('explains the refusal when a fully-received PO is clicked, rather than doing nothing', async () => {
+    const onSelect = vi.fn();
+    const { user } = open([FULLY_RECEIVED], onSelect);
+    await user.click(screen.getByRole('button', { name: /standalone receipt/i }));
+    await user.click(poOptions()[0]!);
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByRole('status').textContent).toMatch(/PO-2026-0235 is fully received/i);
+  });
+
+  it('explains the refusal on Enter too, not just on click', async () => {
+    const onSelect = vi.fn();
+    const { user } = open([FULLY_RECEIVED], onSelect);
+    await user.click(screen.getByRole('button', { name: /standalone receipt/i }));
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByRole('status').textContent).toMatch(/fully received/i);
+  });
+
+  it('clears the refusal once the user searches again', async () => {
+    const { user } = open([FULLY_RECEIVED, INCIDENT]);
+    await user.click(screen.getByRole('button', { name: /standalone receipt/i }));
+    await user.click(poOptions().find((o) => o.textContent?.includes('PO-2026-0235'))!);
+    expect(screen.getByRole('status')).toBeTruthy();
+
+    await user.type(screen.getByLabelText('Search purchase orders'), '0237');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('shows no refusal message until the user actually tries a refused PO', async () => {
+    const { user } = open([FULLY_RECEIVED]);
+    await user.click(screen.getByRole('button', { name: /standalone receipt/i }));
+
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   it('keeps a fully-received PO reachable so its state can be discovered', async () => {
     const { user } = open([FULLY_RECEIVED]);
     await user.click(screen.getByRole('button', { name: /standalone receipt/i }));

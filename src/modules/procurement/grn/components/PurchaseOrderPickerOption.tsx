@@ -8,8 +8,11 @@
  * Unselectable rows use aria-disabled rather than the native disabled
  * attribute: native disabled drops the row out of the accessibility tree, so a
  * screen-reader user could never discover that a fully-received PO exists or
- * why it cannot be chosen. The row stays reachable and announces its state; the
- * refusal happens when choosing.
+ * why it cannot be chosen. The row stays reachable and announces its state.
+ *
+ * It also stays clickable: the refusal is decided by the picker's choose(), so
+ * that a click and an Enter produce the same explanation instead of silently
+ * doing nothing.
  */
 
 import { poReceiptState, poStateBadge, type PickerPurchaseOrder } from '../lib/poPickerOptions';
@@ -40,7 +43,7 @@ export function PurchaseOrderPickerOption({
       aria-selected={selected}
       aria-disabled={!selectable}
       tabIndex={-1}
-      onClick={() => selectable && onChoose()}
+      onClick={onChoose}
       className={`w-full text-left px-3 py-2 border-b border-[var(--ff-border-light)] last:border-b-0 ${
         selectable ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'
       } ${active ? 'bg-[var(--ff-bg-tertiary)]' : ''}`}

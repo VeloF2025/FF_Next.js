@@ -3,12 +3,11 @@
 /**
  * PurchaseOrderPicker — searchable combobox for the GRN "Source Purchase Order".
  *
- * Replaces a native <select> that carried every receivable PO (621 in
- * production on 2026-08-21) with no way to search, and sorted part-received
- * POs below every untouched one — so an order awaiting its second receipt
- * landed ~350 entries down and read as deleted.
- *
- * The page has already loaded the list, so filtering is local.
+ * Replaces a native <select> holding every receivable PO (621 in production on
+ * 2026-08-21) with no search, which sorted part-received POs below every
+ * untouched one — so an order awaiting its second receipt landed ~350 entries
+ * down and read as deleted. The page has already loaded the list, so filtering
+ * is local.
  *
  * Keyboard parity with the <select> is deliberate: the search box replaces
  * type-ahead, Arrow/Home/End/Enter/Escape behave as in a native listbox, and
@@ -16,10 +15,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, X } from 'lucide-react';
 import { buildPickerRows, filterAndRankPos, type PickerPurchaseOrder } from '../lib/poPickerOptions';
 import { isNavKey, nextActiveIndex } from '../lib/listboxNavigation';
 import { PurchaseOrderPickerPanel } from './PurchaseOrderPickerPanel';
+import { PurchaseOrderPickerTrigger } from './PurchaseOrderPickerTrigger';
 
 interface Props {
   purchaseOrders: PickerPurchaseOrder[];
@@ -42,14 +41,16 @@ export function PurchaseOrderPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [refusal, setRefusal] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const visible = useMemo(() => filterAndRankPos(purchaseOrders, query), [purchaseOrders, query]);
-
-  const rows = useMemo(() => buildPickerRows(visible), [visible]);
+  const rows = useMemo(
+    () => buildPickerRows(filterAndRankPos(purchaseOrders, query)),
+    [purchaseOrders, query]
+  );
   const selected = useMemo(
     () => purchaseOrders.find((po) => po.id === selectedPOId) ?? null,
     [purchaseOrders, selectedPOId]
@@ -60,15 +61,27 @@ export function PurchaseOrderPicker({
     setOpen(false);
     setQuery('');
     setActiveIndex(-1);
+    setRefusal('');
     if (refocus) triggerRef.current?.focus();
   }, []);
 
+  /**
+   * One decision point for mouse and keyboard. A fully-received PO is refused
+   * out loud: ignoring the click silently reads as a broken control to anyone
+   * not parsing the muted "Fully received" badge.
+   */
   const choose = useCallback(
     (poId: string) => {
+      const row = rows.find((r) => r.poId === poId);
+      if (row && !row.selectable) {
+        const name = row.po?.poNumber ?? 'That purchase order';
+        setRefusal(`${name} is fully received — nothing left to receive against it.`);
+        return;
+      }
       onSelect(poId);
       close();
     },
-    [onSelect, close]
+    [rows, onSelect, close]
   );
 
   useEffect(() => {
@@ -76,7 +89,10 @@ export function PurchaseOrderPicker({
   }, [open]);
 
   // A filtered-out active row must not stay active.
-  useEffect(() => setActiveIndex(-1), [query]);
+  useEffect(() => {
+    setActiveIndex(-1);
+    setRefusal('');
+  }, [query]);
 
   // Keep the active row in view when arrowing through a long list.
   useEffect(() => {
@@ -110,7 +126,7 @@ export function PurchaseOrderPicker({
       if (e.key === 'Enter') {
         e.preventDefault();
         const row = rows[activeIndex];
-        if (row?.selectable) choose(row.poId);
+        if (row) choose(row.poId);
         return;
       }
       if (e.key === 'Escape') {
@@ -122,14 +138,10 @@ export function PurchaseOrderPicker({
   );
 
   /**
-   * Tab-away closes the panel rather than leaving stale UI behind.
-   *
-   * A null relatedTarget is ignored so that pressing the mouse on inert panel
-   * chrome (the empty-state line, padding) does not close the panel underneath
-   * the pointer. NOT covered by a test: jsdom reports body rather than null
-   * here, so the branch cannot be distinguished from the outside-click
-   * listener without asserting on jsdom's own quirk. Outside clicks are
-   * covered — see the mousedown tests.
+   * Tab-away closes the panel. A null relatedTarget is ignored so a mousedown
+   * on inert panel chrome does not close it under the pointer. That branch is
+   * NOT tested: jsdom reports body rather than null, so any test would assert
+   * on a jsdom quirk. Outside clicks are covered by the mousedown tests.
    */
   const onBlurCapture = useCallback(
     (e: React.FocusEvent) => {
@@ -147,35 +159,16 @@ export function PurchaseOrderPicker({
 
   return (
     <div ref={containerRef} className="relative" onKeyDown={onKeyDown} onBlurCapture={onBlurCapture}>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => !disabled && (open ? close() : setOpen(true))}
+      <PurchaseOrderPickerTrigger
+        triggerRef={triggerRef}
+        label={triggerLabel}
+        open={open}
         disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={open ? LISTBOX_ID : undefined}
-        className={`w-full flex items-center gap-2 px-4 py-2 border rounded-lg text-left text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${
-          disabled
-            ? 'bg-[var(--ff-bg-tertiary)] border-emerald-500/30 opacity-75 cursor-not-allowed'
-            : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
-        }`}
-      >
-        <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>
-        <span className={selected && !disabled ? 'w-6' : ''} aria-hidden="true" />
-        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ff-text-tertiary)]" />
-      </button>
-
-      {selected && !disabled && (
-        <button
-          type="button"
-          onClick={() => choose('')}
-          aria-label="Clear selected purchase order"
-          className="absolute right-8 top-1/2 -translate-y-1/2 p-1.5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      )}
+        listboxId={LISTBOX_ID}
+        showClear={!!selected && !disabled}
+        onToggle={() => !disabled && (open ? close() : setOpen(true))}
+        onClear={() => choose('')}
+      />
 
       {open && !disabled && (
         <PurchaseOrderPickerPanel
@@ -188,6 +181,7 @@ export function PurchaseOrderPicker({
           selectedPOId={selectedPOId}
           emptyLabel={emptyLabel}
           onChoose={choose}
+          refusal={refusal}
           inputRef={inputRef}
           listRef={listRef}
         />

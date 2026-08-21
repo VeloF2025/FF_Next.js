@@ -22,13 +22,15 @@ interface Props {
   selectedPOId: string;
   emptyLabel: string;
   onChoose: (poId: string) => void;
+  /** Explanation shown when the user tries to pick an unselectable PO. */
+  refusal: string;
   inputRef: RefObject<HTMLInputElement>;
   listRef: RefObject<HTMLDivElement>;
 }
 
 export function PurchaseOrderPickerPanel({
   listboxId, optionDomId, query, onQueryChange, rows, activeIndex,
-  selectedPOId, emptyLabel, onChoose, inputRef, listRef,
+  selectedPOId, emptyLabel, onChoose, refusal, inputRef, listRef,
 }: Props) {
   return (
     <div className="absolute z-30 mt-1 w-full rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] shadow-lg">
@@ -48,6 +50,15 @@ export function PurchaseOrderPickerPanel({
           className="w-full bg-transparent text-sm text-[var(--ff-text-primary)] focus:outline-none"
         />
       </div>
+
+      {refusal && (
+        <div
+          role="status"
+          className="px-3 py-2 text-xs text-amber-400 bg-amber-500/10 border-b border-[var(--ff-border-light)]"
+        >
+          {refusal}
+        </div>
+      )}
 
       <div ref={listRef} id={listboxId} role="listbox" className="max-h-72 overflow-auto">
         {rows.map((row, index) =>
