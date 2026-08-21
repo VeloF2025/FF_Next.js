@@ -12,18 +12,11 @@
  */
 
 import { useCallback, useState } from 'react';
-import { FileText, Loader2, AlertTriangle, CheckCircle2, HelpCircle } from 'lucide-react';
+import { FileText, Loader2 } from 'lucide-react';
 import { request } from '@/modules/field-stock-pwa/api/request';
+import { PaperSheetResult } from './PaperSheetResult';
+import type { SheetSummary } from './paperSheetTypes';
 
-interface SheetSummary {
-  sheetId: string;
-  total: number;
-  alreadyRecorded: number;
-  contradictsStock: number;
-  unknownSerial: number;
-  unclassified: number;
-  serials: Array<{ serialNumber: string; status: string | null; verdict: string }>;
-}
 
 export interface PaperSheetCaptureProps {
   /** Serials already scanned, owned by the page so the scanner can add to them. */
@@ -61,58 +54,7 @@ export function PaperSheetCapture({ serials, onBack }: PaperSheetCaptureProps) {
   }, [sheetDate, technicianName, serials]);
 
   if (summary) {
-    const flagged = summary.serials.filter((s) => s.verdict === 'contradicts-stock');
-    return (
-      <div className="space-y-3">
-        <div className="rounded-lg bg-neutral-950 border border-neutral-800 px-4 py-3">
-          <p className="text-sm text-neutral-200 font-medium">
-            Sheet recorded — {summary.total} serial{summary.total === 1 ? '' : 's'}
-          </p>
-        </div>
-
-        {/* The finding, first and loudest. */}
-        {flagged.length > 0 && (
-          <div className="rounded-lg bg-amber-950/40 border border-amber-700 px-4 py-3">
-            <p className="text-sm text-amber-200 font-medium flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              {flagged.length} still shown as available stock
-            </p>
-            <p className="text-xs text-amber-300/80 mt-1">
-              The system thinks {flagged.length === 1 ? 'this one is' : 'these are'} on the shelf,
-              but this sheet says {flagged.length === 1 ? 'it was' : 'they were'} handed out.
-              {flagged.length === 1 ? ' It' : ' They'} could be issued again by mistake.
-            </p>
-            <ul className="mt-2 space-y-1">
-              {flagged.map((s) => (
-                <li key={s.serialNumber} className="text-xs font-mono text-amber-100">
-                  {s.serialNumber}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="rounded-lg bg-neutral-950 border border-neutral-800 divide-y divide-neutral-800">
-          <Row icon={<CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-               label="Already recorded — nothing to do" value={summary.alreadyRecorded} />
-          <Row icon={<HelpCircle className="w-4 h-4 text-neutral-400" />}
-               label="Not in the system at all" value={summary.unknownSerial} />
-          {summary.unclassified > 0 && (
-            <Row icon={<HelpCircle className="w-4 h-4 text-neutral-400" />}
-                 label="Status we have no rule for" value={summary.unclassified} />
-          )}
-        </div>
-
-        <p className="text-[11px] text-neutral-500 px-1">
-          Nothing was moved in or out of stock. This is a record of what the paper says.
-        </p>
-
-        <button type="button" onClick={onBack}
-          className="w-full min-h-[48px] rounded-lg bg-neutral-800 text-neutral-200 text-sm font-medium">
-          Done
-        </button>
-      </div>
-    );
+    return <PaperSheetResult summary={summary} onBack={onBack} />;
   }
 
   return (
@@ -174,11 +116,3 @@ export function PaperSheetCapture({ serials, onBack }: PaperSheetCaptureProps) {
   );
 }
 
-function Row({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
-  return (
-    <div className="px-4 py-2.5 flex items-center justify-between">
-      <span className="text-xs text-neutral-400 flex items-center gap-2">{icon}{label}</span>
-      <span className="text-sm text-neutral-200 tabular-nums">{value}</span>
-    </div>
-  );
-}

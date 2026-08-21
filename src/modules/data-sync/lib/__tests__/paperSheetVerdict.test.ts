@@ -39,9 +39,53 @@ describe('verdictForPaperSerial', () => {
       .toBe('unknown-serial');
   });
 
+  it('covers EVERY status the CHECK constraint allows', () => {
+    // From migration 387, verified against the live DB 2026-08-21. A status
+    // silently missing from the rules is how four of these came to be
+    // mis-bucketed in the first version.
+    const ALL = [
+      'available', 'in_stock', 'allocated_to_project', 'issued', 'installed',
+      'activated', 'faulty', 'returned', 'scrapped',
+    ];
+    const byStatus = Object.fromEntries(
+      ALL.map((status) => [status, verdictForPaperSerial({ serialNumber: 'X', status })]),
+    );
+    expect(byStatus).toEqual({
+      // still at the store and un-handed-out — the paper contradicts this
+      available: 'contradicts-stock',
+      in_stock: 'contradicts-stock',
+      allocated_to_project: 'contradicts-stock',
+      // the handout happened; the system already knows
+      issued: 'already-recorded',
+      installed: 'already-recorded',
+      activated: 'already-recorded',
+      // reachable both from a unit that went out and one that never did
+      returned: 'unclassified',
+      faulty: 'unclassified',
+      scrapped: 'unclassified',
+    });
+  });
+
+  it('flags allocated_to_project, which is reserved rather than handed out', () => {
+    // Not directly issuable, but the system believes it is still at the store
+    // awaiting a project — and the paper says it left in May.
+    expect(verdictForPaperSerial({ serialNumber: 'X', status: 'allocated_to_project' }))
+      .toBe('contradicts-stock');
+  });
+
+  it('does NOT call a returned serial a contradiction', () => {
+    // The returns flow is issue -> return -> inspect -> disposition, so
+    // 'returned' is consistent with the sheet: it went out and came back.
+    // Calling it a contradiction would send storemen hunting for stock that
+    // is exactly where the system says it is.
+    expect(verdictForPaperSerial({ serialNumber: 'X', status: 'returned' }))
+      .not.toBe('contradicts-stock');
+  });
+
   it('does not fold an unrecognised status into a known bucket', () => {
     // Guessing here would either hide a contradiction or invent one.
-    expect(verdictForPaperSerial({ serialNumber: 'X', status: 'faulty' })).toBe('unclassified');
+    // 'quarantine' is not in the constraint at all — a status invented later
+    // must not be silently absorbed into a bucket.
     expect(verdictForPaperSerial({ serialNumber: 'X', status: 'quarantine' })).toBe('unclassified');
     expect(verdictForPaperSerial({ serialNumber: 'X', status: '' })).toBe('unclassified');
   });

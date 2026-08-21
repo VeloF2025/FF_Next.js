@@ -82,6 +82,40 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
   }));
   const summary = summarisePaperSheet(classified);
 
+  // Same paper, recorded twice. photo_hash's unique index is PARTIAL
+  // (WHERE photo_hash IS NOT NULL), and this path has no photo, so the
+  // database will not stop a double-tap or a storeman re-scanning next week —
+  // and every duplicate would double-count into the reconciliation stats.
+  // Match on what actually identifies the sheet: its date plus its exact set
+  // of serials.
+  const existing = await sql`
+    SELECT s.id
+    FROM eod_install_sheets s
+    WHERE s.source = 'scanned'
+      AND s.sheet_date = ${body.sheetDate}
+      AND (
+        SELECT array_agg(e.ont_serial ORDER BY e.ont_serial)
+        FROM eod_install_sheet_entries e
+        WHERE e.sheet_id = s.id
+      ) = ${[...serials].sort()}::text[]
+    LIMIT 1
+  `;
+  const duplicateOf = (existing as Array<{ id: string }>)[0]?.id ?? null;
+  if (duplicateOf) {
+    // Report what it found anyway — the storeman still wants the answer — but
+    // do not add a second copy of the sheet.
+    log.info('paper sheet already recorded; returning the existing one', {
+      sheetId: duplicateOf, sheetDate: body.sheetDate, serials: serials.length,
+    }, 'my/stores/paper-sheets');
+    return apiResponse.success(
+      res,
+      // NOT `alreadyRecorded` — that name is already a per-serial count in the
+      // summary, and spreading it after would silently overwrite the flag.
+      { sheetId: duplicateOf, duplicateSheet: true, ...summary },
+      'This sheet was already recorded',
+    );
+  }
+
   const sheet = await createSheet({
     sheetDate: body.sheetDate,
     source: 'scanned',

@@ -51,6 +51,8 @@ const data = (res: { jsonData?: Record<string, unknown> }) =>
 beforeEach(() => {
   vi.clearAllMocks();
   mockCreateSheet.mockResolvedValue({ id: 'sheet-1' });
+  // Default: classification read returns nothing, duplicate check finds none.
+  mockSql.mockResolvedValue([]);
 });
 
 describe('classification', () => {
@@ -77,11 +79,14 @@ describe('classification', () => {
     mockSql.mockResolvedValueOnce([{ serial_number: 'A1B2C3D4', status: 'in_stock' }]);
     await handler(post({ sheetDate: '2026-05-11', serials: ['A1B2C3D4'] }), makeRes());
 
-    // Exactly one query — the read that classifies. Back-dating stock movement
-    // is irreversible and is deliberately not done here.
-    expect(mockSql).toHaveBeenCalledTimes(1);
+    // Assert on what the statements DO, not how many there are — the count
+    // changes whenever a read is added (it already has, for the duplicate
+    // check) and a count assertion would fail for the wrong reason.
     const statements = mockSql.mock.calls.map((c) => String(c[0]));
     expect(statements.some((s) => /UPDATE|INSERT|DELETE/i.test(s))).toBe(false);
+    expect(statements.some((s) => /stock_serials/i.test(s))).toBe(true); // the read
+    expect(statements.filter((s) => /stock_serials/i.test(s))
+      .every((s) => /^\s*SELECT/i.test(s.trim()))).toBe(true);
   });
 
   it('records the sheet as scanned, not as VLM-extracted', async () => {
@@ -153,3 +158,52 @@ describe('input handling', () => {
     expect(r2.statusCode).toBe(422);
   });
 });
+
+describe('recording the same sheet twice', () => {
+  it('returns the existing sheet instead of creating a second copy', async () => {
+    // photo_hash's unique index is PARTIAL (WHERE photo_hash IS NOT NULL) and
+    // this path has no photo, so the database will not stop a double-tap.
+    // Every duplicate would double-count into the reconciliation stats.
+    mockSql
+      .mockResolvedValueOnce([])                        // classification read
+      .mockResolvedValueOnce([{ id: 'sheet-already' }]); // duplicate check hit
+
+    const res = makeRes();
+    await handler(post({ sheetDate: '2026-05-11', serials: ['A1B2C3D4'] }), res);
+
+    expect(data(res).sheetId).toBe('sheet-already');
+    expect(data(res).duplicateSheet).toBe(true);
+    expect(mockCreateSheet).not.toHaveBeenCalled();
+  });
+
+  it('still reports what the sheet found, so the storeman gets an answer', async () => {
+    mockSql
+      .mockResolvedValueOnce([{ serial_number: 'A1B2C3D4', status: 'in_stock' }])
+      .mockResolvedValueOnce([{ id: 'sheet-already' }]);
+
+    const res = makeRes();
+    await handler(post({ sheetDate: '2026-05-11', serials: ['A1B2C3D4'] }), res);
+
+    // The contradiction still surfaces on a re-scan — that is the whole point.
+    expect(data(res).contradictsStock).toBe(1);
+  });
+
+  it('creates the sheet when the serial set differs on the same date', async () => {
+    // Two different pages can share a date; only an identical serial set is a
+    // duplicate.
+    mockSql
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]); // no matching sheet
+    await handler(post({ sheetDate: '2026-05-11', serials: ['A1B2C3D4'] }), makeRes());
+    expect(mockCreateSheet).toHaveBeenCalled();
+  });
+
+  it('matches on the serial set regardless of scan order', async () => {
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await handler(post({ sheetDate: '2026-05-11', serials: ['E5F6G7H8', 'A1B2C3D4'] }), makeRes());
+    const dupCheckParams = mockSql.mock.calls[1]!.slice(1);
+    // Sorted, so a page scanned bottom-to-top still matches one scanned top-to-bottom.
+    expect(dupCheckParams).toContainEqual(['A1B2C3D4', 'E5F6G7H8']);
+  });
+});
+
