@@ -57,6 +57,7 @@ DECLARE
   v_normalised  text;
   v_existing    uuid;
   v_new_id      uuid;
+  v_attempt     int;
 BEGIN
   SELECT project_name INTO v_name FROM projects WHERE id = p_project_id;
   IF v_name IS NULL THEN
@@ -95,8 +96,30 @@ BEGIN
     RETURN v_existing;
   END IF;
 
+  -- generate_warehouse_code does a check-then-insert, which is a TOCTOU race:
+  -- under READ COMMITTED a concurrent session's uncommitted row is invisible, so
+  -- two projects whose names collide can both clear the WHILE EXISTS loop and
+  -- then race on the code UNIQUE constraint. This trigger runs inside the
+  -- caller's own transaction on projects, so an uncaught unique_violation would
+  -- abort project creation itself — an opaque failure of a core workflow caused
+  -- by an unrelated naming collision. Retry instead, then fall back to a code
+  -- derived from the project id, which cannot collide (one warehouse per
+  -- project, and we only reach here when the project has none).
+  FOR v_attempt IN 1..5 LOOP
+    BEGIN
+      INSERT INTO stock_locations (code, name, location_type, project_id, is_active, is_virtual, created_by)
+      VALUES (generate_warehouse_code(v_name), v_name, 'warehouse', p_project_id, true, false, 'auto-provision')
+      RETURNING id INTO v_new_id;
+
+      RETURN v_new_id;
+    EXCEPTION WHEN unique_violation THEN
+      -- Another session claimed this code between the check and the insert.
+      NULL;
+    END;
+  END LOOP;
+
   INSERT INTO stock_locations (code, name, location_type, project_id, is_active, is_virtual, created_by)
-  VALUES (generate_warehouse_code(v_name), v_name, 'warehouse', p_project_id, true, false, 'auto-provision')
+  VALUES ('WH-' || replace(p_project_id::text, '-', ''), v_name, 'warehouse', p_project_id, true, false, 'auto-provision')
   RETURNING id INTO v_new_id;
 
   RETURN v_new_id;
@@ -120,7 +143,10 @@ DROP TRIGGER IF EXISTS tr_project_warehouse_on_active ON projects;
 CREATE TRIGGER tr_project_warehouse_on_active
   AFTER INSERT OR UPDATE OF status ON projects
   FOR EACH ROW
-  WHEN (NEW.status = 'active')
+  -- lower(): pages/api/projects.ts:194 writes (status || 'PLANNING').toUpperCase(),
+  -- so that route can land a row as 'ACTIVE'. A case-sensitive match would skip
+  -- it silently — no warehouse, no error.
+  WHEN (lower(NEW.status) = 'active')
   EXECUTE FUNCTION trg_project_warehouse();
 
 -- ---------------------------------------------------------------------------
@@ -152,7 +178,7 @@ DO $$
 DECLARE
   p RECORD;
 BEGIN
-  FOR p IN SELECT id, project_name FROM projects WHERE status = 'active' ORDER BY project_name LOOP
+  FOR p IN SELECT id, project_name FROM projects WHERE lower(status) = 'active' ORDER BY project_name LOOP
     PERFORM ensure_project_warehouse(p.id);
   END LOOP;
 END;
