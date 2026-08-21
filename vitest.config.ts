@@ -81,6 +81,7 @@ export default defineConfig({
       'tests/migrations/511_fleet_incident_driver_input.test.ts',
       'tests/migrations/512_fleet_assignment_roster_sql.test.ts',
       'tests/migrations/513_fleet_assignment_preview_state.test.ts',
+      'tests/migrations/518_fleet_operational_analytics_retention.test.ts',
       'tests/migrations/metric-registry-execution.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.

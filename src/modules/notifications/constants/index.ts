@@ -66,6 +66,13 @@ export const DEFAULT_CHANNEL_PREFERENCES: Record<string, ChannelPreferences> = {
   // manager request or a driver response is routine, not an emergency.
   'fleet.driver_input_requested': { in_app: true, email: true, whatsapp: false },
   'fleet.driver_response_received': { in_app: true, email: true, whatsapp: false },
+  'fleet.retention_hold_review_due': { in_app: true, email: true, whatsapp: false },
+  // Both automation failures share fleet.operational_monitor_failed's
+  // mandatory channels: aggregation feeds the coverage gate that retention
+  // deletes against, so a silent failure in either is a data-loss risk, not
+  // an inbox item.
+  'fleet.operational_aggregation_failed': { in_app: true, email: true, whatsapp: true },
+  'fleet.operational_retention_failed': { in_app: true, email: true, whatsapp: true },
 
   // -- Attendance --
   'attendance.clockout_due':        { in_app: true, email: false, whatsapp: false },
@@ -124,6 +131,9 @@ export const EVENT_ICONS: Record<string, string> = {
   'fleet.operational_monitor_failed': 'circle-x',
   'fleet.driver_input_requested': 'message-square',
   'fleet.driver_response_received': 'reply',
+  'fleet.retention_hold_review_due': 'calendar-clock',
+  'fleet.operational_aggregation_failed': 'chart-column-decreasing',
+  'fleet.operational_retention_failed': 'database-backup',
   'attendance.clockout_due':        'clock',
   'attendance.correction_required': 'alert-circle',
   'attendance.supervisor_digest':   'clipboard-list',
@@ -177,6 +187,9 @@ export const EVENT_SEVERITY: Record<string, NotificationSeverity> = {
   'fleet.operational_monitor_failed': 'error',
   'fleet.driver_input_requested': 'info',
   'fleet.driver_response_received': 'info',
+  'fleet.retention_hold_review_due': 'warning',
+  'fleet.operational_aggregation_failed': 'error',
+  'fleet.operational_retention_failed': 'error',
   'attendance.clockout_due':        'warning',
   'attendance.correction_required': 'warning',
   'attendance.supervisor_digest':   'warning',
@@ -230,6 +243,9 @@ export const EVENT_LABELS: Record<string, string> = {
   'fleet.operational_monitor_failed': 'Operational Monitor Failed',
   'fleet.driver_input_requested': 'Driver Input Requested',
   'fleet.driver_response_received': 'Driver Response Received',
+  'fleet.retention_hold_review_due': 'Retention Hold Review Due',
+  'fleet.operational_aggregation_failed': 'Operational Aggregation Failed',
+  'fleet.operational_retention_failed': 'Operational Retention Failed',
   'attendance.clockout_due':        'Clock-out Required',
   'attendance.correction_required': 'Attendance Correction Required',
   'attendance.supervisor_digest':   'Supervisor Attendance Digest',
@@ -283,6 +299,9 @@ export const EVENT_GROUPS: Record<string, string> = {
   'fleet.operational_monitor_failed': 'Fleet',
   'fleet.driver_input_requested': 'Fleet',
   'fleet.driver_response_received': 'Fleet',
+  'fleet.retention_hold_review_due': 'Fleet',
+  'fleet.operational_aggregation_failed': 'Fleet',
+  'fleet.operational_retention_failed': 'Fleet',
   'attendance.clockout_due':        'Attendance',
   'attendance.correction_required': 'Attendance',
   'attendance.supervisor_digest':   'Attendance',
