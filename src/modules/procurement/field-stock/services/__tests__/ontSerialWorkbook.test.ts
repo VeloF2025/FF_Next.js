@@ -10,6 +10,24 @@ import * as XLSX from 'xlsx';
 import { parseOntGizzuWorkbook, FT_ONT_ITEM_ID, FT_GIZZU_ITEM_ID } from '../ontSerialWorkbook';
 import type { LocationRef } from '../sheetLocation';
 
+/**
+ * Live project rows (2026-08-21) for the allocation half — including
+ * Themb'elihle and Etwatwa. An earlier fixture omitted them, which made a test
+ * assert that the Tembelilhle tab is unallocatable when in production it
+ * resolves. Fixtures for a name resolver must mirror the real name set.
+ */
+const PROJECTS: LocationRef[] = [
+  { id: 'p-etwatwa', name: 'Etwatwa' },
+  { id: 'p-lawley', name: 'Lawley' },
+  { id: 'p-mamelodi', name: 'Mamelodi' },
+  { id: 'p-mohadin', name: 'Mohadin' },
+  { id: 'p-mohadin2', name: 'Mohadin Ph 2' },
+  { id: 'p-thembelihle', name: "Themb'elihle" },
+  { id: 'p-thembisa1', name: 'Thembisa POP 1' },
+  { id: 'p-thembisa2', name: 'Thembisa POP 2' },
+  { id: 'p-thembisa3', name: 'Thembisa POP 3' },
+];
+
 const LOCATIONS: LocationRef[] = [
   { id: 'loc-lawley', name: 'Lawley' },
   { id: 'loc-mamelodi', name: 'Mamelodi Pop1' },
@@ -37,11 +55,19 @@ describe('parseOntGizzuWorkbook', () => {
 
     const parsed = parseOntGizzuWorkbook(wb, XLSX, LOCATIONS);
 
+    // allocatedToProjectId is null here: no project list was supplied, so the
+    // tab's allocation is unknown rather than assumed.
     expect(parsed.ontItems).toEqual([
-      { stockItemId: FT_ONT_ITEM_ID, serialNumber: 'ALCLB4948758', locationId: 'loc-tembelihle' },
+      {
+        stockItemId: FT_ONT_ITEM_ID, serialNumber: 'ALCLB4948758',
+        locationId: 'loc-tembelihle', allocatedToProjectId: null,
+      },
     ]);
     expect(parsed.gizzuItems).toEqual([
-      { stockItemId: FT_GIZZU_ITEM_ID, serialNumber: 'GU18W12V2599990001', locationId: 'loc-tembelihle' },
+      {
+        stockItemId: FT_GIZZU_ITEM_ID, serialNumber: 'GU18W12V2599990001',
+        locationId: 'loc-tembelihle', allocatedToProjectId: null,
+      },
     ]);
     expect(parsed.unresolvedSheets).toEqual([]);
     expect(parsed.projects[0]).toMatchObject({ locationName: 'Tembelihle', matchedBy: 'fuzzy' });
@@ -82,6 +108,58 @@ describe('parseOntGizzuWorkbook', () => {
     const parsed = parseOntGizzuWorkbook(wb, XLSX, LOCATIONS);
     expect(parsed.ontItems).toHaveLength(0);
     expect(parsed.unresolvedSheets.map((u) => u.reason)).toEqual(['not-a-project', 'not-a-project']);
+  });
+
+  it('allocates each serial to the project its tab names', () => {
+    const wb = makeWorkbook({ Lawley: [['ALCLB49486FF', 'GU18W12V2599990001']] });
+    const parsed = parseOntGizzuWorkbook(wb, XLSX, LOCATIONS, PROJECTS);
+
+    expect(parsed.ontItems[0]!.allocatedToProjectId).toBe('p-lawley');
+    expect(parsed.gizzuItems[0]!.allocatedToProjectId).toBe('p-lawley');
+    // The warehouse is still recorded — it is where we ASSUME the stock sits.
+    expect(parsed.ontItems[0]!.locationId).toBe('loc-lawley');
+    expect(parsed.projects[0]).toMatchObject({ allocatedProjectName: 'Lawley' });
+    expect(parsed.unallocatedSheets).toEqual([]);
+  });
+
+  it('imports the stock but leaves allocation UNSET when the project is ambiguous', () => {
+    // Thembisa matches three POPs. Guessing would allocate stock to the wrong
+    // project; the stock itself still imports.
+    const wb = makeWorkbook({ Thembisa: [['ALCLB49486FF', 'GU18W12V2599990001']] });
+    const parsed = parseOntGizzuWorkbook(wb, XLSX, LOCATIONS, PROJECTS);
+
+    expect(parsed.ontItems).toHaveLength(1);
+    expect(parsed.ontItems[0]!.allocatedToProjectId).toBeNull();
+    expect(parsed.unallocatedSheets).toEqual([
+      {
+        sheetName: 'Thembisa',
+        reason: 'ambiguous',
+        candidates: ['Thembisa POP 1', 'Thembisa POP 2', 'Thembisa POP 3'],
+        serialsUnallocated: 2,
+      },
+    ]);
+  });
+
+  it("allocates the misspelled Tembelilhle tab to Themb'elihle", () => {
+    // Same township, different spelling — and the only candidate among all 25
+    // real projects. Against the production project list this resolves; a
+    // trimmed fixture previously made it look unallocatable.
+    const wb = makeWorkbook({ Tembelilhle: [['ALCLB49486FF', '']] });
+    const parsed = parseOntGizzuWorkbook(wb, XLSX, LOCATIONS, PROJECTS);
+
+    expect(parsed.ontItems[0]!.locationId).toBe('loc-tembelihle');
+    expect(parsed.ontItems[0]!.allocatedToProjectId).toBe('p-thembelihle');
+    expect(parsed.unallocatedSheets).toEqual([]);
+  });
+
+  it('imports the stock but leaves allocation UNSET when no project matches', () => {
+    const wb = makeWorkbook({ Kimberley: [['ALCLB49486FF', '']] });
+    const parsed = parseOntGizzuWorkbook(wb, XLSX, LOCATIONS, PROJECTS);
+
+    // Unresolvable as a WAREHOUSE too, so it does not import at all — the
+    // allocation half is reported by unresolvedSheets in that case.
+    expect(parsed.ontItems).toHaveLength(0);
+    expect(parsed.unresolvedSheets[0]).toMatchObject({ sheetName: 'Kimberley', reason: 'no-match' });
   });
 
   it('keeps skippedSheets populated for existing callers', () => {

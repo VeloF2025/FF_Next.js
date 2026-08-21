@@ -22,7 +22,7 @@ import { receiveSerials } from './serialIntake';
 import { closeOesIntakeGap, liveGapDeps } from './oesIntakeGap';
 import type { OesIntakeGapReport } from './oesIntakeGap';
 import { parseOntGizzuWorkbook } from './ontSerialWorkbook';
-import type { UnresolvedSheet } from './ontSerialWorkbook';
+import type { UnresolvedSheet, ParsedWorkbook } from './ontSerialWorkbook';
 import type { LocationRef } from './sheetLocation';
 
 /** Warn if more than this many OES-active ONTs remain unreceived after a sync. */
@@ -38,6 +38,10 @@ export interface OntSerialSyncReport {
   skippedSheets: string[];
   /** Tabs that produced nothing, each with the reason and the rows it cost. */
   unresolvedSheets: UnresolvedSheet[];
+  /** Tabs whose stock imported but could not be tied to exactly one project. */
+  unallocatedSheets: ParsedWorkbook['unallocatedSheets'];
+  /** Serials imported without an allocation, across all such tabs. */
+  serialsWithoutAllocation: number;
   /** Serial-bearing rows lost across all unresolved project tabs. */
   rowsLostToUnresolvedSheets: number;
   /** The #1864 receive-and-promote pass run before the gap was measured. */
@@ -117,7 +121,23 @@ export async function syncOntSerialsFromSharePoint(pool: Pool): Promise<OntSeria
   );
   const locations: LocationRef[] = locRows.rows;
 
-  const parsed = parseOntGizzuWorkbook(workbook, XLSX, locations);
+  // The tab also names the PROJECT the stock is allocated to. That is what the
+  // workbook actually asserts; the warehouse is only where we assume it sits.
+  const projRows = await pool.query<{ id: string; name: string }>(
+    `SELECT id, project_name AS name FROM projects`,
+  );
+
+  const parsed = parseOntGizzuWorkbook(workbook, XLSX, locations, projRows.rows);
+
+  // A tab whose stock imported but could not be tied to a project is a real
+  // reporting gap — the allocation is the thing the sheet exists to record.
+  for (const u of parsed.unallocatedSheets) {
+    log.warn(
+      'ONT serial sync: tab imported but NOT allocated to a project',
+      { sheet: u.sheetName, reason: u.reason, serials: u.serialsUnallocated, candidates: u.candidates },
+      'ont-serial-sync',
+    );
+  }
 
   // A tab that carries serials but resolves to no warehouse is a real loss, not
   // a summary tab being ignored. Say so at warn level with the row count.
@@ -202,6 +222,8 @@ export async function syncOntSerialsFromSharePoint(pool: Pool): Promise<OntSeria
     skippedSheets: parsed.skippedSheets,
     oesIntakeGap,
     unresolvedSheets: parsed.unresolvedSheets,
+    unallocatedSheets: parsed.unallocatedSheets,
+    serialsWithoutAllocation: parsed.unallocatedSheets.reduce((n, u) => n + u.serialsUnallocated, 0),
     rowsLostToUnresolvedSheets: costly.reduce((n, u) => n + u.rowsLost, 0),
     oesGapRemaining,
     sourceLikelyStale,
