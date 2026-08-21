@@ -94,3 +94,24 @@ export function poStateBadge(po: PickerPurchaseOrder): string | null {
   if (state === 'partially_received') return `${poOutstanding(po)} outstanding`;
   return null;
 }
+
+/** One row of the picker listbox: the standalone-receipt choice, or a PO. */
+export interface PickerRow {
+  poId: string;
+  po: PickerPurchaseOrder | null;
+  selectable: boolean;
+}
+
+/**
+ * Every row the listbox renders, standalone-receipt first.
+ *
+ * Keyboard navigation runs over this rather than over the PO list alone: the
+ * standalone row is a real role="option" the mouse can click, so leaving it out
+ * of the navigable set would make it mouse-only.
+ */
+export function buildPickerRows(pos: PickerPurchaseOrder[]): PickerRow[] {
+  return [
+    { poId: '', po: null, selectable: true },
+    ...pos.map((po) => ({ poId: po.id, po, selectable: isPoSelectable(po) })),
+  ];
+}

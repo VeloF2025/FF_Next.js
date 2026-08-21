@@ -14,6 +14,7 @@ import {
   poMatchesQuery,
   filterAndRankPos,
   poStateBadge,
+  buildPickerRows,
   type PickerPurchaseOrder,
 } from '../poPickerOptions';
 
@@ -181,5 +182,27 @@ describe('poStateBadge', () => {
 
   it('shows nothing for an untouched PO', () => {
     expect(poStateBadge(UNTOUCHED)).toBeNull();
+  });
+});
+
+describe('buildPickerRows', () => {
+  it('puts the standalone-receipt row first so the keyboard can reach it', () => {
+    const rows = buildPickerRows([PART_RECEIVED]);
+    expect(rows[0]).toEqual({ poId: '', po: null, selectable: true });
+  });
+
+  it('marks a fully-received PO unselectable but still includes it as a row', () => {
+    const rows = buildPickerRows([FULLY_RECEIVED]);
+    expect(rows).toHaveLength(2);
+    expect(rows[1]?.selectable).toBe(false);
+    expect(rows[1]?.poId).toBe('p235');
+  });
+
+  it('marks a part-received PO selectable', () => {
+    expect(buildPickerRows([PART_RECEIVED])[1]?.selectable).toBe(true);
+  });
+
+  it('returns just the standalone row for an empty list', () => {
+    expect(buildPickerRows([])).toHaveLength(1);
   });
 });
