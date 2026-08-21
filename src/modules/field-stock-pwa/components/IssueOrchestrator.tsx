@@ -108,6 +108,8 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
       )}
       {flow.step === 'pick-tech' && (
         <PickTechStep
+          storeLocationId={flow.sourceLocation?.id ?? null}
+          storeName={flow.sourceLocation?.name ?? null}
           onPick={(tech) => setFlow((s) => ({ ...s, step: 'pick-item', technician: tech }))} />
       )}
       {flow.step === 'pick-item' && flow.technician && (

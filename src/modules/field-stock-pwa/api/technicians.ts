@@ -30,6 +30,11 @@ interface FieldUserRow {
   account_status: string;
   created_by_staff_id: string | null;
   created_at: string;
+  // Site fields, annotated server-side by /api/my/stores/technicians.
+  site_project_id?: string | null;
+  site_project_name?: string | null;
+  site_source?: 'assigned' | 'declared' | 'none';
+  site_match?: 'match' | 'elsewhere' | 'unknown-staff' | 'unmapped-store';
 }
 
 interface FieldUserCreated {
@@ -52,6 +57,11 @@ function mapFieldUserRow(row: FieldUserRow): PwaTechSummary {
     contractorId: null,
     contractorName: null,
     accountStatus: row.account_status as PwaTechSummary['accountStatus'],
+    role: row.role ?? null,
+    siteProjectId: row.site_project_id ?? null,
+    siteProjectName: row.site_project_name ?? null,
+    siteSource: (row.site_source ?? 'none') as PwaTechSummary['siteSource'],
+    siteMatch: (row.site_match ?? 'unmapped-store') as PwaTechSummary['siteMatch'],
   };
 }
 
@@ -71,9 +81,13 @@ function mapFieldUserRow(row: FieldUserRow): PwaTechSummary {
  *   200-row limit becomes a problem in production.
  */
 export async function fetchTechnicians(
-  opts: { search?: string; contractorId?: string } = {}
+  opts: { search?: string; contractorId?: string; storeLocationId?: string | null } = {}
 ): Promise<PwaTechSummary[]> {
-  const rows = await request<FieldUserRow[]>('/api/my/stores/technicians?role=technician');
+  // Both roles: casuals receive stock exactly like technicians, and the old
+  // single-role request excluded every one of them from the picker.
+  const params = new URLSearchParams({ roles: 'technician,casual' });
+  if (opts.storeLocationId) params.set('storeLocationId', opts.storeLocationId);
+  const rows = await request<FieldUserRow[]>(`/api/my/stores/technicians?${params.toString()}`);
   const mapped = rows.map(mapFieldUserRow);
 
   let result = mapped;
@@ -128,6 +142,13 @@ export async function createTechnician(input: {
     // This field is NOT persisted on staff — it must be threaded into the picking body.
     contractorId: input.contractorId ?? null,
     contractorName: null, // caller must look up name from fetchContractors() if needed
+    role: 'technician',
+    // A just-created person has no site yet. 'unknown-staff' keeps them visible:
+    // the storeman created them seconds ago precisely in order to issue to them.
+    siteProjectId: null,
+    siteProjectName: null,
+    siteSource: 'none',
+    siteMatch: 'unknown-staff',
     accountStatus: envelope.user.account_status as PwaTechSummary['accountStatus'],
   };
 }
