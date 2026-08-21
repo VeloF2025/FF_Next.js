@@ -61,7 +61,11 @@ describe('runBatchValidation', () => {
     });
   });
 
-  it('issues the good members and flags the bad ones in a partial box', async () => {
+  it('issues the good members and flags the bad one in a partial box', async () => {
+    // A serial at another warehouse is ALLOWED, not rejected (see the note atop
+    // serialVerdict.ts — that location is an assumption, and refusing the
+    // handout on it blocks real work over a guess). Only the issued serial is
+    // an actual mistake here.
     const db = querier([
       row(),
       row({ serial_number: 'ALCLB4948758', status: 'issued' }),
@@ -76,9 +80,8 @@ describe('runBatchValidation', () => {
       stockItemId: 'item-ont',
       sourceLocationId: SOURCE_ID,
     });
-    expect(res.results.map((r) => r.valid)).toEqual([true, false, false]);
+    expect(res.results.map((r) => r.valid)).toEqual([true, false, true]);
     expect(res.results[1]!.errorMessage).toContain('status: issued');
-    expect(res.results[2]!.errorMessage).toContain('Lawley');
   });
 
   it('returns results in the scanned order, not the database order', async () => {
