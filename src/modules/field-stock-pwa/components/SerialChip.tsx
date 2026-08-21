@@ -42,11 +42,10 @@ function StateIcon({ state }: { state: PwaScannedSerial['state'] }) {
 }
 
 export function SerialChip({ serial, onRemove, onPhotograph }: SerialChipProps) {
-  // Only offered where a photo would actually change the outcome: the serial
-  // is unknown to stock. A serial refused for its STATUS (already issued,
-  // wrong item) is not admitted by any photograph.
-  const photoWouldHelp =
-    serial.state === 'invalid' && /take a photo of the label/i.test(serial.errorMessage ?? '');
+  // Only where a photo would actually change the outcome. Read from the
+  // verdict's own flag, NOT from the message text: matching copy with a regex
+  // loses the button silently the moment anyone rewords or translates it.
+  const photoWouldHelp = serial.state === 'invalid' && serial.canPhotograph === true;
   return (
     <li
       className={`px-3 py-2.5 rounded-lg border flex items-start gap-2 ${borderClass(serial.state, !!serial.warning)}`}

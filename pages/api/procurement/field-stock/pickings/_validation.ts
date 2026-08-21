@@ -266,17 +266,40 @@ export async function validateSerialsAvailable(
  *
  * Matched on the serial itself, so a photo attached to a DIFFERENT serial
  * cannot be reused to admit this one.
+ *
+ * ONE PHOTO, ONE UNIT. A key that appears against more than one serial admits
+ * NEITHER. The feature's whole claim is that a photograph evidences a specific
+ * physical unit; a single picture standing for ten Gizzus is not evidence, it
+ * is a formality. Refusing both rather than the later one keeps the outcome
+ * independent of array order, so the same request cannot admit different
+ * serials depending on how the client happened to sort them.
+ *
+ * A unique index (migration 520) enforces this across requests as well. This
+ * check exists so a reused key fails as a clear refusal here rather than as a
+ * database error deep in the picking chain.
  */
 function photoFor(
   line: PickingLine,
   serialNumber: string,
 ): { photoKey: string; photoUrl?: string | null } | null {
-  const photos = Array.isArray(line.intakePhotos) ? line.intakePhotos : [];
-  const match = photos.find(
-    (p) => p && typeof p.photoKey === 'string' && p.photoKey.length > 0
-      && p.serialNumber === serialNumber,
+  const photos = (Array.isArray(line.intakePhotos) ? line.intakePhotos : []).filter(
+    (p) => p && typeof p.photoKey === 'string' && p.photoKey.trim().length > 0,
   );
-  return match ? { photoKey: match.photoKey, photoUrl: match.photoUrl ?? null } : null;
+
+  const timesUsed = new Map<string, number>();
+  for (const p of photos) timesUsed.set(p.photoKey, (timesUsed.get(p.photoKey) ?? 0) + 1);
+
+  const match = photos.find((p) => p.serialNumber === serialNumber);
+  if (!match) return null;
+  if ((timesUsed.get(match.photoKey) ?? 0) > 1) {
+    log.warn('label photo offered for more than one serial — refusing all of them', {
+      photoKey: match.photoKey,
+      serialNumber,
+      usedFor: photos.filter((p) => p.photoKey === match.photoKey).map((p) => p.serialNumber),
+    }, 'pickings/_validation');
+    return null;
+  }
+  return { photoKey: match.photoKey, photoUrl: match.photoUrl ?? null };
 }
 
 /**

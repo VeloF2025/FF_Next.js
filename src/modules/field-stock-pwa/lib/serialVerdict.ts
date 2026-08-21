@@ -90,7 +90,22 @@ export type SerialVerdict =
        */
       provisional?: true;
     }
-  | { valid: false; errorMessage: string; stockItemId?: string; stockItemName?: string };
+  | {
+      valid: false;
+      errorMessage: string;
+      stockItemId?: string;
+      stockItemName?: string;
+      /**
+       * True when a label photograph WOULD admit this serial — i.e. it is
+       * simply unknown to stock, not refused for its status or for being the
+       * wrong item, neither of which any photograph fixes.
+       *
+       * A structured signal on purpose. The UI previously decided by
+       * regex-matching the error copy, which silently loses the camera button
+       * the moment anyone rewords or translates the message.
+       */
+      canPhotograph?: true;
+    };
 
 export function verdictForSerial(record: SerialRecord | null, ctx: VerdictContext): SerialVerdict {
   if (!record) {
@@ -111,6 +126,7 @@ export function verdictForSerial(record: SerialRecord | null, ctx: VerdictContex
     return {
       valid: false,
       errorMessage: 'Not in the system — take a photo of the label to record it',
+      canPhotograph: true,
     };
   }
 

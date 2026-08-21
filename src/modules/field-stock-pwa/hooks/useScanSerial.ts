@@ -356,6 +356,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
             errorMessage: exists
               ? (result.errorMessage ?? verdict.errorMessage)
               : (verdict.errorMessage ?? result.errorMessage),
+            ...(verdict.valid ? {} : { canPhotograph: verdict.canPhotograph === true }),
           };
 
       applyResolved([resolved]);

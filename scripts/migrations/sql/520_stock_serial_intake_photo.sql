@@ -26,7 +26,20 @@ ALTER TABLE stock_serials
   ADD COLUMN IF NOT EXISTS intake_photo_url text;
 
 COMMENT ON COLUMN stock_serials.intake_photo_key IS
-  'VF Storage key of the label photo proving a single unlisted unit existed. Required for single-serial field intake; carton intake corroborates itself and has none.';
+  'VF Storage key of the label photo evidencing a single unlisted unit. Set by the app for single-serial field intake; carton intake corroborates itself and leaves it NULL. Unique: one photo cannot stand for two units.';
+
+-- ONE PHOTO, ONE UNIT.
+--
+-- Without this, the same key could be attached to any number of serials and
+-- the audit trail would be a single photograph backing an arbitrary number of
+-- supposedly distinct units — which is exactly the accountability the feature
+-- claims to provide. The app refuses a reused key within a request; this
+-- refuses it across requests too, and is the only thing that actually holds.
+--
+-- Partial, because carton intake and every ordinary serial leave it NULL.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_stock_serials_intake_photo_key
+  ON stock_serials (intake_photo_key)
+  WHERE intake_photo_key IS NOT NULL;
 
 -- The audit query: single-unit intakes, which are the ones resting on a photo.
 CREATE INDEX IF NOT EXISTS idx_stock_serials_intake_photo

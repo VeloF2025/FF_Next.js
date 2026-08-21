@@ -57,6 +57,11 @@ export interface PwaScannedSerial {
   intakePhotoKey?: string;
   intakePhotoUrl?: string;
   /**
+   * True when photographing the label would admit this refused serial. Set
+   * from the verdict, never inferred from the message text.
+   */
+  canPhotograph?: boolean;
+  /**
    * The RAW decoded payload this serial came from, when it was scanned. Sent
    * to the server so it can re-derive what the scan corroborates, rather than
    * being told. Absent for typed serials.
