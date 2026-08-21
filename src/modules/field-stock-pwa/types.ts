@@ -47,6 +47,16 @@ export interface PwaScannedSerial {
   /** Carton package id, when the serial came from a box scan. */
   cartonId?: string;
   /**
+   * VF Storage key of a photograph of THIS unit's label.
+   *
+   * What admits a single unlisted unit. A carton cross-checks itself; a lone
+   * unit — and a Gizzu has no carton — carries nothing to check against, so
+   * the photo is the evidence. It does not prove the typed digits match the
+   * label; it ties a real unit to a named storeman at a known time.
+   */
+  intakePhotoKey?: string;
+  intakePhotoUrl?: string;
+  /**
    * The RAW decoded payload this serial came from, when it was scanned. Sent
    * to the server so it can re-derive what the scan corroborates, rather than
    * being told. Absent for typed serials.

@@ -61,6 +61,21 @@ export interface PickingLine {
   intakeScanPayloads?: string[] | null;
   /** The carton's package id, so a box's serials stay traceable together. */
   intakeCartonId?: string | null;
+  /**
+   * Label photographs for SINGLE units the sheet has never listed, keyed by
+   * serial.
+   *
+   * A carton corroborates itself — nine serials and a declared count. A lone
+   * unit does not, and a Gizzu has no carton, so without this a Gizzu the
+   * workbook lacks could not be issued at all (field report 2026-08-21). The
+   * photo is the substitute evidence.
+   *
+   * What it proves: a real unit with a label existed, tied to a named storeman
+   * at a known time, checkable afterwards. What it does NOT prove: that the
+   * typed digits match the label. It makes an unverifiable claim auditable, it
+   * does not make it verified.
+   */
+  intakePhotos?: Array<{ serialNumber: string; photoKey: string; photoUrl?: string | null }>;
 }
 
 /** Context the serial validator needs in order to take unlisted stock in. */
@@ -204,16 +219,21 @@ export async function validateSerialsAvailable(
       // carton scanned on 2026-08-21 had all 9 of its serials refused because
       // the workbook lacked that consignment. Refusing does not prevent the
       // handout, only its recording.
-      // Derived from the payloads, not asserted by the caller. A serial no
-      // payload lists cannot be taken in, however the request is shaped —
-      // including one smuggled into the line but absent from every scan.
-      if (corroboratedFor(line).has(serialNumber)) {
+      // Two ways an unlisted serial may be taken in, and no third:
+      //   - a CARTON payload lists it (derived server-side, never asserted by
+      //     the caller, so a serial smuggled into the line but absent from
+      //     every scan cannot get through), or
+      //   - a LABEL PHOTOGRAPH was captured for it.
+      const photo = photoFor(line, serialNumber);
+      if (corroboratedFor(line).has(serialNumber) || photo) {
         const createdId = await takeSerialIntoStock(sql, {
           serialNumber,
           stockItemId: line.stockItemId,
           locationId: ctx.sourceLocationId ?? null,
           cartonId: line.intakeCartonId ?? null,
           actorStaffId: ctx.actorStaffId ?? null,
+          photoKey: photo?.photoKey ?? null,
+          photoUrl: photo?.photoUrl ?? null,
         });
         if (createdId) {
           resolvedSerialIds.set(serialNumber, createdId);
@@ -239,6 +259,24 @@ export async function validateSerialsAvailable(
   }
 
   return { ok: true, resolvedSerialIds };
+}
+
+/**
+ * The label photograph captured for one serial, if any.
+ *
+ * Matched on the serial itself, so a photo attached to a DIFFERENT serial
+ * cannot be reused to admit this one.
+ */
+function photoFor(
+  line: PickingLine,
+  serialNumber: string,
+): { photoKey: string; photoUrl?: string | null } | null {
+  const photos = Array.isArray(line.intakePhotos) ? line.intakePhotos : [];
+  const match = photos.find(
+    (p) => p && typeof p.photoKey === 'string' && p.photoKey.length > 0
+      && p.serialNumber === serialNumber,
+  );
+  return match ? { photoKey: match.photoKey, photoUrl: match.photoUrl ?? null } : null;
 }
 
 /**
@@ -293,16 +331,20 @@ async function takeSerialIntoStock(
     locationId: string | null;
     cartonId: string | null;
     actorStaffId: string | null;
+    photoKey: string | null;
+    photoUrl: string | null;
   },
 ): Promise<string | null> {
   const inserted = await sql`
     INSERT INTO stock_serials
       (stock_item_id, serial_number, status, condition, current_location_id,
        provenance, intake_carton_id, intake_by_staff_id, intake_at,
+       intake_photo_key, intake_photo_url,
        received_date, received_reference)
     VALUES
       (${opts.stockItemId}, ${opts.serialNumber}, 'in_stock', 'new', ${opts.locationId},
        'field_intake', ${opts.cartonId}, ${opts.actorStaffId}, NOW(),
+       ${opts.photoKey}, ${opts.photoUrl},
        NOW(), 'FIELD-INTAKE')
     ON CONFLICT (stock_item_id, serial_number) DO NOTHING
     RETURNING id
@@ -315,6 +357,8 @@ async function takeSerialIntoStock(
       cartonId: opts.cartonId,
       locationId: opts.locationId,
       actorStaffId: opts.actorStaffId,
+      // Which evidence admitted it: a carton listing, or a label photo.
+      evidence: opts.cartonId ? 'carton' : opts.photoKey ? 'label-photo' : 'none',
     }, 'pickings/_validation');
     return createdId;
   }

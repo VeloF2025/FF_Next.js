@@ -40,10 +40,13 @@ describe('verdictForSerial', () => {
     expect(verdictForSerial(record({ status: 'available' }), CTX).valid).toBe(true);
   });
 
-  it('rejects a serial the system does not have', () => {
-    expect(verdictForSerial(null, CTX)).toEqual({
-      valid: false, errorMessage: 'Serial number not found',
-    });
+  it('rejects a serial the system does not have, and says what would admit it', () => {
+    // The message names the way forward rather than leaving a dead end: two
+    // real Gizzu serials were refused with a bare "not found" on 2026-08-21
+    // and the handout simply went unrecorded.
+    const v = verdictForSerial(null, CTX);
+    expect(v.valid).toBe(false);
+    if (!v.valid) expect(v.errorMessage).toMatch(/take a photo of the label/i);
   });
 
   it('rejects a serial that is already issued, naming the status', () => {
@@ -182,11 +185,11 @@ describe('a serial the sheet has never listed (field intake)', () => {
     expect(new Set(CARTON).size).toBe(9);
   });
 
-  it('still refuses an unknown serial that was TYPED by hand', () => {
-    // A typo must never mint a phantom ONT issued to a named technician.
+  it('still refuses an unknown TYPED serial with no photo', () => {
+    // A bare typo must never mint a phantom unit issued to a named technician.
     const v = verdictForSerial(null, ctx('manual'));
     expect(v.valid).toBe(false);
-    if (!v.valid) expect(v.errorMessage).toBe('Serial number not found');
+    if (!v.valid) expect(v.errorMessage).toMatch(/take a photo of the label/i);
   });
 
   it('refuses an unknown serial when the caller says nothing about the source', () => {
@@ -231,6 +234,63 @@ describe('a serial the sheet has never listed (field intake)', () => {
     const v = verdictForSerial(null, ctx('machine'));
     expect(v.valid).toBe(true);
     if (v.valid) expect(v.warning).toMatch(/not on the stock sheet/i);
+  });
+});
+
+describe('a single unlisted unit, on the evidence of a label photo', () => {
+  // The Gizzus refused on 2026-08-21. GU18W12V2601016741 and ...745 genuinely
+  // are not in stock: the 2601 batch is there, 124 units, but its range runs
+  // ...037025 to ...058200. They came from a consignment the workbook never
+  // listed, and a Gizzu has no carton to corroborate them.
+  const GIZZUS = ['GU18W12V2601016741', 'GU18W12V2601016745'];
+  const base = {
+    expectedItemId: 'item-gizzu',
+    expectedItemName: 'FT-GIZZU',
+    sourceLocation: { id: 'loc-tem1', name: 'Tembisa 1' },
+  };
+
+  it('admits a TYPED Gizzu once its label has been photographed', () => {
+    for (const sn of GIZZUS) {
+      const v = verdictForSerial(null, {
+        ...base, scanSource: 'manual', hasIntakePhoto: true,
+      });
+      expect(v.valid, `${sn} should be admitted with a photo`).toBe(true);
+      if (v.valid) {
+        expect(v.provisional).toBe(true);
+        expect(v.stockItemId).toBe('item-gizzu');
+      }
+    }
+  });
+
+  it('says the record came from the photo, not from a carton', () => {
+    // The storeman needs to know which evidence is holding it up.
+    const v = verdictForSerial(null, { ...base, scanSource: 'manual', hasIntakePhoto: true });
+    expect(v.valid).toBe(true);
+    if (v.valid) expect(v.warning).toMatch(/from your photo/i);
+  });
+
+  it('refuses the same serial with no photo', () => {
+    const v = verdictForSerial(null, { ...base, scanSource: 'manual' });
+    expect(v.valid).toBe(false);
+  });
+
+  it('does not let a photo override a real REJECTION', () => {
+    // A photo evidences that a unit exists, not that it is free to issue.
+    const issued = {
+      serialNumber: GIZZUS[0]!, stockItemId: 'item-gizzu', stockItemName: 'FT-GIZZU',
+      status: 'issued', currentLocationId: 'loc-tem1', currentLocationName: 'Tembisa 1',
+    };
+    const v = verdictForSerial(issued, { ...base, hasIntakePhoto: true });
+    expect(v.valid).toBe(false);
+  });
+
+  it('does not let a photo override a WRONG ITEM', () => {
+    const wrongItem = {
+      serialNumber: 'ALCLB4948601', stockItemId: 'item-ont', stockItemName: 'FT-ONT',
+      status: 'available', currentLocationId: 'loc-tem1', currentLocationName: 'Tembisa 1',
+    };
+    const v = verdictForSerial(wrongItem, { ...base, hasIntakePhoto: true });
+    expect(v.valid).toBe(false);
   });
 });
 

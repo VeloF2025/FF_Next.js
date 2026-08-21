@@ -49,7 +49,7 @@ describe('runBatchValidation', () => {
     expect(res.results.map((r) => r.valid)).toEqual([true, true]);
   });
 
-  it('reports a serial missing from the database as not found', async () => {
+  it('reports a serial missing from the database, naming what would admit it', async () => {
     const db = querier([row()]);
     const res = await runBatchValidation(db, {
       serials: ['ALCLB49486FF', 'ALCLB0000MISSING'],
@@ -57,7 +57,12 @@ describe('runBatchValidation', () => {
       sourceLocationId: SOURCE_ID,
     });
     expect(res.results[1]).toMatchObject({
-      serialNumber: 'ALCLB0000MISSING', valid: false, errorMessage: 'Serial number not found',
+      // The message names the way forward rather than dead-ending: a bare
+      // 'not found' is what left two real Gizzu handouts unrecorded on
+      // 2026-08-21. A batch caller with no carton payload and no photo still
+      // gets a refusal, just an actionable one.
+      serialNumber: 'ALCLB0000MISSING', valid: false,
+      errorMessage: 'Not in the system — take a photo of the label to record it',
     });
   });
 

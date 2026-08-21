@@ -118,7 +118,9 @@ describe('a single scanned code corroborates nothing', () => {
 
     const [row] = lastChange(onChange);
     expect(row!.state).toBe('invalid');
-    expect(row!.errorMessage).toBe('Serial number not found');
+    // The message now names the way forward — a bare 'not found' is the dead
+    // end that left two real Gizzu handouts unrecorded on 2026-08-21.
+    expect(row!.errorMessage).toMatch(/take a photo of the label/i);
   });
 
   it('still ACCEPTS a genuinely available serial', async () => {

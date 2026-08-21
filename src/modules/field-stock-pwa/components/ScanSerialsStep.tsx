@@ -23,6 +23,7 @@ import { SerialChip } from '@/modules/field-stock-pwa/components/SerialChip';
 import { BoxGroupChip } from '@/modules/field-stock-pwa/components/BoxGroupChip';
 import { ScanNoticeBanner } from '@/modules/field-stock-pwa/components/ScanNoticeBanner';
 import { PhotoSerialFallback } from '@/modules/field-stock-pwa/components/PhotoSerialFallback';
+import { LabelPhotoCapture } from '@/modules/field-stock-pwa/components/LabelPhotoCapture';
 import { buildScanRows } from '@/modules/field-stock-pwa/lib/scanRows';
 import { batchWarning } from '@/modules/field-stock-pwa/lib/batchWarning';
 import { scanRegionFor } from '@/modules/field-stock-pwa/lib/scanBox';
@@ -49,9 +50,14 @@ export function ScanSerialsStep({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualInput, setManualInput] = useState('');
+  /** Serial currently having its label photographed, if any. */
+  const [photographing, setPhotographing] = useState<string | null>(null);
   const [fallbackHint, setFallbackHint] = useState<string | null>(null);
 
-  const { handleRawSerial, handleRemove, handleRemoveGroup, scanNotice, clearScanNotice } =
+  const {
+    handleRawSerial, handleRemove, handleRemoveGroup, scanNotice, clearScanNotice,
+    attachIntakePhoto,
+  } =
     useScanSerial({ stockItem, scanned, onChange, sourceLocation });
 
   const renderRows = buildScanRows(scanned);
@@ -217,10 +223,25 @@ export function ScanSerialsStep({
                 onRemoveMember={handleRemove}
               />
             ) : (
-              <SerialChip key={row.serial.serialNumber} serial={row.serial} onRemove={handleRemove} />
+              <SerialChip
+                key={row.serial.serialNumber}
+                serial={row.serial}
+                onRemove={handleRemove}
+                onPhotograph={setPhotographing}
+              />
             ),
           )}
         </ul>
+      )}
+
+      {/* Label photo for a single unit the sheet has never listed — the Gizzu
+          case, where there is no carton to corroborate it. */}
+      {photographing && (
+        <LabelPhotoCapture
+          serialNumber={photographing}
+          onCaptured={(photo) => { attachIntakePhoto(photographing, photo); setPhotographing(null); }}
+          onCancel={() => setPhotographing(null)}
+        />
       )}
 
       {overBatchWarning && <p className="text-xs text-amber-400 px-1">{overBatchWarning}</p>}
