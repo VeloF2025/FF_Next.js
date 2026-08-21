@@ -8,18 +8,39 @@
  * the live camera could not read a label that decodes fine from a still photo
  * (reported from the field 2026-08-21).
  *
- * A square region fixes that without hurting 1D scanning, because a 1D barcode
- * needs WIDTH and the square is no narrower than the old rectangle was.
+ * The fix is not "make it square" — that was the first attempt, and on a
+ * wide-but-short viewfinder (e.g. 320x280) a square throws away width the frame
+ * was offering, ending up NARROWER than the 300px it replaced and regressing
+ * the 1D barcodes it was supposed to leave alone.
  *
- * Sized from the actual viewfinder rather than a constant: a scan box larger
- * than the video frame is clamped or ignored depending on version, and phones
- * in this fleet range from small iPhones to large Androids.
+ * What each format actually needs:
+ *   1D (Code128 on a unit label) — WIDTH. The old region gave 300.
+ *   2D (DataMatrix on a carton)  — HEIGHT as well. The old region gave 140.
+ *
+ * So take as much of the frame as sensible on EACH axis independently, capped.
+ * That is at least as good as the old region in both dimensions on every
+ * viewfinder large enough to offer it, and clamps to the frame when it is not —
+ * a box larger than the video cannot be scanned at all.
  */
 
-/** Fraction of the shorter viewfinder edge the decode region should span. */
-const EDGE_FRACTION = 0.8;
-/** Never smaller than this — below it, a dense DataMatrix cannot resolve. */
-const MIN_EDGE = 200;
+/** Fraction of each viewfinder edge the decode region should span. */
+const EDGE_FRACTION = 0.9;
+/**
+ * Target floor, and the reason for it: the region this replaced was 300px WIDE.
+ * A 1D barcode needs width, so going below 300 would trade a 2D fix for a 1D
+ * regression. On a 350px viewfinder EDGE_FRACTION alone gives 280 — narrower
+ * than before — so the floor, not the fraction, is what protects 1D scanning.
+ *
+ * It is a target, not a guarantee: a viewfinder smaller than this is clamped
+ * down to the frame below, because a box larger than the video cannot be
+ * scanned at all.
+ */
+const MIN_EDGE = 300;
+/**
+ * Height target. The old region gave 2D symbols only 140px, which is what made
+ * a carton label unreadable in live video while a still photo decoded it.
+ */
+const MIN_HEIGHT = 260;
 /** Never larger than this — huge regions cost frame rate for no accuracy gain. */
 const MAX_EDGE = 480;
 
@@ -33,19 +54,29 @@ export interface ScanBox {
  * never exceeding the frame itself.
  */
 export function squareScanBox(viewfinderWidth: number, viewfinderHeight: number): ScanBox {
-  const shortest = Math.min(viewfinderWidth, viewfinderHeight);
+  return {
+    width: edgeFor(viewfinderWidth, viewfinderHeight, MIN_EDGE),
+    height: edgeFor(viewfinderHeight, viewfinderWidth, MIN_HEIGHT),
+  };
+}
 
-  // A non-positive or absurd viewfinder (measured before layout settles) must
-  // not produce a zero-sized box — that silently disables scanning entirely.
-  if (!Number.isFinite(shortest) || shortest <= 0) {
-    return { width: MIN_EDGE, height: MIN_EDGE };
-  }
+/**
+ * One axis of the decode region.
+ *
+ * `fallback` is the OTHER axis, used only when this one is unmeasurable — if a
+ * real dimension exists it must still bound the box, because falling back to a
+ * constant beside a genuinely small frame produces a box bigger than the video.
+ */
+function edgeFor(dimension: number, fallback: number, target: number): number {
+  const frame = Number.isFinite(dimension) && dimension > 0
+    ? dimension
+    : (Number.isFinite(fallback) && fallback > 0 ? fallback : 0);
 
-  const desired = Math.floor(shortest * EDGE_FRACTION);
-  // Clamp upward first, then never exceed the frame: on a genuinely tiny
-  // viewfinder the frame wins over MIN_EDGE, since a box larger than the video
-  // cannot be scanned.
-  const edge = Math.min(Math.max(desired, MIN_EDGE), MAX_EDGE, Math.floor(shortest));
+  // Nothing measurable at all: a zero-sized box silently disables scanning, so
+  // return the target and let html5-qrcode clamp it against the real video.
+  if (frame === 0) return target;
 
-  return { width: edge, height: edge };
+  const desired = Math.floor(frame * EDGE_FRACTION);
+  // Reach the target where the frame allows it; never exceed the frame.
+  return Math.min(Math.max(desired, target), MAX_EDGE, Math.floor(frame));
 }
