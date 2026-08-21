@@ -13,10 +13,17 @@ const repo = vi.hoisted(() => ({
   claimIncident: vi.fn(), recordStorageObjectDeleted: vi.fn(), markStorageComplete: vi.fn(),
   markItemFailed: vi.fn(), recordItemAttempt: vi.fn(), listResumableItems: vi.fn(), getItem: vi.fn(),
 }));
+// One mock object behind both repository modules: the service's callers do not
+// care which file a function lives in, and splitting the doubles would only
+// duplicate the happy-path setup.
 vi.mock('../retentionRepository', () => repo);
+vi.mock('../retentionRunRepository', () => repo);
 
-const purge = vi.hoisted(() => ({ purgeIncidentRecords: vi.fn() }));
+const purge = vi.hoisted(() => ({ purgeIncidentRecords: vi.fn(), preflightPurgeStatements: vi.fn() }));
 vi.mock('../incidentPurge', () => purge);
+
+const identity = vi.hoisted(() => ({ assertRetentionIdentityConfigured: vi.fn() }));
+vi.mock('../retentionDb', () => identity);
 
 const storage = vi.hoisted(() => ({ deleteIncidentStorageObject: vi.fn() }));
 vi.mock('../storageDeletion', () => storage);
@@ -68,12 +75,61 @@ function happyPath(): void {
   db.transaction.mockImplementation(async (work: (txn: unknown) => Promise<unknown>) => work({ query: db.txnQuery, queryOne: db.txnQueryOne }));
   storage.deleteIncidentStorageObject.mockResolvedValue('deleted');
   purge.purgeIncidentRecords.mockResolvedValue(undefined);
+  purge.preflightPurgeStatements.mockResolvedValue(undefined);
+  identity.assertRetentionIdentityConfigured.mockReturnValue(undefined);
   notifications.notifyRetentionHealth.mockResolvedValue({ notificationsSent: 0, notificationsFailed: 0, recipientsMissing: false });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   happyPath();
+});
+
+describe('run-wide preflight', () => {
+  // The class of bug: a failure that is a property of the RUN, not of the
+  // item, discovered lazily inside the item path — after storage deletion has
+  // already destroyed files. A blank FLEET_RETENTION_DATABASE_URL did exactly
+  // that, and so would a missing grant or a wrong cast in the purge SQL.
+  it('fails on a misconfigured retention identity before deleting any object', async () => {
+    identity.assertRetentionIdentityConfigured.mockImplementation(() => {
+      throw new Error('FLEET_RETENTION_DATABASE_URL is set but blank');
+    });
+    await expect(runOperationalRetention({ dryRun: false, requestedAt: NOW }))
+      .rejects.toThrow(/FLEET_RETENTION_DATABASE_URL/);
+    expect(storage.deleteIncidentStorageObject).not.toHaveBeenCalled();
+    expect(purge.purgeIncidentRecords).not.toHaveBeenCalled();
+  });
+
+  it('does not even open a run row for a misconfigured identity', async () => {
+    identity.assertRetentionIdentityConfigured.mockImplementation(() => { throw new Error('blank'); });
+    await expect(runOperationalRetention({ dryRun: false, requestedAt: NOW })).rejects.toThrow();
+    expect(repo.insertRetentionRun).not.toHaveBeenCalled();
+  });
+
+  // Privileges and SQL validity are run-wide too: the uuid-cast bug and the
+  // missing DELETE grant would both have destroyed one item's attachments per
+  // item before failing identically every time.
+  it('proves the purge statements can execute before deleting any object', async () => {
+    await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    const preflightOrder = purge.preflightPurgeStatements.mock.invocationCallOrder[0]!;
+    const deleteOrder = storage.deleteIncidentStorageObject.mock.invocationCallOrder[0]!;
+    expect(preflightOrder).toBeLessThan(deleteOrder);
+  });
+
+  it('aborts the run when the purge statements cannot execute', async () => {
+    purge.preflightPurgeStatements.mockRejectedValue(Object.assign(new Error('permission denied'), { code: '42501' }));
+    await expect(runOperationalRetention({ dryRun: false, requestedAt: NOW })).rejects.toThrow(/permission denied/);
+    expect(storage.deleteIncidentStorageObject).not.toHaveBeenCalled();
+    expect(repo.finalizeRetentionRun).toHaveBeenCalledWith(RUN, expect.objectContaining({ status: 'failed', errorCode: '42501' }));
+  });
+
+  // A dry run deletes nothing, so it must not require delete privileges to
+  // report what a live run would do.
+  it('does not require purge privileges for a dry run', async () => {
+    purge.preflightPurgeStatements.mockRejectedValue(Object.assign(new Error('permission denied'), { code: '42501' }));
+    const result = await runOperationalRetention({ dryRun: true, requestedAt: NOW });
+    expect(result.status).toBe('succeeded');
+  });
 });
 
 describe('dry run', () => {
@@ -160,6 +216,19 @@ describe('live run', () => {
     const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
     expect(purge.purgeIncidentRecords).toHaveBeenCalled();
     expect(result.itemsCompleted).toBe(1);
+  });
+
+  // AbortSignal.timeout rejects with a DOMException named TimeoutError. It IS
+  // instanceof Error on Node 18+ and carries a NUMERIC code, so the code
+  // extractor must prefer a string code and fall back to the name — preferring
+  // the numeric code, or dropping the name fallback, loses the one code an
+  // operator most wants to see on a stalled run.
+  it('records a storage timeout as TimeoutError, not as an unknown error', async () => {
+    storage.deleteIncidentStorageObject.mockRejectedValue(
+      new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+    );
+    await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(repo.markItemFailed).toHaveBeenCalledWith('item-a', 'TimeoutError');
   });
 
   it('marks the item failed but keeps it resumable when the database purge fails', async () => {
@@ -324,6 +393,33 @@ describe('a hold landing between the claim and the storage deletion', () => {
     const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
     expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'item-a', incidentId: INCIDENT_A });
     expect(result.itemsCompleted).toBe(1);
+  });
+});
+
+describe('run duration', () => {
+  // The per-request timeout bounds ONE request. A run holds the
+  // fleet-operational-retention advisory lock for its whole duration, so a
+  // batch of slow items would still block every later tick.
+  it('stops claiming new work once the run budget is spent', async () => {
+    vi.useFakeTimers();
+    try {
+      repo.listPurgeCandidates.mockResolvedValue([candidateA, candidateB]);
+      purge.purgeIncidentRecords.mockImplementation(async () => {
+        vi.advanceTimersByTime(11 * 60 * 1000);
+      });
+      const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+      expect(repo.claimIncident).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ itemsCompleted: 1, stoppedForBudget: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not stop early inside the budget', async () => {
+    repo.listPurgeCandidates.mockResolvedValue([candidateA, candidateB]);
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(repo.claimIncident).toHaveBeenCalledTimes(2);
+    expect(result.stoppedForBudget).toBe(false);
   });
 });
 

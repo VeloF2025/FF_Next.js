@@ -1,6 +1,9 @@
 /**
- * Candidate selection, the aggregate coverage gate, and durable per-item
- * staging for the retention pipeline (migration 518).
+ * Candidate selection, the aggregate coverage gate, and the pre-destruction
+ * purgeability check for the retention pipeline (migration 518).
+ *
+ * Run and item state lives in `retentionRunRepository.ts`; this file decides
+ * only WHICH incidents may be purged, never records what happened to them.
  *
  * Three properties are enforced here and re-enforced by the schema:
  *
@@ -20,8 +23,7 @@
  * DELETE's lock (migration 518, invariant 2). Adding an application lock would
  * duplicate a guarantee the schema already gives.
  */
-import { query, queryOne, transaction, type TxnClient } from '@/lib/db-pool';
-import type { RetentionItem, RetentionItemStage, RunStatus } from '../analytics/types';
+import { query, queryOne, transaction } from '@/lib/db-pool';
 
 export interface PurgeCandidate {
   incidentId: string;
@@ -201,144 +203,4 @@ export async function hasCompleteAggregateCoverage(monthStart: string, metricVer
     [monthStart, metricVersion],
   );
   return Number(row?.total ?? 0) > 0;
-}
-
-export interface RetentionRunTotals {
-  status: RunStatus;
-  itemsConsidered: number;
-  itemsClaimed: number;
-  itemsCompleted: number;
-  itemsFailed: number;
-  itemsSkippedHold: number;
-  itemsSkippedCoverage: number;
-  storageObjectsDeleted: number;
-  errorCode: string | null;
-}
-
-interface IdRow extends Record<string, unknown> { id: string }
-
-export async function insertRetentionRun(params: {
-  dryRun: boolean; cutoffWorkDate: string; policyMonths: number; triggerSource: 'cron' | 'manual';
-}): Promise<string> {
-  const row = await queryOne<IdRow>(
-    `/* fleet-retention:run-start */
-     INSERT INTO fleet_operational_retention_runs (dry_run, cutoff_work_date, policy_months, trigger_source)
-     VALUES ($1, $2::date, $3::int, $4) RETURNING id`,
-    [params.dryRun, params.cutoffWorkDate, params.policyMonths, params.triggerSource],
-  );
-  if (!row) throw new Error('Retention run insert returned no row');
-  return row.id;
-}
-
-export async function finalizeRetentionRun(runId: string, totals: RetentionRunTotals): Promise<void> {
-  await query(
-    `/* fleet-retention:run-finish */
-     UPDATE fleet_operational_retention_runs
-        SET status = $2, finished_at = now(), items_considered = $3, items_claimed = $4,
-            items_completed = $5, items_failed = $6, items_skipped_hold = $7,
-            items_skipped_coverage = $8, storage_objects_deleted = $9, error_code = $10
-      WHERE id = $1::uuid`,
-    [
-      runId, totals.status, totals.itemsConsidered, totals.itemsClaimed, totals.itemsCompleted,
-      totals.itemsFailed, totals.itemsSkippedHold, totals.itemsSkippedCoverage,
-      totals.storageObjectsDeleted, totals.errorCode,
-    ],
-  );
-}
-
-const ITEM_COLUMNS = `id, retention_run_id, incident_id, stage, storage_objects_total,
-  storage_objects_deleted, attempts, last_error_code`;
-
-interface ItemRow extends Record<string, unknown> {
-  id: string; retention_run_id: string; incident_id: string | null; stage: RetentionItemStage;
-  storage_objects_total: number; storage_objects_deleted: number; attempts: number; last_error_code: string | null;
-}
-
-function mapItem(row: ItemRow): RetentionItem {
-  return {
-    id: row.id, retentionRunId: row.retention_run_id, incidentId: row.incident_id, stage: row.stage,
-    storageObjectsTotal: row.storage_objects_total, storageObjectsDeleted: row.storage_objects_deleted,
-    attempts: row.attempts, lastErrorCode: row.last_error_code,
-  };
-}
-
-/**
- * Claims one incident for this run. The insert trips
- * `trg_fleet_retention_item_guard` (terminal state, no active hold) and the
- * `ux_fleet_operational_retention_items_live` unique index (no second claim),
- * so a lost race raises rather than double-purging.
- */
-export async function claimIncident(
-  txn: TxnClient, params: { runId: string; incidentId: string; storageObjectsTotal: number },
-): Promise<RetentionItem> {
-  const row = await txn.queryOne<ItemRow>(
-    `/* fleet-retention:claim */
-     INSERT INTO fleet_operational_retention_items
-       (retention_run_id, incident_id, stage, storage_objects_total, attempts)
-     VALUES ($1::uuid, $2::uuid, 'pending_storage', $3::int, 1)
-     RETURNING ${ITEM_COLUMNS}`,
-    [params.runId, params.incidentId, params.storageObjectsTotal],
-  );
-  if (!row) throw new Error('Retention item claim returned no row');
-  return mapItem(row);
-}
-
-/** One more object accounted for. Called per object so a crash mid-batch loses at most the current one. */
-export async function recordStorageObjectDeleted(itemId: string): Promise<void> {
-  await query(
-    `/* fleet-retention:storage-progress */
-     UPDATE fleet_operational_retention_items
-        SET storage_objects_deleted = storage_objects_deleted + 1, updated_at = now()
-      WHERE id = $1::uuid AND storage_objects_deleted < storage_objects_total`,
-    [itemId],
-  );
-}
-
-export async function markStorageComplete(itemId: string): Promise<void> {
-  await query(
-    `/* fleet-retention:storage-complete */
-     UPDATE fleet_operational_retention_items
-        SET stage = 'storage_complete', last_error_code = NULL, updated_at = now()
-      WHERE id = $1::uuid`,
-    [itemId],
-  );
-}
-
-/** Records a failure WITHOUT touching the incident's records — they stay for the retry. */
-export async function markItemFailed(itemId: string, errorCode: string): Promise<void> {
-  await query(
-    `/* fleet-retention:item-failed */
-     UPDATE fleet_operational_retention_items
-        SET stage = 'failed', last_error_code = $2, updated_at = now()
-      WHERE id = $1::uuid`,
-    [itemId, errorCode.slice(0, 100)],
-  );
-}
-
-export async function recordItemAttempt(itemId: string): Promise<void> {
-  await query(
-    `/* fleet-retention:item-attempt */
-     UPDATE fleet_operational_retention_items SET attempts = attempts + 1, updated_at = now() WHERE id = $1::uuid`,
-    [itemId],
-  );
-}
-
-/** Items from earlier runs that still hold an identity: resumed from their durable stage before new work is claimed. */
-export async function listResumableItems(limit: number): Promise<RetentionItem[]> {
-  const rows = await query<ItemRow>(
-    `/* fleet-retention:resumable */
-     SELECT ${ITEM_COLUMNS} FROM fleet_operational_retention_items
-      WHERE incident_id IS NOT NULL AND stage IN ('claimed', 'pending_storage', 'storage_complete', 'failed')
-      ORDER BY claimed_at ASC LIMIT $1::int`,
-    [limit],
-  );
-  return rows.map(mapItem);
-}
-
-export async function getItem(itemId: string): Promise<RetentionItem | null> {
-  const row = await queryOne<ItemRow>(
-    `/* fleet-retention:item */ SELECT ${ITEM_COLUMNS} FROM fleet_operational_retention_items WHERE id = $1::uuid`,
-    [itemId],
-  );
-  return row ? mapItem(row) : null;
 }

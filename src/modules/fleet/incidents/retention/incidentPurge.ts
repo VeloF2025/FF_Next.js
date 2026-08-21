@@ -79,6 +79,47 @@ export const PURGE_ITEM_COMPLETION_STATEMENT =
  * deletions is configuration (`retentionDb.ts`) rather than a hard-wired
  * import of the shared application pool.
  */
+/**
+ * A uuid that matches nothing. Every purge statement is keyed on an incident
+ * id, so running them against this parses and plans the real SQL, exercises
+ * the real privileges, and touches no row.
+ */
+const SENTINEL_ID = '00000000-0000-0000-0000-000000000000';
+
+class PreflightRollback extends Error {}
+
+/**
+ * Proves, before the run deletes its first file, that the purge statements can
+ * actually execute as the configured identity.
+ *
+ * This exists because of a specific failure class: a deterministic, RUN-WIDE
+ * fault discovered per item, after storage deletion has already destroyed
+ * attachments. A missing DELETE grant (42501), a wrong cast (42883), a renamed
+ * column (42703) all behave that way — identically for every item, every
+ * night, with files gone and rows intact each time.
+ *
+ * Running each statement against a sentinel id inside a transaction that is
+ * always rolled back catches every one of them for the cost of one round trip.
+ * It deliberately does NOT prove the trigger behaviour or the FK ordering —
+ * no rows match, so nothing fires. It proves the statements are executable.
+ */
+export async function preflightPurgeStatements(): Promise<void> {
+  try {
+    await purgeTransaction(async (txn: TxnClient) => {
+      for (const statement of PURGE_CHILD_STATEMENTS) {
+        await txn.query(statement, [SENTINEL_ID]);
+      }
+      await txn.query(PURGE_INCIDENT_STATEMENT, [SENTINEL_ID]);
+      await txn.query(PURGE_ITEM_COMPLETION_STATEMENT, [SENTINEL_ID]);
+      throw new PreflightRollback('preflight');
+    });
+  } catch (error) {
+    // The sentinel rollback is the success path; anything else is a real
+    // problem with privileges, types, or the schema.
+    if (!(error instanceof PreflightRollback)) throw error;
+  }
+}
+
 export async function purgeIncidentRecords(params: { itemId: string; incidentId: string }): Promise<void> {
   await purgeTransaction(async (txn: TxnClient) => {
     for (const statement of PURGE_CHILD_STATEMENTS) {

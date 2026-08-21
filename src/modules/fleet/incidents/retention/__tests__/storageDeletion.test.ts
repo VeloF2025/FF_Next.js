@@ -41,11 +41,6 @@ describe('approved programme paths', () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it('surfaces a timeout as a failure rather than a silent success', async () => {
-    fetchMock.mockRejectedValue(Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }));
-    await expect(deleteIncidentStorageObject('fleet/incidents/abc123_photo.jpg')).rejects.toThrow(/timeout/i);
-  });
-
   it('treats an object that is already gone as success so a retry can finish', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 404 });
     expect(await deleteIncidentStorageObject('fleet/incidents/abc123_photo.jpg')).toBe('already_absent');

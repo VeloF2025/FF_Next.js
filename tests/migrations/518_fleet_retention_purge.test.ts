@@ -46,8 +46,10 @@ const VEHICLE = '55555555-5555-4555-8555-555555555555';
 const ADJUSTMENT = '66666666-6666-4666-8666-666666666666';
 
 const PREREQUISITES = `
-  -- EVERY column below mirrors production's name AND type, verified against
-  -- information_schema on the shared database. A fixture may declare a SUBSET
+  -- EVERY column below mirrors production's name, type AND LENGTH, verified
+  -- against information_schema on the shared database. Length matters in the
+  -- unsafe direction: a fixture wider than production lets an over-long value
+  -- pass here and raise 22001 there. A fixture may declare a SUBSET
   -- of production's columns; it may never declare a column production does not
   -- have, or the same column with a different type. A TEXT stand-in for a uuid
   -- column is not a harmless simplification: it makes a ::text comparison parse
@@ -72,8 +74,8 @@ const PREREQUISITES = `
   -- cast to match it, and this fixture is what proves the cast is right.
   CREATE TABLE user_notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL,
-    event_type VARCHAR(100) NOT NULL, title VARCHAR(255) NOT NULL, body TEXT,
-    severity VARCHAR(20) NOT NULL DEFAULT 'info', source_module VARCHAR(100), source_id UUID,
+    event_type VARCHAR(100) NOT NULL, title VARCHAR(500) NOT NULL, body TEXT,
+    severity VARCHAR(20) NOT NULL DEFAULT 'info', source_module VARCHAR(50), source_id UUID,
     is_read BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
@@ -112,7 +114,8 @@ function urlAsRole(role: string): string {
 /** A role with no grants at all, used to prove the identity seam actually routes. */
 const UNPRIVILEGED_ROLE = 'fleet_retention_seam_probe';
 
-type Repo = typeof import('@/modules/fleet/incidents/retention/retentionRepository');
+type Repo = typeof import('@/modules/fleet/incidents/retention/retentionRepository')
+  & typeof import('@/modules/fleet/incidents/retention/retentionRunRepository');
 type Purge = typeof import('@/modules/fleet/incidents/retention/incidentPurge');
 type RetentionDb = typeof import('@/modules/fleet/incidents/retention/retentionDb');
 let repo: Repo;
@@ -241,7 +244,10 @@ beforeAll(async () => {
   // The purge also removes this module's bell notifications; the real table
   // already grants the application DELETE, and the scratch copy mirrors that.
   await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ${SCHEMA}.user_notifications TO fibreflow_user`);
-  repo = await import('@/modules/fleet/incidents/retention/retentionRepository');
+  repo = {
+    ...await import('@/modules/fleet/incidents/retention/retentionRepository'),
+    ...await import('@/modules/fleet/incidents/retention/retentionRunRepository'),
+  };
   purge = await import('@/modules/fleet/incidents/retention/incidentPurge');
   retentionDb = await import('@/modules/fleet/incidents/retention/retentionDb');
   ({ transaction } = await import('@/lib/db-pool'));
@@ -388,6 +394,18 @@ describe('a hold landing after the claim', () => {
   it('refuses the storage-progress update', async () => {
     const { itemId } = await claimThenHold();
     await expect(repo.recordStorageObjectDeleted(itemId)).rejects.toMatchObject({ code: '23514' });
+  });
+
+  // The counter guard has an escape: once storage_objects_deleted reaches the
+  // total recorded at CLAIM time, the UPDATE matches no row, no trigger fires,
+  // and a loop over a grown evidence set would keep deleting unguarded. It has
+  // to fail loudly instead of matching nothing.
+  it('raises rather than silently matching nothing when the evidence set grew after the claim', async () => {
+    const seeded = await seedIncident();
+    const runId = await repo.insertRetentionRun({ dryRun: false, cutoffWorkDate: '2025-08-21', policyMonths: 12, triggerSource: 'cron' });
+    const item = await transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId: seeded.incidentId, storageObjectsTotal: 1 }));
+    await repo.recordStorageObjectDeleted(item.id);
+    await expect(repo.recordStorageObjectDeleted(item.id)).rejects.toThrow(/storage object count/i);
   });
 
   it('refuses the failure-recording update — the failure path itself is blocked', async () => {
@@ -589,6 +607,24 @@ describe('retention database identity', () => {
     // Nothing was destroyed on the way to being refused.
     expect(await count('fleet_operational_incidents', 'id = $1', [claimed.incidentId])).toBe(1);
     expect(await count('fleet_operational_incident_evidence', 'incident_id = $1', [claimed.incidentId])).toBe(1);
+    await retentionDb.__closeRetentionPoolForTests();
+  });
+
+  // The preflight is what turns a deterministic, run-wide fault into a run
+  // that fails before deleting anything, instead of one destroyed attachment
+  // at a time. It has to be exercised against a real role and real SQL.
+  it('preflight passes for the granted retention role and changes nothing', async () => {
+    const seeded = await seedIncident();
+    await purge.preflightPurgeStatements();
+    expect(await count('fleet_operational_incidents', 'id = $1', [seeded.incidentId])).toBe(1);
+    expect(await count('fleet_operational_incident_evidence', 'incident_id = $1', [seeded.incidentId])).toBe(1);
+    expect(await count('user_notifications', 'source_id = $1', [seeded.incidentId])).toBe(1);
+  });
+
+  it('preflight fails loudly for a role without the grants', async () => {
+    process.env.FLEET_RETENTION_DATABASE_URL = urlAsRole(UNPRIVILEGED_ROLE);
+    retentionDb.__resetRetentionPoolForTests();
+    await expect(purge.preflightPurgeStatements()).rejects.toMatchObject({ code: '42501' });
     await retentionDb.__closeRetentionPoolForTests();
   });
 

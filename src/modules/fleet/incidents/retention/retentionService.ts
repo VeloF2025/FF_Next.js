@@ -20,17 +20,30 @@ import { log } from '@/lib/logger';
 import { transaction, type TxnClient } from '@/lib/db-pool';
 import { getEffectiveAnalyticsRetentionSettings } from '../analytics/settingsRepository';
 import type { RetentionItem, RetentionPolicy, RunStatus } from '../analytics/types';
-import { purgeIncidentRecords } from './incidentPurge';
+import { preflightPurgeStatements } from './incidentPurge';
 import {
-  claimIncident, countCandidatesHeld, finalizeRetentionRun, getIncidentPurgeState,
-  hasCompleteAggregateCoverage, insertRetentionRun, listIncidentStorageObjects, listPurgeCandidates,
-  listResumableItems, markItemFailed, markStorageComplete, recordItemAttempt,
-  recordStorageObjectDeleted,
+  countCandidatesHeld, hasCompleteAggregateCoverage, listIncidentStorageObjects, listPurgeCandidates,
 } from './retentionRepository';
+import {
+  claimIncident, finalizeRetentionRun, insertRetentionRun, listResumableItems,
+} from './retentionRunRepository';
+import {
+  errorCode, isExpectedClaimRefusal, processItem, type Totals,
+} from './retentionItemProcessor';
 import { notifyRetentionHealth } from './retentionNotifications';
-import { deleteIncidentStorageObject } from './storageDeletion';
+import { assertRetentionIdentityConfigured } from './retentionDb';
 
 const MODULE = 'FleetRetentionService';
+/**
+ * How long a run may keep claiming NEW work.
+ *
+ * `storageDeletion`'s per-request timeout bounds one HTTP call; it says nothing
+ * about a run of 100 items with several attachments each. A run holds the
+ * `fleet-operational-retention` advisory lock for its whole duration, so an
+ * unbounded run blocks every later tick as well as this one. Work already
+ * claimed is always finished — stopping mid-item is what strands evidence.
+ */
+const RUN_BUDGET_MS = 10 * 60 * 1000;
 
 export class LiveRetentionDisabledError extends Error {
   constructor(message: string) { super(message); this.name = 'LiveRetentionDisabledError'; }
@@ -57,6 +70,8 @@ export interface RetentionResult {
   storageObjectsDeleted: number;
   /** Dry run only: objects that WOULD be deleted. Never a byte total — the evidence table records no size. */
   storageObjectsPending: number;
+  /** True when the run stopped claiming new work to stay inside its time budget. Remaining candidates wait for the next run. */
+  stoppedForBudget: boolean;
 }
 
 /** The SAST calendar date `retentionMonths` before the run instant. Everything strictly older than it is out of policy. */
@@ -66,126 +81,21 @@ export function resolveCutoffWorkDate(requestedAt: string, retentionMonths: numb
   return cutoff.toISOString().slice(0, 10);
 }
 
-function errorCode(error: unknown): string {
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code?: unknown }).code;
-    if (typeof code === 'string') return code;
-  }
-  return error instanceof Error ? error.name : 'unknown_error';
-}
-
-/**
- * `trg_fleet_retention_item_guard` refuses any write about an incident that is
- * held or non-terminal, with 23514. That is an EXPECTED outcome of a hold
- * landing mid-run, not a crash — and critically, it also refuses the write
- * that would record the failure, so a refusal must never be routed into the
- * failure path.
- */
-function isGuardRefusal(error: unknown): boolean {
-  return errorCode(error) === '23514';
-}
-
-/** A claim refused by the guard (23514) or already taken (23505) is expected too. */
-function isExpectedClaimRefusal(error: unknown): boolean {
-  const code = errorCode(error);
-  return code === '23514' || code === '23505';
-}
-
-interface Totals {
-  considered: number; claimed: number; completed: number; failed: number;
-  skippedHold: number; skippedCoverage: number; storageDeleted: number; storagePending: number;
-}
-
-async function deleteItemStorage(item: RetentionItem, totals: Totals): Promise<void> {
-  // `storage_complete` is the stage, but the COUNTERS are the durable truth:
-  // markItemFailed overwrites the stage, so a resumed item that had already
-  // finished storage would otherwise re-run it and re-count every object.
-  if (item.stage === 'storage_complete' || item.storageObjectsDeleted >= item.storageObjectsTotal) return;
-  const objects = await listIncidentStorageObjects(item.incidentId!);
-  for (const object of objects) {
-    // Throws on any failure other than "already gone", which aborts this item
-    // BEFORE the database transaction and leaves its evidence for the retry.
-    const outcome = await deleteIncidentStorageObject(object.storagePath);
-    await recordStorageObjectDeleted(item.id);
-    // Only a real deletion counts. On a resume the objects are already gone,
-    // and counting those would report deletions this run never performed.
-    if (outcome === 'deleted') totals.storageDeleted += 1;
-  }
-  await markStorageComplete(item.id);
-}
-
-type ItemOutcome = 'completed' | 'failed' | 'skipped';
-
-/**
- * Works one item through storage and then the database.
- *
- * The purgeability re-check comes FIRST and before anything destructive: the
- * claim has already committed and storage deletion is HTTP, so a hold raised
- * in that window would otherwise be discovered only when a bookkeeping UPDATE
- * was refused — after an attachment had been destroyed for an incident
- * somebody just decided to keep.
- *
- * Nothing here touches the item row before that check passes. Once an incident
- * is held, the schema refuses EVERY write about it, including `markItemFailed`
- * and `recordItemAttempt`; a skip that tries to record itself becomes an
- * exception that aborts the whole run.
- */
-async function processItem(
-  item: RetentionItem, totals: Totals, options: { recordAttempt?: boolean } = {},
-): Promise<ItemOutcome> {
-  if (!item.incidentId) return 'skipped';
-  const state = await getIncidentPurgeState(item.incidentId);
-  if (state !== 'purgeable') {
-    totals.skippedHold += 1;
-    log.info('[fleet-retention] item no longer purgeable — left untouched for a later run', {
-      itemId: item.id, state,
-    }, MODULE);
-    return 'skipped';
-  }
-
-  try {
-    if (options.recordAttempt) await recordItemAttempt(item.id);
-    await deleteItemStorage(item, totals);
-    await purgeIncidentRecords({ itemId: item.id, incidentId: item.incidentId });
-    totals.completed += 1;
-    return 'completed';
-  } catch (error) {
-    // A hold that landed inside the residual window surfaces here as 23514.
-    // Recording it is impossible (the same guard refuses that write), so the
-    // item is left exactly as it is and picked up again once the hold lifts.
-    if (isGuardRefusal(error)) {
-      totals.skippedHold += 1;
-      log.info('[fleet-retention] guard refused mid-item — a hold landed during the run', {
-        itemId: item.id, code: errorCode(error),
-      }, MODULE);
-      return 'skipped';
-    }
-    totals.failed += 1;
-    const code = errorCode(error);
-    // Item ids and counts only: a retention log must not become a list of who
-    // was investigated.
-    log.error('[fleet-retention] item failed and was left for retry', {
-      itemId: item.id, stage: item.stage, code,
-    }, MODULE);
-    try {
-      await markItemFailed(item.id, code);
-    } catch (recordError) {
-      // Bookkeeping is never more important than the batch: a failure to
-      // record a failure is logged and the run continues.
-      log.error('[fleet-retention] could not record the item failure', {
-        itemId: item.id, code: errorCode(recordError),
-      }, MODULE);
-    }
-    return 'failed';
-  }
-}
-
 async function claimAndProcessCandidates(
-  runId: string, policy: RetentionPolicy, cutoffWorkDate: string, totals: Totals,
+  runId: string, policy: RetentionPolicy, cutoffWorkDate: string, totals: Totals, deadline: number,
 ): Promise<void> {
   const candidates = await listPurgeCandidates({ cutoffWorkDate, limit: policy.retentionBatchSize });
   totals.considered += candidates.length;
   for (const candidate of candidates) {
+    // Checked before CLAIMING, never mid-item: an item already claimed is
+    // carried to completion so no evidence is left half-deleted.
+    if (Date.now() >= deadline) {
+      totals.stoppedForBudget = true;
+      log.warn('[fleet-retention] run budget spent — remaining candidates left for the next run', {
+        claimed: totals.claimed, considered: totals.considered,
+      }, MODULE);
+      return;
+    }
     if (!await hasCompleteAggregateCoverage(candidate.monthStart, policy.metricVersion)) {
       totals.skippedCoverage += 1;
       continue;
@@ -229,6 +139,9 @@ export async function runOperationalRetention(request: RetentionRunRequest): Pro
   }
   // The effective policy is the one in force at the run instant, so a
   // shortened policy can never delete anything before its own effective time.
+  // Before the run row, before any item: a configuration fault must not be
+  // discovered after the first attachment has been destroyed.
+  if (!request.dryRun) assertRetentionIdentityConfigured();
   const cutoffWorkDate = resolveCutoffWorkDate(request.requestedAt, policy.retentionMonths);
   const runId = await insertRetentionRun({
     dryRun: request.dryRun, cutoffWorkDate, policyMonths: policy.retentionMonths,
@@ -236,15 +149,23 @@ export async function runOperationalRetention(request: RetentionRunRequest): Pro
   });
   const totals: Totals = {
     considered: 0, claimed: 0, completed: 0, failed: 0,
-    skippedHold: 0, skippedCoverage: 0, storageDeleted: 0, storagePending: 0,
+    skippedHold: 0, skippedCoverage: 0, storageDeleted: 0, storagePending: 0, stoppedForBudget: false,
   };
+  const deadline = Date.now() + RUN_BUDGET_MS;
 
   let status: RunStatus = 'succeeded';
   try {
     if (request.dryRun) {
+      // A dry run deletes nothing, so it neither needs nor checks delete
+      // privileges — it must still be able to report on a database the live
+      // run could not touch.
       await runDryRun(policy, cutoffWorkDate, totals);
     } else {
+      // Deterministic, run-wide faults (privileges, casts, renamed columns)
+      // are caught here rather than one destroyed attachment at a time.
+      await preflightPurgeStatements();
       for (const stale of await listResumableItems(policy.retentionBatchSize)) {
+        if (Date.now() >= deadline) { totals.stoppedForBudget = true; break; }
         // The attempt counter is incremented INSIDE processItem, after the
         // purgeability check — it is an UPDATE the guard refuses for a held
         // item, and one held item used to abort the run before any candidate
@@ -252,7 +173,7 @@ export async function runOperationalRetention(request: RetentionRunRequest): Pro
         const outcome = await processItem(stale, totals, { recordAttempt: true });
         if (outcome !== 'skipped') totals.claimed += 1;
       }
-      await claimAndProcessCandidates(runId, policy, cutoffWorkDate, totals);
+      await claimAndProcessCandidates(runId, policy, cutoffWorkDate, totals, deadline);
     }
     if (totals.failed > 0) status = 'partial';
   } catch (error) {
@@ -288,6 +209,6 @@ export async function runOperationalRetention(request: RetentionRunRequest): Pro
     itemsConsidered: totals.considered, itemsClaimed: totals.claimed, itemsCompleted: totals.completed,
     itemsFailed: totals.failed, itemsSkippedHold: totals.skippedHold,
     itemsSkippedCoverage: totals.skippedCoverage, storageObjectsDeleted: totals.storageDeleted,
-    storageObjectsPending: totals.storagePending,
+    storageObjectsPending: totals.storagePending, stoppedForBudget: totals.stoppedForBudget,
   };
 }

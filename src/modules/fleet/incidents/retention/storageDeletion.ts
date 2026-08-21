@@ -25,10 +25,10 @@ const VF_STORAGE_URL = process.env.VF_STORAGE_URL ?? 'http://100.96.203.105:8091
 const PROGRAMME_KEY_PATTERN = /^fleet\/incidents\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const PROXY_PREFIX = '/storage/';
 /**
- * Deleting one object is a small request. A hung VF Storage must not stall the
- * run, because the run holds the `fleet-operational-retention` advisory lock
- * for its whole duration — an unbounded fetch here blocks every later tick as
- * well as this one.
+ * Bounds ONE request, and nothing more. A run deletes many objects across many
+ * items, so this does not bound the run — `retentionService`'s RUN_BUDGET_MS is
+ * what stops a slow night from holding the advisory lock indefinitely. What
+ * this prevents is a single hung connection stalling forever.
  */
 const DELETE_TIMEOUT_MS = 15_000;
 

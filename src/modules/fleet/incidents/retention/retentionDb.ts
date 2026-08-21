@@ -122,6 +122,20 @@ export async function purgeTransaction<T>(work: (txn: TxnClient) => Promise<T>):
   return dedicatedTransaction(connectionString, work);
 }
 
+/**
+ * Validates the configured identity WITHOUT connecting.
+ *
+ * Call this once at the start of a run, before anything destructive. The
+ * validity of this configuration is a property of the RUN, not of a
+ * transaction, and resolving it lazily inside `purgeTransaction` put the error
+ * AFTER the storage deletions — which destroyed attachments and then failed
+ * with no database row removed. That is the same shape as the uuid-cast bug it
+ * was introduced to avoid, one layer up.
+ */
+export function assertRetentionIdentityConfigured(): void {
+  dedicatedConnectionString();
+}
+
 /** Which identity the purge would use, for logging. Never the connection string. */
 export function retentionIdentityDescription(): 'application' | 'dedicated' {
   return dedicatedConnectionString() ? 'dedicated' : 'application';
