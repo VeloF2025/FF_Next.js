@@ -197,7 +197,6 @@ export function ConsumptionRecorder({
             ) : (
               <div className="space-y-4">
                 <StockItemPicker
-                  instanceId="consumption"
                   items={quantityItems}
                   selectedItemId={selectedItem?.id || ''}
                   onSelect={(itemId) => {

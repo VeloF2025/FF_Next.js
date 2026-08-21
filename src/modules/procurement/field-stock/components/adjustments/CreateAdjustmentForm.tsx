@@ -27,7 +27,12 @@ interface CreateAdjustmentFormProps {
   reasons: AdjustmentReason[];
 }
 
-export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: CreateAdjustmentFormProps) {
+export function CreateAdjustmentForm({
+  isOpen,
+  onClose,
+  onSubmit,
+  reasons,
+}: CreateAdjustmentFormProps) {
   const { locations } = useLocations({ autoFetch: true });
   const { items: stockItems } = useStockItems({ autoFetch: true });
 
@@ -43,7 +48,6 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
   const [locationSearch, setLocationSearch] = useState('');
 
   if (!isOpen) return null;
-
 
   const filteredLocations = locations.filter(
     (l) =>
@@ -105,7 +109,9 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-lg p-6 border border-[var(--ff-border-light)] max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">New Stock Adjustment</h2>
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+            New Stock Adjustment
+          </h2>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="h-5 w-5" />
           </Button>
@@ -114,7 +120,12 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
         <div className="space-y-4">
           {/* Location */}
           <div>
-            <label htmlFor="adj-location-id" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Location *</label>
+            <label
+              htmlFor="adj-location-id"
+              className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1"
+            >
+              Location *
+            </label>
             <input
               id="adj-location-search"
               name="location-search"
@@ -143,9 +154,13 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
 
           {/* Stock Item */}
           <div>
-            <label htmlFor="adj-stock-item-id" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Stock Item *</label>
+            <label
+              htmlFor="adj-stock-item-id"
+              className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1"
+            >
+              Stock Item *
+            </label>
             <StockItemPicker
-              instanceId="adjustment"
               triggerId="adj-stock-item-id"
               items={stockItems}
               selectedItemId={formData.stock_item_id}
@@ -156,7 +171,9 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
 
           {/* Adjustment Type Toggle */}
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Adjustment Type *</label>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+              Adjustment Type *
+            </label>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -187,7 +204,12 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
 
           {/* Quantity */}
           <div>
-            <label htmlFor="adj-quantity" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Quantity *</label>
+            <label
+              htmlFor="adj-quantity"
+              className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1"
+            >
+              Quantity *
+            </label>
             <input
               id="adj-quantity"
               name="quantity"
@@ -203,7 +225,12 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
 
           {/* Reason */}
           <div>
-            <label htmlFor="adj-reason" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Reason *</label>
+            <label
+              htmlFor="adj-reason"
+              className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1"
+            >
+              Reason *
+            </label>
             <select
               id="adj-reason"
               name="reason_code"
@@ -222,7 +249,12 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
 
           {/* Notes */}
           <div>
-            <label htmlFor="adj-notes" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Notes</label>
+            <label
+              htmlFor="adj-notes"
+              className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1"
+            >
+              Notes
+            </label>
             <textarea
               id="adj-notes"
               name="notes"
@@ -236,10 +268,7 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <Button
-            variant="ghost"
-            onClick={onClose}
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button

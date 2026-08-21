@@ -13,7 +13,7 @@
  * listboxNavigation — same keyboard contract, so the two behave identically.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
 import { isNavKey, nextActiveIndex } from '../../../grn/lib/listboxNavigation';
 import { filterStockItems, itemSubtitle, type SearchableStockItem } from '../../lib/itemSearch';
@@ -24,8 +24,6 @@ interface Props {
   onSelect: (itemId: string) => void;
   disabled?: boolean;
   placeholder?: string;
-  /** Distinguishes the listbox ids when several pickers share a page. */
-  instanceId: string;
   /** DOM id for the trigger, so an existing <label htmlFor> still binds. */
   triggerId?: string;
 }
@@ -36,9 +34,15 @@ export function StockItemPicker({
   onSelect,
   disabled = false,
   placeholder = 'Select item…',
-  instanceId,
   triggerId,
 }: Props) {
+  /**
+   * useId is unique per mounted instance, so several pickers on one page
+   * (CreatePickingForm and CreateReturnModal both render one per line) cannot
+   * collide on DOM ids — and callers do not have to invent a stable key to
+   * make that true. CreateReturnModal's lines have no stable id to offer.
+   */
+  const scopeId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -46,7 +50,7 @@ export function StockItemPicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const listboxId = `stock-item-listbox-${instanceId}`;
+  const listboxId = `stock-item-listbox-${scopeId}`;
   const optionDomId = useCallback((i: number) => `${listboxId}-option-${i}`, [listboxId]);
 
   const visible = useMemo(() => filterStockItems(items, query), [items, query]);

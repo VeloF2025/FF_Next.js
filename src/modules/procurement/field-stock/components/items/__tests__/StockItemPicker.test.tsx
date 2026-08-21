@@ -28,7 +28,7 @@ const CATALOGUE: SearchableStockItem[] = [
 
 function open(items: SearchableStockItem[], onSelect = vi.fn()) {
   const user = userEvent.setup();
-  render(<StockItemPicker instanceId="t" items={items} selectedItemId="" onSelect={onSelect} />);
+  render(<StockItemPicker items={items} selectedItemId="" onSelect={onSelect} />);
   return { user, onSelect };
 }
 
@@ -92,7 +92,7 @@ describe('StockItemPicker', () => {
     const user = userEvent.setup();
     render(
       <div>
-        <StockItemPicker instanceId="t" items={[SPLITTER]} selectedItemId="" onSelect={vi.fn()} />
+        <StockItemPicker items={[SPLITTER]} selectedItemId="" onSelect={vi.fn()} />
         <div data-testid="outside">elsewhere</div>
       </div>
     );
@@ -119,7 +119,7 @@ describe('StockItemPicker', () => {
   });
 
   it('shows the selected item on the closed trigger', () => {
-    render(<StockItemPicker instanceId="t" items={[SPLITTER]} selectedItemId="sp" onSelect={vi.fn()} />);
+    render(<StockItemPicker items={[SPLITTER]} selectedItemId="sp" onSelect={vi.fn()} />);
     expect(screen.getByRole('button', { name: /OPT-116BF - 1:16 Bare Fibre Splitter/ })).toBeTruthy();
   });
 
@@ -128,7 +128,6 @@ describe('StockItemPicker', () => {
       <div>
         <label htmlFor="bound-trigger">Stock Item</label>
         <StockItemPicker
-          instanceId="t"
           triggerId="bound-trigger"
           items={[SPLITTER]}
           selectedItemId=""
@@ -140,11 +139,13 @@ describe('StockItemPicker', () => {
     expect(screen.getByLabelText('Stock Item').tagName).toBe('BUTTON');
   });
 
-  it('gives each instance its own listbox id so sibling rows do not collide', () => {
+  it('gives each instance its own listbox id WITHOUT the caller supplying one', () => {
+    // No instanceId passed on purpose: useId must make these unique by itself,
+    // because CreateReturnModal's lines have no stable key to hand over.
     const { container } = render(
       <div>
-        <StockItemPicker instanceId="line-1" items={[SPLITTER]} selectedItemId="" onSelect={vi.fn()} />
-        <StockItemPicker instanceId="line-2" items={[SPLITTER]} selectedItemId="" onSelect={vi.fn()} />
+        <StockItemPicker items={[SPLITTER]} selectedItemId="" onSelect={vi.fn()} />
+        <StockItemPicker items={[SPLITTER]} selectedItemId="" onSelect={vi.fn()} />
       </div>
     );
     const triggers = within(container).getAllByRole('button', { name: /select item/i });

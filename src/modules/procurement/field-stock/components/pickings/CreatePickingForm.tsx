@@ -359,7 +359,6 @@ export function CreatePickingForm({
                       Item
                     </label>
                     <StockItemPicker
-                      instanceId={line.id}
                       items={stockItems}
                       selectedItemId={line.stockItemId}
                       onSelect={(itemId) => updateLine(line.id, { stockItemId: itemId })}
