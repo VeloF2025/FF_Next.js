@@ -15,6 +15,10 @@ interface Request extends NextApiRequest { user?: { id: string; role: string } }
 async function handler(req: Request, res: NextApiResponse): Promise<void> {
   const user = req.user;
   if (!user) return apiResponse.unauthorized(res);
+  const incidentId = req.query.incidentId;
+  if (typeof incidentId !== 'string' || !isValidUUID(incidentId)) {
+    return apiResponse.badRequest(res, 'A valid incidentId is required');
+  }
   const holdId = req.query.holdId;
   if (typeof holdId !== 'string' || !isValidUUID(holdId)) {
     return apiResponse.badRequest(res, 'A valid holdId is required');
@@ -30,8 +34,9 @@ async function handler(req: Request, res: NextApiResponse): Promise<void> {
   try {
     const staffId = await resolveStaffIdForUser(user.id);
     const actor: RetentionHoldActorScope = { userId: user.id, staffId, role: user.role };
-    // holdId comes from the path, never from the body.
-    const hold = await reviewRetentionHold({ holdId, note, nextReviewAt }, actor, new Date().toISOString());
+    // Both ids come from the path, never from the body; the service checks
+    // that the hold really belongs to the incident the URL names.
+    const hold = await reviewRetentionHold({ holdId, incidentId, note, nextReviewAt }, actor, new Date().toISOString());
     return apiResponse.success(res, hold);
   } catch (error) {
     if (error instanceof RetentionHoldValidationError) return apiResponse.badRequest(res, error.message);

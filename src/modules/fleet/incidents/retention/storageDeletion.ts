@@ -24,6 +24,13 @@ const VF_STORAGE_URL = process.env.VF_STORAGE_URL ?? 'http://100.96.203.105:8091
 /** The one storage category Fleet incident evidence is uploaded to (`evidenceService.FLEET_EVIDENCE_CATEGORY`). */
 const PROGRAMME_KEY_PATTERN = /^fleet\/incidents\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const PROXY_PREFIX = '/storage/';
+/**
+ * Deleting one object is a small request. A hung VF Storage must not stall the
+ * run, because the run holds the `fleet-operational-retention` advisory lock
+ * for its whole duration — an unbounded fetch here blocks every later tick as
+ * well as this one.
+ */
+const DELETE_TIMEOUT_MS = 15_000;
 
 export type StorageDeletionOutcome = 'deleted' | 'already_absent';
 
@@ -80,7 +87,10 @@ export function resolveProgrammeStorageKey(storagePath: string): string {
 /** Deletes one approved programme object. Throws on any failure other than "already gone". */
 export async function deleteIncidentStorageObject(storagePath: string): Promise<StorageDeletionOutcome> {
   const key = resolveProgrammeStorageKey(storagePath);
-  const response = await fetch(`${VF_STORAGE_URL}/delete/${key}`, { method: 'DELETE' });
+  const response = await fetch(`${VF_STORAGE_URL}/delete/${key}`, {
+    method: 'DELETE',
+    signal: AbortSignal.timeout(DELETE_TIMEOUT_MS),
+  });
   if (response.ok) return 'deleted';
   if (response.status === 404) return 'already_absent';
   throw new StorageDeletionError(`VF Storage delete failed: HTTP ${response.status}`);

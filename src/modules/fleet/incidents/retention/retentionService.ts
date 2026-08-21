@@ -22,9 +22,10 @@ import { getEffectiveAnalyticsRetentionSettings } from '../analytics/settingsRep
 import type { RetentionItem, RetentionPolicy, RunStatus } from '../analytics/types';
 import { purgeIncidentRecords } from './incidentPurge';
 import {
-  claimIncident, countCandidatesHeld, finalizeRetentionRun, hasCompleteAggregateCoverage,
-  insertRetentionRun, listIncidentStorageObjects, listPurgeCandidates, listResumableItems,
-  markItemFailed, markStorageComplete, recordItemAttempt, recordStorageObjectDeleted,
+  claimIncident, countCandidatesHeld, finalizeRetentionRun, getIncidentPurgeState,
+  hasCompleteAggregateCoverage, insertRetentionRun, listIncidentStorageObjects, listPurgeCandidates,
+  listResumableItems, markItemFailed, markStorageComplete, recordItemAttempt,
+  recordStorageObjectDeleted,
 } from './retentionRepository';
 import { notifyRetentionHealth } from './retentionNotifications';
 import { deleteIncidentStorageObject } from './storageDeletion';
@@ -73,7 +74,18 @@ function errorCode(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown_error';
 }
 
-/** A claim refused by `trg_fleet_retention_item_guard` (23514) or already taken (23505) is an expected outcome, not a crash. */
+/**
+ * `trg_fleet_retention_item_guard` refuses any write about an incident that is
+ * held or non-terminal, with 23514. That is an EXPECTED outcome of a hold
+ * landing mid-run, not a crash — and critically, it also refuses the write
+ * that would record the failure, so a refusal must never be routed into the
+ * failure path.
+ */
+function isGuardRefusal(error: unknown): boolean {
+  return errorCode(error) === '23514';
+}
+
+/** A claim refused by the guard (23514) or already taken (23505) is expected too. */
 function isExpectedClaimRefusal(error: unknown): boolean {
   const code = errorCode(error);
   return code === '23514' || code === '23505';
@@ -85,33 +97,86 @@ interface Totals {
 }
 
 async function deleteItemStorage(item: RetentionItem, totals: Totals): Promise<void> {
-  if (item.stage === 'storage_complete') return;
+  // `storage_complete` is the stage, but the COUNTERS are the durable truth:
+  // markItemFailed overwrites the stage, so a resumed item that had already
+  // finished storage would otherwise re-run it and re-count every object.
+  if (item.stage === 'storage_complete' || item.storageObjectsDeleted >= item.storageObjectsTotal) return;
   const objects = await listIncidentStorageObjects(item.incidentId!);
   for (const object of objects) {
     // Throws on any failure other than "already gone", which aborts this item
     // BEFORE the database transaction and leaves its evidence for the retry.
-    await deleteIncidentStorageObject(object.storagePath);
+    const outcome = await deleteIncidentStorageObject(object.storagePath);
     await recordStorageObjectDeleted(item.id);
-    totals.storageDeleted += 1;
+    // Only a real deletion counts. On a resume the objects are already gone,
+    // and counting those would report deletions this run never performed.
+    if (outcome === 'deleted') totals.storageDeleted += 1;
   }
   await markStorageComplete(item.id);
 }
 
-async function processItem(item: RetentionItem, totals: Totals): Promise<void> {
-  if (!item.incidentId) return;
+type ItemOutcome = 'completed' | 'failed' | 'skipped';
+
+/**
+ * Works one item through storage and then the database.
+ *
+ * The purgeability re-check comes FIRST and before anything destructive: the
+ * claim has already committed and storage deletion is HTTP, so a hold raised
+ * in that window would otherwise be discovered only when a bookkeeping UPDATE
+ * was refused — after an attachment had been destroyed for an incident
+ * somebody just decided to keep.
+ *
+ * Nothing here touches the item row before that check passes. Once an incident
+ * is held, the schema refuses EVERY write about it, including `markItemFailed`
+ * and `recordItemAttempt`; a skip that tries to record itself becomes an
+ * exception that aborts the whole run.
+ */
+async function processItem(
+  item: RetentionItem, totals: Totals, options: { recordAttempt?: boolean } = {},
+): Promise<ItemOutcome> {
+  if (!item.incidentId) return 'skipped';
+  const state = await getIncidentPurgeState(item.incidentId);
+  if (state !== 'purgeable') {
+    totals.skippedHold += 1;
+    log.info('[fleet-retention] item no longer purgeable — left untouched for a later run', {
+      itemId: item.id, state,
+    }, MODULE);
+    return 'skipped';
+  }
+
   try {
+    if (options.recordAttempt) await recordItemAttempt(item.id);
     await deleteItemStorage(item, totals);
     await purgeIncidentRecords({ itemId: item.id, incidentId: item.incidentId });
     totals.completed += 1;
+    return 'completed';
   } catch (error) {
+    // A hold that landed inside the residual window surfaces here as 23514.
+    // Recording it is impossible (the same guard refuses that write), so the
+    // item is left exactly as it is and picked up again once the hold lifts.
+    if (isGuardRefusal(error)) {
+      totals.skippedHold += 1;
+      log.info('[fleet-retention] guard refused mid-item — a hold landed during the run', {
+        itemId: item.id, code: errorCode(error),
+      }, MODULE);
+      return 'skipped';
+    }
     totals.failed += 1;
     const code = errorCode(error);
-    await markItemFailed(item.id, code);
     // Item ids and counts only: a retention log must not become a list of who
     // was investigated.
     log.error('[fleet-retention] item failed and was left for retry', {
       itemId: item.id, stage: item.stage, code,
     }, MODULE);
+    try {
+      await markItemFailed(item.id, code);
+    } catch (recordError) {
+      // Bookkeeping is never more important than the batch: a failure to
+      // record a failure is logged and the run continues.
+      log.error('[fleet-retention] could not record the item failure', {
+        itemId: item.id, code: errorCode(recordError),
+      }, MODULE);
+    }
+    return 'failed';
   }
 }
 
@@ -180,9 +245,12 @@ export async function runOperationalRetention(request: RetentionRunRequest): Pro
       await runDryRun(policy, cutoffWorkDate, totals);
     } else {
       for (const stale of await listResumableItems(policy.retentionBatchSize)) {
-        await recordItemAttempt(stale.id);
-        totals.claimed += 1;
-        await processItem(stale, totals);
+        // The attempt counter is incremented INSIDE processItem, after the
+        // purgeability check — it is an UPDATE the guard refuses for a held
+        // item, and one held item used to abort the run before any candidate
+        // was reached.
+        const outcome = await processItem(stale, totals, { recordAttempt: true });
+        if (outcome !== 'skipped') totals.claimed += 1;
       }
       await claimAndProcessCandidates(runId, policy, cutoffWorkDate, totals);
     }

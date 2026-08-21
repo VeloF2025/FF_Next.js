@@ -48,16 +48,22 @@ const STAFF = '22222222-2222-4222-8222-222222222222';
 const PROJECT = '33333333-3333-4333-8333-333333333333';
 
 const PREREQUISITES = `
+  -- EVERY column below mirrors production's name AND type, verified against
+  -- information_schema on the shared database. A fixture may declare a SUBSET
+  -- of production's columns; it may never invent one, or retype one.
   CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now());
-  -- Mirrors the REAL users table (role/is_active are what recipient
-  -- resolution reads); inventing a shape here is what let a 500 ship before.
   CREATE TABLE users (
     id UUID PRIMARY KEY, email VARCHAR(255) NOT NULL UNIQUE,
     role VARCHAR(50) DEFAULT 'user', is_active BOOLEAN DEFAULT true
   );
-  CREATE TABLE staff (id UUID PRIMARY KEY, name TEXT NOT NULL);
-  CREATE TABLE projects (id UUID PRIMARY KEY, project_name TEXT NOT NULL, project_manager UUID);
-  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration TEXT);
+  -- Production staff has first_name/last_name and NO full_name/name column.
+  CREATE TABLE staff (
+    id UUID PRIMARY KEY, first_name VARCHAR(100) NOT NULL, last_name VARCHAR(100) NOT NULL
+  );
+  CREATE TABLE projects (
+    id UUID PRIMARY KEY, project_name VARCHAR(255) NOT NULL, project_manager UUID
+  );
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(20));
   CREATE TABLE fleet_project_operational_sites (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_status_rules (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_assignments (id UUID PRIMARY KEY);
@@ -83,7 +89,7 @@ const PREREQUISITES = `
     ('${REVOKED}', 'holds-revoked@example.test', 'admin', true),
     ('${INACTIVE}', 'holds-inactive@example.test', 'admin', false),
     ('${PM_ONLY}', 'holds-pm@example.test', 'project_manager', true);
-  INSERT INTO staff (id, name) VALUES ('${STAFF}', 'Migration Test Staff');
+  INSERT INTO staff (id, first_name, last_name) VALUES ('${STAFF}', 'Migration', 'Test Staff');
   INSERT INTO projects (id, project_name, project_manager) VALUES ('${PROJECT}', 'Test Project', '${PM_ONLY}');
   INSERT INTO fleet_project_operational_sites (id) VALUES ('44444444-4444-4444-8444-444444444444');
   INSERT INTO access_permissions (type, key, label) VALUES ('module', 'fleet', 'Fleet');

@@ -71,11 +71,15 @@ const FORBIDDEN_DELETE_TABLES = [
 ];
 
 const PREREQUISITES = `
+  -- Column names and types mirror production (verified against
+  -- information_schema); a fixture may be a subset, never a re-typing.
   CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now());
-  CREATE TABLE users (id UUID PRIMARY KEY, email TEXT NOT NULL UNIQUE);
-  CREATE TABLE staff (id UUID PRIMARY KEY, full_name TEXT NOT NULL);
-  CREATE TABLE projects (id UUID PRIMARY KEY, project_name TEXT NOT NULL);
-  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration TEXT);
+  CREATE TABLE users (id UUID PRIMARY KEY, email VARCHAR(255) NOT NULL UNIQUE);
+  CREATE TABLE staff (
+    id UUID PRIMARY KEY, first_name VARCHAR(100) NOT NULL, last_name VARCHAR(100) NOT NULL
+  );
+  CREATE TABLE projects (id UUID PRIMARY KEY, project_name VARCHAR(255) NOT NULL);
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(20));
   CREATE TABLE fleet_project_operational_sites (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_status_rules (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_assignments (id UUID PRIMARY KEY);

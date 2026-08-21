@@ -205,11 +205,15 @@ export interface CreateRetentionHoldCommand {
 
 export interface ReviewRetentionHoldCommand {
   holdId: string;
+  /** The incident the caller reached this hold through; verified against the hold's own incident. */
+  incidentId?: string;
   note: string;
   nextReviewAt: string;
 }
 
 export interface ReleaseRetentionHoldCommand {
   holdId: string;
+  /** The incident the caller reached this hold through; verified against the hold's own incident. */
+  incidentId?: string;
   releaseReason: string;
 }

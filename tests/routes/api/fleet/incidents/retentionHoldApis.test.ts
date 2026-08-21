@@ -167,6 +167,23 @@ describe('/api/fleet/incidents/[incidentId]/retention-holds/[holdId]/review', ()
     expect(mocks.reviewRetentionHold.mock.calls[0]![0]).toMatchObject({ holdId: HOLD });
   });
 
+  // The route sits under [incidentId]; ignoring that segment makes the URL a
+  // lie, and a caller could review a hold through any incident's path. Scope
+  // is still enforced against the hold's real incident, so this is a trap
+  // rather than a hole — closed anyway.
+  it('passes the path incidentId through so the service can verify the pair', async () => {
+    await call(reviewHandler, 'POST', { body: { note: 'ok', nextReviewAt: '2026-09-01T00:00:00.000Z' } });
+    expect(mocks.reviewRetentionHold.mock.calls[0]![0]).toMatchObject({ holdId: HOLD, incidentId: INCIDENT });
+  });
+
+  it('rejects a malformed incidentId in the path', async () => {
+    const result = await call(reviewHandler, 'POST', {
+      query: { incidentId: 'not-a-uuid', holdId: HOLD }, body: { note: 'ok', nextReviewAt: '2026-09-01T00:00:00.000Z' },
+    });
+    expect(result.status).toBe(400);
+    expect(mocks.reviewRetentionHold).not.toHaveBeenCalled();
+  });
+
   it('maps a hold released concurrently to 409', async () => {
     mocks.reviewRetentionHold.mockRejectedValue(new RetentionHoldConflictError('released'));
     const result = await call(reviewHandler, 'POST', { body: { note: 'ok', nextReviewAt: '2026-09-01T00:00:00.000Z' } });
@@ -187,6 +204,11 @@ describe('/api/fleet/incidents/[incidentId]/retention-holds/[holdId]/release', (
     const [command, actor] = mocks.releaseRetentionHold.mock.calls[0]!;
     expect(command).toMatchObject({ holdId: HOLD, releaseReason: 'Matter closed' });
     expect(actor).toEqual({ userId: USER, staffId: STAFF, role: 'admin' });
+  });
+
+  it('passes the path incidentId through so the service can verify the pair', async () => {
+    await call(releaseHandler, 'POST', { body: { releaseReason: 'Matter closed' } });
+    expect(mocks.releaseRetentionHold.mock.calls[0]![0]).toMatchObject({ holdId: HOLD, incidentId: INCIDENT });
   });
 
   it('maps a missing hold permission to 403', async () => {

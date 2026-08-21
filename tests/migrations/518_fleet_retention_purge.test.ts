@@ -46,22 +46,36 @@ const VEHICLE = '55555555-5555-4555-8555-555555555555';
 const ADJUSTMENT = '66666666-6666-4666-8666-666666666666';
 
 const PREREQUISITES = `
+  -- EVERY column below mirrors production's name AND type, verified against
+  -- information_schema on the shared database. A fixture may declare a SUBSET
+  -- of production's columns; it may never declare a column production does not
+  -- have, or the same column with a different type. A TEXT stand-in for a uuid
+  -- column is not a harmless simplification: it makes a ::text comparison parse
+  -- here and fail with 42883 in production, which is exactly the bug this
+  -- fixture hid until 2026-08-21. (No backticks in these comments — the block
+  -- is a JS template literal and a backtick would terminate it.)
   CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now());
-  CREATE TABLE users (id UUID PRIMARY KEY, email TEXT NOT NULL UNIQUE);
-  CREATE TABLE staff (id UUID PRIMARY KEY, full_name TEXT NOT NULL);
-  CREATE TABLE projects (id UUID PRIMARY KEY, project_name TEXT NOT NULL);
-  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration TEXT);
+  CREATE TABLE users (id UUID PRIMARY KEY, email VARCHAR(255) NOT NULL UNIQUE);
+  -- Production staff has first_name/last_name and NO full_name/name column.
+  CREATE TABLE staff (
+    id UUID PRIMARY KEY, first_name VARCHAR(100) NOT NULL, last_name VARCHAR(100) NOT NULL
+  );
+  CREATE TABLE projects (id UUID PRIMARY KEY, project_name VARCHAR(255) NOT NULL);
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(20));
   CREATE TABLE fleet_project_operational_sites (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_status_rules (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_assignments (id UUID PRIMARY KEY);
   -- The Attendance record a correction LINK points at. Retention deletes the
   -- link; this row is source Attendance data and must survive.
   CREATE TABLE attendance_adjustments (id UUID PRIMARY KEY DEFAULT gen_random_uuid());
-  -- Mirrors the real user_notifications columns the purge filters on.
+  -- source_id is UUID in production, not text. The purge's WHERE clause has to
+  -- cast to match it, and this fixture is what proves the cast is right.
   CREATE TABLE user_notifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL, event_type TEXT NOT NULL,
-    title TEXT NOT NULL, body TEXT, source_module TEXT, source_id TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL,
+    event_type VARCHAR(100) NOT NULL, title VARCHAR(255) NOT NULL, body TEXT,
+    severity VARCHAR(20) NOT NULL DEFAULT 'info', source_module VARCHAR(100), source_id UUID,
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
   CREATE TABLE access_permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), type VARCHAR(20) NOT NULL, key VARCHAR(100) UNIQUE NOT NULL,
@@ -79,7 +93,7 @@ const PREREQUISITES = `
     UNIQUE (user_id, permission_key)
   );
   INSERT INTO users (id, email) VALUES ('${USER}', 'migration-518-purge@example.test');
-  INSERT INTO staff (id, full_name) VALUES ('${STAFF}', 'Migration Test Driver');
+  INSERT INTO staff (id, first_name, last_name) VALUES ('${STAFF}', 'Migration', 'Test Driver');
   INSERT INTO projects (id, project_name) VALUES ('${PROJECT}', 'Migration Test Project');
   INSERT INTO fleet_vehicles (id, registration) VALUES ('${VEHICLE}', 'CA 123-456');
   INSERT INTO fleet_project_operational_sites (id) VALUES ('${SITE}');
@@ -354,6 +368,82 @@ describe('claim guards', () => {
     await transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId, storageObjectsTotal: 0 }));
     await expect(transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId, storageObjectsTotal: 0 })))
       .rejects.toMatchObject({ code: '23505' });
+  });
+});
+
+describe('a hold landing after the claim', () => {
+  // The premise of the service's hold handling, proved against the real
+  // trigger rather than against a mock: once a hold exists, the item guard
+  // refuses EVERY update to a still-identified item — including the two
+  // bookkeeping writes the failure path would want to make. Code that assumes
+  // it can always record a failure is wrong, and this is why.
+  async function claimThenHold(): Promise<{ itemId: string; incidentId: string }> {
+    const seeded = await seedIncident();
+    const runId = await repo.insertRetentionRun({ dryRun: false, cutoffWorkDate: '2025-08-21', policyMonths: 12, triggerSource: 'cron' });
+    const item = await transaction(async (txn) => repo.claimIncident(txn, { runId, incidentId: seeded.incidentId, storageObjectsTotal: 1 }));
+    await seedActiveHold(seeded.incidentId);
+    return { itemId: item.id, incidentId: seeded.incidentId };
+  }
+
+  it('refuses the storage-progress update', async () => {
+    const { itemId } = await claimThenHold();
+    await expect(repo.recordStorageObjectDeleted(itemId)).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('refuses the failure-recording update — the failure path itself is blocked', async () => {
+    const { itemId } = await claimThenHold();
+    await expect(repo.markItemFailed(itemId, 'storage_failed')).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('refuses the attempt counter the resume path increments', async () => {
+    const { itemId } = await claimThenHold();
+    await expect(repo.recordItemAttempt(itemId)).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('reports the incident as held so the service can stop before deleting anything', async () => {
+    const { incidentId } = await claimThenHold();
+    expect(await repo.getIncidentPurgeState(incidentId)).toBe('held');
+  });
+
+  it('reports a purgeable incident as purgeable and a still-open one as not terminal', async () => {
+    const resolved = await seedIncident();
+    const open = await seedIncident({ lifecycle: 'open' });
+    expect(await repo.getIncidentPurgeState(resolved.incidentId)).toBe('purgeable');
+    expect(await repo.getIncidentPurgeState(open.incidentId)).toBe('not_terminal');
+  });
+
+  it('reports an incident that no longer exists as missing', async () => {
+    expect(await repo.getIncidentPurgeState('99999999-9999-4999-8999-999999999999')).toBe('missing');
+  });
+
+  // The check takes a row lock that conflicts with the FOR KEY SHARE a hold
+  // insert takes, so a hold still MID-COMMIT when the check runs is waited for
+  // rather than missed. (This is a different race from the purge/hold one the
+  // FK already closes — see getIncidentPurgeState.)
+  it('waits for an in-flight hold insert instead of reading past it', async () => {
+    const seeded = await seedIncident();
+    const holdClient = await db.connect();
+    let checkResolved = false;
+    try {
+      await holdClient.query('BEGIN');
+      await holdClient.query(
+        `INSERT INTO fleet_incident_retention_holds
+           (incident_id, category, reason, owner_user_id, created_by, next_review_at)
+         VALUES ($1, 'legal', 'Litigation pending', $2, $2, now() + INTERVAL '30 days')`,
+        [seeded.incidentId, USER],
+      );
+      const check = repo.getIncidentPurgeState(seeded.incidentId).then((state) => {
+        checkResolved = true;
+        return state;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      // Still blocked on the uncommitted hold rather than answering "purgeable".
+      expect(checkResolved).toBe(false);
+      await holdClient.query('COMMIT');
+      expect(await check).toBe('held');
+    } finally {
+      holdClient.release();
+    }
   });
 });
 

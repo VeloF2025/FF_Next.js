@@ -46,9 +46,26 @@ import { transaction, type TxnClient } from '@/lib/db-pool';
 
 let dedicatedPool: Pool | null = null;
 
+export class RetentionIdentityConfigError extends Error {
+  constructor(message: string) { super(message); this.name = 'RetentionIdentityConfigError'; }
+}
+
+/**
+ * Unset means "use the application pool". Set-but-blank means somebody TRIED
+ * to configure a dedicated identity and got it wrong, and quietly reading that
+ * as "unset" would select the MORE privileged pool — the failure direction has
+ * to be away from privilege, so it is an error instead.
+ */
 function dedicatedConnectionString(): string | null {
-  const configured = process.env.FLEET_RETENTION_DATABASE_URL?.trim();
-  return configured ? configured : null;
+  const configured = process.env.FLEET_RETENTION_DATABASE_URL;
+  if (configured === undefined) return null;
+  const trimmed = configured.trim();
+  if (!trimmed) {
+    throw new RetentionIdentityConfigError(
+      'FLEET_RETENTION_DATABASE_URL is set but blank — unset it to use the application pool, or give it a valid connection string',
+    );
+  }
+  return trimmed;
 }
 
 function getDedicatedPool(connectionString: string): Pool {

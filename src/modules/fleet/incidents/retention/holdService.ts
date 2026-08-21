@@ -150,11 +150,25 @@ export async function createRetentionHold(
   }
 }
 
-/** Locks the hold, proves scope over ITS incident, and returns it. */
-async function lockActiveHold(txn: TxnClient, holdId: string, actor: RetentionHoldActorScope): Promise<RetentionHold> {
+/**
+ * Locks the hold, proves the caller reached it through its OWN incident, and
+ * proves scope over that incident.
+ *
+ * `pathIncidentId` is the `[incidentId]` segment the route was called on.
+ * Scope is enforced against the hold's real incident either way, so a mismatch
+ * is not a privilege hole — but a route that ignores half its own path is a
+ * trap, and a hold id must not be actionable through an unrelated incident's
+ * URL.
+ */
+async function lockActiveHold(
+  txn: TxnClient, holdId: string, actor: RetentionHoldActorScope, pathIncidentId?: string,
+): Promise<RetentionHold> {
   if (!isValidUUID(holdId)) throw new RetentionHoldValidationError('A valid holdId is required');
   const hold = await lockHold(txn, holdId);
   if (!hold) throw new IncidentNotFoundError(`Retention hold ${holdId} was not found`);
+  if (pathIncidentId !== undefined && pathIncidentId !== hold.incidentId) {
+    throw new IncidentNotFoundError(`Retention hold ${holdId} does not belong to incident ${pathIncidentId}`);
+  }
   await assertIncidentInScope(hold.incidentId, actor);
   if (hold.status !== 'active') {
     throw new RetentionHoldConflictError('This hold has already been released');
@@ -171,7 +185,7 @@ export async function reviewRetentionHold(
   const nextReviewAt = validateReviewInstant(command.nextReviewAt, at, policy);
 
   return transaction(async (txn: TxnClient) => {
-    const hold = await lockActiveHold(txn, command.holdId, actor);
+    const hold = await lockActiveHold(txn, command.holdId, actor, command.incidentId);
     const updated = await recordHoldReview(txn, {
       holdId: hold.id, actorUserId: actor.userId, nextReviewAt, at,
     });
@@ -194,7 +208,7 @@ export async function releaseRetentionHold(
   const releaseReason = requiredText(command.releaseReason, 'releaseReason');
 
   return transaction(async (txn: TxnClient) => {
-    const hold = await lockActiveHold(txn, command.holdId, actor);
+    const hold = await lockActiveHold(txn, command.holdId, actor, command.incidentId);
     const released = await recordHoldRelease(txn, {
       holdId: hold.id, actorUserId: actor.userId, releaseReason, at,
     });

@@ -100,9 +100,18 @@ describe('dedicated identity', () => {
     expect(description).not.toContain('pw');
   });
 
-  it('refuses a blank configured connection string rather than treating it as unset', async () => {
+  // Failure direction matters: a blank value is a misconfiguration, and
+  // treating it as "unset" silently selects the MORE privileged pool. Fail
+  // away from privilege.
+  it('treats a set-but-blank connection string as a configuration error', async () => {
     process.env.FLEET_RETENTION_DATABASE_URL = '   ';
-    await purgeTransaction(async () => 'x');
-    expect(dbPool.transaction).toHaveBeenCalledTimes(1);
+    await expect(purgeTransaction(async () => 'x')).rejects.toThrow(/FLEET_RETENTION_DATABASE_URL/);
+    expect(dbPool.transaction).not.toHaveBeenCalled();
+    expect(pg.Pool).not.toHaveBeenCalled();
+  });
+
+  it('reports a blank value as misconfigured rather than as the application identity', () => {
+    process.env.FLEET_RETENTION_DATABASE_URL = '   ';
+    expect(() => retentionIdentityDescription()).toThrow(/FLEET_RETENTION_DATABASE_URL/);
   });
 });

@@ -41,7 +41,14 @@ export const PURGE_CHILD_STATEMENTS: readonly string[] = [
   `DELETE FROM fleet_operational_incident_observations WHERE incident_id = $1::uuid`,
   // The bell notifications this module produced. Scoped by source_module as
   // well as id so a coincidental id from another module is out of reach.
-  `DELETE FROM user_notifications WHERE source_module = 'fleet-incidents' AND source_id = $1::text`,
+  //
+  // source_id is UUID in production, NOT text: a ::text cast here parses
+  // against a text-typed fixture and fails with 42883 (`operator does not
+  // exist: uuid = text`) against the real column. That mattered more than a
+  // wrong cast usually does — storage deletion runs BEFORE this transaction,
+  // so the failure mode was destroyed attachments plus an aborted purge that
+  // removed no rows at all.
+  `DELETE FROM user_notifications WHERE source_module = 'fleet-incidents' AND source_id = $1::uuid`,
 ];
 
 /**

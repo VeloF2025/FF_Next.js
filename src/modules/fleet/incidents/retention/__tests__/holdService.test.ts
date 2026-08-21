@@ -216,6 +216,23 @@ describe('reviewRetentionHold', () => {
     expect(repo.recordHoldReview).not.toHaveBeenCalled();
   });
 
+  // A hold id from one incident's URL must not be actionable through another
+  // incident's path, even though scope is checked against the hold's real
+  // incident either way.
+  it('404s when the path incident does not own the hold', async () => {
+    await expect(reviewRetentionHold(
+      { holdId: HOLD, incidentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', note: 'ok', nextReviewAt: '2026-10-01T00:00:00.000Z' },
+      actor, NOW,
+    )).rejects.toBeInstanceOf(IncidentNotFoundError);
+    expect(repo.recordHoldReview).not.toHaveBeenCalled();
+  });
+
+  it('accepts the matching incident on the path', async () => {
+    await expect(reviewRetentionHold(
+      { holdId: HOLD, incidentId: INCIDENT, note: 'ok', nextReviewAt: '2026-10-01T00:00:00.000Z' }, actor, NOW,
+    )).resolves.toBeTruthy();
+  });
+
   it('rejects a review interval beyond the configured maximum', async () => {
     await expect(reviewRetentionHold({ holdId: HOLD, note: 'ok', nextReviewAt: '2027-01-01T00:00:00.000Z' }, actor, NOW))
       .rejects.toBeInstanceOf(RetentionHoldValidationError);

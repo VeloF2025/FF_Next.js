@@ -9,6 +9,7 @@ vi.mock('../../analytics/settingsRepository', () => settings);
 const repo = vi.hoisted(() => ({
   listPurgeCandidates: vi.fn(), countCandidatesHeld: vi.fn(), listIncidentStorageObjects: vi.fn(),
   hasCompleteAggregateCoverage: vi.fn(), insertRetentionRun: vi.fn(), finalizeRetentionRun: vi.fn(),
+  getIncidentPurgeState: vi.fn(),
   claimIncident: vi.fn(), recordStorageObjectDeleted: vi.fn(), markStorageComplete: vi.fn(),
   markItemFailed: vi.fn(), recordItemAttempt: vi.fn(), listResumableItems: vi.fn(), getItem: vi.fn(),
 }));
@@ -52,6 +53,15 @@ function happyPath(): void {
   repo.listIncidentStorageObjects.mockResolvedValue([{ evidenceId: 'ev-1', storagePath: 'fleet/incidents/a.jpg' }]);
   repo.hasCompleteAggregateCoverage.mockResolvedValue(true);
   repo.insertRetentionRun.mockResolvedValue(RUN);
+  repo.getIncidentPurgeState.mockResolvedValue('purgeable');
+  // Explicit defaults: vi.clearAllMocks() clears CALLS but not
+  // implementations, so a mockRejectedValue set by one test would otherwise
+  // leak into every test after it.
+  repo.markItemFailed.mockResolvedValue(undefined);
+  repo.markStorageComplete.mockResolvedValue(undefined);
+  repo.recordStorageObjectDeleted.mockResolvedValue(undefined);
+  repo.recordItemAttempt.mockResolvedValue(undefined);
+  repo.finalizeRetentionRun.mockResolvedValue(undefined);
   repo.listResumableItems.mockResolvedValue([]);
   repo.claimIncident.mockImplementation(async (_txn: unknown, params: { incidentId: string }) =>
     (params.incidentId === INCIDENT_A ? itemA : itemB));
@@ -193,6 +203,127 @@ describe('live run', () => {
     settings.getEffectiveAnalyticsRetentionSettings.mockResolvedValue({ ...policy, retentionBatchSize: 25 });
     await runOperationalRetention({ dryRun: false, requestedAt: NOW });
     expect(repo.listPurgeCandidates).toHaveBeenCalledWith({ cutoffWorkDate: '2025-08-21', limit: 25 });
+  });
+});
+
+describe('a hold landing between the claim and the storage deletion', () => {
+  // The window the schema cannot close: the claim has COMMITTED and storage
+  // deletion happens over HTTP, outside any transaction. Discovering the hold
+  // by having the first bookkeeping UPDATE refused means an attachment has
+  // already been destroyed for an incident somebody just decided to keep.
+  it('re-checks purgeability before deleting the first object', async () => {
+    await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    const checkOrder = repo.getIncidentPurgeState.mock.invocationCallOrder[0]!;
+    const deleteOrder = storage.deleteIncidentStorageObject.mock.invocationCallOrder[0]!;
+    expect(checkOrder).toBeLessThan(deleteOrder);
+  });
+
+  it('destroys nothing when the incident is held by the time storage would run', async () => {
+    repo.getIncidentPurgeState.mockResolvedValue('held');
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(storage.deleteIncidentStorageObject).not.toHaveBeenCalled();
+    expect(purge.purgeIncidentRecords).not.toHaveBeenCalled();
+    expect(result.itemsSkippedHold).toBe(1);
+  });
+
+  // Every UPDATE to a still-identified item is refused by the schema trigger
+  // once a hold exists — including markItemFailed. Touching the row at all
+  // turns a clean skip into an exception that aborts the run.
+  it('does not touch the item row at all when the guard would refuse it', async () => {
+    repo.getIncidentPurgeState.mockResolvedValue('held');
+    await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(repo.markItemFailed).not.toHaveBeenCalled();
+    expect(repo.recordStorageObjectDeleted).not.toHaveBeenCalled();
+    expect(repo.markStorageComplete).not.toHaveBeenCalled();
+  });
+
+  it('keeps processing the rest of the batch when one item is held', async () => {
+    repo.listPurgeCandidates.mockResolvedValue([candidateA, candidateB]);
+    repo.getIncidentPurgeState.mockImplementation(async (incidentId: string) =>
+      (incidentId === INCIDENT_A ? 'held' : 'purgeable'));
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'item-b', incidentId: INCIDENT_B });
+    expect(result).toMatchObject({ itemsSkippedHold: 1, itemsCompleted: 1, status: 'succeeded' });
+  });
+
+  // A hold landing INSIDE the window, after the re-check: the guard refusal
+  // surfaces as 23514 from a bookkeeping write. It is an expected outcome, not
+  // a crash, and the failure path must not try to record it — that write is
+  // refused too.
+  it('treats a guard refusal raised mid-item as a skip, not a failure', async () => {
+    repo.recordStorageObjectDeleted.mockRejectedValue(Object.assign(new Error('purge guard'), { code: '23514' }));
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(repo.markItemFailed).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ itemsSkippedHold: 1, itemsFailed: 0, status: 'succeeded' });
+  });
+
+  it('never lets a refused bookkeeping write abort the whole run', async () => {
+    repo.listPurgeCandidates.mockResolvedValue([candidateA, candidateB]);
+    repo.markStorageComplete.mockRejectedValueOnce(Object.assign(new Error('purge guard'), { code: '23514' }));
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(result.itemsCompleted).toBe(1);
+    expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'item-b', incidentId: INCIDENT_B });
+  });
+
+  // Belt and braces: even a NON-guard failure to record a failure must not
+  // take the run down. Bookkeeping is never more important than the batch.
+  it('survives a failure-recording write that fails for any other reason', async () => {
+    purge.purgeIncidentRecords.mockRejectedValue(new Error('deadlock'));
+    repo.markItemFailed.mockRejectedValue(new Error('db down'));
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(result).toMatchObject({ status: 'partial', itemsFailed: 1 });
+  });
+
+  // Objects a previous attempt already deleted come back "already absent".
+  // Counting those would report deletions this run never performed, and the
+  // run totals are what an operator reads to decide the pipeline is behaving.
+  it('counts only objects it actually deleted, never ones already gone', async () => {
+    repo.listResumableItems.mockResolvedValue([
+      { ...itemA, id: 'stale-3', stage: 'failed', storageObjectsTotal: 2, storageObjectsDeleted: 1 },
+    ]);
+    repo.listPurgeCandidates.mockResolvedValue([]);
+    repo.listIncidentStorageObjects.mockResolvedValue([
+      { evidenceId: 'ev-1', storagePath: 'fleet/incidents/a.jpg' },
+      { evidenceId: 'ev-2', storagePath: 'fleet/incidents/b.jpg' },
+    ]);
+    storage.deleteIncidentStorageObject.mockResolvedValue('already_absent');
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(storage.deleteIncidentStorageObject).toHaveBeenCalledTimes(2);
+    expect(result.storageObjectsDeleted).toBe(0);
+    expect(result.itemsCompleted).toBe(1);
+  });
+
+  // A resumed item that had already finished storage must not re-run it: the
+  // stage is overwritten by markItemFailed, so the durable counters decide.
+  it('does not re-run storage for an item whose objects are all accounted for', async () => {
+    repo.listResumableItems.mockResolvedValue([
+      { ...itemA, id: 'stale-4', stage: 'failed', storageObjectsTotal: 1, storageObjectsDeleted: 1 },
+    ]);
+    repo.listPurgeCandidates.mockResolvedValue([]);
+    await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(storage.deleteIncidentStorageObject).not.toHaveBeenCalled();
+    expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'stale-4', incidentId: INCIDENT_A });
+  });
+
+  it('skips a resumable item that is now held without recording an attempt', async () => {
+    repo.listResumableItems.mockResolvedValue([{ ...itemA, id: 'stale-1', stage: 'failed', attempts: 2 }]);
+    repo.listPurgeCandidates.mockResolvedValue([]);
+    repo.getIncidentPurgeState.mockResolvedValue('held');
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(repo.recordItemAttempt).not.toHaveBeenCalled();
+    expect(storage.deleteIncidentStorageObject).not.toHaveBeenCalled();
+    expect(result.itemsSkippedHold).toBe(1);
+  });
+
+  // One held resumable item used to abort every run before any candidate was
+  // reached, wedging the pipeline until the hold was released.
+  it('still processes new candidates when a resumable item is held', async () => {
+    repo.listResumableItems.mockResolvedValue([{ ...itemA, id: 'stale-1', incidentId: INCIDENT_B, stage: 'failed' }]);
+    repo.getIncidentPurgeState.mockImplementation(async (incidentId: string) =>
+      (incidentId === INCIDENT_B ? 'held' : 'purgeable'));
+    const result = await runOperationalRetention({ dryRun: false, requestedAt: NOW });
+    expect(purge.purgeIncidentRecords).toHaveBeenCalledWith({ itemId: 'item-a', incidentId: INCIDENT_A });
+    expect(result.itemsCompleted).toBe(1);
   });
 });
 
