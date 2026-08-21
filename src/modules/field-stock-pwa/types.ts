@@ -14,6 +14,15 @@ export interface PwaTechSummary {
   contractorId: string | null;
   contractorName: string | null;
   accountStatus: 'pending' | 'active' | 'suspended';
+  /** Staff role — 'casual' workers receive stock exactly like technicians. */
+  role: string | null;
+  /** The person's site: admin assignment if set, otherwise their own declaration. */
+  siteProjectId: string | null;
+  siteProjectName: string | null;
+  /** Where siteProjectId came from, so the UI can say so rather than imply certainty. */
+  siteSource: 'assigned' | 'declared' | 'none';
+  /** How that site relates to the store being issued from. */
+  siteMatch: 'match' | 'elsewhere' | 'unknown-staff' | 'unmapped-store';
 }
 
 export interface PwaScannedSerial {

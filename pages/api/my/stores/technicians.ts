@@ -20,49 +20,87 @@ import { log } from '@/lib/logger';
 import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import { requireStoresActor, type StoresActor } from '@/modules/field-stock-pwa/lib/storesActor';
 import { findExistingStaffForRegistration } from '@/services/staff/staffPhoneDedup';
+import { resolveStaffSite, matchStaffToStore } from '@/modules/field-stock-pwa/lib/staffSite';
+
+/** Reject a malformed project id rather than letting Postgres raise on the cast. */
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
-  const { role, accountStatus } = req.query as { role?: string; accountStatus?: string };
+  const { role, roles, accountStatus, storeLocationId } = req.query as {
+    role?: string;
+    roles?: string;
+    accountStatus?: string;
+    storeLocationId?: string;
+  };
 
-  let rows: Record<string, unknown>[];
-  if (role && accountStatus) {
-    rows = await sql`
-      SELECT id, first_name, last_name, phone, email, role, account_status,
-             created_by_staff_id, created_at
-      FROM staff
-      WHERE role = ${role} AND account_status = ${accountStatus}
-      ORDER BY created_at DESC
-      LIMIT 200
-    `;
-  } else if (role) {
-    rows = await sql`
-      SELECT id, first_name, last_name, phone, email, role, account_status,
-             created_by_staff_id, created_at
-      FROM staff
-      WHERE role = ${role}
-      ORDER BY created_at DESC
-      LIMIT 200
-    `;
-  } else if (accountStatus) {
-    rows = await sql`
-      SELECT id, first_name, last_name, phone, email, role, account_status,
-             created_by_staff_id, created_at
-      FROM staff
-      WHERE account_status = ${accountStatus}
-      ORDER BY created_at DESC
-      LIMIT 200
-    `;
-  } else {
-    rows = await sql`
-      SELECT id, first_name, last_name, phone, email, role, account_status,
-             created_by_staff_id, created_at
-      FROM staff
-      ORDER BY created_at DESC
-      LIMIT 200
-    `;
+  // `roles` (csv) supersedes the older single `role`. The picker needs BOTH
+  // technicians and casuals: casuals receive stock like anyone else, and the
+  // single-role param silently excluded all ten of them from the list.
+  //
+  // An EMPTY filter must mean "no filter", never "match nothing". `roles=','`
+  // parses to [], and `role = ANY(ARRAY[]::text[])` is false for every row —
+  // the caller would get zero people and no error. Collapse empty to null so
+  // it takes the IS NULL branch, matching the old `if (accountStatus)` shape.
+  const parsedRoles = roles
+    ? roles.split(',').map((r) => r.trim()).filter(Boolean)
+    : role
+      ? [role.trim()].filter(Boolean)
+      : [];
+  const roleList = parsedRoles.length > 0 ? parsedRoles : null;
+
+  // Same trap: `accountStatus=''` is not nullish, so `?? null` keeps the empty
+  // string and `account_status = ''` matches nobody. Normalise to null.
+  const accountStatusFilter = accountStatus && accountStatus.trim() ? accountStatus.trim() : null;
+
+  // Resolve the store's site HERE rather than trusting a client-supplied
+  // project id: the server owns the warehouse->project mapping, and a caller
+  // that passed the wrong project would filter the list against the wrong site.
+  //
+  // A store is only comparable once it has been mapped (migration 514). An
+  // unmapped store resolves to null, every row comes back 'unmapped-store', and
+  // the picker shows everyone — never filter against a site we cannot determine.
+  let storeProject: string | null = null;
+  if (storeLocationId && UUID_SHAPE.test(storeLocationId)) {
+    const loc = await sql`SELECT project_id FROM stock_locations WHERE id = ${storeLocationId}`;
+    storeProject = (loc[0]?.project_id as string | null) ?? null;
   }
 
-  return apiResponse.success(res, rows);
+  // One query, no conditional SQL fragments: this repo's tagged-template tag
+  // mis-handles `${cond ? sql`...` : sql``}`, so absent filters are expressed
+  // as NULL parameters instead of as branches.
+  const rows = await sql`
+    SELECT s.id, s.first_name, s.last_name, s.phone, s.email, s.role, s.account_status,
+           s.created_by_staff_id, s.created_at,
+           s.assigned_project_id, ap.project_name AS assigned_project_name,
+           s.declared_project_id, dp.project_name AS declared_project_name
+    FROM staff s
+    LEFT JOIN projects ap ON ap.id = s.assigned_project_id
+    LEFT JOIN projects dp ON dp.id = s.declared_project_id
+    WHERE (${roleList}::text[] IS NULL OR s.role = ANY(${roleList}::text[]))
+      AND (${accountStatusFilter}::text IS NULL OR s.account_status = ${accountStatusFilter})
+    ORDER BY s.created_at DESC
+    LIMIT 200
+  `;
+
+  // Site resolution and matching live in staffSite.ts so the server and the
+  // picker cannot drift on what "works at this site" means.
+  const annotated = rows.map((r) => {
+    const site = resolveStaffSite({
+      assignedProjectId: (r.assigned_project_id as string | null) ?? null,
+      assignedProjectName: (r.assigned_project_name as string | null) ?? null,
+      declaredProjectId: (r.declared_project_id as string | null) ?? null,
+      declaredProjectName: (r.declared_project_name as string | null) ?? null,
+    });
+    return {
+      ...r,
+      site_project_id: site.projectId,
+      site_project_name: site.projectName,
+      site_source: site.source,
+      site_match: matchStaffToStore(site, storeProject),
+    };
+  });
+
+  return apiResponse.success(res, annotated);
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: StoresActor) {
