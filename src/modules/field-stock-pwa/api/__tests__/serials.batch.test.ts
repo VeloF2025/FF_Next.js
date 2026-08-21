@@ -46,6 +46,7 @@ describe('validateSerialBatch', () => {
         serials: ['ALCLB49486FF', 'ALCLB4948758'],
         stockItemId: 'item-ont',
         sourceLocationId: 'loc-garst',
+        scanSource: 'manual',
       }),
     });
     expect(res.results).toHaveLength(2);
@@ -70,3 +71,22 @@ describe('validateSerialBatch', () => {
     expect(res.quantsWarning).toEqual({ serialsInStock: 1, quantsOnHand: 0 });
   });
 });
+
+describe('validateSerialBatch scan source', () => {
+  it('defaults to manual when the caller says nothing', async () => {
+    // Fails closed: only an explicit machine read may take in serials the
+    // stock sheet has never listed, so an omission must never unlock it.
+    requestMock.mockResolvedValueOnce({ results: [] });
+    await validateSerialBatch({ serials: ['X'], stockItemId: 'i' });
+    const body = JSON.parse((requestMock.mock.calls.at(-1)![1] as { body: string }).body);
+    expect(body.scanSource).toBe('manual');
+  });
+
+  it('sends machine for a carton scan', async () => {
+    requestMock.mockResolvedValueOnce({ results: [] });
+    await validateSerialBatch({ serials: ['X'], stockItemId: 'i', scanSource: 'machine' });
+    const body = JSON.parse((requestMock.mock.calls.at(-1)![1] as { body: string }).body);
+    expect(body.scanSource).toBe('machine');
+  });
+});
+

@@ -28,6 +28,10 @@ export interface BatchResult {
   serialNumber: string;
   valid: boolean;
   errorMessage?: string;
+  /** Set on a valid row worth flagging — e.g. not on the stock sheet yet. */
+  warning?: string;
+  /** True when no stock row exists and one will be created at picking time. */
+  provisional?: true;
   stockItemId?: string;
   stockItemName?: string;
   currentLocationId?: string | null;
@@ -50,9 +54,15 @@ interface SerialQueryRow extends Record<string, unknown> {
 
 export async function runBatchValidation(
   db: BatchQuerier,
-  input: { serials: string[]; stockItemId: string; sourceLocationId: string | null },
+  input: {
+    serials: string[];
+    stockItemId: string;
+    sourceLocationId: string | null;
+    /** 'machine' permits taking in serials the sheet has never listed. */
+    scanSource?: 'machine' | 'manual';
+  },
 ): Promise<BatchResponse> {
-  const { serials, stockItemId, sourceLocationId } = input;
+  const { serials, stockItemId, sourceLocationId, scanSource } = input;
 
   // Plain equality, not UPPER(TRIM(...)): it matches the single-serial route
   // (serialService.getSerialByNumber) exactly, and it can use
@@ -109,6 +119,7 @@ export async function runBatchValidation(
     expectedItemId: stockItemId,
     expectedItemName: expectedItemName || stockItemId,
     sourceLocation: sourceLocationId ? { id: sourceLocationId, name: sourceLocationName } : null,
+    scanSource,
   };
 
   const results: BatchResult[] = serials.map((serialNumber) => {
@@ -128,7 +139,12 @@ export async function runBatchValidation(
     return {
       serialNumber,
       valid: verdict.valid,
-      ...(verdict.valid ? {} : { errorMessage: verdict.errorMessage }),
+      ...(verdict.valid
+        ? {
+            ...(verdict.warning ? { warning: verdict.warning } : {}),
+            ...(verdict.provisional ? { provisional: true as const } : {}),
+          }
+        : { errorMessage: verdict.errorMessage }),
       stockItemId: verdict.stockItemId,
       stockItemName: verdict.stockItemName,
       currentLocationId: row?.current_location_id ?? null,

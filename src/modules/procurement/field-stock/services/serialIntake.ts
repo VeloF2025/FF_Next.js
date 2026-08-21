@@ -12,8 +12,10 @@
  * `no-direct-serial-status-write` rule targets only `UPDATE stock_serials SET`,
  * so a genesis INSERT is outside its scope (no allow-list entry needed).
  *
- * Idempotent: `ON CONFLICT (stock_item_id, serial_number) DO NOTHING` — an
- * already-received serial is skipped (no row, no status write, so the emit
+ * Idempotent: `ON CONFLICT (stock_item_id, serial_number) DO UPDATE` that
+ * touches ONLY unconfirmed field_intake rows, stamping source_confirmed_at.
+ * An ordinary already-received serial matches no WHERE and is skipped (no row,
+ * no status write, so the emit
  * trigger never fires). Safe to re-run on a schedule.
  */
 
@@ -63,6 +65,12 @@ export interface SerialIntakeResult {
   received: number;
   /** Serials that already existed and were skipped. */
   skipped: number;
+  /**
+   * field_intake serials the sheet has now caught up with. These were issued
+   * from a scanned carton before the workbook listed them (migration 515);
+   * this run confirmed them, so they drop off the unconfirmed ageing report.
+   */
+  confirmed: number;
 }
 
 /** Rows per transaction. Keeps each unit small while amortising round-trips. */
@@ -83,7 +91,7 @@ export async function receiveSerials(
   items: SerialIntakeItem[],
   ctx: SerialIntakeContext,
 ): Promise<SerialIntakeResult> {
-  const result: SerialIntakeResult = { received: 0, skipped: 0 };
+  const result: SerialIntakeResult = { received: 0, skipped: 0, confirmed: 0 };
 
   for (let i = 0; i < items.length; i += CHUNK_SIZE) {
     const chunk = items.slice(i, i + CHUNK_SIZE);
@@ -91,6 +99,7 @@ export async function receiveSerials(
     try {
       await client.query('BEGIN');
       let inserted = 0;
+      let confirmed = 0;
       await withSerialEventContext(
         client,
         { sourceTable: ctx.sourceTable, sourceId: ctx.sourceId, payload: ctx.payload },
@@ -107,7 +116,11 @@ export async function receiveSerials(
              FROM unnest($1::uuid[], $2::text[], $3::uuid[], $4::uuid[], $5::text[])
                AS incoming(stock_item_id, serial_number, location_id,
                            allocated_to_project_id, condition)
-             ON CONFLICT (stock_item_id, serial_number) DO NOTHING`,
+             ON CONFLICT (stock_item_id, serial_number) DO UPDATE
+               SET source_confirmed_at = NOW(), updated_at = NOW()
+               WHERE stock_serials.provenance = 'field_intake'
+                 AND stock_serials.source_confirmed_at IS NULL
+             RETURNING (xmax = 0) AS was_insert`,
             [
               chunk.map((item) => item.stockItemId),
               chunk.map((item) => item.serialNumber),
@@ -117,12 +130,21 @@ export async function receiveSerials(
               ctx.receivedReference,
             ],
           );
-          inserted = res.rowCount ?? 0;
+          // With DO UPDATE, rowCount counts confirmations as well as inserts,
+          // which would inflate `received` and make a sync that imported
+          // nothing look productive. `xmax = 0` is true only for a genuine
+          // INSERT, so the two are counted apart.
+          const rows = (res.rows ?? []) as Array<{ was_insert: boolean }>;
+          inserted = rows.filter((r) => r.was_insert).length;
+          confirmed = rows.length - inserted;
         },
       );
       await client.query('COMMIT');
       result.received += inserted;
-      result.skipped += chunk.length - inserted;
+      result.confirmed += confirmed;
+      // A confirmation is not a skip: the row was already there, but the sheet
+      // catching up with it is the event the ageing report waits for.
+      result.skipped += chunk.length - inserted - confirmed;
     } catch (err) {
       await client.query('ROLLBACK');
       log.error(

@@ -59,6 +59,15 @@ export async function submitIssue(
         stockItemId: draft.stockItemId,
         plannedQuantity: isSerialIssue ? draft.serials.length : (draft.quantity ?? 0),
         serialIds: isSerialIssue ? draft.serials.map((s) => s.serialNumber) : undefined,
+        // The subset the server may take into stock if the sheet has never
+        // listed them. Typed serials are deliberately absent: a typo must not
+        // be able to mint a phantom ONT issued to a named technician.
+        machineReadSerials: isSerialIssue
+          ? draft.serials.filter((s) => s.scanSource === 'machine').map((s) => s.serialNumber)
+          : undefined,
+        intakeCartonId: isSerialIssue
+          ? (draft.serials.find((s) => s.cartonId)?.cartonId ?? null)
+          : undefined,
         notes: draft.notes || undefined,
       },
     ],
