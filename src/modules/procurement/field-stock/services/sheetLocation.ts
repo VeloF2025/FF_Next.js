@@ -64,14 +64,17 @@ export const SHEET_ALIASES: Record<string, string> = {
 /**
  * Tab -> PROJECT aliases. Deliberately EMPTY.
  *
- * Two tabs cannot be resolved to a project from their names, and neither has an
- * answer this code is entitled to invent:
- *   - `Thembisa` matches Thembisa POP 1, POP 2 and POP 3.
- *   - `Tembelilhle` matches nothing — no such project exists, and its stock is
- *     observed installing on Thembisa POP 1 and Etwatwa, so there is no single
- *     right answer.
- * Both are refused and reported, leaving the allocation unset rather than wrong.
- * Add an entry here only when someone decides which project a tab means.
+ * One tab cannot be resolved to a project from its name and has no answer this
+ * code is entitled to invent: `Thembisa` matches Thembisa POP 1, POP 2 and
+ * POP 3 equally. It is refused and reported, leaving the allocation unset
+ * rather than wrong. Add an entry here only when someone decides what it means.
+ *
+ * `Tembelilhle` needs no alias: it is a misspelling of `Themb'elihle` (Lenasia,
+ * Gauteng) and the fuzzy step resolves it — edit distance 2 after
+ * normalisation, next nearest project 8, so a unique winner rather than a coin
+ * flip. Its stock is observed INSTALLING on Thembisa POP 1 and Etwatwa, but
+ * that is the allocation-vs-reality divergence this module exists to record; it
+ * does not make the allocation wrong.
  */
 export const PROJECT_ALIASES: Record<string, string> = {};
 

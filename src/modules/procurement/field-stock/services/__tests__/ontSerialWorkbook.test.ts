@@ -10,10 +10,19 @@ import * as XLSX from 'xlsx';
 import { parseOntGizzuWorkbook, FT_ONT_ITEM_ID, FT_GIZZU_ITEM_ID } from '../ontSerialWorkbook';
 import type { LocationRef } from '../sheetLocation';
 
-/** Live project rows (2026-08-21) for the allocation half. */
+/**
+ * Live project rows (2026-08-21) for the allocation half — including
+ * Themb'elihle and Etwatwa. An earlier fixture omitted them, which made a test
+ * assert that the Tembelilhle tab is unallocatable when in production it
+ * resolves. Fixtures for a name resolver must mirror the real name set.
+ */
 const PROJECTS: LocationRef[] = [
+  { id: 'p-etwatwa', name: 'Etwatwa' },
   { id: 'p-lawley', name: 'Lawley' },
   { id: 'p-mamelodi', name: 'Mamelodi' },
+  { id: 'p-mohadin', name: 'Mohadin' },
+  { id: 'p-mohadin2', name: 'Mohadin Ph 2' },
+  { id: 'p-thembelihle', name: "Themb'elihle" },
   { id: 'p-thembisa1', name: 'Thembisa POP 1' },
   { id: 'p-thembisa2', name: 'Thembisa POP 2' },
   { id: 'p-thembisa3', name: 'Thembisa POP 3' },
@@ -131,13 +140,26 @@ describe('parseOntGizzuWorkbook', () => {
     ]);
   });
 
-  it('imports the stock but leaves allocation UNSET when no such project exists', () => {
+  it("allocates the misspelled Tembelilhle tab to Themb'elihle", () => {
+    // Same township, different spelling — and the only candidate among all 25
+    // real projects. Against the production project list this resolves; a
+    // trimmed fixture previously made it look unallocatable.
     const wb = makeWorkbook({ Tembelilhle: [['ALCLB49486FF', '']] });
     const parsed = parseOntGizzuWorkbook(wb, XLSX, LOCATIONS, PROJECTS);
 
     expect(parsed.ontItems[0]!.locationId).toBe('loc-tembelihle');
-    expect(parsed.ontItems[0]!.allocatedToProjectId).toBeNull();
-    expect(parsed.unallocatedSheets[0]).toMatchObject({ sheetName: 'Tembelilhle', reason: 'no-match' });
+    expect(parsed.ontItems[0]!.allocatedToProjectId).toBe('p-thembelihle');
+    expect(parsed.unallocatedSheets).toEqual([]);
+  });
+
+  it('imports the stock but leaves allocation UNSET when no project matches', () => {
+    const wb = makeWorkbook({ Kimberley: [['ALCLB49486FF', '']] });
+    const parsed = parseOntGizzuWorkbook(wb, XLSX, LOCATIONS, PROJECTS);
+
+    // Unresolvable as a WAREHOUSE too, so it does not import at all — the
+    // allocation half is reported by unresolvedSheets in that case.
+    expect(parsed.ontItems).toHaveLength(0);
+    expect(parsed.unresolvedSheets[0]).toMatchObject({ sheetName: 'Kimberley', reason: 'no-match' });
   });
 
   it('keeps skippedSheets populated for existing callers', () => {
