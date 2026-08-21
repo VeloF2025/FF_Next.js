@@ -92,53 +92,75 @@ describe('probeVlmHealth', () => {
   });
 });
 
+/**
+ * `execFileSyncPoison` throws distinctively if anything still calls the sync
+ * form. Combined with asserting it was NEVER called, this is what actually
+ * proves the async path is used — a mutation test confirmed the previous
+ * version of these tests (which only checked the parsed *result*) still
+ * passed after reverting to `execFileSync`, because the sync throw landed in
+ * the same try/catch and produced an identical null-uptime result. The
+ * result alone cannot distinguish sync from async; only observing which
+ * function was invoked can.
+ */
+function mockChildProcess(execFile: (...args: unknown[]) => void) {
+  const execFileSyncPoison = vi.fn(() => {
+    throw new Error('execFileSync must not be called — probe.ts must use the async execFile');
+  });
+  vi.doMock('child_process', () => ({
+    execFile,
+    execFileSync: execFileSyncPoison,
+    default: { execFile, execFileSync: execFileSyncPoison },
+  }));
+  return { execFileSyncPoison };
+}
+
 describe('defaultServiceUptimeMs (real systemctl path)', () => {
-  it('computes uptime from a valid ActiveEnterTimestamp', async () => {
-    const execFileImpl = (
-      _cmd: string,
-      _args: string[],
-      _opts: unknown,
-      cb: (err: Error | null, result: { stdout: string; stderr: string }) => void,
-    ) => cb(null, { stdout: '2026-08-21 08:00:00 SAST\n', stderr: '' });
-    vi.doMock('child_process', () => ({ execFile: execFileImpl, default: { execFile: execFileImpl } }));
+  it('computes uptime from a valid ActiveEnterTimestamp via the async execFile, not execFileSync', async () => {
+    const enteredAt = new Date(Date.now() - 60_000); // 1 minute ago
+    const execFileSpy = vi.fn(
+      (_cmd: string, _args: string[], _opts: unknown, cb: (err: Error | null, result: { stdout: string; stderr: string }) => void) =>
+        cb(null, { stdout: `${enteredAt.toISOString()}\n`, stderr: '' }),
+    );
+    const { execFileSyncPoison } = mockChildProcess(execFileSpy);
     vi.resetModules();
     const { probeVlmHealth: probeWithRealUptime } = await import('./probe');
     const fetchImpl = fakeFetch({ ok: false, status: 502 });
     const result = await probeWithRealUptime({ fetchImpl });
-    // withinStartupGrace depends on the real clock vs the mocked timestamp,
-    // but the important thing this proves is the systemctl output parsed
-    // without error and produced a real (non-null-forced) verdict.
-    expect(typeof result.withinStartupGrace).toBe('boolean');
+    // 1 minute of uptime is well inside the 25-minute grace window — this
+    // value could only come from the parsed timestamp, not a swallowed error.
+    expect(result.withinStartupGrace).toBe(true);
+    expect(execFileSpy).toHaveBeenCalledTimes(1);
+    expect(execFileSyncPoison).not.toHaveBeenCalled();
   });
 
   it('treats "n/a" (service never started) as unknown uptime, not a crash', async () => {
-    const execFileImpl = (
-      _cmd: string,
-      _args: string[],
-      _opts: unknown,
-      cb: (err: Error | null, result: { stdout: string; stderr: string }) => void,
-    ) => cb(null, { stdout: 'n/a\n', stderr: '' });
-    vi.doMock('child_process', () => ({ execFile: execFileImpl, default: { execFile: execFileImpl } }));
+    const execFileSpy = vi.fn(
+      (_cmd: string, _args: string[], _opts: unknown, cb: (err: Error | null, result: { stdout: string; stderr: string }) => void) =>
+        cb(null, { stdout: 'n/a\n', stderr: '' }),
+    );
+    const { execFileSyncPoison } = mockChildProcess(execFileSpy);
     vi.resetModules();
     const { probeVlmHealth: probeWithRealUptime } = await import('./probe');
     const fetchImpl = fakeFetch({ ok: false, status: 502 });
     const result = await probeWithRealUptime({ fetchImpl });
     expect(result.withinStartupGrace).toBe(false);
+    expect(execFileSpy).toHaveBeenCalledTimes(1);
+    expect(execFileSyncPoison).not.toHaveBeenCalled();
   });
 
   it('does not throw when systemctl itself fails (e.g. not installed, timeout)', async () => {
-    const execFileImpl = (
-      _cmd: string,
-      _args: string[],
-      _opts: unknown,
-      cb: (err: Error | null, result?: { stdout: string; stderr: string }) => void,
-    ) => cb(new Error('command not found'), undefined);
-    vi.doMock('child_process', () => ({ execFile: execFileImpl, default: { execFile: execFileImpl } }));
+    const execFileSpy = vi.fn(
+      (_cmd: string, _args: string[], _opts: unknown, cb: (err: Error | null, result?: { stdout: string; stderr: string }) => void) =>
+        cb(new Error('command not found'), undefined),
+    );
+    const { execFileSyncPoison } = mockChildProcess(execFileSpy);
     vi.resetModules();
     const { probeVlmHealth: probeWithRealUptime } = await import('./probe');
     const fetchImpl = fakeFetch({ ok: false, status: 502 });
     const result = await probeWithRealUptime({ fetchImpl });
     expect(result.withinStartupGrace).toBe(false);
     expect(result.modelId).toBeNull();
+    expect(execFileSpy).toHaveBeenCalledTimes(1);
+    expect(execFileSyncPoison).not.toHaveBeenCalled();
   });
 });
