@@ -46,7 +46,7 @@ describe('validateSerialBatch', () => {
         serials: ['ALCLB49486FF', 'ALCLB4948758'],
         stockItemId: 'item-ont',
         sourceLocationId: 'loc-garst',
-        scanSource: 'manual',
+        scanPayload: null,
       }),
     });
     expect(res.results).toHaveLength(2);
@@ -72,21 +72,24 @@ describe('validateSerialBatch', () => {
   });
 });
 
-describe('validateSerialBatch scan source', () => {
-  it('defaults to manual when the caller says nothing', async () => {
-    // Fails closed: only an explicit machine read may take in serials the
-    // stock sheet has never listed, so an omission must never unlock it.
+describe('validateSerialBatch scan payload', () => {
+  it('sends null when there was no scan', async () => {
+    // Fails closed: with no payload the server can corroborate nothing, so
+    // nothing may be taken into stock.
     requestMock.mockResolvedValueOnce({ results: [] });
     await validateSerialBatch({ serials: ['X'], stockItemId: 'i' });
     const body = JSON.parse((requestMock.mock.calls.at(-1)![1] as { body: string }).body);
-    expect(body.scanSource).toBe('manual');
+    expect(body.scanPayload).toBeNull();
   });
 
-  it('sends machine for a carton scan', async () => {
+  it('sends the RAW payload, not a claim about it', async () => {
+    const raw = 'ALCLB49486FF;ALCLB4948758;ALCLB4948779';
     requestMock.mockResolvedValueOnce({ results: [] });
-    await validateSerialBatch({ serials: ['X'], stockItemId: 'i', scanSource: 'machine' });
+    await validateSerialBatch({ serials: ['X'], stockItemId: 'i', scanPayload: raw });
     const body = JSON.parse((requestMock.mock.calls.at(-1)![1] as { body: string }).body);
-    expect(body.scanSource).toBe('machine');
+    expect(body.scanPayload).toBe(raw);
+    // There must be no boolean the server could take on trust.
+    expect(body.scanSource).toBeUndefined();
   });
 });
 

@@ -2,7 +2,7 @@
  * POST /api/my/stores/serials/validate-batch — validate a scanned carton's
  * serials in one round-trip.
  *
- * Body: { serials, stockItemId, sourceLocationId?, scanSource?: 'machine'|'manual' }
+ * Body: { serials, stockItemId, sourceLocationId?, scanPayload?: string }
  * Data: { results: BatchResult[], quantsWarning?: { serialsInStock, quantsOnHand } }
  *
  * Read-only. Status writes go through the domain endpoints (pickings, returns).
@@ -33,7 +33,7 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
     serials?: unknown;
     stockItemId?: unknown;
     sourceLocationId?: unknown;
-    scanSource?: unknown;
+    scanPayload?: unknown;
   };
 
   if (!Array.isArray(body.serials) || body.serials.length === 0) {
@@ -64,10 +64,10 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
         serials,
         stockItemId: body.stockItemId,
         sourceLocationId,
-        // Only the literal 'machine' unlocks taking in unlisted serials.
-        // Anything else — absent, misspelled, a truthy object — falls back to
-        // 'manual', which refuses. Fails closed by construction.
-        scanSource: body.scanSource === 'machine' ? 'machine' : 'manual',
+        // The RAW scan payload, not a claim about it. The core re-parses it
+        // and only serials the payload actually lists may be taken into stock.
+        // A non-string (absent, object, number) yields no eligible serials.
+        scanPayload: typeof body.scanPayload === 'string' ? body.scanPayload : null,
       },
     );
     return apiResponse.success(res, data);

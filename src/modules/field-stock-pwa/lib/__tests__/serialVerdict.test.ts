@@ -152,14 +152,34 @@ describe('a serial the sheet has never listed (field intake)', () => {
   });
 
   it('accepts every serial of the real carton when machine-read', () => {
-    for (const sn of CARTON) {
-      const v = verdictForSerial(null, ctx('machine'));
-      expect(v.valid, `${sn} must not be refused`).toBe(true);
-      if (v.valid) {
-        expect(v.provisional).toBe(true);
-        expect(v.stockItemId).toBe('item-ont');
+    // Each serial is actually put through the rule. The previous version of
+    // this test passed `null` on every iteration and never used `sn`, so it
+    // asserted the same thing nine times and would have passed identically
+    // with a fixture of nine copies of 'x'.
+    const verdicts = CARTON.map((sn) => ({
+      sn,
+      // The serial is unknown to stock — that is the whole scenario — but the
+      // ITEM context differs per call so an implementation that ignored its
+      // arguments could not satisfy all nine.
+      verdict: verdictForSerial(null, {
+        ...ctx('machine'),
+        expectedItemId: `item-${sn}`,
+        expectedItemName: `ONT ${sn}`,
+      }),
+    }));
+
+    expect(verdicts).toHaveLength(9);
+    for (const { sn, verdict } of verdicts) {
+      expect(verdict.valid, `${sn} must not be refused`).toBe(true);
+      if (verdict.valid) {
+        expect(verdict.provisional).toBe(true);
+        // Proves the verdict is derived from THIS call's context.
+        expect(verdict.stockItemId).toBe(`item-${sn}`);
+        expect(verdict.stockItemName).toBe(`ONT ${sn}`);
       }
     }
+    // And the nine are distinct, so the fixture cannot be nine copies.
+    expect(new Set(CARTON).size).toBe(9);
   });
 
   it('still refuses an unknown serial that was TYPED by hand', () => {

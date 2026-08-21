@@ -10,6 +10,8 @@ vi.mock('@/lib/logger', () => ({
   log: {
     info: vi.fn(),
     error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 
@@ -155,6 +157,65 @@ describe('reconciling serials taken in from the field', () => {
       sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF',
     });
     expect(result).toEqual({ received: 0, skipped: 3, confirmed: 0 });
+  });
+});
+
+describe('duplicate serials in the source', () => {
+  // ON CONFLICT DO UPDATE raises "command cannot affect row a second time" if
+  // one statement proposes the same (stock_item_id, serial_number) twice —
+  // which aborts the chunk and, because the error is rethrown, the whole run.
+  // The previous DO NOTHING tolerated it, so this hazard arrived with the
+  // confirmation logic. Verified against real Postgres 2026-08-21.
+  it('never proposes the same serial twice in one statement', async () => {
+    const { pool, client } = makePool([2]);
+    const dup = 'ALCLB49486FF';
+    const items = [
+      { stockItemId: STOCK_ITEM_ID, serialNumber: dup, locationId: null },
+      { stockItemId: STOCK_ITEM_ID, serialNumber: dup, locationId: null },
+      { stockItemId: STOCK_ITEM_ID, serialNumber: 'ALCLB4948758', locationId: null },
+    ];
+
+    await receiveSerials(pool, items, {
+      sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF',
+    });
+
+    const insert = client.query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO stock_serials'),
+    );
+    const serialParam = (insert?.[1] as unknown[])[1] as string[];
+    expect(serialParam).toHaveLength(2);
+    expect(new Set(serialParam).size).toBe(2);
+    expect(serialParam.filter((x) => x === dup)).toHaveLength(1);
+  });
+
+  it('counts a dropped duplicate as skipped so the totals still add up', async () => {
+    const { pool } = makePool([1]);
+    const items = [
+      { stockItemId: STOCK_ITEM_ID, serialNumber: 'A', locationId: null },
+      { stockItemId: STOCK_ITEM_ID, serialNumber: 'A', locationId: null },
+    ];
+    const result = await receiveSerials(pool, items, {
+      sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF',
+    });
+    // 2 in, 1 inserted, 1 dropped as a duplicate.
+    expect(result.received + result.skipped + result.confirmed).toBe(2);
+    expect(result.skipped).toBe(1);
+  });
+
+  it('keeps the same serial when it belongs to a DIFFERENT stock item', async () => {
+    // The unique constraint is composite, so the same printed label on two
+    // product types is legitimate and must not be deduplicated away.
+    const OTHER_ITEM = '11111111-2222-4333-8444-555555555555';
+    const { pool, client } = makePool([2]);
+    await receiveSerials(pool, [
+      { stockItemId: STOCK_ITEM_ID, serialNumber: 'SHARED', locationId: null },
+      { stockItemId: OTHER_ITEM, serialNumber: 'SHARED', locationId: null },
+    ], { sourceTable: 'sharepoint', sourceId: null, payload: {}, receivedReference: 'REF' });
+
+    const insert = client.query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO stock_serials'),
+    );
+    expect((insert?.[1] as unknown[])[1] as string[]).toHaveLength(2);
   });
 });
 

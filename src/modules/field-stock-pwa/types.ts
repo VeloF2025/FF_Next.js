@@ -46,6 +46,12 @@ export interface PwaScannedSerial {
   scanSource?: 'machine' | 'manual';
   /** Carton package id, when the serial came from a box scan. */
   cartonId?: string;
+  /**
+   * The RAW decoded payload this serial came from, when it was scanned. Sent
+   * to the server so it can re-derive what the scan corroborates, rather than
+   * being told. Absent for typed serials.
+   */
+  scanPayload?: string;
   /** Set on every member of one carton scan; absent for individually scanned units. */
   groupId?: string;
   /** Human label for the group header, e.g. 'Box · 9 serials'. Set on every member. */

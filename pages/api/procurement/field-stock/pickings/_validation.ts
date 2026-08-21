@@ -20,6 +20,7 @@ import { neon } from '@neondatabase/serverless';
 import { ErrorCode } from '@/lib/apiResponse';
 import { FIELD_DEFAULT_LOCATION_ID } from '@/modules/field-stock-pwa/lib/locationDefaults';
 import { log } from '@/lib/logger';
+import { serialsEligibleForIntake } from '@/modules/field-stock-pwa/lib/boxScan';
 
 // ---------------------------------------------------------------------------
 // Shape contract
@@ -44,15 +45,15 @@ export interface PickingLine {
   lotNumber?: string;
   notes?: string;
   /**
-   * Serial numbers on this line that were read from a printed barcode (carton
-   * DataMatrix, photo decode, or live camera) rather than typed. ONLY these
-   * may be taken into stock when the sheet has never listed them — a typed
-   * serial that does not resolve is still refused, because a typo would become
-   * a permanent phantom ONT issued to a named technician.
+   * The RAW decoded carton payload for this line, when one was scanned.
    *
-   * A subset of serialIds. Anything here that is not in serialIds is ignored.
+   * The server re-derives which serials it corroborates (serialsEligibleForIntake)
+   * instead of trusting a client-supplied "this was machine-read" list. Only
+   * serials the payload itself lists may be taken into stock when the sheet has
+   * never listed them; anything else is refused, because a typo must not become
+   * a permanent phantom ONT issued to a named technician.
    */
-  machineReadSerials?: string[];
+  intakeScanPayload?: string | null;
   /** The carton's package id, so a box's serials stay traceable together. */
   intakeCartonId?: string | null;
 }
@@ -198,9 +199,11 @@ export async function validateSerialsAvailable(
       // carton scanned on 2026-08-21 had all 9 of its serials refused because
       // the workbook lacked that consignment. Refusing does not prevent the
       // handout, only its recording.
-      const machineRead = Array.isArray(line.machineReadSerials)
-        && line.machineReadSerials.includes(serialNumber);
-      if (machineRead) {
+      // Derived from the payload, not asserted by the caller. A serial the
+      // payload does not list cannot be taken in, however the request is
+      // shaped — including one smuggled into the line but absent from the scan.
+      const corroborated = serialsEligibleForIntake(line.intakeScanPayload);
+      if (corroborated.has(serialNumber)) {
         const createdId = await takeSerialIntoStock(sql, {
           serialNumber,
           stockItemId: line.stockItemId,
@@ -244,9 +247,21 @@ export async function validateSerialsAvailable(
  * joins the ordinary flow at the ordinary place and every downstream path —
  * custody, promotion, the mig-387 event triggers — treats it like any other.
  *
- * Not wrapped in the picking's transaction on purpose. If the picking later
- * fails, the serial remains as available field_intake stock, which is TRUE:
- * the carton really is on the shelf. Losing that record would be the lie.
+ * NOT transactional with the picking — and note that createPicking has no
+ * transaction at all: its `sql` is a bare neon() HTTP client, so the header
+ * insert, the line inserts and this one each autocommit independently. An
+ * earlier version of this comment said the intake was "deliberately outside
+ * the transaction", which implied one existed.
+ *
+ * So if a later step fails, this row stays committed as available stock at the
+ * source warehouse with provenance='field_intake', not linked to any picking
+ * or holder. That is a real orphan, and worth being plain about rather than
+ * calling it deliberate: it is TRUE in the sense that the carton really is on
+ * the shelf, and it is discoverable (the unconfirmed intake report lists it
+ * with its carton id and who took it in) — but nothing records which handout
+ * failed to use it, so it can look like ordinary available stock to the next
+ * storeman. Making it atomic needs createPicking to gain a transaction, which
+ * is a larger change than this one.
  *
  * ON CONFLICT DO NOTHING + re-select makes a retry idempotent: a second
  * attempt resolves the row the first one created rather than erroring.

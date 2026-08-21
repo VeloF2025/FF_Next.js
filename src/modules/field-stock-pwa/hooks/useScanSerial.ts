@@ -132,7 +132,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
 
   /** Expand one carton scan into grouped, batch-validated chips. */
   const handleBoxScan = useCallback(
-    async (serials: string[], cartonId?: string | null) => {
+    async (serials: string[], cartonId?: string | null, rawPayload?: string) => {
       const seen = alreadyScanned();
       const fresh = serials.filter((s) => !seen.has(s));
       if (fresh.length === 0) { buzzDuplicate(); return; }
@@ -151,6 +151,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
         state: 'pending-validation', groupId, groupLabel,
         scanSource: 'machine' as const,
         ...(cartonId ? { cartonId } : {}),
+        ...(rawPayload ? { scanPayload: rawPayload } : {}),
       }));
       commit([...scannedRef.current, ...pending]);
 
@@ -160,7 +161,8 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
           serials: fresh,
           stockItemId: stockItem.id,
           sourceLocationId: sourceLocation?.id ?? null,
-          scanSource: 'machine',
+          // The payload itself — the server decides what it corroborates.
+          scanPayload: rawPayload ?? null,
         });
       } catch (err) {
         if (!mountedRef.current) return;
@@ -242,7 +244,7 @@ export function useScanSerial({ stockItem, scanned, onChange, sourceLocation }: 
             ? `Label says ${declared}, read ${payload.serials.length} — rescan the box.`
             : null,
         );
-        await handleBoxScan(payload.serials, declaredPackageId.current);
+        await handleBoxScan(payload.serials, declaredPackageId.current, rawSerial);
         return;
       }
 

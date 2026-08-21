@@ -59,6 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_serials_unconfirmed_intake
   ON stock_serials (intake_at)
   WHERE provenance = 'field_intake' AND source_confirmed_at IS NULL;
 
--- Existing rows all came from the workbook. The DEFAULT already covers them,
--- but state it so a re-run after a partial apply cannot leave NULLs behind.
-UPDATE stock_serials SET provenance = 'sheet' WHERE provenance IS NULL;
+-- No backfill statement here on purpose. ADD COLUMN ... NOT NULL DEFAULT
+-- 'sheet' already materialises 'sheet' on every existing row before the NOT
+-- NULL is enforced, so an `UPDATE ... WHERE provenance IS NULL` could never
+-- match anything. An earlier draft carried one and it was dead code.

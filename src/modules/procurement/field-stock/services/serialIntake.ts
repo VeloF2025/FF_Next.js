@@ -82,7 +82,7 @@ const CHUNK_SIZE = 500;
  *
  * Atomicity is per-chunk, NOT per-run: if a later chunk throws, earlier chunks
  * are already committed. This is safe because intake is idempotent
- * (`ON CONFLICT DO NOTHING`) — re-running resumes from where it stopped — but
+ * (the upsert below) — re-running resumes from where it stopped — but
  * callers receive the error and should surface that the run was partial. The
  * count of serials received before the failure is logged here.
  */
@@ -93,8 +93,38 @@ export async function receiveSerials(
 ): Promise<SerialIntakeResult> {
   const result: SerialIntakeResult = { received: 0, skipped: 0, confirmed: 0 };
 
-  for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-    const chunk = items.slice(i, i + CHUNK_SIZE);
+  // Deduplicate on the conflict target BEFORE chunking. This is load-bearing,
+  // not tidiness: `ON CONFLICT DO UPDATE` raises "command cannot affect row a
+  // second time" if one statement proposes the same (stock_item_id,
+  // serial_number) twice, which aborts the chunk and, because the error is
+  // rethrown, the whole run. The previous `DO NOTHING` tolerated duplicates
+  // silently, so this hazard arrived with the confirmation logic.
+  //
+  // The source is a hand-maintained workbook that already carries junk rows,
+  // so a repeated serial is a question of when, not whether. Verified against
+  // Postgres 2026-08-21: DO NOTHING inserts 2 of 3 and survives; DO UPDATE
+  // errors on the same input.
+  const seenKeys = new Set<string>();
+  const uniqueItems: SerialIntakeItem[] = [];
+  let duplicatesDropped = 0;
+  for (const item of items) {
+    const key = `${item.stockItemId}\u0000${item.serialNumber}`;
+    if (seenKeys.has(key)) { duplicatesDropped += 1; continue; }
+    seenKeys.add(key);
+    uniqueItems.push(item);
+  }
+  if (duplicatesDropped > 0) {
+    // Counted as skipped so the totals still add up to what the caller sent.
+    result.skipped += duplicatesDropped;
+    log.warn('receiveSerials: dropped duplicate serials from the source', {
+      duplicatesDropped,
+      received: items.length,
+      unique: uniqueItems.length,
+    }, 'field-stock/serialIntake');
+  }
+
+  for (let i = 0; i < uniqueItems.length; i += CHUNK_SIZE) {
+    const chunk = uniqueItems.slice(i, i + CHUNK_SIZE);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');

@@ -13,6 +13,7 @@
  */
 
 import { verdictForSerial } from '@/modules/field-stock-pwa/lib/serialVerdict';
+import { serialsEligibleForIntake } from '@/modules/field-stock-pwa/lib/boxScan';
 import type { SerialRecord } from '@/modules/field-stock-pwa/lib/serialVerdict';
 
 /**
@@ -58,11 +59,17 @@ export async function runBatchValidation(
     serials: string[];
     stockItemId: string;
     sourceLocationId: string | null;
-    /** 'machine' permits taking in serials the sheet has never listed. */
-    scanSource?: 'machine' | 'manual';
+    /**
+     * The RAW decoded scan payload, when there was one. The server re-derives
+     * which serials it corroborates rather than trusting a client flag — see
+     * serialsEligibleForIntake. Absent means nothing may be taken in.
+     */
+    scanPayload?: string | null;
   },
 ): Promise<BatchResponse> {
-  const { serials, stockItemId, sourceLocationId, scanSource } = input;
+  const { serials, stockItemId, sourceLocationId, scanPayload } = input;
+  // Derived here, from the payload itself — never taken on the caller's word.
+  const intakeEligible = serialsEligibleForIntake(scanPayload);
 
   // Plain equality, not UPPER(TRIM(...)): it matches the single-serial route
   // (serialService.getSerialByNumber) exactly, and it can use
@@ -119,7 +126,6 @@ export async function runBatchValidation(
     expectedItemId: stockItemId,
     expectedItemName: expectedItemName || stockItemId,
     sourceLocation: sourceLocationId ? { id: sourceLocationId, name: sourceLocationName } : null,
-    scanSource,
   };
 
   const results: BatchResult[] = serials.map((serialNumber) => {
@@ -135,7 +141,11 @@ export async function runBatchValidation(
         }
       : null;
 
-    const verdict = verdictForSerial(record, ctx);
+    // Per-serial: only a serial the payload actually lists may be taken in.
+    const verdict = verdictForSerial(record, {
+      ...ctx,
+      scanSource: intakeEligible.has(serialNumber) ? 'machine' : 'manual',
+    });
     return {
       serialNumber,
       valid: verdict.valid,

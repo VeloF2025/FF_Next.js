@@ -159,8 +159,11 @@ export async function validateSerialBatch(input: {
   serials: string[];
   stockItemId: string;
   sourceLocationId?: string | null;
-  /** 'machine' permits taking in serials the stock sheet has never listed. */
-  scanSource?: 'machine' | 'manual';
+  /**
+   * The RAW decoded scan payload. The server re-derives which serials it
+   * corroborates; there is deliberately no client flag saying "trust me".
+   */
+  scanPayload?: string | null;
 }): Promise<BatchSerialResponse> {
   return request<BatchSerialResponse>('/api/my/stores/serials/validate-batch', {
     method: 'POST',
@@ -168,7 +171,7 @@ export async function validateSerialBatch(input: {
       serials: input.serials,
       stockItemId: input.stockItemId,
       sourceLocationId: input.sourceLocationId ?? null,
-      scanSource: input.scanSource ?? 'manual',
+      scanPayload: input.scanPayload ?? null,
     }),
   });
 }
