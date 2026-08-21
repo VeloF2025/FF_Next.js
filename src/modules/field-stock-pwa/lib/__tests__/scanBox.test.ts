@@ -1,10 +1,17 @@
 /**
- * scanRegionFor — the decode region must be SQUARE and large enough for a
+ * scanRegionFor — the decode region must be large enough on BOTH axes for a
  * dense carton DataMatrix, on any phone in the fleet.
  *
- * The bug this replaces: a fixed 300x140 region. Square is the whole point —
- * a short region crops a 2D symbol, which is why the live camera could not
- * read a label that a still photo decodes fine.
+ * The bug this replaces: a fixed 300x140 region. A short region crops a 2D
+ * symbol, which is why the live camera could not read a label that a still
+ * photo decodes fine. NOT square: squareness was the first attempt and it
+ * regressed 1D scanning on a wide-but-short frame.
+ *
+ * Hand-picked "real phone" sizes are not enough to characterise this function.
+ * It is piecewise over four regimes per axis, and a defect lived precisely in
+ * the band where BOTH axes sit in their flat target band at once — a band no
+ * hand-picked pair happened to hit. The sweeps below replace guessing at
+ * inputs with covering the space.
  */
 import { describe, it, expect } from 'vitest';
 import { scanRegionFor } from '../scanBox';
@@ -83,5 +90,73 @@ describe('scanRegionFor', () => {
     expect(scanRegionFor(NaN, 120).width).toBeLessThanOrEqual(120);
     expect(scanRegionFor(50, NaN).height).toBeLessThanOrEqual(50);
     expect(scanRegionFor(0, 180).width).toBeLessThanOrEqual(180);
+  });
+  // --- Sweeps over the whole plausible viewfinder space -------------------
+  // These exist because six hand-picked pairs missed a real defect. The
+  // function is piecewise (passthrough / flat-at-target / linear / capped) on
+  // each axis independently, so the interesting cases are the combinations of
+  // regimes, not any one device size.
+
+  const SWEEP: Array<[number, number]> = [];
+  for (let w = 200; w <= 1200; w += 1) {
+    for (let h = 200; h <= 1200; h += 7) SWEEP.push([w, h]);
+  }
+
+  it('never produces the 300x260 geometry the measurements record as FAILING', () => {
+    // The defect this test was written for. MIN_HEIGHT used to be 260 — the
+    // symbol's own height — so every viewfinder in width 300-334 x height
+    // 260-289 emitted exactly the region the carton photo fails to decode in.
+    // 1,050 sizes hit it. Setting MIN_HEIGHT back to 260 turns this RED.
+    const failing = SWEEP.filter(([w, h]) => {
+      const box = scanRegionFor(w, h);
+      return box.width === 300 && box.height === 260;
+    });
+    expect(
+      failing.slice(0, 5),
+      `${failing.length} viewfinder sizes emit the documented-failing 300x260 region`,
+    ).toEqual([]);
+  });
+
+  it('gives a 2D symbol room beyond its own height wherever the frame allows', () => {
+    // The quiet-zone rule, stated as an invariant rather than as a size: a
+    // frame tall enough to offer more than the 260px symbol must not be
+    // handed a region that merely equals it.
+    for (const [w, h] of SWEEP) {
+      if (h < 300) continue;
+      expect(scanRegionFor(w, h).height, `height on ${w}x${h}`).toBeGreaterThan(260);
+    }
+  });
+
+  it('never hands html5-qrcode a box it will throw on', () => {
+    // Verified against html5-qrcode 2.3.8: it truncates only WIDTH against the
+    // root element, never height, then throws from getShadedRegionBounds if
+    // EITHER axis exceeds the frame, and throws again below MIN_QR_BOX_SIZE.
+    // So both bounds are the library's contract, not a preference of ours.
+    const MIN_QR_BOX_SIZE = 50;
+    for (const [w, h] of SWEEP) {
+      const box = scanRegionFor(w, h);
+      expect(box.width, `width on ${w}x${h}`).toBeLessThanOrEqual(w);
+      expect(box.height, `height on ${w}x${h}`).toBeLessThanOrEqual(h);
+      expect(box.width, `width on ${w}x${h}`).toBeGreaterThanOrEqual(MIN_QR_BOX_SIZE);
+      expect(box.height, `height on ${w}x${h}`).toBeGreaterThanOrEqual(MIN_QR_BOX_SIZE);
+    }
+  });
+
+  it('is never narrower than the 300px region it replaced, across the sweep', () => {
+    // 1D needs width. Stated over the whole space, not over five phones.
+    for (const [w, h] of SWEEP) {
+      expect(scanRegionFor(w, h).width, `width on ${w}x${h}`).toBeGreaterThanOrEqual(
+        Math.min(300, w),
+      );
+    }
+  });
+
+  it('covers each regime boundary on both axes explicitly', () => {
+    // MIN_EDGE/0.9 ~= 333.3, MIN_HEIGHT/0.9 ~= 333.3, MAX_EDGE/0.9 ~= 533.3.
+    expect(scanRegionFor(333, 333)).toEqual({ width: 300, height: 300 }); // flat at target
+    expect(scanRegionFor(334, 334)).toEqual({ width: 300, height: 300 }); // floor(300.6)=300
+    expect(scanRegionFor(400, 400)).toEqual({ width: 360, height: 360 }); // linear
+    expect(scanRegionFor(533, 533)).toEqual({ width: 479, height: 479 }); // just under cap
+    expect(scanRegionFor(534, 534)).toEqual({ width: 480, height: 480 }); // capped
   });
 });

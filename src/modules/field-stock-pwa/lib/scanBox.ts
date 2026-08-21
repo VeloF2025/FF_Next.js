@@ -25,7 +25,7 @@
  * MEASURED, not assumed (2026-08-21, real carton photo through zxing):
  *
  *   region 300x140, symbol 285x260 visible as 285x140 : FAILS   <- the old bug
- *   region 300x260, symbol 285x260 filling it exactly  : FAILS
+ *   region 300x260, symbol 285x260 filling it exactly  : FAILS   <- MIN_HEIGHT
  *   region 300x300, same symbol with ~20px of margin   : DECODES
  *
  * The second row is the one worth knowing. A DataMatrix needs a QUIET ZONE: a
@@ -55,8 +55,17 @@ const MIN_EDGE = 300;
 /**
  * Height target. The old region gave 2D symbols only 140px, which is what made
  * a carton label unreadable in live video while a still photo decoded it.
+ *
+ * It is 300 and not 260 for a reason worth keeping. 260 is the height of the
+ * symbol in the measurements above, and a region of exactly that height is the
+ * `300x260 : FAILS` row — the symbol fills it edge to edge and the quiet zone
+ * is gone. Setting the target to the symbol's own height reproduces the very
+ * geometry the measurement rules out: 1,050 viewfinder sizes (width 300-334 x
+ * height 260-289) landed on exactly 300x260, because both axes sit in their
+ * flat band at once. 300 is the `DECODES` row. Raising it costs nothing on a
+ * shorter frame, which is clamped to the frame either way.
  */
-const MIN_HEIGHT = 260;
+const MIN_HEIGHT = 300;
 /** Never larger than this — huge regions cost frame rate for no accuracy gain. */
 const MAX_EDGE = 480;
 
@@ -66,8 +75,11 @@ export interface ScanBox {
 }
 
 /**
- * A square decode region for the given viewfinder, clamped to sane bounds and
- * never exceeding the frame itself.
+ * The decode region for the given viewfinder: each axis sized independently,
+ * clamped to sane bounds and never exceeding the frame itself.
+ *
+ * Deliberately NOT square — see the note above on why the square attempt
+ * regressed 1D scanning on a wide-but-short frame.
  */
 export function scanRegionFor(viewfinderWidth: number, viewfinderHeight: number): ScanBox {
   return {
@@ -88,8 +100,15 @@ function edgeFor(dimension: number, fallback: number, target: number): number {
     ? dimension
     : (Number.isFinite(fallback) && fallback > 0 ? fallback : 0);
 
-  // Nothing measurable at all: a zero-sized box silently disables scanning, so
-  // return the target and let html5-qrcode clamp it against the real video.
+  // Nothing measurable on either axis. There is no good answer here and the
+  // comment that used to sit on this line ("let html5-qrcode clamp it") was
+  // wrong: the library truncates only WIDTH against the root element
+  // (correctWidthBasedOnRootElementSize), never height, and then throws from
+  // getShadedRegionBounds if either axis exceeds the frame — and throws again
+  // below MIN_QR_BOX_SIZE (50px). So a viewfinder that really measures zero
+  // cannot be scanned at ANY qrbox value; every choice throws. Return the
+  // target so the thrown error names a sane size, and treat a zero frame as
+  // the caller's bug rather than something this function can rescue.
   if (frame === 0) return target;
 
   const desired = Math.floor(frame * EDGE_FRACTION);
