@@ -45,15 +45,20 @@ export interface PickingLine {
   lotNumber?: string;
   notes?: string;
   /**
-   * The RAW decoded carton payload for this line, when one was scanned.
+   * The RAW decoded carton payloads for this line — one per carton scanned.
    *
-   * The server re-derives which serials it corroborates (serialsEligibleForIntake)
-   * instead of trusting a client-supplied "this was machine-read" list. Only
-   * serials the payload itself lists may be taken into stock when the sheet has
-   * never listed them; anything else is refused, because a typo must not become
-   * a permanent phantom ONT issued to a named technician.
+   * The server re-derives which serials they corroborate
+   * (serialsEligibleForIntake) instead of trusting a client-supplied "this was
+   * machine-read" list. Only serials a payload itself lists may be taken into
+   * stock when the sheet has never listed them; anything else is refused,
+   * because a typo must not become a permanent phantom ONT issued to a named
+   * technician.
+   *
+   * An ARRAY, because one handout can contain more than one carton of the same
+   * item. Checking against only the first would refuse the second carton's
+   * genuinely scanned serials.
    */
-  intakeScanPayload?: string | null;
+  intakeScanPayloads?: string[] | null;
   /** The carton's package id, so a box's serials stay traceable together. */
   intakeCartonId?: string | null;
 }
@@ -199,11 +204,10 @@ export async function validateSerialsAvailable(
       // carton scanned on 2026-08-21 had all 9 of its serials refused because
       // the workbook lacked that consignment. Refusing does not prevent the
       // handout, only its recording.
-      // Derived from the payload, not asserted by the caller. A serial the
-      // payload does not list cannot be taken in, however the request is
-      // shaped — including one smuggled into the line but absent from the scan.
-      const corroborated = serialsEligibleForIntake(line.intakeScanPayload);
-      if (corroborated.has(serialNumber)) {
+      // Derived from the payloads, not asserted by the caller. A serial no
+      // payload lists cannot be taken in, however the request is shaped —
+      // including one smuggled into the line but absent from every scan.
+      if (corroboratedFor(line).has(serialNumber)) {
         const createdId = await takeSerialIntoStock(sql, {
           serialNumber,
           stockItemId: line.stockItemId,
@@ -235,6 +239,21 @@ export async function validateSerialsAvailable(
   }
 
   return { ok: true, resolvedSerialIds };
+}
+
+/**
+ * Every serial the line's carton scans corroborate, unioned across payloads.
+ *
+ * Computed per line rather than per serial so a 9-serial carton parses once
+ * instead of nine times.
+ */
+function corroboratedFor(line: PickingLine): Set<string> {
+  const payloads = Array.isArray(line.intakeScanPayloads) ? line.intakeScanPayloads : [];
+  const all = new Set<string>();
+  for (const payload of payloads) {
+    for (const serial of serialsEligibleForIntake(payload)) all.add(serial);
+  }
+  return all;
 }
 
 /**
