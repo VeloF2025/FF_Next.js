@@ -92,7 +92,7 @@ def main():
     # Every stub invoked unconditionally on a real run. The two conditional ones
     # (resolve_spatial_pon_map, minio_resolve_photo_version) are asserted in the
     # scenarios that actually trigger them — asserting >0 here would fail spuriously.
-    for stub in ("resolve_gpkg_path", "minio_download_latest",
+    for stub in ("resolve_gpkg_paths", "minio_latest_version", "minio_download_latest",
                  "minio_list_dcim_directory", "sync_hierarchy",
                  "fetch_linked_qf_project_ids", "hierarchy_backfill_needed"):
         check(h.stub_calls.get(stub, 0) > 0,
@@ -195,6 +195,20 @@ def main():
     check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
           "download failure writes NO sync-state")
 
+    # A file MinIO holds no version of is a different fault from a broken transfer —
+    # the first is how a dead path presents (Mahikeng's emptied version folders), and a
+    # cron log has to be able to tell them apart.
+    found, upserted, out, h = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, no_versions=True, dry_run=False)
+    check((found, upserted) == (0, 0), f"no versions -> (0,0), got ({found},{upserted})")
+    check("No versions of this GPKG in MinIO" in out,
+          "a versionless GPKG is reported as such, not as a download failure")
+    check(h.stub_calls.get("minio_download_latest", 0) == 0,
+          "and no transfer is attempted")
+    check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
+          "no versions writes NO sync-state")
+
     found, upserted, out, h = run(
         columns=["NAME", "unrelated"],
         rows=[{"NAME": "P1", "unrelated": "x"}], dry_run=False)
@@ -271,14 +285,160 @@ def main():
     check(not h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"), "dry-run records no sync-state")
     check(not h.conn.committed, "dry-run does not commit")
 
-    print("\nSuperseded-path retirement")
+    print("\nNo sync-state row is ever retired")
+    # Inverted 2026-08-20. While the resolver picked ONE winner per family, the loser's
+    # row could never advance and was deleted as superseded. Every member is now read on
+    # every run, so that delete became actively harmful: reading a dormant sibling would
+    # drop the row of the actively-written file and force a full re-scan next run. It is
+    # also what stranded Namakgale's 'Civil Audit phase_2_.gpkg' row on 2026-08-14 — it
+    # cleaned the configured path when a sibling won, and nothing cleaned the sibling
+    # when the configured path won back, so the monitor paged on it for days.
     _, _, _, h = run(
-        config=config(gpkg_path="Civil audit.gpkg"),
-        gpkg_path="Civil audit updated_27_07.gpkg",
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path="Civil Audit phase_2_.gpkg",
         columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
         dcim={"a.jpg": "k/a"}, dry_run=False)
-    check(h.cursor.ran("DELETE FROM qfield_gpkg_sync_state"),
-          "a followed rename retires the superseded sync-state row")
+    check(not h.cursor.ran("DELETE FROM qfield_gpkg_sync_state"),
+          "reading a sibling does NOT delete the configured path's sync-state row")
+    check(h.cursor.ran("INSERT INTO qfield_gpkg_sync_state"),
+          "the sibling records its own sync-state row")
+
+    print("\nEvery family member is read, and the totals are summed")
+    # The loop added on 2026-08-20. Namakgale publishes four concurrent civil-audit
+    # layers; reading only the newest is what left three of them unread. Two members
+    # here, each resolving to the same one-photo fixture: the assertion is that the
+    # second file is processed at all, and that extract_project reports the SUM rather
+    # than the last file's figures.
+    _, _, _, h = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    synced = [p[1] for sql, p in h.cursor.executed
+              if "INSERT INTO qfield_gpkg_sync_state" in sql]
+    check(synced == ["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+          f"both family members record their own sync-state row, got {synced}")
+    check(h.stub_calls.get("minio_download_latest", 0) == 2,
+          f"both are downloaded, got {h.stub_calls.get('minio_download_latest', 0)}")
+
+    found, upserted, _, _ = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        columns=["NAME", STEP_1, STEP_2],
+        rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg", STEP_2: "DCIM/b.jpg"}],
+        dcim={"a.jpg": "k/a", "b.jpg": "k/b"}, dry_run=True)
+    check((found, upserted) == (4, 2),
+          f"extract_project returns the SUM across the family, got ({found},{upserted})")
+
+    print("\nAn unchanged member is not transferred at all")
+    # The delta check resolves the version first, so the common case across a family —
+    # a member nobody touched since the last run — costs one listing and no download.
+    _, _, out, h = run(
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"},
+        state={"last_version": "v20260731122829-abc12345", "pending_count": 0},
+        dry_run=False)
+    check("SKIP: Already processed this version" in out, "the unchanged version is skipped")
+    check(h.stub_calls.get("minio_download_latest", 0) == 0,
+          f"and never downloaded, got {h.stub_calls.get('minio_download_latest', 0)} download(s)")
+    check(h.stub_calls.get("minio_latest_version", 0) == 1,
+          "the version is resolved without a transfer")
+
+    print("\nPer-project work is shared across the family, and stays lazy")
+    _, _, _, h = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    check(h.stub_calls.get("minio_list_dcim_directory", 0) == 1,
+          f"the DCIM directory is listed ONCE for two members, got "
+          f"{h.stub_calls.get('minio_list_dcim_directory', 0)}")
+
+    _, _, _, h = run(
+        gpkg_path=["Civil Audit.gpkg"],
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"},
+        state={"last_version": "v20260731122829-abc12345", "pending_count": 0},
+        dry_run=False)
+    check(h.stub_calls.get("minio_list_dcim_directory", 0) == 0,
+          "a project with nothing to do never walks DCIM at all")
+
+    print("\nA photo referenced by two members is counted once (dry-run too)")
+    # Real runs dedup against the DB between members; a --dry-run commits nothing, so
+    # without a shared dedup set the overlap is reported twice in the preview figure.
+    for dry in (False, True):
+        found, upserted, _, _ = run(
+            config=config(gpkg_path="Civil Audit.gpkg"),
+            gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+            columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+            dcim={"a.jpg": "k/a"}, dry_run=dry)
+        check((found, upserted) == (2, 1),
+              f"dry_run={dry}: both members SEE the photo, only one INGESTS it, "
+              f"got ({found},{upserted})")
+
+    print("\nOne member failing does not take the family down")
+    # EXTRACT_FAILURES is module state that main() turns into the exit code; reset it so
+    # these scenarios stay independent of each other and of their order in this file.
+    MOD.EXTRACT_FAILURES.clear()
+    found, upserted, out, h = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        fail_on=["Civil Audit.gpkg"],
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    check("ERROR: 'Civil Audit.gpkg' failed" in out, "the failure is reported, not swallowed")
+    check((found, upserted) == (1, 1),
+          f"the surviving member still ingests, got ({found},{upserted})")
+    synced = [p[1] for sql, p in h.cursor.executed
+              if "INSERT INTO qfield_gpkg_sync_state" in sql]
+    check(synced == ["Civil Audit phase_2_.gpkg"],
+          f"and only the surviving member records a sync, got {synced}")
+    # main() turns this into a non-zero exit. Recovering per file must not make the RUN
+    # look green — cron-qa-ingest.sh branches on that status to log "Extraction FAILED".
+    check([f[1] for f in MOD.EXTRACT_FAILURES] == ["Civil Audit.gpkg"],
+          f"the failure is recorded for the run's exit status, got {MOD.EXTRACT_FAILURES}")
+
+    print("\nA DB-originated failure is rolled back, not carried into the next member")
+    # The dangerous shape. psycopg2 runs with autocommit=False, so a failed statement
+    # puts the connection in "current transaction is aborted, commands ignored until
+    # end of transaction block". Without a rollback, continuing to the next member
+    # means every later statement — for this family, for every project after it in an
+    # --all run — raises and gets swallowed, writing nothing while reporting success.
+    MOD.EXTRACT_FAILURES.clear()
+    found, upserted, out, h = run(
+        config=config(gpkg_path="Civil Audit.gpkg"),
+        gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+        raise_once_on="INSERT INTO qfield_photo_validations",
+        columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"}, dry_run=False)
+    check(h.conn.rollbacks >= 1,
+          f"the aborted transaction is rolled back, got {h.conn.rollbacks} rollback(s)")
+    check(not h.cursor.aborted, "the connection is usable again afterwards")
+    synced = [p[1] for sql, p in h.cursor.executed
+              if "INSERT INTO qfield_gpkg_sync_state" in sql]
+    check(synced == ["Civil Audit phase_2_.gpkg"],
+          f"the next member still writes its sync-state row, got {synced}")
+    check((found, upserted) == (1, 1),
+          f"and still ingests its photo, got ({found},{upserted})")
+    check([f[1] for f in MOD.EXTRACT_FAILURES] == ["Civil Audit.gpkg"],
+          f"the DB failure is recorded too, got {MOD.EXTRACT_FAILURES}")
+
+    print("\nA connection too dead to roll back stops the run instead of looping")
+    MOD.EXTRACT_FAILURES.clear()
+    raised = None
+    try:
+        run(config=config(gpkg_path="Civil Audit.gpkg"),
+            gpkg_path=["Civil Audit.gpkg", "Civil Audit phase_2_.gpkg"],
+            raise_once_on="INSERT INTO qfield_photo_validations",
+            rollback_fails=True,
+            columns=["NAME", STEP_1], rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+            dcim={"a.jpg": "k/a"}, dry_run=False)
+    except Exception as exc:
+        raised = exc
+    check(raised is not None and "connection already closed" in str(raised),
+          f"the failed rollback propagates rather than being swallowed, got {raised!r}")
+    check(raised is not None and raised.__context__ is not None,
+          "and the original failure is preserved as its context")
 
     print()
     if failures:

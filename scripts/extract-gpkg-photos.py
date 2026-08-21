@@ -15,6 +15,7 @@ import argparse
 import os
 import sys
 import tempfile
+import traceback
 
 import psycopg2
 import psycopg2.extras
@@ -37,7 +38,7 @@ from qfield_project_registry import ALTERNATE_GPKGS, OPTICAL_GPKGS, PROJECTS
 # (minio_list_gpkg_versions/_family, qfc_list_dcim_files) are reached from inside the
 # storage modules' own namespaces, so importing them here would be dead — and worse
 # than dead: it would imply they are patchable from this module, which they are not.
-from qfield_gpkg_storage import resolve_gpkg_path
+from qfield_gpkg_storage import resolve_gpkg_paths
 from qfield_photo_storage import minio_resolve_photo_version
 from qfield_row_ingest import ingest_rows
 
@@ -45,10 +46,9 @@ from qfield_row_ingest import ingest_rows
 # NOTE: the patchable I/O these phases call resolves in THAT module's namespace, so
 # the test harness patches qfield_extract_phases too — see its docstring.
 from qfield_extract_phases import (
-    build_photo_index,
+    ProjectContext,
     download_and_check_delta,
     finalize,
-    load_dedup_sets,
 )
 from qfield_gpkg_table import open_gpkg
 
@@ -67,27 +67,79 @@ DB_URL = os.environ.get("DATABASE_URL")
 
 
 
-def extract_project(conn, project_name, config, dry_run=False, force=False):
-    """Extract photo references from a project's GPKG and upsert into DB.
+# [(project_name, gpkg_path, error)] for every family member that failed this run.
+# Swallowing a per-file error to protect the other files is only safe if the RUN still
+# reports failure — otherwise cron reads exit 0 and nobody learns a project was skipped.
+EXTRACT_FAILURES = []
 
-    Coordinates the phases in qfield_extract_phases. A phase returning None means
-    "abort this project" and becomes (0, 0) here — see that module for why every
-    abort must happen before any sync-state is written.
+
+def extract_project(conn, project_name, config, dry_run=False, force=False):
+    """Extract photo references from every GPKG in the project's family.
+
+    Crews both RENAME an audit GPKG rather than overwriting it (Mahikeng: 918 photos
+    missed over 5 days) and SPLIT one into concurrent layers (Namakgale: four
+    civil-audit phase files, all live). Reading only the newest member handles the
+    first and silently drops the second, so every member is read; each keeps its own
+    sync-state row, so an unchanged one costs a download and a SKIP.
     """
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     qf_id = config["qf_project_id"]
-    ff_id = config["ff_project_id"]
 
     print(f"\n{'='*60}")
     print(f"Project: {project_name}")
     print(f"  QField: {qf_id}")
 
-    # Crews rename an audit GPKG rather than overwriting it, which silently pins the
-    # ingest to a dead file (Mahikeng: 918 photos missed over 5 days). Follow the
-    # rename to the newest member of the configured file's family. Every downstream
-    # step — sync-state lookup, download, sync-state upsert — must use gpkg_path, not
-    # config["gpkg_path"], or the delta check compares against the wrong state row.
-    gpkg_path = resolve_gpkg_path(qf_id, config["gpkg_path"])
+    total_found = 0
+    total_upserted = 0
+    # Built once and SHARED across the family. The photo index shells out an `mc ls`
+    # over the whole DCIM directory (9 309 objects on Mahikeng) and the dedup sets cost
+    # two queries; none of it varies between members of the same project. Sharing the
+    # dedup sets also keeps a photo referenced by two members from being counted twice —
+    # a real run dedups against the DB between members, but a --dry-run commits nothing
+    # and would otherwise report the overlap twice in the figure an operator reads.
+    shared = ProjectContext(conn, config)
+    for gpkg_path in resolve_gpkg_paths(qf_id, config["gpkg_path"]):
+        try:
+            found, upserted = extract_gpkg(
+                conn, config, gpkg_path, shared, dry_run=dry_run, force=force)
+        except Exception as exc:
+            # One member must not take the rest of the family — or, since main() has no
+            # per-project guard either, every project queued behind it — down with it.
+            # Reading N files means N times the transient-MinIO surface of reading one.
+            print(f"  ERROR: '{gpkg_path}' failed, continuing with the rest: "
+                  f"{type(exc).__name__}: {exc}")
+            traceback.print_exc()
+            # MANDATORY, not tidiness. The connection runs autocommit=False, so if the
+            # exception came from a statement, Postgres has put it in "current
+            # transaction is aborted, commands ignored until end of transaction block".
+            # Continuing without this means every later statement — the rest of this
+            # family, every project after it in an --all run, and
+            # resolve_unversioned_keys() at the end — raises and is swallowed here, so
+            # the run writes nothing further while printing as though it recovered.
+            try:
+                conn.rollback()
+            except Exception as rb_exc:      # a dead connection cannot be rolled back
+                print(f"  ERROR: rollback after '{gpkg_path}' failed: {rb_exc}")
+                raise
+            EXTRACT_FAILURES.append((project_name, gpkg_path, f"{type(exc).__name__}: {exc}"))
+            continue
+        total_found += found
+        total_upserted += upserted
+    return total_found, total_upserted
+
+
+def extract_gpkg(conn, config, gpkg_path, shared, dry_run=False, force=False):
+    """Extract photo references from ONE GPKG and upsert into DB.
+
+    Coordinates the phases in qfield_extract_phases. A phase returning None means
+    "abort this file" and becomes (0, 0) here — see that module for why every abort
+    must happen before any sync-state is written. Every step — sync-state lookup,
+    download, sync-state upsert — must use gpkg_path, not config["gpkg_path"], or the
+    delta check compares against the wrong state row.
+    """
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    qf_id = config["qf_project_id"]
+    ff_id = config["ff_project_id"]
+
     print(f"  GPKG:   {gpkg_path}")
 
     # pending_count = photos referenced by the GPKG whose binary had not yet uploaded
@@ -114,11 +166,8 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
         table = open_gpkg(tmp_path, config, gpkg_path)
         if table is None:
             return 0, 0
-        spatial_pon_map, combined_dcim, linked_qf_ids = build_photo_index(
-            cur, qf_id, ff_id, config)
-
-        existing_keys, existing_filenames, existing_photo_keys = load_dedup_sets(
-            cur, qf_id, ff_id, linked_qf_ids)
+        spatial_pon_map, combined_dcim, _linked_qf_ids = shared.photo_index()
+        existing_keys, existing_filenames, existing_photo_keys = shared.dedup_sets()
 
         photos_found, photos_upserted, photos_skipped_missing = ingest_rows(
             cur, qf_id, table, combined_dcim,
@@ -252,10 +301,17 @@ def main():
     print(f"TOTAL: {total_found} photos found, {total_upserted} new upserted")
     if args.dry_run:
         print("DRY RUN — no changes written")
+    if EXTRACT_FAILURES:
+        print(f"{len(EXTRACT_FAILURES)} GPKG(s) FAILED and were skipped:")
+        for project_name, gpkg_path, err in EXTRACT_FAILURES:
+            print(f"  {project_name} / {gpkg_path}: {err}")
     print(f"{'='*60}")
 
     conn.close()
+    # Per-file recovery keeps the other files moving; it must not turn a real failure
+    # into a green cron run. The wrapper (cron-qa-ingest.sh) branches on this status.
+    return 1 if EXTRACT_FAILURES else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
