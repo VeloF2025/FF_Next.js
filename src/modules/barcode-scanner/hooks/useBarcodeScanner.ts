@@ -22,7 +22,10 @@ interface Html5QrcodeInstance {
     constraints: { facingMode: string } | MediaTrackConstraints,
     config: {
       fps: number;
-      qrbox: number | { width: number; height: number };
+      qrbox:
+        | number
+        | { width: number; height: number }
+        | ((viewfinderWidth: number, viewfinderHeight: number) => { width: number; height: number });
       aspectRatio: number;
       videoConstraints?: MediaTrackConstraints;
     },
@@ -149,13 +152,16 @@ export function useBarcodeScanner({
         });
       }
 
+      // html5-qrcode accepts a (width, height) => box function and calls it with
+      // the live viewfinder size; pass it through untouched so callers can size
+      // the region to the frame rather than guessing a constant.
       const qrboxSize = config.qrboxSize ?? 250;
 
       await scannerRef.current.start(
         { facingMode: config.facingMode ?? 'environment' },
         {
           fps: config.fps ?? 10,
-          qrbox: typeof qrboxSize === 'number' ? qrboxSize : qrboxSize,
+          qrbox: qrboxSize,
           aspectRatio: config.aspectRatio ?? 1.0,
           ...(config.videoConstraints ? { videoConstraints: config.videoConstraints } : {}),
         },

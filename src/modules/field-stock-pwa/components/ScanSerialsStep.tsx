@@ -25,6 +25,7 @@ import { ScanNoticeBanner } from '@/modules/field-stock-pwa/components/ScanNotic
 import { PhotoSerialFallback } from '@/modules/field-stock-pwa/components/PhotoSerialFallback';
 import { buildScanRows } from '@/modules/field-stock-pwa/lib/scanRows';
 import { batchWarning } from '@/modules/field-stock-pwa/lib/batchWarning';
+import { squareScanBox } from '@/modules/field-stock-pwa/lib/scanBox';
 import type { PwaScannedSerial } from '@/modules/field-stock-pwa/types';
 
 const SCANNER_ELEMENT_ID = 'serial-scanner-reader';
@@ -73,7 +74,12 @@ export function ScanSerialsStep({
     config: {
       formatsToSupport: ['DATA_MATRIX', 'QR_CODE', 'CODE_128', 'CODE_39', 'EAN_13', 'EAN_8'],
       useBarCodeDetectorIfSupported: true,
-      qrboxSize: { width: 300, height: 140 },
+      // SQUARE, sized to the live viewfinder. The previous fixed 300x140 region
+      // was shaped for a 1D barcode and cropped the carton's serial-list
+      // DataMatrix, so the live camera could not read a label that decodes fine
+      // from a still photo (field report 2026-08-21). Square costs 1D nothing —
+      // a 1D barcode needs width, and this is no narrower than 300.
+      qrboxSize: squareScanBox,
       videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
     },
     onScan: (result) => { handleRawSerial(result.decodedText); },
@@ -110,7 +116,8 @@ export function ScanSerialsStep({
         <div className="rounded-lg overflow-hidden border border-neutral-700 bg-black">
           <div id={SCANNER_ELEMENT_ID} className="w-full" style={{ minHeight: '240px' }} />
           <p className="px-3 py-1.5 text-[11px] text-neutral-500 text-center">
-            Hold barcodes horizontal and fill the box — or use &quot;Take a photo instead&quot;.
+            Fill the square with the code. Carton labels scan more reliably from a
+            photo — use the button below if the camera struggles.
           </p>
           {scannerState === 'initializing' && (
             <div className="flex items-center justify-center py-6 gap-2 text-neutral-400 text-sm">
