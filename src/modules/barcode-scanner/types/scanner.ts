@@ -61,7 +61,18 @@ export interface ScannerConfig {
   /** Frames per second for scanning */
   fps?: number;
   /** Size of the scanning box (qrbox) */
-  qrboxSize?: number | { width: number; height: number };
+  /**
+   * Decode region. html5-qrcode only reads INSIDE this box.
+   *
+   * A function receives the live viewfinder dimensions and is the right choice
+   * for dense 2D symbols, which need a region tall enough not to crop them and
+   * larger than the symbol itself — a fixed wide/short box cuts them in half
+   * (see field-stock-pwa/lib/scanBox.ts).
+   */
+  qrboxSize?:
+    | number
+    | { width: number; height: number }
+    | ((viewfinderWidth: number, viewfinderHeight: number) => { width: number; height: number });
   /** Aspect ratio of the video feed */
   aspectRatio?: number;
   /** Whether to show the torch/flashlight button */
