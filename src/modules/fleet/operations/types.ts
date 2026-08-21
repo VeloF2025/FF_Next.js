@@ -21,7 +21,12 @@ export interface OperationalRule {
 
 export interface OperationalSchedule {
   policyId: string; workDate: string; timezone: string; scheduled: boolean; explicitWork: boolean;
-  startTime: string; endTime: string; graceMinutes: number;
+  /**
+   * NULL when the policy gives this day no shift window — Sunday, or a staff
+   * member who is not `attendance_tracked`. Never defaulted to 08:00-17:00:
+   * an invented window becomes an invented `late` finding against a person.
+   */
+  startTime: string | null; endTime: string | null; graceMinutes: number;
 }
 
 export interface OperationalPoint { latitude: number; longitude: number; recordedAt: string }

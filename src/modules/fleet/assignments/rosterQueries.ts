@@ -1,4 +1,5 @@
 import { query } from '@/lib/db-pool';
+import { resolveRosterSchedule, type RosterScheduleDay } from './rosterSchedule';
 
 export interface AssignmentRosterFilters {
   projectId?: string;
@@ -89,7 +90,10 @@ export interface AssignmentRosterQuery {
   params: unknown[];
 }
 
-export function buildAssignmentRosterQuery(filters: AssignmentRosterFilters = {}): AssignmentRosterQuery {
+export function buildAssignmentRosterQuery(
+  filters: AssignmentRosterFilters = {},
+  schedule: RosterScheduleDay[] = [],
+): AssignmentRosterQuery {
   const conditions: string[] = [];
   const params: unknown[] = [];
   const add = (condition: string, value: unknown) => {
@@ -105,14 +109,22 @@ export function buildAssignmentRosterQuery(filters: AssignmentRosterFilters = {}
   const { limit, offset } = pagination(filters);
   params.push(filters.startDate ?? null, filters.endDate ?? null);
   const startDateParam = params.length - 1; const endDateParam = params.length;
+  params.push(schedule.map((day) => day.workDate), schedule.map((day) => day.scheduled),
+    schedule.map((day) => day.startTime), schedule.map((day) => day.endTime));
+  const schedDates = params.length - 3; const schedFlags = params.length - 2;
+  const schedStarts = params.length - 1; const schedEnds = params.length;
   params.push(limit, offset);
 
   return { text: `
     WITH staff_days AS (
       SELECT s.id AS staff_id, CONCAT_WS(' ', s.first_name, s.last_name) AS staff_name, s.home_site_id,
+        COALESCE(s.attendance_tracked,false) AS attendance_tracked,
         day::date AS work_date
       FROM staff s CROSS JOIN generate_series(COALESCE($${startDateParam}::date, CURRENT_DATE), COALESCE($${endDateParam}::date, CURRENT_DATE), interval '1 day') day
       WHERE LOWER(COALESCE(s.status,'')) = 'active' AND COALESCE(s.is_active,true)
+    ), policy_days AS (
+      SELECT d AS work_date, sch AS scheduled, st AS start_time, en AS end_time
+      FROM unnest($${schedDates}::date[], $${schedFlags}::boolean[], $${schedStarts}::text[], $${schedEnds}::text[]) AS t(d, sch, st, en)
     ), effective AS (
       SELECT sd.*, explicit.id AS assignment_id,
         CASE WHEN explicit.id IS NOT NULL THEN explicit.assignment_kind
@@ -122,16 +134,18 @@ export function buildAssignmentRosterQuery(filters: AssignmentRosterFilters = {}
         COALESCE(explicit.operational_site_id, CASE WHEN driver_vehicle.candidate_count = 1 AND vehicle_project.candidate_count = 1 THEN vehicle_project.operational_site_id END) AS operational_site_id,
         explicit.start_date, explicit.end_date,
         COALESCE(explicit.vehicle_assignment_id, CASE WHEN driver_vehicle.candidate_count = 1 THEN driver_vehicle.id END) AS vehicle_assignment_id,
-        driver_vehicle.registration_number AS vehicle_registration,
-        COALESCE(policy.scheduled,false) AS scheduled, policy.start_time AS expected_start_time, policy.end_time AS expected_end_time,
+        driver_vehicle.registration AS vehicle_registration,
+        (COALESCE(policy.scheduled,false) AND sd.attendance_tracked) AS scheduled,
+        CASE WHEN sd.attendance_tracked THEN policy.start_time END AS expected_start_time,
+        CASE WHEN sd.attendance_tracked THEN policy.end_time END AS expected_end_time,
         home.name AS home_name
       FROM staff_days sd
       LEFT JOIN LATERAL (SELECT oa.* FROM fleet_operational_assignments oa WHERE oa.staff_id=sd.staff_id AND oa.status='active' AND sd.work_date BETWEEN oa.start_date AND oa.end_date ORDER BY CASE oa.assignment_kind WHEN 'daily_override' THEN 0 ELSE 1 END LIMIT 1) explicit ON true
-      LEFT JOIN LATERAL (SELECT va.id, va.fleet_vehicle_id, fv.registration_number, COUNT(*) OVER() AS candidate_count FROM vehicle_assignments va JOIN fleet_vehicles fv ON fv.id=va.fleet_vehicle_id AND LOWER(COALESCE(fv.status,'active'))='active' WHERE va.staff_id=sd.staff_id AND va.assignment_start<=sd.work_date AND COALESCE(va.assignment_end,'9999-12-31')>=sd.work_date ORDER BY va.assignment_start DESC LIMIT 1) driver_vehicle ON true
+      LEFT JOIN LATERAL (SELECT va.id, va.fleet_vehicle_id, fv.registration, COUNT(*) OVER() AS candidate_count FROM vehicle_assignments va JOIN fleet_vehicles fv ON fv.id=va.fleet_vehicle_id AND LOWER(COALESCE(fv.status,'active'))='active' WHERE va.staff_id=sd.staff_id AND va.assignment_start<=sd.work_date AND COALESCE(va.assignment_end,'9999-12-31')>=sd.work_date ORDER BY va.assignment_start DESC LIMIT 1) driver_vehicle ON true
       LEFT JOIN LATERAL (SELECT fvpa.id, fvpa.project_id, ops.id AS operational_site_id, COUNT(*) OVER() AS candidate_count FROM fleet_vehicle_project_assignments fvpa LEFT JOIN fleet_project_operational_sites ops ON ops.project_id=fvpa.project_id AND ops.is_active AND ops.is_default WHERE explicit.id IS NULL AND driver_vehicle.candidate_count=1 AND fvpa.vehicle_id=driver_vehicle.fleet_vehicle_id AND fvpa.is_active AND fvpa.assigned_date<=sd.work_date AND COALESCE(fvpa.returned_date,'9999-12-31')>=sd.work_date ORDER BY fvpa.assigned_date DESC LIMIT 1) vehicle_project ON true
       LEFT JOIN fleet_authorized_locations home ON home.id=sd.home_site_id AND home.is_active AND explicit.id IS NULL
         AND (driver_vehicle.id IS NULL OR (driver_vehicle.candidate_count=1 AND vehicle_project.id IS NULL))
-      LEFT JOIN LATERAL (SELECT ap.start_time::text, ap.end_time::text, COALESCE((ap.work_days->>TRIM(LOWER(TO_CHAR(sd.work_date,'day'))))::boolean,false) AS scheduled FROM attendance_policy_assignments apa JOIN attendance_policies ap ON ap.id=apa.policy_id AND ap.is_active WHERE apa.staff_id=sd.staff_id AND apa.effective_from<=sd.work_date AND COALESCE(apa.effective_to,'9999-12-31')>=sd.work_date ORDER BY apa.effective_from DESC LIMIT 1) policy ON true
+      LEFT JOIN policy_days policy ON policy.work_date=sd.work_date
     )
     SELECT effective.assignment_id, effective.staff_id, effective.staff_name, effective.project_id, p.project_name,
       effective.operational_site_id, COALESCE(ops.display_name,effective.home_name) AS operational_site_name,
@@ -146,7 +160,7 @@ export function buildAssignmentRosterQuery(filters: AssignmentRosterFilters = {}
 }
 
 export async function listAssignmentRoster(filters: AssignmentRosterFilters = {}): Promise<AssignmentRosterResult> {
-  const rosterQuery = buildAssignmentRosterQuery(filters);
+  const rosterQuery = buildAssignmentRosterQuery(filters, await resolveRosterSchedule(filters));
   const rows = await query<RosterRow>(rosterQuery.text, rosterQuery.params);
   return {
     items: rows.map((row) => ({
@@ -201,7 +215,7 @@ export async function listAssignmentOptions(
         WHERE LOWER(COALESCE(s.status, '')) = 'active' AND COALESCE(s.is_active, true)
       ) staff_rows), '[]'::jsonb) AS staff,
       COALESCE((SELECT jsonb_agg(value ORDER BY value->>'label') FROM (
-        SELECT jsonb_build_object('id', t.id, 'label', t.team_name) AS value
+        SELECT jsonb_build_object('id', t.id, 'label', t.name) AS value
         FROM teams t WHERE t.is_active = true AND t.team_type <> 'contractor'
       ) team_rows), '[]'::jsonb) AS teams,
       COALESCE((SELECT jsonb_agg(value ORDER BY value->>'label') FROM (
@@ -217,7 +231,7 @@ export async function listAssignmentOptions(
           AND LOWER(p.status) IN ('active', 'in_progress')
       ) site_rows), '[]'::jsonb) AS sites,
       COALESCE((SELECT jsonb_agg(value ORDER BY value->>'label') FROM (
-        SELECT jsonb_build_object('id', fv.id, 'label', fv.registration_number,
+        SELECT jsonb_build_object('id', fv.id, 'label', fv.registration,
           'vehicleAssignmentId', va.id, 'staffId', va.staff_id) AS value
         FROM vehicle_assignments va
         JOIN fleet_vehicles fv ON fv.id = va.fleet_vehicle_id

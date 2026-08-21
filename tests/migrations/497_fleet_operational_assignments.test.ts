@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool } from 'pg';
 import { buildAssignmentRosterQuery } from '@/modules/fleet/assignments/rosterQueries';
+import { resolveRosterSchedule } from '@/modules/fleet/assignments/rosterSchedule';
 
 const SCHEMA = 'mig497_fleet_operational_assignments_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
@@ -38,6 +39,13 @@ const POLICY = '10000000-0000-4000-8000-000000000010';
 
 const admin = new Pool({ connectionString: BASE_URL, ssl: false, max: 1 });
 const db = new Pool({ connectionString: SCOPED_URL, ssl: false, max: 1 });
+/**
+ * The expectation now comes from `attendance_schedule_policies` via the
+ * attendance resolver, so it is resolved here against the same scratch schema
+ * and handed to the builder rather than joined inside the query.
+ */
+const reader = async <T extends Record<string, unknown>>(text: string, params?: unknown[]): Promise<T[]> =>
+  (await db.query<T>(text, params as unknown[])).rows;
 
 const PREREQUISITES = `
   CREATE TABLE schema_migrations (
@@ -47,21 +55,24 @@ const PREREQUISITES = `
   CREATE TABLE users (id UUID PRIMARY KEY, email TEXT NOT NULL UNIQUE);
   CREATE TABLE staff (id UUID PRIMARY KEY, user_id UUID REFERENCES users(id), full_name TEXT NOT NULL,
     first_name TEXT, last_name TEXT, status TEXT DEFAULT 'active', is_active BOOLEAN DEFAULT true,
-    home_site_id UUID);
+    attendance_tracked BOOLEAN NOT NULL DEFAULT false, home_site_id UUID);
   CREATE TABLE projects (id UUID PRIMARY KEY, project_name TEXT NOT NULL, project_code TEXT,
     status TEXT DEFAULT 'active');
   CREATE TABLE fno_atlas_project_aois (id UUID PRIMARY KEY);
   CREATE TABLE fleet_authorized_locations (id UUID PRIMARY KEY, name TEXT NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true);
-  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration_number TEXT, status TEXT);
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration TEXT, status TEXT);
   CREATE TABLE vehicle_assignments (id UUID PRIMARY KEY, staff_id UUID NOT NULL REFERENCES staff(id),
     fleet_vehicle_id UUID, assignment_start DATE, assignment_end DATE);
   CREATE TABLE fleet_vehicle_project_assignments (id UUID PRIMARY KEY, vehicle_id UUID, project_id UUID,
     is_active BOOLEAN, assigned_date DATE, returned_date DATE);
-  CREATE TABLE attendance_policies (id UUID PRIMARY KEY, is_active BOOLEAN, start_time TIME, end_time TIME,
-    work_days JSONB);
-  CREATE TABLE attendance_policy_assignments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), staff_id UUID,
-    policy_id UUID, effective_from DATE, effective_to DATE);
-  CREATE TABLE teams (id UUID PRIMARY KEY, team_name TEXT, is_active BOOLEAN, team_type TEXT);
+  CREATE TABLE attendance_schedule_policies (id UUID PRIMARY KEY, timezone TEXT NOT NULL DEFAULT 'Africa/Johannesburg',
+    active_from DATE NOT NULL, active_to DATE,
+    weekday_start TIME NOT NULL DEFAULT '08:00', weekday_end TIME NOT NULL DEFAULT '17:00',
+    weekday_unpaid_break_minutes INTEGER NOT NULL DEFAULT 60, weekday_paid_cap_hrs NUMERIC(4,2) NOT NULL DEFAULT 8,
+    saturday_start TIME NOT NULL DEFAULT '08:00', saturday_end TIME NOT NULL DEFAULT '13:00',
+    saturday_paid_cap_hrs NUMERIC(4,2) NOT NULL DEFAULT 5, sunday_scheduled BOOLEAN NOT NULL DEFAULT false,
+    sunday_missing_out_cap_hrs NUMERIC(4,2) NOT NULL DEFAULT 5, late_alert_minutes INTEGER NOT NULL DEFAULT 15);
+  CREATE TABLE teams (id UUID PRIMARY KEY, name TEXT, is_active BOOLEAN, team_type TEXT);
   CREATE TABLE team_members (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), team_id UUID, user_id UUID,
     is_active BOOLEAN);
   CREATE TABLE project_team_assignments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), project_id UUID,
@@ -90,11 +101,9 @@ const PREREQUISITES = `
   INSERT INTO fno_atlas_project_aois (id) VALUES ('${AOI}');
   INSERT INTO fleet_authorized_locations (id, name) VALUES ('${LOCATION}', 'Migration Test Location');
   INSERT INTO vehicle_assignments (id, staff_id) VALUES ('${VEHICLE_ASSIGNMENT}', '${STAFF}');
-  INSERT INTO attendance_policies (id, is_active, start_time, end_time, work_days) VALUES
-    ('${POLICY}', true, '08:00', '17:00', '{"monday":true}');
-  INSERT INTO attendance_policy_assignments (staff_id, policy_id, effective_from) VALUES
-    ('${STAFF}', '${POLICY}', '2026-01-01'), ('${UNASSIGNED_STAFF}', '${POLICY}', '2026-01-01');
-  INSERT INTO teams (id, team_name, is_active, team_type) VALUES ('${TEAM}', 'Migration Team', true, 'internal');
+  INSERT INTO attendance_schedule_policies (id, active_from) VALUES ('${POLICY}', '2026-01-01');
+  UPDATE staff SET attendance_tracked = true WHERE id IN ('${STAFF}', '${UNASSIGNED_STAFF}');
+  INSERT INTO teams (id, name, is_active, team_type) VALUES ('${TEAM}', 'Migration Team', true, 'internal');
   INSERT INTO team_members (team_id, user_id, is_active) VALUES ('${TEAM}', '${UNASSIGNED_USER}', true);
   INSERT INTO project_team_assignments (project_id, team_id, role) VALUES ('${PROJECT}', '${TEAM}', 'other');
   INSERT INTO access_permissions (type, key, label) VALUES ('module', 'fleet', 'Fleet');
@@ -331,7 +340,8 @@ describe('effective roster production SQL', () => {
     const siteId = await insertSite({ aoiId: AOI, locationId: null });
     await db.query(`UPDATE staff SET home_site_id = $1 WHERE id = $2`, [LOCATION, STAFF]);
     await insertAssignment({ siteId, startDate: '2026-08-17', endDate: '2026-08-17' });
-    const built = buildAssignmentRosterQuery({ projectId: PROJECT, startDate: '2026-08-17', endDate: '2026-08-17' });
+    const schedule = await resolveRosterSchedule({ startDate: '2026-08-17', endDate: '2026-08-17' }, reader);
+    const built = buildAssignmentRosterQuery({ projectId: PROJECT, startDate: '2026-08-17', endDate: '2026-08-17' }, schedule);
     const { rows } = await db.query<{ staff_id: string; assignment_kind: string; operational_site_id: string; scheduled: boolean; expected_start_time: string }>(built.text, built.params);
 
     expect(rows).toEqual([expect.objectContaining({
@@ -339,13 +349,14 @@ describe('effective roster production SQL', () => {
       assignment_kind: 'roster',
       operational_site_id: siteId,
       scheduled: true,
-      expected_start_time: '08:00:00',
+      expected_start_time: '08:00',
     })]);
   });
 
   it('executes the scheduled-unassigned project-team scope branch', async () => {
+    const schedule = await resolveRosterSchedule({ startDate: '2026-08-17', endDate: '2026-08-17' }, reader);
     const built = buildAssignmentRosterQuery({ projectId: PROJECT, source: 'unassigned', unassignedScheduled: true,
-      startDate: '2026-08-17', endDate: '2026-08-17' });
+      startDate: '2026-08-17', endDate: '2026-08-17' }, schedule);
     const { rows } = await db.query<{ staff_id: string; assignment_kind: string; scheduled: boolean }>(built.text, built.params);
 
     expect(rows).toEqual([expect.objectContaining({ staff_id: UNASSIGNED_STAFF, assignment_kind: 'unassigned', scheduled: true })]);

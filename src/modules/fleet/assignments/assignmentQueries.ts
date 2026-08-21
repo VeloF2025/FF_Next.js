@@ -53,7 +53,7 @@ export async function loadPreviewState(rows: AssignmentProposalRow[], db: Db = p
     db.query<{ staff_id: string; assignment_kind: AssignmentKind; start_date: string; end_date: string }>(`SELECT staff_id, assignment_kind, ${dates} FROM fleet_operational_assignments WHERE staff_id = ANY($1::uuid[]) AND status = 'active' AND daterange(start_date,end_date,'[]') && daterange($2::date,$3::date,'[]')`, [staffIds, bounds.from, bounds.to]),
     db.query<{ id: string; staff_id: string; vehicle_id: string; start_date: string; end_date: string }>(`SELECT id, staff_id, fleet_vehicle_id AS vehicle_id, TO_CHAR(assignment_start,'YYYY-MM-DD') AS start_date, TO_CHAR(COALESCE(assignment_end,'9999-12-31'::date),'YYYY-MM-DD') AS end_date FROM vehicle_assignments WHERE staff_id = ANY($1::uuid[]) AND assignment_start <= $3::date AND COALESCE(assignment_end,'9999-12-31'::date) >= $2::date`, [staffIds, bounds.from, bounds.to]),
     db.query<{ vehicle_id: string; project_id: string; operational_site_id: string | null; start_date: string; end_date: string }>(`SELECT vehicle_id, project_id, NULL::uuid AS operational_site_id, TO_CHAR(assigned_date,'YYYY-MM-DD') AS start_date, TO_CHAR(COALESCE(returned_date,'9999-12-31'::date),'YYYY-MM-DD') AS end_date FROM fleet_vehicle_project_assignments WHERE assigned_date <= $2::date AND COALESCE(returned_date,'9999-12-31'::date) >= $1::date`, [bounds.from, bounds.to]),
-    db.queryOne<AssignmentSourceVersions & Record<string, unknown>>(`SELECT COALESCE((SELECT MAX(updated_at)::text FROM fleet_operational_assignments),'') assignments, COALESCE((SELECT MAX(updated_at)::text FROM fleet_vehicles),'') vehicles, COALESCE((SELECT MAX(updated_at)::text FROM vehicle_assignments),'') "vehicleAssignments", COALESCE((SELECT MAX(updated_at)::text FROM staff),'') staff, COALESCE((SELECT MAX(updated_at)::text FROM fleet_project_operational_sites),'') "projectSites", COALESCE((SELECT MAX(updated_at)::text FROM team_members),'') "teamMembers", COALESCE((SELECT MAX(updated_at)::text FROM attendance_policy_assignments),'') "attendancePolicies"`),
+    db.queryOne<AssignmentSourceVersions & Record<string, unknown>>(`SELECT COALESCE((SELECT MAX(updated_at)::text FROM fleet_operational_assignments),'') assignments, COALESCE((SELECT MAX(updated_at)::text FROM fleet_vehicles),'') vehicles, COALESCE((SELECT MAX(updated_at)::text FROM vehicle_assignments),'') "vehicleAssignments", COALESCE((SELECT MAX(updated_at)::text FROM staff),'') staff, COALESCE((SELECT MAX(updated_at)::text FROM fleet_project_operational_sites),'') "projectSites", COALESCE((SELECT MAX(updated_at)::text FROM team_members),'') "teamMembers", COALESCE((SELECT MAX(created_at)::text FROM attendance_schedule_policies),'') "attendancePolicies"`),
   ]);
   const snapshots: PreviewState['snapshots'] = {};
   for (const project of projects) snapshots[project.id] = { projectName: project.project_name, projectCode: project.project_code, sites: {} };
@@ -83,7 +83,14 @@ export async function lockRelevantPreviewSources(tx: Db, rows: AssignmentProposa
   await tx.query(`SELECT fvpa.id FROM fleet_vehicle_project_assignments fvpa JOIN vehicle_assignments va ON va.fleet_vehicle_id = fvpa.vehicle_id WHERE va.staff_id = ANY($1::uuid[]) FOR UPDATE OF fvpa`, [staffIds]);
   await tx.query(`SELECT id FROM teams WHERE id = ANY($1::uuid[]) FOR UPDATE`, [teamIds]);
   await tx.query(`SELECT id FROM team_members WHERE team_id = ANY($1::uuid[]) FOR UPDATE`, [teamIds]);
-  await tx.query(`SELECT id FROM attendance_policy_assignments WHERE staff_id = ANY($1::uuid[]) FOR UPDATE`, [staffIds]);
+  // No attendance-policy lock here, deliberately. This used to take
+  // `SELECT id FROM attendance_policy_assignments ... FOR UPDATE` to pin the
+  // per-staff policy rows for the transaction. That table has never existed —
+  // the model is ONE global, time-versioned `attendance_schedule_policies` row.
+  // Do not "restore" this by locking that table instead: a row lock on a global
+  // config row would serialise every concurrent assignment commit behind a
+  // table that has changed twice in four months, trading a crash for a
+  // throughput bug. There are no per-staff policy rows to pin.
 }
 
 export async function insertAssignment(tx: Db, row: AssignmentProposalRow, actorId: string, snapshot: PreviewState['snapshots'][string]): Promise<AssignmentRecord> {

@@ -2,6 +2,9 @@ import { query } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { staleAfterSecondsFor } from '@/services/tracking/staleness';
 import { buildAssignmentRosterQuery } from '../assignments/rosterQueries';
+import { rosterScheduleDay } from '../assignments/rosterSchedule';
+import { findEffectivePolicy } from '@/services/attendance/reconcileQueries';
+import type { AttendanceSchedulePolicy } from '@/services/attendance/policy/types';
 import { loadEffectiveRule } from './ruleQueries';
 import { operationalWindow } from './timeRules';
 import type { OperationalEvidence, OperationalRule, OperationalVehiclePoint } from './types';
@@ -17,31 +20,22 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
   const rule = await loadEffectiveRule(request.asOf);
   if (!rule) throw new Error('No effective operational status rule');
   if (!request.projectId && !request.staffId) throw new Error('A project or staff scope is required');
+  // One lookup, reused for both the roster's expectation and this request's
+  // timezone/grace, so the evidence load stays at a constant six statements.
+  const policy = await findEffectivePolicy(request.workDate);
+  const schedule = [rosterScheduleDay(request.workDate, policy)];
   const rosterQuery = buildAssignmentRosterQuery({ projectId: request.projectId, staffId: request.staffId,
-    startDate: request.workDate, endDate: request.workDate, limit: request.limit, offset: request.offset });
+    startDate: request.workDate, endDate: request.workDate, limit: request.limit, offset: request.offset }, schedule);
   const rosterRows = await query<Row>(rosterQuery.text, rosterQuery.params);
   let total = rosterRows.length ? asNumber(rosterRows[0]!.total_count) : 0;
   if (!rosterRows.length && request.offset > 0) {
     const countSource = buildAssignmentRosterQuery({ projectId: request.projectId, staffId: request.staffId,
-      startDate: request.workDate, endDate: request.workDate, limit: 1, offset: 0 });
+      startDate: request.workDate, endDate: request.workDate, limit: 1, offset: 0 }, schedule);
     const countRows = await query<Row>(`SELECT COALESCE(MAX(total_count),0)::bigint total_count
       FROM (${countSource.text}) counted`, countSource.params);
     total = countRows[0] ? asNumber(countRows[0].total_count) : 0;
   }
-  const schedules = await query<Row>(`WITH ids AS (SELECT unnest($1::uuid[]) staff_id)
-    SELECT ids.staff_id,ap.id policy_id,sp.id schedule_policy_id,
-      COALESCE(sp.timezone,'Africa/Johannesburg') timezone,ap.start_time::text,ap.end_time::text,
-      COALESCE((ap.work_days->>TRIM(LOWER(TO_CHAR($2::date,'day'))))::boolean,false) scheduled,
-      sp.late_alert_minutes grace_minutes
-    FROM ids LEFT JOIN LATERAL (SELECT ap.* FROM attendance_policy_assignments apa
-      JOIN attendance_policies ap ON ap.id=apa.policy_id AND ap.is_active
-      WHERE apa.staff_id=ids.staff_id AND apa.effective_from<=$2::date
-        AND COALESCE(apa.effective_to,'9999-12-31')>=$2::date ORDER BY apa.effective_from DESC LIMIT 1) ap ON true
-    LEFT JOIN LATERAL (SELECT asp.* FROM attendance_schedule_policies asp
-      WHERE asp.active_from<=$2::date AND COALESCE(asp.active_to,'9999-12-31')>=$2::date
-      ORDER BY asp.active_from DESC LIMIT 1) sp ON true`, [rosterRows.map((row) => row.staff_id), request.workDate]);
-  const schedulesByStaff = new Map(schedules.map((row) => [String(row.staff_id), row]));
-  const roster = rosterRows.map((row) => ({ ...row, ...schedulesByStaff.get(String(row.staff_id)),
+  const roster = rosterRows.map((row) => ({ ...row,
     source: row.assignment_kind, explicit_work: ['roster', 'daily_override'].includes(String(row.assignment_kind)) }));
   const staffIds = roster.map((row) => String(row.staff_id));
   const staffSiteIds = roster.map((row) => row.operational_site_id);
@@ -94,7 +88,7 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
   const vehicleMappings = selectedVehicles.flatMap((vehicle) => {
     const row = roster.find((candidate) => candidate.staff_id === vehicle.staff_id);
     if (!row) return [];
-    try { return [{ vehicle, row, monitoringEnd: operationalWindow(toSchedule(row, request.workDate), rule).monitoringEnd }]; }
+    try { return [{ vehicle, row, monitoringEnd: operationalWindow(toSchedule(row, request.workDate, policy), rule).monitoringEnd }]; }
     catch (error) {
       // An unusable schedule drops this staff member from the GPS window only.
       // evaluateOperationalStatus recomputes the same window per person and
@@ -113,7 +107,7 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
   const monitoringEnds = vehicleMappings.map(({ monitoringEnd }) => monitoringEnd);
   const lookbackMinutes = Math.max(rule.arrivalDwellMinutes, rule.wrongSiteConfirmationMinutes, rule.earlyDepartureConfirmationMinutes);
   const starts = roster.flatMap((row) => {
-    try { return [Date.parse(operationalWindow(toSchedule(row, request.workDate), rule).monitoringStart)]; }
+    try { return [Date.parse(operationalWindow(toSchedule(row, request.workDate, policy), rule).monitoringStart)]; }
     catch (error) {
       // Same contract as the vehicle window above: this row only loses its
       // contribution to the earliest-lookback bound, and falls back to the
@@ -159,28 +153,39 @@ export async function loadOperationalEvidence(request: OperationalEvidenceReques
     LEFT JOIN fno_atlas_project_aois aoi ON aoi.id=ops.project_aoi_id AND aoi.retired_at IS NULL
     LEFT JOIN fleet_authorized_locations fal ON fal.id=ops.authorized_location_id AND fal.is_active
     WHERE ops.id=ANY($1::uuid[])`, [roster.map((row) => row.operational_site_id).filter(Boolean)]);
-  return { items: mapEvidence(roster, attendance, vehicles, positions, sites, rule, request), total };
+  return { items: mapEvidence(roster, attendance, vehicles, positions, sites, rule, request, policy), total };
 }
 
-function toSchedule(row: Row, workDate: string): NonNullable<OperationalEvidence['schedule']> {
-  return { policyId: String(row.schedule_policy_id ?? row.policy_id), workDate, timezone: String(row.timezone), scheduled: Boolean(row.scheduled),
-    explicitWork: Boolean(row.explicit_work), startTime: String(row.start_time), endTime: String(row.end_time), graceMinutes: asNumber(row.grace_minutes) };
+/**
+ * Null means "no expectation for this date" — no policy covers it, so we cannot
+ * say when anyone was due. Callers treat that as `unverifiable/schedule_missing`
+ * rather than assuming a shift, because a fabricated window becomes a
+ * fabricated `late` incident against a named driver.
+ *
+ * A covered date for an untracked staff member is NOT null: it is a real policy
+ * with `scheduled` false and NULL times, which reads as off_duty/not_scheduled.
+ */
+function toSchedule(row: Row, workDate: string, policy: AttendanceSchedulePolicy | null): OperationalEvidence['schedule'] {
+  if (!policy) return null;
+  return { policyId: policy.id, workDate, timezone: policy.timezone, scheduled: Boolean(row.scheduled),
+    explicitWork: Boolean(row.explicit_work), startTime: asString(row.expected_start_time),
+    endTime: asString(row.expected_end_time), graceMinutes: policy.lateAlertMinutes };
 }
 
-function mapEvidence(roster: Row[], attendanceRows: Row[], vehicleRows: Row[], positionRows: Row[], siteRows: Row[], rule: OperationalRule, request: OperationalEvidenceRequest): OperationalEvidence[] {
+function mapEvidence(roster: Row[], attendanceRows: Row[], vehicleRows: Row[], positionRows: Row[], siteRows: Row[], rule: OperationalRule, request: OperationalEvidenceRequest, policy: AttendanceSchedulePolicy | null): OperationalEvidence[] {
   const attendance = by(attendanceRows, 'staff_id'); const vehicles = by(vehicleRows, 'staff_id');
   const positions = by(positionRows, 'vehicle_id'); const sites = by(siteRows, 'operational_site_id');
   const freshness = new Map<string, number>();
   for (const row of vehicleRows) { const provider = asString(row.provider); const account = asString(row.account_ref); if (!provider || !account) continue; const key = `${provider}\0${account}`; if (!freshness.has(key)) freshness.set(key, staleAfterSecondsFor(provider, account)); }
   return roster.map((row) => {
-    try { return mapPerson(row, attendance.get(String(row.staff_id))?.[0], vehicles.get(String(row.staff_id)) ?? [], positions, sites, freshness, rule, request); }
+    try { return mapPerson(row, attendance.get(String(row.staff_id))?.[0], vehicles.get(String(row.staff_id)) ?? [], positions, sites, freshness, rule, request, policy); }
     catch { return emptyEvidence(row, rule, request, ['malformed_evidence']); }
   });
 }
 
-function mapPerson(row: Row, attendance: Row | undefined, vehicleCandidates: Row[], positions: Map<string, Row[]>, sites: Map<string, Row[]>, freshness: Map<string, number>, rule: OperationalRule, request: OperationalEvidenceRequest): OperationalEvidence {
+function mapPerson(row: Row, attendance: Row | undefined, vehicleCandidates: Row[], positions: Map<string, Row[]>, sites: Map<string, Row[]>, freshness: Map<string, number>, rule: OperationalRule, request: OperationalEvidenceRequest, policy: AttendanceSchedulePolicy | null): OperationalEvidence {
   const base = emptyEvidence(row, rule, request, []); const site = sites.get(String(row.operational_site_id))?.[0];
-  base.schedule = toSchedule(row, request.workDate);
+  base.schedule = toSchedule(row, request.workDate, policy);
   base.assignment.siteGeometryValid = Boolean(site?.geometry_valid); base.assignment.siteGeometryLowConfidence = Boolean(site?.low_confidence);
   if (attendance) {
     const clockInAt = asString(attendance.clock_in_at); const clockOutAt = asString(attendance.clock_out_at);

@@ -34,19 +34,22 @@
  * successfully requested input must not see a 500 because a delivery
  * counter failed to update.
  *
- * Response-window `scheduledWeekdays`: this task could not find a
- * migration in this worktree defining the `attendance_policies`/
- * `attendance_policy_assignments` tables that
- * `fleet/operations/evidenceQueries.ts` already reads from (no
- * `CREATE TABLE` for either name appears anywhere under
- * `scripts/migrations/sql/`), so querying them here would be an
- * unverifiable schema guess — exactly the trap this task was warned
- * about ("unit tests mock the database, so a schema mismatch will not be
- * caught"). `scheduledWeekdays` is passed as `null`, which
- * `./inputState.ts#calculateRespondBy` already treats as "no schedule
- * rows" and falls back to Monday-Friday, matching design §6's own
- * documented fallback. Wiring the real per-driver schedule is left as a
- * follow-up once that table's migration is confirmed.
+ * Response-window `scheduledWeekdays`: the `attendance_policies` and
+ * `attendance_policy_assignments` tables this once expected DO NOT EXIST —
+ * not in production, and not in any migration in this repo (`to_regclass`
+ * returns NULL for both). They were never merely "missing from this
+ * worktree". The real source is the single global, time-versioned
+ * `attendance_schedule_policies` row, read through
+ * `findEffectivePolicy` in `@/services/attendance/reconcileQueries`;
+ * `fleet/assignments/rosterSchedule.ts` shows the intended use, and there
+ * is no per-staff policy assignment anywhere in the model.
+ *
+ * `scheduledWeekdays` is still passed as `null`, which
+ * `./inputState.ts#calculateRespondBy` treats as "no schedule rows",
+ * falling back to Monday-Friday — the same Mon-Sat/Sunday reading the
+ * policy encodes, minus Saturday. Wiring it to `findEffectivePolicy` is a
+ * follow-up; it is a behaviour change to a driver-facing deadline, not a
+ * blocked schema lookup.
  */
 import { query, queryOne, transaction, type TxnClient } from '@/lib/db-pool';
 import { log } from '@/lib/logger';

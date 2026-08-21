@@ -162,6 +162,10 @@ describe('assignment source locking', () => {
     expect(statements.join('\n')).toMatch(/fleet_vehicle_project_assignments .*FOR UPDATE OF fvpa/);
     expect(statements.join('\n')).toMatch(/FROM teams .*FOR UPDATE/);
     expect(statements.join('\n')).toMatch(/FROM team_members .*FOR UPDATE/);
-    expect(statements.join('\n')).toMatch(/attendance_policy_assignments .*FOR UPDATE/);
+    // No attendance-policy lock, and nothing may reintroduce one. The per-staff
+    // policy table it used to lock has never existed, and locking the global
+    // attendance_schedule_policies row instead would serialise every concurrent
+    // assignment commit behind a config table. See lockRelevantPreviewSources.
+    expect(statements.join('\n')).not.toMatch(/attendance_polic\w* .*FOR UPDATE/);
   });
 });

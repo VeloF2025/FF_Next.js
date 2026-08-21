@@ -14,6 +14,30 @@ const schedule: OperationalSchedule = {
   explicitWork: false, startTime: '08:00:00', endTime: '17:00:00', graceMinutes: 15,
 };
 
+/**
+ * Sunday, or a driver who is not `attendance_tracked`: the policy gives the day
+ * no shift window, so startTime/endTime are NULL. These two tests pin the only
+ * safe readings of that state — there is no window to compute, and there is no
+ * shift to be late for. Defaulting either to 08:00-17:00 would manufacture a
+ * `late` finding against a named person.
+ */
+const noWindow: OperationalSchedule = { ...schedule, scheduled: false, startTime: null, endTime: null };
+
+describe('a schedule with no shift window', () => {
+  it('refuses to compute a window, naming the missing window specifically', () => {
+    expect(() => operationalWindow(noWindow, rule))
+      .toThrow('Attendance schedule has no shift window for this day');
+  });
+
+  /**
+   * Explicit work keeps evaluation alive past the not-scheduled check, so this
+   * is the path that would otherwise reach parseTime(null).
+   */
+  it('reports off duty rather than throwing when the driver is explicitly rostered', () => {
+    expect(timePhase('2026-08-14T09:00:00.000Z', { ...noWindow, explicitWork: true }, rule)).toBe('off_duty');
+  });
+});
+
 describe('operational time boundaries', () => {
   it('returns the exact SAST window instants for an 08:00-17:00 shift', () => {
     expect(operationalWindow(schedule, rule)).toEqual({

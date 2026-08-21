@@ -248,7 +248,13 @@ function getDaySchedule(workDate: string, policy: CalculateDailyResultInput['pol
   return { paidHours: saturday ? policy.saturdayPaidCapHours : policy.weekdayPaidCapHours, start, end, isSunday: false };
 }
 
-function weekdayFor(workDate: string): number {
+/**
+ * 0=Sunday .. 6=Saturday, with a round-trip check that rejects a string that
+ * is not a real calendar date. Exported because fleet's roster expectation
+ * (modules/fleet/assignments/rosterSchedule.ts) must split the week exactly the
+ * way payroll does — a parallel implementation is a place for the two to drift.
+ */
+export function weekdayFor(workDate: string): number {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(workDate);
   if (!match) throw new Error(`workDate must be YYYY-MM-DD; got ${workDate}`);
   const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));

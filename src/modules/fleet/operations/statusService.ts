@@ -1,7 +1,7 @@
 import { evaluateOperationalStatus } from './evaluateStatus';
 import { loadOperationalEvidence } from './evidenceQueries';
 import { parseStrictIsoInstant } from './instantValidation';
-import { operationalWindow } from './timeRules';
+import { hasScheduleWindow, operationalWindow } from './timeRules';
 import type { OperationalEvaluation, OperationalEvidence, OperationalStatusSummary } from './types';
 
 export class OperationalStatusRequestError extends Error { constructor(message: string) { super(message); this.name = 'OperationalStatusRequestError'; } }
@@ -29,7 +29,7 @@ function validate(workDate: string, asOf: string): void {
 
 function fallback(evidence: OperationalEvidence): OperationalEvaluation { return { status: 'unverifiable', flags: ['evidence_source_error'], reasonCodes: ['person_evaluation_failed'], ruleId: evidence.rule.id, ruleVersion: evidence.rule.version, sourceTimestamps: [], thresholdsUsed: {} }; }
 function safelyEvaluate(evidence: OperationalEvidence): OperationalEvaluation { try { return evaluateOperationalStatus(evidence); } catch { return fallback(evidence); } }
-function windowFor(evidence: OperationalEvidence) { return evidence.schedule ? operationalWindow(evidence.schedule, evidence.rule) : null; }
+function windowFor(evidence: OperationalEvidence) { return hasScheduleWindow(evidence.schedule) ? operationalWindow(evidence.schedule, evidence.rule) : null; }
 export function isOperationalAttendancePointEligible(input: AttendancePointEligibility): boolean {
   if (!input.monitoringStart || !input.monitoringEnd) return false;
   const asOf = Date.parse(input.asOf); const start = Date.parse(input.monitoringStart); const end = Date.parse(input.monitoringEnd);
