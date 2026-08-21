@@ -17,6 +17,12 @@ interface CreateSheetInput {
    * of the ONT column on the May sheets, a barcode read is effectively exact.
    */
   source?: 'vlm' | 'scanned';
+  /**
+   * Identifies a SCANNED sheet by its content (date + sorted serial set), so
+   * the unique index from migration 517 can refuse a second copy. NULL on the
+   * VLM path, which dedupes on photo_hash instead.
+   */
+  contentHash?: string | null;
   velocityRepName: string | null;
   velocityRepId: string | null;
   technicianName: string | null;
@@ -124,13 +130,14 @@ export async function createSheet(input: CreateSheetInput): Promise<EodInstallSh
     INSERT INTO eod_install_sheets (
       sheet_date, velocity_rep_name, velocity_rep_id,
       technician_name, technician_id,
-      photo_url, photo_hash, entry_count, vlm_raw_json, uploaded_by, source
+      photo_url, photo_hash, entry_count, vlm_raw_json, uploaded_by, source,
+      content_hash
     ) VALUES (
       ${input.sheetDate}, ${input.velocityRepName}, ${input.velocityRepId},
       ${input.technicianName}, ${input.technicianId},
       ${input.photoUrl}, ${input.photoHash}, ${input.entries.length},
       ${JSON.stringify(input.vlmRawJson)}::jsonb, ${input.uploadedBy},
-      ${input.source ?? 'vlm'}
+      ${input.source ?? 'vlm'}, ${input.contentHash ?? null}
     )
     RETURNING *
   `;

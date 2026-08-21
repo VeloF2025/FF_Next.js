@@ -24,7 +24,17 @@ vi.mock('@/lib/db-pool', () => {
 vi.mock('@/lib/logger', () => ({
   log: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('@/services/serialHistoryService', () => ({ logSerialChange: vi.fn() }));
+// The REAL import path. An earlier version mocked '@/services/serialHistoryService',
+// which does not exist — so nothing was mocked, and the write-back test made a
+// live fetch to the placeholder DATABASE_URL on every CI run. It passed only
+// because the Neon HTTP driver rejects that host fast and eodSheetService
+// swallows the error; a slower DNS or egress policy would turn it into a hang.
+const { mockLogSerialChange } = vi.hoisted(() => ({
+  mockLogSerialChange: vi.fn(async () => ({ historyId: 'hist-1' })),
+}));
+vi.mock('@/modules/activate/services/activity-log/serialHistory', () => ({
+  logSerialChange: (...a: unknown[]) => mockLogSerialChange(...a),
+}));
 
 import { createSheet } from '../eodSheetService';
 
@@ -105,5 +115,10 @@ describe('createSheet on the scanned path', () => {
       }],
     }));
     expect(statements().some((s) => /dr_photo_unified_reviews/i.test(s))).toBe(true);
+    // Proves the mock is wired to the path the service actually imports. With
+    // the wrong module path the real logSerialChange runs instead — it opens a
+    // live connection, the service swallows the failure, and this assertion is
+    // the only thing that notices.
+    expect(mockLogSerialChange).toHaveBeenCalled();
   });
 });

@@ -27,6 +27,17 @@ import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import { requireStoresActor, type StoresActor } from '@/modules/field-stock-pwa/lib/storesActor';
 import { createSheet } from '@/modules/data-sync/services/eodSheetService';
 import { summarisePaperSheet, type PaperSheetSerial } from '@/modules/data-sync/lib/paperSheetVerdict';
+import { createHash } from 'node:crypto';
+
+/** Postgres unique-violation. The duplicate answer, not an error. */
+const UNIQUE_VIOLATION = '23505';
+
+/** What identifies a paper sheet: its date and its exact set of serials. */
+function contentHashFor(sheetDate: string, sortedSerials: string[]): string {
+  return createHash('sha256')
+    .update(`${sheetDate}\u0000${sortedSerials.join(',')}`)
+    .digest('hex');
+}
 
 /** One page of the form holds 10 rows; allow a generous multiple, not unlimited. */
 const MAX_SERIALS_PER_SHEET = 60;
@@ -83,22 +94,18 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
   const summary = summarisePaperSheet(classified);
 
   // Same paper, recorded twice. photo_hash's unique index is PARTIAL
-  // (WHERE photo_hash IS NOT NULL), and this path has no photo, so the
-  // database will not stop a double-tap or a storeman re-scanning next week —
-  // and every duplicate would double-count into the reconciliation stats.
-  // Match on what actually identifies the sheet: its date plus its exact set
-  // of serials.
+  // (WHERE photo_hash IS NOT NULL), and this path has no photo, so nothing
+  // stopped a double-tap or a re-scan next week — and every duplicate
+  // double-counts into the reconciliation stats.
+  //
+  // The check below is a fast path for the friendly case. It CANNOT be the
+  // guarantee: two concurrent submissions (a flaky-network retry firing twice,
+  // the likeliest real cause) can both read "none" and both insert. The unique
+  // index from migration 517 is what actually closes it, and the insert below
+  // treats its violation as the answer.
+  const contentHash = contentHashFor(body.sheetDate, [...serials].sort());
   const existing = await sql`
-    SELECT s.id
-    FROM eod_install_sheets s
-    WHERE s.source = 'scanned'
-      AND s.sheet_date = ${body.sheetDate}
-      AND (
-        SELECT array_agg(e.ont_serial ORDER BY e.ont_serial)
-        FROM eod_install_sheet_entries e
-        WHERE e.sheet_id = s.id
-      ) = ${[...serials].sort()}::text[]
-    LIMIT 1
+    SELECT id FROM eod_install_sheets WHERE content_hash = ${contentHash} LIMIT 1
   `;
   const duplicateOf = (existing as Array<{ id: string }>)[0]?.id ?? null;
   if (duplicateOf) {
@@ -116,9 +123,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
     );
   }
 
-  const sheet = await createSheet({
+  let sheet: { id: string };
+  try {
+    sheet = await createSheet({
     sheetDate: body.sheetDate,
     source: 'scanned',
+    contentHash,
     velocityRepName: null,
     velocityRepId: null,
     technicianName: typeof body.technicianName === 'string' ? body.technicianName : null,
@@ -142,6 +152,23 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, actor: Stor
       address: null,
     })),
   });
+  } catch (err) {
+    // Lost the race: another submission inserted the same sheet between our
+    // check and our insert. That is the same outcome, reached the hard way.
+    if ((err as { code?: string })?.code !== UNIQUE_VIOLATION) throw err;
+    const raced = await sql`
+      SELECT id FROM eod_install_sheets WHERE content_hash = ${contentHash} LIMIT 1
+    `;
+    const racedId = (raced as Array<{ id: string }>)[0]?.id ?? null;
+    log.info('paper sheet lost the insert race; returning the winner', {
+      sheetId: racedId, sheetDate: body.sheetDate,
+    }, 'my/stores/paper-sheets');
+    return apiResponse.success(
+      res,
+      { sheetId: racedId, duplicateSheet: true, ...summary },
+      'This sheet was already recorded',
+    );
+  }
 
   if (summary.contradictsStock > 0) {
     log.warn('paper sheet contradicts stock — serials believed on the shelf were handed out', {

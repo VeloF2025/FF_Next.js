@@ -198,12 +198,56 @@ describe('recording the same sheet twice', () => {
     expect(mockCreateSheet).toHaveBeenCalled();
   });
 
-  it('matches on the serial set regardless of scan order', async () => {
+  it('hashes the same sheet identically whatever order it was scanned in', async () => {
+    // A page scanned bottom-to-top must collide with one scanned top-to-bottom.
+    const hashFor = async (serials: string[]) => {
+      vi.clearAllMocks();
+      mockSql.mockResolvedValue([]);
+      mockCreateSheet.mockResolvedValue({ id: 'sheet-1' });
+      await handler(post({ sheetDate: '2026-05-11', serials }), makeRes());
+      return (mockCreateSheet.mock.calls[0]![0] as { contentHash: string }).contentHash;
+    };
+    expect(await hashFor(['E5F6G7H8', 'A1B2C3D4']))
+      .toBe(await hashFor(['A1B2C3D4', 'E5F6G7H8']));
+  });
+
+  it('gives a DIFFERENT hash to a different date or a different serial set', async () => {
+    const hashFor = async (sheetDate: string, serials: string[]) => {
+      vi.clearAllMocks();
+      mockSql.mockResolvedValue([]);
+      mockCreateSheet.mockResolvedValue({ id: 'sheet-1' });
+      await handler(post({ sheetDate, serials }), makeRes());
+      return (mockCreateSheet.mock.calls[0]![0] as { contentHash: string }).contentHash;
+    };
+    const base = await hashFor('2026-05-11', ['A1B2C3D4']);
+    expect(await hashFor('2026-05-12', ['A1B2C3D4'])).not.toBe(base);
+    expect(await hashFor('2026-05-11', ['A1B2C3D4', 'E5F6G7H8'])).not.toBe(base);
+  });
+
+  it('returns the winner when it LOSES the insert race', async () => {
+    // The check-then-insert window: both submissions read "none", both insert,
+    // one hits the unique index from migration 517. That violation is the
+    // answer, not an error — this is the double-tap case.
+    mockSql
+      .mockResolvedValueOnce([])                      // classification
+      .mockResolvedValueOnce([])                      // fast-path check: none
+      .mockResolvedValueOnce([{ id: 'sheet-winner' }]); // re-read after the clash
+    mockCreateSheet.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: '23505' }));
+
+    const res = makeRes();
+    await handler(post({ sheetDate: '2026-05-11', serials: ['A1B2C3D4'] }), res);
+
+    expect(data(res).sheetId).toBe('sheet-winner');
+    expect(data(res).duplicateSheet).toBe(true);
+  });
+
+  it('does NOT swallow an unrelated database error', async () => {
+    // Only 23505 means "already recorded". Anything else must surface.
     mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    await handler(post({ sheetDate: '2026-05-11', serials: ['E5F6G7H8', 'A1B2C3D4'] }), makeRes());
-    const dupCheckParams = mockSql.mock.calls[1]!.slice(1);
-    // Sorted, so a page scanned bottom-to-top still matches one scanned top-to-bottom.
-    expect(dupCheckParams).toContainEqual(['A1B2C3D4', 'E5F6G7H8']);
+    mockCreateSheet.mockRejectedValueOnce(Object.assign(new Error('boom'), { code: '42P01' }));
+    await expect(
+      handler(post({ sheetDate: '2026-05-11', serials: ['A1B2C3D4'] }), makeRes()),
+    ).rejects.toThrow('boom');
   });
 });
 
