@@ -17,6 +17,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { PurchaseOrderPicker } from '@/modules/procurement/grn/components/PurchaseOrderPicker';
 import { isReceivableLocation } from '@/modules/procurement/field-stock/lib/receivableLocations';
 
 // UOM Options
@@ -454,45 +455,15 @@ export default function NewGRNPage() {
                 </div>
               );
             })()}
-            <div className="relative">
-              <select
-                value={selectedPOId}
-                onChange={(e) => setSelectedPOId(e.target.value)}
-                disabled={isLoadingData || isLinkedFromPO}
-                className={`w-full px-4 py-2 border rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none ${
-                  isLinkedFromPO
-                    ? 'bg-[var(--ff-bg-tertiary)] border-emerald-500/30 opacity-75 cursor-not-allowed'
-                    : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
-                }`}
-              >
-                <option value="">No linked PO (standalone receipt)</option>
-                {purchaseOrders.map((po) => {
-                  const outstanding = (po.totalOrdered ?? 0) - (po.totalReceived ?? 0);
-                  const fullyReceived = po.grnCount && po.grnCount > 0 && outstanding <= 0;
-                  const partiallyReceived = po.grnCount && po.grnCount > 0 && outstanding > 0;
-                  let label = `${po.poNumber} — ${po.supplierName} (${po.itemCount} items)`;
-                  if (fullyReceived) {
-                    label += ' [Fully Received]';
-                  } else if (partiallyReceived) {
-                    label += ` [${outstanding} outstanding]`;
-                  }
-                  return (
-                    <option
-                      key={po.id}
-                      value={po.id}
-                      disabled={!!fullyReceived}
-                      className={fullyReceived ? 'text-[var(--ff-text-tertiary)]' : ''}
-                    >
-                      {label}
-                    </option>
-                  );
-                })}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)] pointer-events-none" />
-            </div>
+            <PurchaseOrderPicker
+              purchaseOrders={purchaseOrders}
+              selectedPOId={selectedPOId}
+              onSelect={setSelectedPOId}
+              disabled={isLoadingData || isLinkedFromPO}
+            />
             {!isLinkedFromPO && (
               <p className="mt-2 text-xs text-[var(--ff-text-tertiary)]">
-                Fully received POs are disabled. POs with outstanding quantities can receive additional GRNs.
+                Search by PO number or supplier. Part-received POs are listed first with the quantity still outstanding; fully received POs cannot be selected.
               </p>
             )}
           </div>

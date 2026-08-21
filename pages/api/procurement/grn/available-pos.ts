@@ -24,24 +24,45 @@ export default withAuth(withErrorHandler(async (
       po.status,
       po.supplier_id,
       COALESCE(s.company_name, s.name, 'Unknown') as supplier_name,
-      (SELECT COUNT(*)::int FROM purchase_order_items WHERE purchase_order_id = po.id) as item_count,
-      (SELECT COUNT(*)::int FROM goods_receipt_notes WHERE purchase_order_id = po.id) as grn_count,
-      COALESCE((SELECT SUM(quantity_ordered) FROM purchase_order_items WHERE purchase_order_id = po.id), 0)::numeric as total_ordered,
-      COALESCE((
-        SELECT SUM(gri.quantity_received)
-        FROM goods_receipt_items gri
-        JOIN goods_receipt_notes grn ON grn.id = gri.grn_id
-        WHERE grn.purchase_order_id = po.id
-          AND grn.status NOT IN ('cancelled', 'rejected')
-      ), 0)::numeric as total_received
+      ordered_agg.item_count,
+      grn_agg.grn_count,
+      ordered_agg.total_ordered,
+      grn_agg.total_received
     FROM purchase_orders po
     LEFT JOIN suppliers s ON po.supplier_id = s.id
+    LEFT JOIN LATERAL (
+      SELECT
+        COUNT(*)::int AS item_count,
+        COALESCE(SUM(quantity_ordered), 0)::numeric AS total_ordered
+      FROM purchase_order_items WHERE purchase_order_id = po.id
+    ) ordered_agg ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        COUNT(DISTINCT grn.id)::int AS grn_count,
+        COALESCE(SUM(gri.quantity_received), 0)::numeric AS total_received
+      FROM goods_receipt_notes grn
+      LEFT JOIN goods_receipt_items gri ON gri.grn_id = grn.id
+      WHERE grn.purchase_order_id = po.id
+        -- grn_count now excludes cancelled/rejected GRNs, which the previous
+        -- COUNT(*) did not while total_received always did. A PO whose only
+        -- receipt was cancelled therefore reads as never-received instead of
+        -- part-received. Verified data-identical across all 621 live rows on
+        -- 2026-08-21 (no PO currently has only cancelled receipts); the change
+        -- only shows up once someone cancels a GRN.
+        AND grn.status NOT IN ('cancelled', 'rejected')
+    ) grn_agg ON TRUE
     WHERE po.status NOT IN ('draft', 'cancelled')
+    -- Part-received POs first: they have stock physically waiting to be booked
+    -- in, and they are the only ones a clerk returns to a second time. They used
+    -- to rank BELOW every untouched PO, which put PO-2026-0237 at position 347
+    -- of 621 and read to the user as the order having been deleted.
+    -- Ranking is by received quantity, not po.status, so a stale status column
+    -- cannot bury an order that still has stock outstanding.
     ORDER BY
       CASE
-        WHEN po.status IN ('approved', 'sent', 'acknowledged') THEN 0
-        WHEN po.status = 'partially_received' THEN 1
-        ELSE 2
+        WHEN grn_agg.grn_count > 0 AND ordered_agg.total_ordered > grn_agg.total_received THEN 0
+        WHEN grn_agg.grn_count > 0 THEN 2
+        ELSE 1
       END,
       po.created_at DESC
   `;
