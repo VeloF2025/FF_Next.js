@@ -1,4 +1,6 @@
 {
+  "DEAD_CONFIG_eslintrc_cjs_wins_precedence_this_file_is_never_read_see_scripts_ci_baselines_env_2026_08_22":
+    "NOT LIVE CONFIG. ESLint 8 resolves .eslintrc.cjs before .eslintrc.json, and .eslintrc.cjs has existed since 2025-08-25 (ff9805c6b) — five days after this file. Nothing in the repo reads this file: verified by `npx eslint --print-config`, which resolves with none of the rules below, and by grep across scripts/, .github/workflows/, package.json and editor config. Every rule here is inert, including the jsx-a11y set, no-console:error, prefer-const, no-var, max-lines, local/no-silent-catch and local/no-direct-serial-status-write. Those last two ARE enforced, but by scripts/silent-catch-ratchet.mjs and scripts/verify-no-direct-status-writes.ts, which load the rules by bare id via --rulesdir and ignore this file entirely. This key is deliberately not a valid eslintrc property: if anyone ever makes this file live, ESLint refuses to start and names it, rather than silently switching ~15 unmeasured rules on across the repo. Removing the file is a separate repo-wide change — see the Gate 2e note in scripts/ci-local.sh.",
   "env": {
     "browser": true,
     "es2020": true,

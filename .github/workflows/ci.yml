@@ -157,47 +157,27 @@ jobs:
       # Gate 2 in scripts/ci-local.sh. Ran only when a human typed
       # `npm run ci:quick`; a --no-verify push merged past it.
       #
-      # Counting is split from failure detection. The COUNT comes from
-      # rule-specific message lines, not from ESLint's exit status, because the
-      # scope includes files no error baseline covers (lib/ is in neither
-      # `eslint src` nor lint:pages) and a bare non-zero exit would fail the step
-      # on pre-existing findings unrelated to the gated rule.
+      # Scoring moved into scripts/silent-catch-ratchet.mjs on 2026-08-22, so
+      # this step and ci-local.sh run ONE implementation rather than two shell
+      # copies of a count that had to agree. It reads its baselines from
+      # scripts/ci-baselines.env itself — check-ci-baselines.mjs rejects an
+      # inlined ratchet number in this file, because five copies of these
+      # numbers once disagreed and the gate that blocked PRs compared against
+      # the wrong one.
       #
-      # But exit >= 2 is still checked, because that means ESLint never linted at
-      # all and the count is 0 for the wrong reason. See the inline note below.
+      # It also widened the scope. The old step ran `eslint pages/api` alone —
+      # 77 of the repo's 1443 findings. `local/no-silent-catch` is declared only
+      # in .eslintrc.json, which .eslintrc.cjs shadows under ESLint 8
+      # precedence, so this --rulesdir invocation was the rule's entire
+      # enforcement and src/ (1192 findings) had never been scanned.
       #
-      # The baseline comes from the sourced variable, never a literal:
-      # check-ci-baselines.mjs rejects an inlined ratchet number in this file,
-      # because five copies of these numbers once disagreed and the gate that
-      # blocked PRs compared against the wrong one.
+      # Counting stays split from failure detection: the script reports per
+      # scope against its own baseline rather than trusting ESLint's exit
+      # status, and it fails outright when a scope lints ZERO files — a scope
+      # that scanned nothing counts zero, which no exit code distinguishes from
+      # a clean scope.
       - name: Silent catches (ratchet gate)
-        run: |
-          set -a; . scripts/ci-baselines.env; set +a
-          # An unset baseline makes `[ "$count" -gt "" ]` exit 2 with "integer
-          # expression expected". Inside an `if` condition that does NOT trip
-          # `set -e`, so the step falls through and reports success no matter how
-          # high the count is. ci-local.sh guards the same variable this way.
-          : "${MAX_SILENT_CATCHES:?not set by scripts/ci-baselines.env}"
-          rc=0
-          out=$(npx eslint pages/api --ext .ts --rulesdir scripts/eslint-rules \
-                  --rule '{"no-silent-catch": "warn"}' 2>&1) || rc=$?
-          # ESLint exits 2 when it fails before linting anything — a bad
-          # --rulesdir, a target path that no longer exists, a broken config. Its
-          # output then contains no rule messages at all, so the count below is 0
-          # and the gate would pass while having scanned NOTHING. That is the
-          # exact defect this gate exists to prevent, so treat it as fatal.
-          if [ "$rc" -ge 2 ]; then
-            echo "$out" | tail -20
-            echo "::error::eslint failed to run (exit ${rc}) — the silent-catch gate scanned nothing"
-            exit 1
-          fi
-          count=$( { echo "$out" | grep "no-silent-catch" || true; } | wc -l | tr -d ' ')
-          echo "no-silent-catch: ${count} (max ${MAX_SILENT_CATCHES})"
-          if [ "$count" -gt "$MAX_SILENT_CATCHES" ]; then
-            echo "$out" | grep "no-silent-catch" | tail -20
-            echo "::error::silent catches ${count} exceeds baseline ${MAX_SILENT_CATCHES}"
-            exit 1
-          fi
+        run: node scripts/silent-catch-ratchet.mjs
         timeout-minutes: 15
 
       # Gate 2c in scripts/ci-local.sh — same story, also un-run in CI.
@@ -285,6 +265,7 @@ jobs:
         run: |
           node scripts/eslint-rules/__tests__/no-neon-shim-sql-divergence.test.js
           node scripts/eslint-rules/__tests__/no-direct-serial-status-write.test.js
+          node scripts/eslint-rules/__tests__/no-silent-catch.test.js
 
       # Serial lifecycle discipline (Sprint E Track 3) — every
       # stock_serials.status / holder_id write must route through promoteSerial()
