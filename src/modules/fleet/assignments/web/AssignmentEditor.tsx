@@ -3,6 +3,7 @@ import type { AssignmentOptions } from '../rosterQueries';
 import type { AssignmentKind, AssignmentProposalRow } from '../types';
 import { assignmentApi, AssignmentApiError, type AssignmentPreview } from './assignmentApi';
 import { ConflictReview } from './ConflictReview';
+import { Button } from '@/components/ui/button';
 
 interface AssignmentEditorProps {
   options: AssignmentOptions; projectId: string; siteId: string; from: string; to: string;
@@ -30,15 +31,15 @@ export function AssignmentEditor({ options, projectId, siteId, from, to, initial
   const visibleStaff = options.staff.filter((staff) => staff.label.toLowerCase().includes(search.trim().toLowerCase()));
   const visibleTeams = options.teams.filter((team) => team.label.toLowerCase().includes(teamSearch.trim().toLowerCase()));
   return <section className="space-y-3" aria-label="Assignment editor"><h2>Build assignment batch</h2>
-    {!siteId && <p className="text-amber-300">Configure or select an operational site before assigning staff.</p>}
+    {!siteId && <p className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-300">Configure or select an operational site before assigning staff.</p>}
     <input aria-label="Search staff" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search staff" />
-    <div className="space-y-2">{visibleStaff.map((staff) => <div key={staff.id}><label><input type="checkbox" checked={staffIds.includes(staff.id)} onChange={() => toggleStaff(staff.id)} /> {staff.label}</label>{staffIds.includes(staff.id) && <select aria-label={`Vehicle for ${staff.label}`} value={vehicles[staff.id] ?? ''} onChange={(event) => { setVehicles((current) => ({ ...current, [staff.id]: event.target.value })); setPreview(null); }}><option value="">No vehicle</option>{options.vehicles.filter((vehicle) => !vehicle.staffId || vehicle.staffId === staff.id).map((vehicle) => <option key={vehicle.vehicleAssignmentId ?? vehicle.id} value={vehicle.vehicleAssignmentId}>{vehicle.label}</option>)}</select>}</div>)}</div>
-    <input aria-label="Search teams" value={teamSearch} onChange={(event) => setTeamSearch(event.target.value)} placeholder="Search teams" />
-    <select aria-label="Teams" multiple value={teamIds} onChange={(event) => { setTeamIds(Array.from(event.target.selectedOptions, (option) => option.value)); setPreview(null); }}>{visibleTeams.map((team) => <option key={team.id} value={team.id}>{team.label}</option>)}</select>
+    <div className="space-y-2 max-h-72 overflow-y-auto border border-[var(--ff-border-light)] rounded-lg p-2">{visibleStaff.map((staff) => <div key={staff.id}><label><input type="checkbox" checked={staffIds.includes(staff.id)} onChange={() => toggleStaff(staff.id)} /> {staff.label}</label>{staffIds.includes(staff.id) && <select aria-label={`Vehicle for ${staff.label}`} value={vehicles[staff.id] ?? ''} onChange={(event) => { setVehicles((current) => ({ ...current, [staff.id]: event.target.value })); setPreview(null); }}><option value="">No vehicle</option>{options.vehicles.filter((vehicle) => !vehicle.staffId || vehicle.staffId === staff.id).map((vehicle) => <option key={vehicle.vehicleAssignmentId ?? vehicle.id} value={vehicle.vehicleAssignmentId}>{vehicle.label}</option>)}</select>}</div>)}</div>
+    <input aria-label="Search teams" className="w-full" value={teamSearch} onChange={(event) => setTeamSearch(event.target.value)} placeholder="Search teams" />
+    <select aria-label="Teams" multiple size={6} className="w-full" value={teamIds} onChange={(event) => { setTeamIds(Array.from(event.target.selectedOptions, (option) => option.value)); setPreview(null); }}>{visibleTeams.map((team) => <option key={team.id} value={team.id}>{team.label}</option>)}</select>
     <select aria-label="Assignment kind" value={kind} onChange={(event) => { setKind(event.target.value as AssignmentKind); setPreview(null); }}><option value="roster">Roster</option><option value="daily_override">Daily override</option></select>
     {kind === 'daily_override' && <input aria-label="Override reason" value={reason} onChange={(event) => { setReason(event.target.value); setPreview(null); }} />}
-    <button type="button" onClick={() => void runPreview()} disabled={pending || !configured || (!rows.length && !teamIds.length) || (kind === 'daily_override' && !reason.trim())}>Preview assignments</button>
-    {preview && <><ConflictReview conflicts={preview.conflicts} />{preview.excludedStaffIds.length > 0 && <p>{preview.excludedStaffIds.length} inactive staff excluded</p>}{warnings && <label><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /> Confirm warnings</label>}<button type="button" onClick={() => void commit()} disabled={pending || blocking || (warnings && !confirmed)}>Commit assignments</button></>}
+    <Button type="button" variant="secondary" onClick={() => void runPreview()} disabled={pending || !configured || (!rows.length && !teamIds.length) || (kind === 'daily_override' && !reason.trim())}>Preview assignments</Button>
+    {preview && <><ConflictReview conflicts={preview.conflicts} />{preview.excludedStaffIds.length > 0 && <p>{preview.excludedStaffIds.length} inactive staff excluded</p>}{warnings && <label><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /> Confirm warnings</label>}<Button type="button" variant="primary" onClick={() => void commit()} disabled={pending || blocking || (warnings && !confirmed)}>Commit assignments</Button></>}
     {error && <p role="alert" className="text-red-300">{error}</p>}
   </section>;
 }
