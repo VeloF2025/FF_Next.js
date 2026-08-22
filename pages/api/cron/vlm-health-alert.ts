@@ -130,12 +130,13 @@ export default async function handler(
     }
 
     if (wasAlerted && failureWindow.filter(Boolean).length === 0) {
+      // Same measure as the outage page: probes that failed, not elapsed time.
       const minutes = downForTicks * 5;
       await dispatchBridgeAlert(
         'RECOVERED: VLM is serving again',
         [
           `The VLM at /v1/models is answering again, serving ${health.model ?? 'an unknown model'}.`,
-          `It was failing for approximately ${minutes} minutes.`,
+          `It failed approximately ${minutes} minutes' worth of probes.`,
           '',
           'Check for DRs stranded during the outage — photo categorization failures',
           'block auto-QA and therefore technician feedback:',
@@ -192,11 +193,17 @@ export default async function handler(
     });
   }
 
+  // failedTicks counts FAILED probes, not elapsed ones, so this is time spent
+  // failing — not wall-clock since the first failure. During a flapping episode
+  // (down,up,down,up,down) those differ: 15 minutes of failure across a
+  // 25-minute span. Worded as failure time because that is what it measures.
   const minutes = failedTicks * 5;
   const dispatch = await dispatchBridgeAlert(
     firstPage ? 'VLM IS DOWN — activate pipeline stalled' : 'VLM STILL DOWN',
     [
-      `The VLM has failed ${failuresInWindow} of the last ${FAILED_WINDOW_TICKS} health probes (~${minutes} minutes since the first failure).`,
+      `The VLM has failed ${failuresInWindow} of the last ${FAILED_WINDOW_TICKS} health probes ` +
+        `(~${minutes} minutes of failed probes; if that is fewer than ${failuresInWindow * 5} ` +
+        `it is flapping rather than flat down).`,
       `Last error: ${reason}`,
       '',
       'Impact: photo categorization is failing. Auto-QA only runs on categorized',
