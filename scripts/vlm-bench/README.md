@@ -17,7 +17,7 @@ Typecheck (the root tsconfig excludes `scripts/**`, so this engine needs its own
 
 | Pack | Task | Labels | Ground truth |
 |---|---|---|---|
-| `serials` | ONT serial OCR from the device back | 12-char `ALCLB4…` | hand-labelled |
+| `serials` | ONT serial OCR, back (step 6) + front (step 9) | 12-char `ALCLB4…` | `vlm_corrections` (corrected) + `ont_serial_scanned` (undisputed) |
 | `categorization` | Activate install-photo step | steps 0–12 | `dr_photo_unified_reviews.vlm_categorization_results[]` per-photo human verdict |
 | `civil-qa` | Construction QA civil photo step | steps 0–7 | `vlm_corrections` (module `construction_qa`) per-photo human correction |
 
@@ -28,7 +28,10 @@ to distinguish a real regression from sampling noise.
 
 Every pack sends the exact string production sends:
 
-- `serials` → `ONT_SERIAL_BACK_PROMPT` (`src/modules/activate/services/vlmPrompts.ts`)
+- `serials` → `ONT_SERIAL_BACK_PROMPT` (back) and `STEP9_FRONT_PROMPT` (front),
+  both from `src/modules/activate/services/vlmPrompts.ts`. The pack picks by the
+  case's `variant`; they return different JSON shapes (`{found,serial}` vs
+  `{ontSerial:{found,serial},…}`) and the scorer parses each accordingly.
 - `categorization` → `buildCategorizationPrompt` (`src/modules/activate/services/categorizationPrompt.ts`)
 - `civil-qa` → `buildPhotoPrompt` (`src/modules/construction-qa/services/constructionQaPrompt.ts`)
 
@@ -57,9 +60,20 @@ label can be traced back to the row it came from.
 
     DATABASE_URL=... npx tsx scripts/vlm-bench/cli.ts harvest --pack civil-qa --size 80 --seed v1
 
+Seeds in use: `v1` for `categorization` and `civil-qa`, **`v2` for `serials`**.
+`v1` drew only 7/40 `wrong_serial_on_label` cases against a 36.8% pool rate
+(~2.6 SD low), which under-represents the two-serial `S/N` vs `S/N II` failure
+this pack exists to catch. Seeds v2–v6 all returned 13–15, so the sampler is
+unbiased and v1 was simply an unlucky draw. The seed was changed for failure-mode
+coverage BEFORE any model was run, so no score influenced the choice.
+
 Read-only. Selection is deterministic: candidates are ordered by
 `sha256(seed:key)`, not by DB order or `Math.random`, so the same seed
 reproduces the same set even as new reviews land.
+
+`serials` balances a second axis inside each stratum — 20 back / 20 front —
+because front corrections outnumber back ~2:1 and an unbalanced draw would
+under-test the back label, which is where the two-serial failure lives.
 
 The sample is **stratified 50/50**, not proportional:
 
@@ -92,10 +106,23 @@ Known gaps, stated rather than hidden:
   review and did not correct this photo" — weaker evidence than a correction.
   Recorded per case as `expected.confirmation`.
 - Civil step 8 (Signature) is unreachable: the classification prompt caps at 7.
+- `vlm_corrections` holds ONLY corrections — all 10,964 activate serial rows have
+  `vlm_extracted_value <> corrected_value` — so it cannot supply a confirmed
+  stratum. Those cases use the review's barcode-scanned `ont_serial_scanned` on
+  reviews with no correction at all. Measured against the 10,881 correction rows
+  that also carry a scan, that label disagrees with the photo **~1%** of the
+  time, so the serials `vlm_right` stratum carries ~1% expected label noise.
+- Serial cases are restricted to reviews with exactly ONE photo at the target
+  step whose step a human confirmed. The step in `photos_metadata` comes from
+  OneMap's `original_type` and is routinely wrong — labelling a photo that does
+  not show the serial would fabricate ground truth. This drops ~85% of
+  correction rows (10,964 → 904 usable).
 
 ## Scoring
 
-`scoring/text.ts` — serials (exact match + character error rate).
+`scoring/text.ts` — serials (exact match + character error rate). A `found:false`
+reply scores as an abstention, recorded separately from a wrong serial: refusing
+to guess and inventing a serial have very different downstream cost.
 `scoring/steps.ts` — step packs. Exact step match with no partial credit for an
 adjacent step, plus per-step precision/recall and a pass rate split by stratum,
 both printed after a run. One aggregate number hides which step the model

@@ -1,7 +1,7 @@
 // tests/unit/vlm-bench/serials-pack.test.ts
 import { describe, it, expect } from 'vitest';
 import { serialsPack } from '../../../scripts/vlm-bench/packs/serials';
-import { ONT_SERIAL_BACK_PROMPT } from '../../../src/modules/activate/services/vlmPrompts';
+import { ONT_SERIAL_BACK_PROMPT, STEP9_FRONT_PROMPT } from '../../../src/modules/activate/services/vlmPrompts';
 
 const reply = (o: Record<string, unknown>): string => JSON.stringify(o);
 
@@ -80,5 +80,66 @@ describe('serialsPack.buildPrompt', () => {
 
   it('uses temperature 0 so golden runs are reproducible', () => {
     expect(req.temperature).toBe(0);
+  });
+});
+
+describe('serialsPack front variant', () => {
+  const front = { serial: 'ALCLB48D1234', variant: 'front' as const };
+  const textOf = (expected: unknown): string => {
+    const content = serialsPack.buildPrompt({ id: 'x', imageRef: 'data:i', expected }).messages[0]!
+      .content as Array<{ type: string; text?: string }>;
+    return content.find((c) => c.type === 'text')!.text!;
+  };
+
+  it('sends production STEP9_FRONT_PROMPT for a front case', () => {
+    expect(textOf(front)).toBe(STEP9_FRONT_PROMPT);
+  });
+
+  it('still sends the BACK prompt for a back case', () => {
+    expect(textOf({ serial: 'ALCLB48D1234', variant: 'back' })).toBe(ONT_SERIAL_BACK_PROMPT);
+  });
+
+  it('defaults to the back prompt when no variant is set (legacy cases)', () => {
+    expect(textOf({ serial: 'ALCLB48D1234' })).toBe(ONT_SERIAL_BACK_PROMPT);
+  });
+
+  it('allows more tokens for front, which also asks for lights and a DR number', () => {
+    const back = serialsPack.buildPrompt({ id: 'x', imageRef: 'd', expected: { serial: 'S', variant: 'back' } });
+    const fr = serialsPack.buildPrompt({ id: 'x', imageRef: 'd', expected: front });
+    expect(fr.max_tokens).toBeGreaterThan(back.max_tokens);
+  });
+
+  it('reads the serial out of the nested ontSerial node the front prompt returns', () => {
+    const reply = JSON.stringify({
+      greenLightsVisible: true,
+      ontSerial: { found: true, serial: 'ALCLB48D1234', confidence: 0.9 },
+      drNumber: { found: true, drNumber: 'DR1234567' },
+    });
+    expect(serialsPack.score(front, reply).pass).toBe(true);
+  });
+
+  it('does not mistake the drNumber node for the serial', () => {
+    const reply = JSON.stringify({
+      greenLightsVisible: true,
+      ontSerial: { found: false, serial: null },
+      drNumber: { found: true, drNumber: 'DR1234567' },
+    });
+    const r = serialsPack.score(front, reply);
+    expect(r.pass).toBe(false);
+    expect(r.detail?.abstained).toBe(true);
+  });
+
+  it('would fail a back-shaped reply to a front case, catching a variant mix-up', () => {
+    // If buildPrompt and score ever disagree about the variant, this is the
+    // symptom: a top-level {found,serial} object arriving for a front case.
+    const r = serialsPack.score(front, JSON.stringify({ found: true, serial: 'ALCLB48D1234' }));
+    expect(r.detail?.variant).toBe('front');
+    expect(r.pass).toBe(true); // recovered by the bare-serial fallback, not by the front parser
+  });
+
+  it('records the variant and stratum on every score', () => {
+    const r = serialsPack.score({ ...front, stratum: 'vlm_wrong' as const }, '{"ontSerial":{"found":true,"serial":"ALCLB48D1234"}}');
+    expect(r.detail?.variant).toBe('front');
+    expect(r.detail?.stratum).toBe('vlm_wrong');
   });
 });

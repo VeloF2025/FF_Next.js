@@ -43,6 +43,41 @@ describe('stratifiedSample', () => {
     expect(a.map((c) => c.key)).not.toEqual(b.map((c) => c.key));
   });
 
+  it('splits a stratum evenly across subgroups instead of letting the big pool win', () => {
+    // Front corrections outnumber back ~2:1, so an unbalanced draw would
+    // under-test the back label — where the two-serial failure actually lives.
+    const mixed: Candidate[] = [
+      ...pool(10, 'vlm_wrong', 'b').map((c) => ({ ...c, subgroup: 'back' })),
+      ...pool(200, 'vlm_wrong', 'f').map((c) => ({ ...c, subgroup: 'front' })),
+      ...pool(100, 'vlm_right', 'r').map((c) => ({ ...c, subgroup: 'back' })),
+    ];
+    const picked = stratifiedSample(mixed, 'v1', { vlm_wrong: 10, vlm_right: 4 });
+    const wrong = picked.filter((c) => c.stratum === 'vlm_wrong');
+    expect(wrong.filter((c) => c.subgroup === 'back')).toHaveLength(5);
+    expect(wrong.filter((c) => c.subgroup === 'front')).toHaveLength(5);
+  });
+
+  it('throws when one subgroup cannot fill its share, rather than topping up from the other', () => {
+    const mixed: Candidate[] = [
+      ...pool(2, 'vlm_wrong', 'b').map((c) => ({ ...c, subgroup: 'back' })),
+      ...pool(200, 'vlm_wrong', 'f').map((c) => ({ ...c, subgroup: 'front' })),
+      ...pool(100, 'vlm_right', 'r').map((c) => ({ ...c, subgroup: 'back' })),
+    ];
+    expect(() => stratifiedSample(mixed, 'v1', { vlm_wrong: 40, vlm_right: 4 })).toThrow(
+      /vlm_wrong\/back: only 2 candidates, need 20/,
+    );
+  });
+
+  it('splits an odd quota deterministically rather than dropping the remainder', () => {
+    const mixed: Candidate[] = [
+      ...pool(10, 'vlm_wrong', 'b').map((c) => ({ ...c, subgroup: 'back' })),
+      ...pool(10, 'vlm_wrong', 'f').map((c) => ({ ...c, subgroup: 'front' })),
+      ...pool(10, 'vlm_right', 'r').map((c) => ({ ...c, subgroup: 'back' })),
+    ];
+    const picked = stratifiedSample(mixed, 'v1', { vlm_wrong: 5, vlm_right: 1 });
+    expect(picked.filter((c) => c.stratum === 'vlm_wrong')).toHaveLength(5);
+  });
+
   it('throws rather than silently returning a short, skewed stratum', () => {
     // Quietly returning 12 hard cases instead of 40 would make the set look
     // balanced in the manifest while the score came mostly from easy ones.

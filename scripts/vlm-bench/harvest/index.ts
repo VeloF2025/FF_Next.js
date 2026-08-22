@@ -2,6 +2,7 @@
 import * as path from 'path';
 import { categorizationCandidates } from './categorizationSource';
 import { civilCandidates } from './civilSource';
+import { serialsCandidates } from './serialsSource';
 import { closeHarvestPool } from './db';
 import { stratifiedSample, type Candidate } from './sample';
 import { seal, type HarvestItem } from './seal';
@@ -11,6 +12,7 @@ type Sourced = Candidate & HarvestItem;
 const SOURCES: Record<string, { dir: string; idPrefix: string; load: () => Promise<Sourced[]> }> = {
   categorization: { dir: 'categorization', idPrefix: 'cat', load: categorizationCandidates },
   'civil-qa': { dir: 'civil-qa', idPrefix: 'civil', load: civilCandidates },
+  serials: { dir: 'serials', idPrefix: 'serial', load: serialsCandidates },
 };
 
 export interface HarvestOpts {
