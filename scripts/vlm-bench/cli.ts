@@ -2,10 +2,15 @@
 // Usage:
 //   npx tsx scripts/vlm-bench/cli.ts run --pack serials --mode golden
 //   npx tsx scripts/vlm-bench/cli.ts coverage
+//   DATABASE_URL=... npx tsx scripts/vlm-bench/cli.ts harvest --pack categorization [--size 80] [--seed v1]
 import * as path from 'path';
 import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { serialsPack } from './packs/serials';
+import { categorizationPack } from './packs/categorization';
+import { civilQaPack } from './packs/civilQa';
+import { stepMetrics, strataBreakdown } from './scoring/steps';
+import { harvest, closeHarvestPool } from './harvest';
 import { runPack } from './engine/runner';
 import { storeRun } from './engine/resultStore';
 import { vlmHealthy, vlmComplete, fileToDataUrl } from './vlmCall';
@@ -13,7 +18,11 @@ import { VLM_MODEL } from '@/lib/vlm';
 import type { RunResult, VlmTestPack } from './types';
 
 const GOLDEN_ROOT = path.join(__dirname, 'datasets/golden');
-const PACKS: Record<string, VlmTestPack> = { serials: serialsPack };
+const PACKS: Record<string, VlmTestPack> = {
+  serials: serialsPack,
+  categorization: categorizationPack,
+  'civil-qa': civilQaPack,
+};
 const MIN_GOLDEN = 100;
 
 function arg(name: string, dflt?: string): string | undefined {
@@ -58,6 +67,38 @@ async function cmdRun(): Promise<void> {
   process.stdout.write(
     `run #${id} ${pack.id} ${mode}: ${packResult.passed}/${packResult.scored} pass, scorePct=${packResult.scorePct.toFixed(1)} (errors=${packResult.errors})\n`,
   );
+
+  // Step packs: one pass rate hides which step the model actually confuses, and
+  // hides whether it only passed the easy stratum. Print both.
+  const metrics = stepMetrics(packResult.cases);
+  if (metrics.length > 0) {
+    for (const [stratum, s] of Object.entries(strataBreakdown(packResult.cases))) {
+      process.stdout.write(`  stratum ${stratum}: ${s.passed}/${s.n}\n`);
+    }
+    process.stdout.write('  step  support  pred  correct  precision  recall     f1\n');
+    for (const m of metrics) {
+      process.stdout.write(
+        `  ${String(m.step).padStart(4)}  ${String(m.support).padStart(7)}  ${String(m.predicted).padStart(4)}  ` +
+          `${String(m.correct).padStart(7)}  ${m.precision.toFixed(3).padStart(9)}  ${m.recall.toFixed(3).padStart(6)}  ${m.f1.toFixed(3).padStart(5)}\n`,
+      );
+    }
+  }
+}
+
+async function cmdHarvest(): Promise<void> {
+  const packId = arg('pack')!;
+  if (!packId) throw new Error('harvest requires --pack <categorization|civil-qa>');
+  try {
+    await harvest({
+      packId,
+      goldenRoot: GOLDEN_ROOT,
+      seed: arg('seed', 'v1')!,
+      size: Number(arg('size', '80')),
+      out: (line) => process.stdout.write(line),
+    });
+  } finally {
+    await closeHarvestPool();
+  }
 }
 
 function cmdCoverage(): void {
@@ -73,8 +114,9 @@ function cmdCoverage(): void {
   const cmd = process.argv[2];
   if (cmd === 'run') await cmdRun();
   else if (cmd === 'coverage') cmdCoverage();
+  else if (cmd === 'harvest') await cmdHarvest();
   else {
-    process.stdout.write('usage: cli.ts run|coverage [--pack <id>] [--mode golden|live]\n');
+    process.stdout.write('usage: cli.ts run|coverage|harvest [--pack <id>] [--mode golden|live] [--size N] [--seed S]\n');
     process.exit(1);
   }
 })().catch((e) => {
