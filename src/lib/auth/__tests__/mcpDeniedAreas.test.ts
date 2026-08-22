@@ -31,18 +31,35 @@ describe('isDeniedAreaViolation', () => {
     expect(isDeniedAreaViolation(mcpUser, '/api/staff/list')).toBe(true);
   });
 
-  it('ALLOWS the areas RBAC is trusted to bound', () => {
-    // The denylist was a blunt instrument over a per-route RBAC layer that already
-    // works. These four are properly gated — people.meetings, procurement,
-    // dashboard.action-items — and /my/* is self-scoped by construction: the route
-    // resolves the caller's own payslips and can return nobody else's.
+  it('ALLOWS /my, which an MCP token cannot reach anyway', () => {
+    // Removing this entry is INERT, and the honest reason is not the one first given.
+    // /api/my/* does not use withAuth at all — it authenticates via `withMySession`
+    // against the `ff_my_session` cookie, which an MCP bearer token cannot present, so
+    // every route there 401s for an integration regardless of this list.
     //
-    // Deliberate widening. An integration should reach what its user reaches, and
-    // denying by group made Cortex less useful without making anything safer.
+    // (It is separately true that those handlers resolve identity from session.staffId
+    // and never from a request-supplied id. That makes them safe for the staff portal;
+    // it is not what makes them unreachable here.)
     expect(isDeniedAreaViolation(mcpUser, '/api/my/payslips')).toBe(false);
-    expect(isDeniedAreaViolation(mcpUser, '/api/meetings')).toBe(false);
-    expect(isDeniedAreaViolation(mcpUser, '/api/procurement/purchase-orders')).toBe(false);
-    expect(isDeniedAreaViolation(mcpUser, '/api/action-items')).toBe(false);
+  });
+
+  it('still refuses meetings, action-items and procurement', () => {
+    // These were opened on the claim that per-route RBAC bounds them. Measured, it does
+    // not: 0 of 8 meetings routes, 0 of 6 action-items and 10 of 139 procurement routes
+    // carry withPermission. The permission keys exist and gate /api/reporting/* — an
+    // audit of THOSE routes was wrongly generalised to the whole group.
+    //
+    // withAuth-only means any authenticated session reaches them regardless of role, so
+    // there is nothing for an integration token to be bounded by.
+    expect(isDeniedAreaViolation(mcpUser, '/api/meetings')).toBe(true);
+    expect(isDeniedAreaViolation(mcpUser, '/api/action-items')).toBe(true);
+    expect(isDeniedAreaViolation(mcpUser, '/api/procurement/purchase-orders')).toBe(true);
+    // …while the RBAC-gated reporting equivalents stay reachable, which is the point.
+    expect(isDeniedAreaViolation(mcpUser, '/api/reporting/meetings')).toBe(false);
+    expect(isDeniedAreaViolation(mcpUser, '/api/reporting/action-items')).toBe(false);
+    // manco-action-items is a different table and properly gated; the sibling rule must
+    // not catch it (it does not start with "action-items-").
+    expect(isDeniedAreaViolation(mcpUser, '/api/manco-action-items')).toBe(false);
   });
 
   it('ALLOWS field attendance, which project managers need', () => {

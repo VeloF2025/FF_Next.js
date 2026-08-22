@@ -146,7 +146,8 @@ def test_rate_limit_keys_are_swept_once_they_age_out(svc, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "group", ["Accounting", "ACCOUNTING", "Staff", "Staff-Documents", "STAFF", "staff"]
+    "group",
+    ["Accounting", "ACCOUNTING", "Staff", "Staff-Documents", "Meetings", "PROCUREMENT"],
 )
 def test_denied_group_is_case_insensitive_on_its_own(svc, group):
     """The predicate is the guard, so it must not rely on every caller having

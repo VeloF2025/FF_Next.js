@@ -35,10 +35,9 @@ from .server import mcp
 # Mirrors DENIED_GROUPS in scripts/build-mcp-endpoint-catalogue.ts. Omitting a group
 # from the catalogue is not enough on its own — Claude can construct a path it never saw
 # listed — so fibreflow_get refuses them too.
-# `action-items` is denied because those rows are meeting content and /api/action-items
-# applies no attendance filter — see the note in build-mcp-endpoint-catalogue.ts. The
-# attendance-scoped report at /api/reporting/action-items is in the `reporting` group and
-# stays reachable.
+# `action-items` rows are meeting content and /api/action-items applies no attendance
+# filter — and no permission check either. The attendance-scoped report at
+# /api/reporting/action-items is in the `reporting` group and stays reachable.
 DENIED_GROUPS = (
     # MIRRORS src/lib/auth/mcpDeniedAreas.ts, which ENFORCES this server-side for every
     # kind='mcp' session. This copy saves a round-trip and stops the model proposing a
@@ -56,6 +55,12 @@ DENIED_GROUPS = (
     #                and .tabs.disciplinary (31 accounts); super_admin bypasses RBAC
     #                entirely, so for 10 of them nothing bounds it at all.
     "accounting",
+    # Kept: measured 0 of 8 meetings routes, 0 of 6 action-items and 10 of 139
+    # procurement routes carry withPermission. The permission keys gate /api/reporting/*,
+    # not these groups — withAuth-only means any authenticated session reaches them.
+    "meetings",
+    "action-items",
+    "procurement",
     "staff",
     "cortex-remote-mcp",
     "ff-remote-mcp",
@@ -66,7 +71,7 @@ DENIED_GROUPS = (
 # Empty by design. /api/field/attendance was the only entry and was opened deliberately:
 # `people.staff.attendance.search` already grants manager, project_manager and
 # site_supervisor, and project managers have a real need to see attendance. Its lack of
-# supervisor scope matters less than it sounds — zero of the 32 active field staff have
+# supervisor scope matters less than it sounds — NO active field staff have
 # `staff.reports_to` set, so a scope would return NOTHING rather than a narrower set.
 #
 # The mechanism stays wired and tested so the next entry costs one line.

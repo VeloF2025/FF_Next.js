@@ -58,6 +58,24 @@ export const MCP_DENIED_GROUPS: readonly string[] = [
   // "The accounting module is dead" is true of the UI and false of the tables. Retiring
   // the routes is the right fix; exposing them to an agent is not.
   'accounting',
+  // Kept after review measured what "RBAC bounds it" is actually worth here:
+  //   meetings       0 of 8 routes carry withPermission
+  //   action-items   0 of 6
+  //   procurement   10 of 139
+  //
+  // The permission keys people.meetings / dashboard.action-items / procurement DO exist
+  // and DO gate the /api/reporting/* routes. They do not gate these groups. An earlier
+  // audit of the reporting routes was generalised to the whole group; that was wrong.
+  // /api/procurement/purchase-orders and boq-spend-summary — the two examples cited as
+  // audited — are withAuth-only, as are audit-logs, cost-center transactions, budget
+  // dashboard and the spend exports.
+  //
+  // withAuth-only means any authenticated session reaches them regardless of role, so
+  // there is nothing here for an integration token to be bounded BY. Opening these needs
+  // the missing withPermission checks first, not a denylist edit.
+  'meetings',
+  'action-items',
+  'procurement',
   // `people.staff` grants admin + manager + super_admin, and carries
   // people.staff.sensitive and people.staff.tabs.disciplinary with it — 31 active
   // accounts. More importantly super_admin bypasses RBAC entirely (see
@@ -84,8 +102,9 @@ export const MCP_DENIED_GROUPS: readonly string[] = [
  * project managers have a real need to see attendance.
  *
  * Its known weakness — the route applies no supervisor scope, so a holder gets the whole
- * field workforce — is weaker than it sounds: ZERO of the 32 active field staff have
- * `staff.reports_to` set, so a scope would return NOTHING rather than a narrower set.
+ * field workforce — is weaker than it sounds: ZERO active field staff have `staff.reports_to`
+ * set — measured three times over two days at 32, 34 and 36 headcount, always zero with
+ * a supervisor — so a scope would return NOTHING rather than a narrower set.
  * Whole-workforce is the only behaviour that currently works. If reports_to is ever
  * populated, that route should adopt the same resolveScope the reporting route uses, and
  * this decision should be revisited rather than assumed still correct.
