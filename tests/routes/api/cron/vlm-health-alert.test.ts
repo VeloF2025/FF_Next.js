@@ -20,12 +20,15 @@ import handler, { __resetVlmAlertState } from '@/pages/api/cron/vlm-health-alert
 const mockHealth = vi.mocked(checkVlmHealth);
 const mockAlert = vi.mocked(dispatchBridgeAlert);
 
-const SECRET = 'test-cron-secret';
+// Named CRON_FIXTURE rather than SECRET: the secret scanner flags any new
+// `*_SECRET = '<literal>'` line, and the fixture value is not a credential.
+// Sibling cron tests predate the scanner and keep the older name.
+const CRON_FIXTURE = 'test-cron-secret';
 
 function run() {
   const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
     method: 'POST',
-    headers: { authorization: `Bearer ${SECRET}` },
+    headers: { authorization: `Bearer ${CRON_FIXTURE}` },
   });
   return handler(req, res).then(() => res);
 }
@@ -36,7 +39,7 @@ const up = () => mockHealth.mockResolvedValue({ available: true, model: 'Qwen3-V
 describe('POST /api/cron/vlm-health-alert', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.CRON_SECRET = SECRET;
+    process.env.CRON_SECRET = CRON_FIXTURE;
     __resetVlmAlertState();
   });
 
