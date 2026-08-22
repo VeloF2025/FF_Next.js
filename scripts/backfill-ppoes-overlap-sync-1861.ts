@@ -64,6 +64,10 @@ const SQL_D4_1 = `
   FROM oa1
   WHERE oa1.drop_number = pp.resolved_drop_number
     AND pp.resolution_status IN ('located_1map', 'located_local', 'located_unified')
+    -- Never resurrect a dispositioned row (migration 524). This is a one-time
+    -- heal, but a one-time script that can be re-run must not promote a
+    -- pre-provision someone has since classified as cancelled or faulty.
+    AND pp.exit_reason IS NULL
     AND NOT (
       pp.serial_number IS NOT NULL AND TRIM(pp.serial_number) NOT IN ('', '-')
       AND oa1.serial_number IS NOT NULL AND TRIM(oa1.serial_number) NOT IN ('', '-')

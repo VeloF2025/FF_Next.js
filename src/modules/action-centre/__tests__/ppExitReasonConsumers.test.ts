@@ -20,8 +20,16 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-// ⚠️ COVERAGE LIMIT, worth knowing before relying on this.
-// The PR gate runs AFFECTED tests only (scripts/test-ratchet.sh --changed), and
+// ⚠️ TWO COVERAGE LIMITS, worth knowing before relying on this.
+//
+// (a) FILE GRANULARITY. The scan asks "does this file contain the clause", not
+// "does every open-PP query in it". A file with two such queries where only one
+// carries the clause passes — verified by mutation: removing one of the two
+// clauses in app/api/analytics/.../pre-provisions/route.ts goes undetected,
+// removing both is caught. Per-query checking needs a SQL parser, which is more
+// machinery than this is worth; the realistic mistake is a whole consumer
+// written without the clause, and that IS caught.
+// (b) SELECTION. The PR gate runs AFFECTED tests only (scripts/test-ratchet.sh --changed), and
 // vitest selects by static dependency graph. This test reads its targets with
 // readFileSync, so it has no static edge to any of them: a PR that adds a ninth
 // consumer WITHOUT touching this file will not select it, and the PR will go
@@ -32,20 +40,49 @@ import { describe, expect, it } from 'vitest';
 // honest than a bash gate.
 
 
-const ROOTS = ['pages/api', 'src/modules', 'src/lib'];
+// BOTH router trees. This repo is hybrid (pages/ and app/), and the first version
+// of this list omitted `app` — which hid a live analytics report that counts the
+// same backlog. One missing root is one whole tree the guard cannot see.
+const ROOTS = ['pages/api', 'app', 'src/modules', 'src/lib', 'scripts'];
 
 /**
  * The ways this repo selects pre-provisions that have not activated.
  *
- * BOTH forms matter, and missing the second is how three consumers were wrongly
- * exempted from the first version of this test: a query can express "still open"
- * as `resolution_status != 'activated'` OR as `resolution_status = 'not_found'`,
- * and the second reads nothing like the first. An exited row keeps whatever
- * resolution_status the import gave it — usually 'not_found' — so it matches the
- * second form just as strongly.
+ * There are FOUR idioms and every one has hidden a consumer during this
+ * feature's review:
+ *   1. resolution_status != 'activated'                  the obvious one
+ *   2. resolution_status <> 'activated'                  same, other operator
+ *   3. resolution_status IS DISTINCT FROM 'activated'    NULL-safe variant
+ *   4. resolution_status = 'not_found' / IN ('located_')  by membership
+ *
+ * The first version matched only (1), which let three consumers through AND got
+ * them wrongly exempted. (4) hid an App Router analytics report. (3) made the
+ * metrics snapshot invisible to its own guard. Before adding a fifth, grep:
+ *   grep -rhoiE "resolution_status\\s*(!=|<>|=|IS DISTINCT FROM|IN)" pages app src scripts
  */
-const OPEN_PP_FILTER =
-  /resolution_status\s*(?:!=|<>)\s*'activated'|resolution_status\s*=\s*'not_found'/i;
+const OPEN_PP_FILTER = new RegExp(
+  [
+    "resolution_status\\s*(?:!=|<>)\\s*'activated'",
+    "resolution_status\\s+IS\\s+DISTINCT\\s+FROM\\s+'activated'",
+    "resolution_status\\s*=\\s*'not_found'",
+    "resolution_status\\s+IN\\s*\\(\\s*'located_",
+  ].join('|'),
+  'i',
+);
+
+/**
+ * Strip comments before matching. Twice now this scan has been fooled by prose:
+ * a doc comment mentioning `exit_reason` counted as coverage, and a comment
+ * saying "933 rows with resolution_status != 'activated'" made a backfill script
+ * that only ever selects ACTIVATED rows look like an open-PP consumer. Code is
+ * the subject; commentary about code is not.
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')   // block comments
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')  // line comments, not URLs
+    .replace(/--[^\n]*/g, ' ');            // SQL comments inside template literals
+}
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -75,13 +112,11 @@ const EXEMPT: Record<string, string> = {
   'pages/api/activate/non-invoiceables/billing-crossref.ts':
     'Cross-reference against billing must see historical rows regardless of exit state.',
   'pages/api/billing/reconcile.ts':
-    'Reconciliation is historical: an exited row may still carry billing consequences.',
+    'Reconciled against Fibertime\'s own ft_pre_provisions_count, which FT computes with no knowledge of our internal exit_reason. Filtering here would manufacture a variance against their number rather than remove one. (The earlier reason on this entry — "historical" — was wrong: the query is a live current-state count with no date bound.)',
   'src/modules/activate/services/oes/oesImportService.ts':
     'Import-side upsert; see import-pp-data.ts.',
   'src/modules/activate/services/oes/oesPostImportService.ts':
     'Post-import lifecycle, including retireSupersededPpSerials, operates on activated rows.',
-  'src/modules/activate/services/oes/oesSerialLifecycle.ts':
-    'Serial lifecycle is per-serial, not a backlog count.',
   'src/modules/activate/services/cascadePpResolution.ts':
     'Cascade acts on a named drop, not on the open list.',
   'src/modules/noc/services/dataSyncResolution.ts':
@@ -92,10 +127,8 @@ const EXEMPT: Record<string, string> = {
     'Historical billing reconciliation; see billing/reconcile.ts.',
   'src/lib/oes-report/queries.ts':
     'The OES report mirrors the vendor sheet as-imported.',
-  'src/lib/oes-report/ppSheetsV2.ts':
-    'See oes-report/queries.ts.',
   'src/modules/non-invoiceables/types.ts':
-    'Type declarations only — the string appears in a doc comment.',
+    'Declares the table name as a union-type member (a source-kind discriminator); it issues no query, so there is nothing to filter.',
 };
 
 describe('pre-provision exit path — every open-PP consumer honours it', () => {
@@ -104,10 +137,15 @@ describe('pre-provision exit path — every open-PP consumer honours it', () => 
 
     for (const root of ROOTS) {
       for (const file of walk(root)) {
-        const src = readFileSync(file, 'utf8');
+        const src = stripComments(readFileSync(file, 'utf8'));
         if (!src.includes('oes_pp_data')) continue;
         if (!OPEN_PP_FILTER.test(src)) continue;
-        if (src.includes('exit_reason')) continue;
+        // Require the actual CLAUSE, not the word. `includes('exit_reason')` was
+        // satisfied by a doc comment mentioning the column, so stripping the real
+        // clause from a file that discusses it elsewhere passed clean. Both
+        // polarities count: most consumers filter (`IS NULL`), one classifies
+        // (`IS NOT NULL THEN 'resolved'`).
+        if (/exit_reason\s+IS\s+(?:NOT\s+)?NULL/i.test(src)) continue;
         if (EXEMPT[file]) continue;
         offenders.push(file);
       }
@@ -127,7 +165,7 @@ describe('pre-provision exit path — every open-PP consumer honours it', () => 
     // the next real offender behind a stale name.
     for (const [file, reason] of Object.entries(EXEMPT)) {
       expect(reason.length, `${file} needs a real reason`).toBeGreaterThan(20);
-      const src = readFileSync(file, 'utf8');
+      const src = stripComments(readFileSync(file, 'utf8'));
       expect(src.includes('oes_pp_data'), `${file} no longer touches oes_pp_data`).toBe(true);
     }
   });

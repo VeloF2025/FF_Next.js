@@ -83,11 +83,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           COALESCE(project, 'Unknown')                                  AS project_name,
           COUNT(*)::int                                                  AS logged,
           COUNT(CASE WHEN resolution_status = 'activated' THEN 1 END)::int AS activated,
+          -- The OPEN buckets exclude dispositioned rows (migration 524), so this
+          -- report agrees with the Action Centre queue about what is outstanding.
+          -- logged and activated deliberately do NOT: they are historical
+          -- facts about a month, and shrinking them retroactively when someone
+          -- classifies a row would rewrite history that already went out.
           COUNT(CASE WHEN resolution_status IN (
             'located_1map','located_local','located_oes','located_unified'
-          ) THEN 1 END)::int                                             AS open,
-          COUNT(CASE WHEN resolution_status = 'not_found'
-            OR resolution_status IS NULL THEN 1 END)::int               AS not_found
+          ) AND exit_reason IS NULL THEN 1 END)::int                     AS open,
+          COUNT(CASE WHEN (resolution_status = 'not_found'
+            OR resolution_status IS NULL) AND exit_reason IS NULL THEN 1 END)::int AS not_found
         FROM oes_pp_data
         WHERE date_registered IS NOT NULL
         GROUP BY year, month_key, month_label, project_name
