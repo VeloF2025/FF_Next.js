@@ -9,6 +9,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { log } from '@/lib/logger';
 import {
   Car,
   ArrowLeft,
@@ -2453,7 +2454,7 @@ function FuelSpendTab({
       }
       return null;
     } catch (err) {
-      console.error('Upload error:', err);
+      log.error('Upload error:', { data: err }, 'VehicleDetailPage');
       return null;
     } finally {
       setUploadingPhoto(false);
@@ -3393,7 +3394,7 @@ export default function VehicleDetailPage() {
         setFinance(financeData.data);
       }
     } catch (err) {
-      console.error('Failed to fetch ownership data:', err);
+      log.error('Failed to fetch ownership data:', { data: err }, 'VehicleDetailPage');
     } finally {
       setLoadingOwnership(false);
     }
@@ -3417,7 +3418,7 @@ export default function VehicleDetailPage() {
         setDocuments(docsData.data || []);
       }
     } catch (err) {
-      console.error('Failed to fetch documents data:', err);
+      log.error('Failed to fetch documents data:', { data: err }, 'VehicleDetailPage');
     } finally {
       setLoadingDocs(false);
     }
@@ -3441,7 +3442,7 @@ export default function VehicleDetailPage() {
         setInsuranceHistory(historyData.data || []);
       }
     } catch (err) {
-      console.error('Failed to fetch insurance data:', err);
+      log.error('Failed to fetch insurance data:', { data: err }, 'VehicleDetailPage');
     } finally {
       setLoadingInsurance(false);
     }
@@ -3481,7 +3482,7 @@ export default function VehicleDetailPage() {
         setVehicleStats(statsData.data || null);
       }
     } catch (err) {
-      console.error('Failed to fetch odometer data:', err);
+      log.error('Failed to fetch odometer data:', { data: err }, 'VehicleDetailPage');
     } finally {
       setLoadingOdometer(false);
     }
@@ -3502,7 +3503,7 @@ export default function VehicleDetailPage() {
         }
       }
     } catch (err) {
-      console.error('Failed to fetch assignment data:', err);
+      log.error('Failed to fetch assignment data:', { data: err }, 'VehicleDetailPage');
     } finally {
       setLoadingAssignment(false);
     }
@@ -3520,7 +3521,7 @@ export default function VehicleDetailPage() {
         setFuelSummary(data.data?.summary || null);
       }
     } catch (err) {
-      console.error('Failed to fetch fuel transactions:', err);
+      log.error('Failed to fetch fuel transactions:', { data: err }, 'VehicleDetailPage');
     } finally {
       setFuelLoading(false);
     }
@@ -3539,7 +3540,7 @@ export default function VehicleDetailPage() {
         setPhotosBySource(data.data?.bySource || { vehicle_photos: 0, check_photos: 0 });
       }
     } catch (err) {
-      console.error('Failed to fetch photos:', err);
+      log.error('Failed to fetch photos:', { data: err }, 'VehicleDetailPage');
     } finally {
       setLoadingPhotos(false);
     }
@@ -3562,7 +3563,7 @@ export default function VehicleDetailPage() {
         setAvailableStaff(staffList);
       }
     } catch (err) {
-      console.error('Failed to fetch staff:', err);
+      log.error('Failed to fetch staff:', { data: err }, 'VehicleDetailPage');
     } finally {
       setLoadingStaff(false);
     }
