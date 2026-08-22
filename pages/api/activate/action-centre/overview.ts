@@ -120,10 +120,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
       safeQuery('ppCounts', async () => {
         const { rows } = await pool.query<{ outstanding: string; ticketed: string }>(
+          // exit_reason IS NULL keeps this tile in step with Action Centre > Items
+          // (migration 524). Without it a row an operator just classified stays in
+          // the outstanding count, so the two screens disagree about the same table.
           `SELECT
               COUNT(*) FILTER (WHERE resolution_status <> 'activated' OR resolution_status IS NULL)::text AS outstanding,
               COUNT(*) FILTER (WHERE ticket_id IS NOT NULL AND (resolution_status <> 'activated' OR resolution_status IS NULL))::text AS ticketed
-           FROM oes_pp_data`,
+           FROM oes_pp_data
+          WHERE exit_reason IS NULL`,
         );
         return {
           outstanding: Number(rows[0]?.outstanding ?? 0),

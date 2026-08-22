@@ -8,8 +8,10 @@
  */
 
 import { useEffect, useState } from 'react';
+
+import PpExitReasonSelect from './PpExitReasonSelect';
 import { useRouter } from 'next/router';
-import { ChevronRight, Ticket as TicketIcon, ExternalLink } from 'lucide-react';
+import { ChevronRight, Ticket as TicketIcon } from 'lucide-react';
 
 type Source = 'deduction' | 'pre_prov' | 'olt_mismatch' | 'offline';
 
@@ -205,8 +207,20 @@ export function ItemsTab() {
                       <ChevronRight className="w-5 h-5" />
                     </a>
                   )}
-                  {!item.drNumber && item.source === 'pre_prov' && (
-                    <ExternalLink className="w-4 h-4 text-[var(--ff-text-tertiary)] flex-shrink-0" aria-hidden="true" />
+                  {item.source === 'pre_prov' && (
+                    <div className="flex-shrink-0">
+                      <PpExitReasonSelect
+                        id={item.sourceId}
+                        // The row is NOT removed here. It stays, showing its new
+                        // state with an Undo, until the next refetch drops it —
+                        // that window is the only chance anyone has to notice a
+                        // mis-click, and the row is gone from every other screen
+                        // the moment the write lands. Only the count moves, so the
+                        // header reflects the real backlog immediately.
+                        onExited={() => setCount((c) => Math.max(0, c - 1))}
+                        onRestored={() => setCount((c) => c + 1)}
+                      />
+                    </div>
                   )}
                 </div>
               </li>

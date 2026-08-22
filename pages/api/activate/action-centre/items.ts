@@ -161,7 +161,14 @@ async function fetchDeductions(f: ItemFilters): Promise<Item[]> {
 
 async function fetchPreProv(f: ItemFilters): Promise<Item[]> {
   const params: unknown[] = [];
-  const clauses: string[] = [`(pp.resolution_status IS NULL OR pp.resolution_status <> 'activated')`];
+  // `exit_reason IS NULL` keeps a classified row out of the work queue: recording
+  // WHY a pre-provision will never activate is precisely what takes it off the
+  // list, so leaving it here would mean the queue never shrinks. Clearing the
+  // reason (POST /api/activate/pp-exit-reason with exit_reason: null) returns it.
+  const clauses: string[] = [
+    `(pp.resolution_status IS NULL OR pp.resolution_status <> 'activated')`,
+    `pp.exit_reason IS NULL`,
+  ];
 
   if (f.project) {
     params.push(f.project);
@@ -181,9 +188,11 @@ async function fetchPreProv(f: ItemFilters): Promise<Item[]> {
     id: string; serial_number: string; project: string | null;
     resolution_status: string | null; resolved_drop_number: string | null;
     ticket_id: string | null; ticket_uid: string | null; created_at: string;
+    exit_reason: string | null;
   }>(
     `SELECT pp.id, pp.serial_number, pp.project, pp.resolution_status,
-            pp.resolved_drop_number, pp.ticket_id, t.ticket_uid, pp.created_at::text
+            pp.resolved_drop_number, pp.ticket_id, t.ticket_uid, pp.created_at::text,
+            pp.exit_reason
        FROM oes_pp_data pp
        LEFT JOIN maintenance_tickets t ON t.id = pp.ticket_id
       WHERE ${clauses.join(' AND ')}

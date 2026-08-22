@@ -187,6 +187,10 @@ export async function getPpList(ppProject: string, dateIso: string): Promise<PpR
             pp.olt_name, pp.olt_pon::text AS olt_pon, pp.date_registered::text AS date_registered,
             COALESCE(pp.date_registered = $2::date, false) AS is_new,
             CASE
+              -- A dispositioned row is resolved, not residual. This report's
+              -- subject is WHY rows did not activate, so it keeps the row and
+              -- classifies it rather than filtering it out (migration 524).
+              WHEN pp.exit_reason IS NOT NULL THEN 'resolved'
               WHEN pp.resolution_status <> 'not_found' THEN 'resolved'
               WHEN EXISTS (SELECT 1 FROM loeks_field_mappings l
                             WHERE UPPER(TRIM(l.ont_serial)) = UPPER(TRIM(pp.serial_number))

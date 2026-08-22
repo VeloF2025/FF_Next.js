@@ -110,7 +110,9 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
         projectCol: 'pp.project', dropCol: 'pp.serial_number',
         ticketCol: 'pp.maintenance_ticket_id',
         project, search, hasTicket,
-        extraFixed: ["pp.resolution_status != 'activated'"],
+        // exit_reason IS NULL: a classified pre-provision is no longer open work
+        // (migration 524), so it must not be served as a non-invoiceable item.
+        extraFixed: ["pp.resolution_status != 'activated'", 'pp.exit_reason IS NULL'],
       });
       queries.push(
         pool.query(

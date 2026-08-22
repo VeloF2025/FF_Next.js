@@ -57,6 +57,10 @@ export async function getConsolidatedNotFound(asOfDateIso: string): Promise<OpsR
             ) AS hint_drop
        FROM oes_pp_data pp
       WHERE pp.resolution_status = 'not_found'
+        -- This is a WORKLIST (aging, hint_drop, residual_class). A pre-provision
+        -- someone has already dispositioned is not outstanding work, so it leaves
+        -- the list here as it does everywhere else (migration 524).
+        AND pp.exit_reason IS NULL
       ORDER BY pp.project, residual_class, aging_days DESC, pp.serial_number`,
     [asOfDateIso],
   );
