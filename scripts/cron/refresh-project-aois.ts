@@ -40,10 +40,12 @@
  *     shouting.
  *   - Since migration 523 the refresh also scores each hull for outlier
  *     distortion. This script reads that score back and WhatsApps the ops group
- *     when any project has an out-of-place pole — a column nobody queries is the
- *     same silence that let one pole 145 km out of its site inflate a geofence
- *     63x for months. The alert is best-effort and NEVER changes the exit code:
- *     the refresh itself has already succeeded by then.
+ *     when a project NEWLY becomes distorted. Only a transition alerts, and only
+ *     `distorted` does — a nightly message about a condition nobody has fixed
+ *     yet is how a channel gets muted, which is the same silence that let one
+ *     pole 145 km out of its site inflate a geofence 63x for months. The alert
+ *     is best-effort and NEVER changes the exit code: the refresh itself has
+ *     already succeeded by then.
  */
 
 import * as dotenv from 'dotenv';
@@ -89,6 +91,10 @@ interface AoiHealthRow extends Record<string, unknown> {
   robust_aoi_area_m2: string | null;
   aoi_area_ratio: string | null;
   furthest_outlier_m: string | null;
+  aoi_status_reason: string | null;
+  previous_aoi_status: string | null;
+  previous_aoi_area_m2: string | null;
+  aoi_growth_ratio: string | null;
 }
 
 // Defaults match the convention in the sibling attendance cron
@@ -114,7 +120,9 @@ async function alertOnDistortedAois(): Promise<void> {
     const rows = await sql.query<AoiHealthRow>(
       `SELECT pr.project_name, a.aoi_status, a.pole_count, a.outlier_pole_count,
               a.aoi_area_m2::text, a.robust_aoi_area_m2::text,
-              a.aoi_area_ratio::text, a.furthest_outlier_m::text
+              a.aoi_area_ratio::text, a.furthest_outlier_m::text,
+              a.aoi_status_reason, a.previous_aoi_status,
+              a.previous_aoi_area_m2::text, a.aoi_growth_ratio::text
          FROM project_aois a LEFT JOIN projects pr ON pr.id = a.project_id
         ORDER BY a.aoi_status, pr.project_name`,
       [],
@@ -138,12 +146,16 @@ async function alertOnDistortedAois(): Promise<void> {
       rows: rows.map((r) => ({
         projectName: r.project_name,
         aoiStatus: r.aoi_status,
+        aoiStatusReason: r.aoi_status_reason,
+        previousAoiStatus: r.previous_aoi_status,
         poleCount: Number(r.pole_count),
         outlierPoleCount: Number(r.outlier_pole_count),
         aoiAreaM2: num(r.aoi_area_m2),
         robustAoiAreaM2: num(r.robust_aoi_area_m2),
         aoiAreaRatio: num(r.aoi_area_ratio),
         furthestOutlierM: num(r.furthest_outlier_m),
+        previousAoiAreaM2: num(r.previous_aoi_area_m2),
+        aoiGrowthRatio: num(r.aoi_growth_ratio),
       })),
       groupJid,
       send: sendWhatsAppGroup,

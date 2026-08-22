@@ -122,6 +122,25 @@ describe('db-health hosting the project AOI liveness check', () => {
     expect(captured.body.projectAoi).toMatchObject({ state: 'not_running' });
   });
 
+  it('does not let a hung WhatsApp bridge stall the probe past its cap', async () => {
+    // sendWhatsAppGroup carries its own 30 s abort and the handler awaits it,
+    // so without a local cap a hung bridge would stall a 60-second-cadence
+    // production endpoint for half the interval. The stub never settles; the
+    // handler must still return, well inside the poll interval.
+    stubPool({ computedAt: THREE_DAYS_AGO() });
+    (sendWhatsAppGroup as unknown as ReturnType<typeof vi.fn>)
+      .mockImplementationOnce(() => new Promise(() => undefined));
+
+    const started = Date.now();
+    const { res, captured } = mockRes();
+    await expect(handler(req, res)).resolves.not.toThrow();
+    const elapsed = Date.now() - started;
+
+    expect(elapsed).toBeLessThan(15_000);
+    expect(captured.status).toBe(200);
+    expect(captured.body.projectAoi).toMatchObject({ state: 'not_running' });
+  }, 20_000);
+
   it('skips the AOI check entirely when the database itself is down', async () => {
     // "The nightly refresh looks dead" is a misleading thing to say during a
     // database outage, and the probe would only fail the same way.

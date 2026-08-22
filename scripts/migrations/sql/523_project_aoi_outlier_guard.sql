@@ -23,7 +23,72 @@
 -- legitimately spread-out project. So: measure, persist, flag, and let a human
 -- fix the pole.
 --
--- THE OUTLIER RULE, AND THE DATA IT WAS CALIBRATED ON
+-- TWO INDEPENDENT SIGNALS, BECAUSE ONE HAS A STRUCTURAL BLIND SPOT
+--
+-- The first version of this guard derived its status from the outlier RATIO
+-- alone. An adversarial review measured what that actually tracks, and it is
+-- not distortion — it is the SPLIT of a project between two areas. Measured on
+-- 1,000-pole synthetic shapes (read-only, against the live database):
+--
+--   shape                                    outliers  full km²  ratio  verdict
+--   two genuine areas 8 km apart, 50/50            0     23.83   1.00   ok
+--   the same shape, 70/30                         22     23.98   1.03   ok
+--   the same shape, 90/10                         99     22.74   1.89   ALARM
+--   3 km cluster + 27 km feeder spur, 80/20       60    118.89   1.35   ALARM
+--   mid-import: 3 tight poles + 1 node 6 km out    1      0.12    n/a   ALARM
+--   pure linear run, 30 km                         0      1.12   1.00   ok
+--   pure linear run, 60 km                         0      2.20   1.00   ok
+--   the 2026-08-21 incident                        1    357.28  17.16   ALARM
+--
+-- The 50/50 and 90/10 rows are the tell: 23.83 km² and 22.74 km² are the same
+-- geometry, and the ratio rule called one clean and the other distorted. Worse,
+-- raising a false alarm needs a DENSITY GRADIENT — dense distribution plus a
+-- long feeder — which is precisely what real fibre topology looks like. A guard
+-- that cries wolf on real topology manufactures the muted channel it was
+-- written to prevent.
+--
+-- So the ratio signal is kept but DEMOTED: it can no longer raise `distorted`
+-- on its own. Two absolute signals were added, each with a different blind
+-- spot, and either one alone is enough to raise `distorted`:
+--
+--   S1 ABSOLUTE AREA — aoi_area_m2 > 150 km².
+--     What only S1 catches: a metro-sized hull with no outlier pole at all —
+--     the 50/50 split above, which the ratio rule structurally cannot see.
+--     Calibration: the largest live project is Mohadin at 9.72 km² (15x
+--     headroom) and the largest LEGITIMATE synthetic shape is the 27 km feeder
+--     spur at 118.89 km². The spur is the binding constraint, not the live
+--     data, and 150 km² clears it by only 1.26x while catching the incident's
+--     357.28 km² by 2.4x. That is thin, and it is thin for a real reason: hull
+--     area grows quadratically with extent, so a long feeder inflates it
+--     enormously while being operationally narrow (compare the 60 km linear
+--     run at 2.20 km²). RE-MEASURE THIS CONSTANT if a project with a feeder
+--     much beyond 27 km is onboarded — a 40 km spur would breach it.
+--
+--   S2 AREA GROWTH — the hull grew 5x or more since the previous refresh,
+--     floored at a previous area of 1 km² and a new area of 25 km².
+--     What only S2 catches: a distortion that stays under S1's cap. A pole
+--     misassigned 10 km out of a 2 km site takes the hull from ~4 km² to
+--     ~40 km² — invisible to S1, an 10x step to S2. Both floors exist to keep
+--     an import in progress quiet: early in a survey a hull legitimately
+--     multiplies from nothing, which is why no baseline means no signal.
+--     5x rather than 4x puts distance between this and a legitimate phase-two
+--     import, which can plausibly double or triple a hull in one night.
+--
+--   S3 OUTLIER RATIO — kept, persisted, queryable, and capped at `suspect`.
+--     There is NO threshold that separates a legitimate split from a real
+--     distortion, and the measurements say so directly. Splitting the same two
+--     genuine areas more unevenly RAISES the ratio: 90/10 measures 1.89, but
+--     99/1 measures 3.66, 95/5 measures 4.24 and 97/3 measures 4.33 — all above
+--     any cut-off worth setting, and all perfectly healthy. So the 2.0 constant
+--     below is not calibrated against anything; it only chooses which
+--     non-alerting label a row carries, and it is deliberately left at the
+--     simplest value rather than tuned to look principled. `suspect` never
+--     alerts. It is a record that the hull moved, for a human who goes looking.
+--
+-- Both absolute signals catch the 2026-08-21 incident independently: 357.28 km²
+-- is 2.4x S1, and 4.10 -> 357.28 km² is an 87x step against S2.
+--
+-- THE OUTLIER RULE ITSELF, AND THE DATA IT WAS CALIBRATED ON
 -- A pole is an outlier when it is BOTH:
 --   (a) further than OUTLIER_FLOOR_M (5 km) from the project's pole centroid, and
 --   (b) further than OUTLIER_K (8x) the project's MEDIAN pole-to-centroid distance.
@@ -72,7 +137,11 @@ ALTER TABLE project_aois
   ADD COLUMN IF NOT EXISTS aoi_area_ratio      numeric,
   ADD COLUMN IF NOT EXISTS outlier_pole_count  integer NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS furthest_outlier_m  numeric,
-  ADD COLUMN IF NOT EXISTS aoi_status          text    NOT NULL DEFAULT 'unassessed';
+  ADD COLUMN IF NOT EXISTS aoi_status          text    NOT NULL DEFAULT 'unassessed',
+  ADD COLUMN IF NOT EXISTS aoi_status_reason   text,
+  ADD COLUMN IF NOT EXISTS previous_aoi_area_m2 numeric,
+  ADD COLUMN IF NOT EXISTS previous_aoi_status  text,
+  ADD COLUMN IF NOT EXISTS aoi_growth_ratio     numeric;
 
 -- Named so a later widening is an ALTER, not a guess at an anonymous name.
 DO $$
@@ -94,8 +163,16 @@ COMMENT ON COLUMN project_aois.outlier_pole_count IS
   'Poles further than both 5 km and 8x the median pole-to-centroid distance. See the migration header for the calibration.';
 COMMENT ON COLUMN project_aois.furthest_outlier_m IS
   'Metres from the pole centroid to the furthest outlier. NULL when there are none.';
+COMMENT ON COLUMN project_aois.aoi_status_reason IS
+  'Which signal raised the status: absolute_area (S1), area_growth (S2), outlier_ratio or no_robust_hull (S3). NULL when ok. Kept so an alert can say WHY without re-deriving it.';
+COMMENT ON COLUMN project_aois.previous_aoi_area_m2 IS
+  'aoi_area_m2 as it stood before this refresh. NULL on a project''s first scored refresh, which is also what suppresses the growth signal during an import.';
+COMMENT ON COLUMN project_aois.previous_aoi_status IS
+  'aoi_status as it stood before this refresh. The nightly alerter fires only on a transition INTO an alerting state, so a distortion left unfixed does not message someone every night.';
+COMMENT ON COLUMN project_aois.aoi_growth_ratio IS
+  'aoi_area_m2 / previous_aoi_area_m2. NULL with no baseline. The 2026-08-21 incident would have measured 87.';
 COMMENT ON COLUMN project_aois.aoi_status IS
-  'ok = no outliers. suspect = outliers present but the hull is under 2x its robust area. distorted = 2x or more, or outliers exist and no robust hull is derivable. unassessed = never refreshed since this column was added.';
+  'distorted = an absolute signal fired (hull over 150 km², or a 5x jump since the last refresh) — this alerts. suspect = the outlier ratio moved but no absolute signal fired — recorded, queryable, does NOT alert. ok = neither. unassessed = never refreshed since this column was added.';
 
 -- Cheap for 9 rows today; present so an alerting query stays an index scan as
 -- the project count grows.
@@ -122,7 +199,15 @@ DECLARE
   -- tuning knob — re-measure before you touch them.
   outlier_k       CONSTANT float8 := 8.0;
   outlier_floor_m CONSTANT float8 := 5000.0;
-  distorted_ratio CONSTANT float8 := 2.0;
+  -- S3's threshold is NOT calibrated, and cannot be: see the header. It only
+  -- decides which non-alerting label a row carries.
+  suspect_ratio   CONSTANT float8 := 2.0;
+  -- S1: above every legitimate shape measured, below the incident. See header.
+  oversize_area_m2 CONSTANT float8 := 150e6;
+  -- S2 and its two floors. No baseline, or a hull still small, means no signal.
+  growth_factor        CONSTANT float8 := 5.0;
+  growth_min_prev_m2   CONSTANT float8 := 1e6;
+  growth_min_new_m2    CONSTANT float8 := 25e6;
 BEGIN
   WITH pts AS (
     SELECT p.project_id, p.longitude::float8 AS lon, p.latitude::float8 AS lat
@@ -177,13 +262,40 @@ BEGIN
       ST_Area(h.aoi) AS full_area,
       -- Two or fewer survivors give a line or a point, whose area is 0 and
       -- whose ratio would be a division by zero dressed up as an answer.
-      CASE WHEN h.kept_count >= 3 THEN ST_Area(h.robust_aoi) END AS robust_area
+      CASE WHEN h.kept_count >= 3 THEN ST_Area(h.robust_aoi) END AS robust_area,
+      -- The baseline for signal S2. A CTE reads the snapshot taken at statement
+      -- start, so this is the PREVIOUS refresh's value even though the same
+      -- statement is about to overwrite it. NULL for a project being scored for
+      -- the first time, which is exactly what keeps an import in progress quiet.
+      prev.aoi_area_m2::float8 AS prev_area,
+      prev.aoi_status AS prev_status
     FROM hulls h
+    LEFT JOIN project_aois prev ON prev.project_id = h.project_id
+  ), signalled AS (
+    SELECT
+      s.*,
+      -- S1: bigger than any legitimate fibre project shape measured.
+      (s.full_area > oversize_area_m2) AS sig_oversize,
+      -- S2: a step change against this project's own previous hull. Both floors
+      -- must clear, or an early import multiplying from nothing would trip it.
+      (s.prev_area IS NOT NULL
+        AND s.prev_area >= growth_min_prev_m2
+        AND s.full_area >= growth_min_new_m2
+        AND s.full_area >= growth_factor * s.prev_area) AS sig_growth,
+      -- S3, capped at `suspect`. Outliers with no derivable robust hull count
+      -- here too: we cannot show the hull is undistorted, but on its own that
+      -- is not evidence the geofence is wrong — the mid-import shape in the
+      -- header measured 0.12 km² and used to raise a full alarm.
+      (s.outlier_pole_count > 0
+        AND (s.robust_area IS NULL OR s.robust_area <= 0
+             OR s.full_area / s.robust_area >= suspect_ratio)) AS sig_ratio
+    FROM scored s
   ), upserted AS (
     INSERT INTO project_aois (
       project_id, aoi, pole_count, computed_at,
       aoi_area_m2, robust_aoi_area_m2, aoi_area_ratio,
-      outlier_pole_count, furthest_outlier_m, aoi_status
+      outlier_pole_count, furthest_outlier_m, aoi_status, aoi_status_reason,
+      previous_aoi_area_m2, previous_aoi_status, aoi_growth_ratio
     )
     SELECT
       s.project_id, s.aoi, s.pole_count, NOW(),
@@ -192,30 +304,40 @@ BEGIN
       CASE WHEN s.robust_area > 0 THEN ROUND((s.full_area / s.robust_area)::numeric, 3) END,
       s.outlier_pole_count,
       ROUND(s.furthest_outlier_m::numeric, 2),
+      -- Either absolute signal is sufficient for `distorted`; the ratio signal
+      -- alone never is. See the header for what each one uniquely catches.
       CASE
-        WHEN s.outlier_pole_count = 0 THEN 'ok'
-        -- Outliers exist and no robust hull is derivable: we cannot show the
-        -- hull is undistorted, so we do not get to call it clean. Bias to
-        -- shouting — a false alarm costs someone a look at a map, a miss costs
-        -- months of a metro-sized geofence.
-        WHEN s.robust_area IS NULL OR s.robust_area <= 0 THEN 'distorted'
-        WHEN s.full_area / s.robust_area >= distorted_ratio THEN 'distorted'
-        ELSE 'suspect'
-      END
-    FROM scored s
+        WHEN s.sig_oversize OR s.sig_growth THEN 'distorted'
+        WHEN s.sig_ratio THEN 'suspect'
+        ELSE 'ok'
+      END,
+      CASE
+        WHEN s.sig_oversize THEN 'absolute_area'
+        WHEN s.sig_growth THEN 'area_growth'
+        WHEN s.sig_ratio AND (s.robust_area IS NULL OR s.robust_area <= 0) THEN 'no_robust_hull'
+        WHEN s.sig_ratio THEN 'outlier_ratio'
+      END,
+      CASE WHEN s.prev_area IS NOT NULL THEN ROUND(s.prev_area::numeric, 2) END,
+      s.prev_status,
+      CASE WHEN s.prev_area > 0 THEN ROUND((s.full_area / s.prev_area)::numeric, 3) END
+    FROM signalled s
     -- A pole may reference a project row that no longer exists; the FK would
     -- abort the whole refresh over one orphan.
     JOIN projects pr ON pr.id = s.project_id
     ON CONFLICT (project_id) DO UPDATE
-      SET aoi                = EXCLUDED.aoi,
-          pole_count         = EXCLUDED.pole_count,
-          computed_at        = EXCLUDED.computed_at,
-          aoi_area_m2        = EXCLUDED.aoi_area_m2,
-          robust_aoi_area_m2 = EXCLUDED.robust_aoi_area_m2,
-          aoi_area_ratio     = EXCLUDED.aoi_area_ratio,
-          outlier_pole_count = EXCLUDED.outlier_pole_count,
-          furthest_outlier_m = EXCLUDED.furthest_outlier_m,
-          aoi_status         = EXCLUDED.aoi_status
+      SET aoi                  = EXCLUDED.aoi,
+          pole_count           = EXCLUDED.pole_count,
+          computed_at          = EXCLUDED.computed_at,
+          aoi_area_m2          = EXCLUDED.aoi_area_m2,
+          robust_aoi_area_m2   = EXCLUDED.robust_aoi_area_m2,
+          aoi_area_ratio       = EXCLUDED.aoi_area_ratio,
+          outlier_pole_count   = EXCLUDED.outlier_pole_count,
+          furthest_outlier_m   = EXCLUDED.furthest_outlier_m,
+          aoi_status           = EXCLUDED.aoi_status,
+          aoi_status_reason    = EXCLUDED.aoi_status_reason,
+          previous_aoi_area_m2 = EXCLUDED.previous_aoi_area_m2,
+          previous_aoi_status  = EXCLUDED.previous_aoi_status,
+          aoi_growth_ratio     = EXCLUDED.aoi_growth_ratio
     RETURNING project_id
   )
   SELECT COUNT(*) INTO n FROM upserted;

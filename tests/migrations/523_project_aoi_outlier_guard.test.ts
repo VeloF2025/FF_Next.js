@@ -110,12 +110,17 @@ interface AoiRow {
   outlier_pole_count: number;
   furthest_outlier_m: string | null;
   aoi_status: string;
+  aoi_status_reason: string | null;
+  previous_aoi_area_m2: string | null;
+  previous_aoi_status: string | null;
+  aoi_growth_ratio: string | null;
 }
 
 async function readAoi(projectId: string): Promise<AoiRow | undefined> {
   const r = await db.query<AoiRow>(
     `SELECT project_id::text, pole_count, aoi_area_m2, robust_aoi_area_m2, aoi_area_ratio,
-            outlier_pole_count, furthest_outlier_m, aoi_status
+            outlier_pole_count, furthest_outlier_m, aoi_status, aoi_status_reason,
+            previous_aoi_area_m2, previous_aoi_status, aoi_growth_ratio
        FROM project_aois WHERE project_id = $1`,
     [projectId],
   );
@@ -212,6 +217,9 @@ describe('migration 523 — project AOI outlier guard', () => {
       expect(row!.pole_count).toBe(2801);
       expect(row!.outlier_pole_count).toBe(1);
       expect(row!.aoi_status).toBe('distorted');
+      // Caught by the absolute-area signal (S1), not by the ratio — the ratio
+      // rule alone is no longer sufficient to raise an alarm.
+      expect(row!.aoi_status_reason).toBe('absolute_area');
       // 145 km, to within the flattening error of a pure-latitude offset.
       expect(Number(row!.furthest_outlier_m) / 1000).toBeGreaterThan(140);
       expect(Number(row!.furthest_outlier_m) / 1000).toBeLessThan(150);
@@ -256,18 +264,169 @@ describe('migration 523 — project AOI outlier guard', () => {
     });
   });
 
-  it('does NOT flag a genuinely spread-out project', async () => {
-    // 60 km across and nothing wrong with it. If the guard were "big project =
-    // alarm" this would fail — and a flagged wide project is exactly the
-    // pressure that leads someone to shrink a legitimate geofence.
-    await db.query(disc(WIDE, -29.0, 24.0, 60, 1200, 99));
+  it('does NOT flag a large but plausible project', async () => {
+    // A 6 km-radius site is ~113 km² — an order of magnitude bigger than
+    // Mohadin, the largest live project at 9.72 km², and still under the
+    // absolute cap. If the guard were "big project = alarm" this would fail,
+    // and a flagged wide project is exactly the pressure that leads someone to
+    // shrink a legitimate geofence.
+    await db.query(disc(WIDE, -29.0, 24.0, 6, 1200, 99));
     await applyBoth();
     const row = await readAoi(WIDE);
     expect(row!.outlier_pole_count).toBe(0);
     expect(row!.aoi_status).toBe('ok');
+    expect(row!.aoi_status_reason).toBeNull();
     expect(Number(row!.aoi_area_ratio)).toBe(1);
-    // Sanity: it really is a big area, ~4 orders of magnitude above a tight site.
-    expect(Number(row!.aoi_area_m2) / 1e6).toBeGreaterThan(5000);
+    expect(Number(row!.aoi_area_m2) / 1e6).toBeGreaterThan(50);
+    expect(Number(row!.aoi_area_m2) / 1e6).toBeLessThan(150);
+  });
+
+  it('catches a metro-sized hull that contains no outlier pole at all', async () => {
+    // This is what ONLY the absolute signal can see. Every pole is uniformly
+    // spread, so no pole is anomalous relative to the others and the ratio is
+    // exactly 1.000 — the structural blind spot that let a 50/50 split read as
+    // clean while a 90/10 split of the same geometry read as distorted.
+    await db.query(disc(WIDE, -29.0, 24.0, 60, 1200, 99));
+    await applyBoth();
+    const row = await readAoi(WIDE);
+    expect(row!.outlier_pole_count).toBe(0);
+    expect(Number(row!.aoi_area_ratio)).toBe(1);
+    expect(row!.aoi_status).toBe('distorted');
+    expect(row!.aoi_status_reason).toBe('absolute_area');
+  });
+
+  it('leaves a 90/10 two-area split alone', async () => {
+    // The adversarial finding, to shape: two genuine work areas 8 km apart with
+    // a density gradient between them. The ratio rule called this distorted;
+    // the geometry is ~23 km² and identical to a 50/50 split it called clean.
+    await db.query(disc(WIDE, -29.0, 24.0, 1.2, 900, 5));
+    await db.query(disc(WIDE, -29.0, 24.0 + 8 / (111.32 * Math.cos((-29 * Math.PI) / 180)), 1.2, 100, 6));
+    await applyBoth();
+    const row = await readAoi(WIDE);
+    expect(row!.aoi_status).toBe('ok');
+    expect(row!.aoi_status_reason).toBeNull();
+  });
+
+  it('leaves a dense cluster with a long feeder spur alone', async () => {
+    // Dense distribution plus a 27 km feeder is what real fibre topology looks
+    // like. It measures ~119 km² — the binding constraint under the absolute
+    // cap, and the reason that cap is 150 km² rather than 25.
+    await db.query(disc(WIDE, -29.0, 24.0, 3, 800, 13));
+    const spur = Array.from({ length: 200 }, (_, i) => {
+      const km = 27 * ((i + 1) / 200);
+      return `('spur-${i}', '${WIDE}', ${(-29.0 + km * DEG_PER_KM_LAT * 0.6).toFixed(8)}, ${(24.0 + (km * DEG_PER_KM_LAT * 0.8) / Math.cos((-29 * Math.PI) / 180)).toFixed(8)})`;
+    });
+    await db.query(`INSERT INTO poles (pole_number, project_id, latitude, longitude) VALUES ${spur.join(',')}`);
+    await applyBoth();
+    const row = await readAoi(WIDE);
+    expect(Number(row!.aoi_area_m2) / 1e6).toBeGreaterThan(50);
+    expect(row!.aoi_status).toBe('ok');
+  });
+
+  it('catches a hull that steps up against its own previous refresh', async () => {
+    // What ONLY the growth signal can see: the hull ends up at ~113 km², under
+    // the absolute cap, with zero outlier poles — invisible to both other
+    // signals. The trade is stated in the migration header: a legitimate
+    // phase-two import that takes a project past 25 km² AND multiplies it 5x
+    // will also land here. No live project is within 2.5x of that floor.
+    await db.query(disc(WIDE, -29.0, 24.0, 2, 600, 21));
+    await applyBoth();
+    const before = await readAoi(WIDE);
+    expect(before!.aoi_status).toBe('ok');
+    expect(before!.previous_aoi_area_m2).toBeNull(); // no baseline on first scoring
+    expect(before!.aoi_growth_ratio).toBeNull();
+
+    await db.query(disc(WIDE, -29.0, 24.0, 6, 600, 22));
+    await db.query('SELECT refresh_project_aois()');
+    const after = await readAoi(WIDE);
+    expect(after!.outlier_pole_count).toBe(0);
+    expect(Number(after!.aoi_area_ratio)).toBe(1);
+    expect(Number(after!.aoi_area_m2) / 1e6).toBeLessThan(150);
+    expect(after!.aoi_status).toBe('distorted');
+    expect(after!.aoi_status_reason).toBe('area_growth');
+    expect(Number(after!.aoi_growth_ratio)).toBeGreaterThan(5);
+    expect(after!.previous_aoi_status).toBe('ok');
+  });
+
+  it('records a 99/1 two-area split as suspect and never as distorted', async () => {
+    // The ratio signal genuinely trips here — 99/1 measures ~3.7 — and this is
+    // a healthy project with two work areas. No ratio cut-off separates it from
+    // a real distortion (tighter splits score HIGHER), which is exactly why the
+    // ratio can never raise an alarm on its own.
+    await db.query(disc(WIDE, -29.0, 24.0, 1.2, 990, 31));
+    await db.query(disc(WIDE, -29.0, 24.0 + 8 / (111.32 * Math.cos((-29 * Math.PI) / 180)), 0.3, 10, 32));
+    await applyBoth();
+    const row = await readAoi(WIDE);
+    expect(row!.outlier_pole_count).toBeGreaterThan(0);
+    expect(Number(row!.aoi_area_ratio)).toBeGreaterThan(2);
+    expect(row!.aoi_status).toBe('suspect');
+    expect(row!.aoi_status_reason).toBe('outlier_ratio');
+  });
+
+  it('does not fire the growth signal while the previous hull is still tiny', async () => {
+    // An import in progress: the hull multiplies 60x, but off a 0.5 km² base.
+    // Early in a survey a hull legitimately explodes from nothing every night.
+    await db.query(disc(WIDE, -29.0, 24.0, 0.4, 200, 41));
+    await applyBoth();
+    const before = await readAoi(WIDE);
+    expect(Number(before!.aoi_area_m2)).toBeLessThan(1_000_000); // under the 1 km² baseline floor
+
+    await db.query(disc(WIDE, -29.0, 24.0, 3.1, 600, 42));
+    await db.query('SELECT refresh_project_aois()');
+    const after = await readAoi(WIDE);
+    expect(Number(after!.aoi_area_m2)).toBeGreaterThan(25_000_000); // clears the new-area floor
+    expect(Number(after!.aoi_growth_ratio)).toBeGreaterThan(5);     // and the multiple
+    expect(after!.aoi_status).toBe('ok');                           // but the baseline floor holds
+  });
+
+  it('does not fire the growth signal while the hull is still smaller than any real project', async () => {
+    // 3 km² to 20 km² is a 6.7x step, but 20 km² is only twice Mohadin. Growth
+    // only means something once a project is larger than anything we have ever
+    // had; below that it is a survey filling in.
+    await db.query(disc(WIDE, -29.0, 24.0, 0.98, 400, 51));
+    await applyBoth();
+    const before = await readAoi(WIDE);
+    expect(Number(before!.aoi_area_m2)).toBeGreaterThan(1_000_000); // clears the baseline floor
+
+    await db.query(disc(WIDE, -29.0, 24.0, 2.52, 600, 52));
+    await db.query('SELECT refresh_project_aois()');
+    const after = await readAoi(WIDE);
+    expect(Number(after!.aoi_area_m2)).toBeLessThan(25_000_000);  // under the new-area floor
+    expect(Number(after!.aoi_growth_ratio)).toBeGreaterThan(5);   // despite the multiple
+    expect(after!.aoi_status).toBe('ok');
+  });
+
+  it('tolerates a 3x step above both floors, which is a deliberate blind spot', async () => {
+    // 30 km² to ~90 km² clears both floors and is still called ok, because the
+    // multiple is 5x. That margin exists so a legitimate phase-two import does
+    // not page anyone — and it is a real blind spot, stated rather than hidden:
+    // a distortion that lands between 3x and 5x on an already-large project
+    // slips past S2, and past S1 too while it stays under 150 km². The 5.0 is a
+    // judgement, not a measurement; this migration starts collecting the
+    // aoi_growth_ratio history needed to replace it with one.
+    await db.query(disc(WIDE, -29.0, 24.0, 3.09, 500, 61));
+    await applyBoth();
+    const before = await readAoi(WIDE);
+    expect(Number(before!.aoi_area_m2)).toBeGreaterThan(25_000_000);
+
+    await db.query(disc(WIDE, -29.0, 24.0, 5.35, 600, 62));
+    await db.query('SELECT refresh_project_aois()');
+    const after = await readAoi(WIDE);
+    const growth = Number(after!.aoi_growth_ratio);
+    expect(growth).toBeGreaterThan(2);
+    expect(growth).toBeLessThan(5);
+    expect(Number(after!.aoi_area_m2)).toBeLessThan(150_000_000); // not S1 keeping it quiet
+    expect(after!.aoi_status).toBe('ok');
+  });
+
+  it('does not fire the growth signal without a baseline', async () => {
+    // An import in progress multiplies a hull from nothing every night. No
+    // previous row means no signal, full stop.
+    await db.query(disc(WIDE, -29.0, 24.0, 6, 600, 23));
+    await applyBoth();
+    const row = await readAoi(WIDE);
+    expect(row!.previous_aoi_area_m2).toBeNull();
+    expect(row!.aoi_status).toBe('ok');
   });
 
   it('reports a clean tight site as ok with a ratio of exactly 1', async () => {
@@ -295,19 +454,24 @@ describe('migration 523 — project AOI outlier guard', () => {
     expect(row!.aoi_status).toBe('ok');
   });
 
-  it('calls a project distorted when the outlier leaves too few poles to prove otherwise', async () => {
-    // Two poles survive, so no robust hull exists. "Cannot show it is clean" is
-    // not "is clean": the status must shout, not fall back to ok.
+  it('records a mid-import shape as suspect rather than raising an alarm', async () => {
+    // Three tight poles plus one legitimate node 6 km away, part-way through an
+    // import. No robust hull is derivable, so the ratio signal has nothing to
+    // measure — but at 0.12 km² this hull is not a distorted geofence, it is an
+    // unfinished one. It used to raise a full alarm; now it is recorded and
+    // stays quiet.
     await db.query(`INSERT INTO poles (pole_number, project_id, latitude, longitude) VALUES
       ('TNY-1','${TINY}', -26.02000000, 28.24000000),
       ('TNY-2','${TINY}', -26.02010000, 28.24010000)`);
-    await db.query(farPole(TINY, -26.0201, 28.24, INCIDENT_OUTLIER_KM, 'TNY-far'));
+    await db.query(farPole(TINY, -26.0201, 28.24, 6, 'TNY-node'));
     await applyBoth();
     const row = await readAoi(TINY);
     expect(row!.outlier_pole_count).toBe(1);
     expect(row!.robust_aoi_area_m2).toBeNull();
     expect(row!.aoi_area_ratio).toBeNull();
-    expect(row!.aoi_status).toBe('distorted');
+    expect(row!.aoi_status).toBe('suspect');
+    expect(row!.aoi_status_reason).toBe('no_robust_hull');
+    expect(Number(row!.aoi_area_m2) / 1e6).toBeLessThan(1);
   });
 
   it('still excludes NaN and out-of-bounds coordinates from the scoring', async () => {

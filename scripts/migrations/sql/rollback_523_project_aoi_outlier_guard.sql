@@ -22,7 +22,11 @@ ALTER TABLE project_aois
   DROP COLUMN IF EXISTS aoi_area_ratio,
   DROP COLUMN IF EXISTS outlier_pole_count,
   DROP COLUMN IF EXISTS furthest_outlier_m,
-  DROP COLUMN IF EXISTS aoi_status;
+  DROP COLUMN IF EXISTS aoi_status,
+  DROP COLUMN IF EXISTS aoi_status_reason,
+  DROP COLUMN IF EXISTS previous_aoi_area_m2,
+  DROP COLUMN IF EXISTS previous_aoi_status,
+  DROP COLUMN IF EXISTS aoi_growth_ratio;
 
 CREATE OR REPLACE FUNCTION refresh_project_aois()
 RETURNS integer

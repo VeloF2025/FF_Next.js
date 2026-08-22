@@ -33,48 +33,85 @@ export interface ProjectAoiHealthRow {
   projectName: string | null;
   /** 'ok' | 'suspect' | 'distorted' | 'unassessed' — see migration 523. */
   aoiStatus: string;
+  /** Which signal raised it: absolute_area | area_growth | outlier_ratio | no_robust_hull. */
+  aoiStatusReason: string | null;
+  /** aoi_status as of the PREVIOUS refresh. NULL on a project's first scoring. */
+  previousAoiStatus: string | null;
   poleCount: number;
   outlierPoleCount: number;
   aoiAreaM2: number | null;
   robustAoiAreaM2: number | null;
   aoiAreaRatio: number | null;
   furthestOutlierM: number | null;
+  previousAoiAreaM2: number | null;
+  aoiGrowthRatio: number | null;
 }
+
+const ALERTING_STATUS = 'distorted';
 
 /**
  * Pure predicate. Returns the rows that warrant an alert; an empty array means
- * everything is clean.
+ * nothing changed for the worse.
  *
- * Any outlier pole at all qualifies, not only a `distorted` hull. A pole more
- * than 5 km AND more than 8x the median distance from its project's centroid is
- * already a data error worth a human look, even when it happens not to have
- * moved the hull much — and under-alerting is the failure this guard exists to
- * end.
+ * TWO deliberate narrowings from the first version, both to stop this becoming
+ * a nightly message nobody reads:
  *
- * `unassessed` also qualifies. Migration 523's refresh writes a real status to
- * every row it touches, so a row still carrying the column default after a
- * refresh means the refresh did not reach it — a silent scoring gap, which is
- * exactly the shape of the original incident.
+ * 1. Only `distorted` qualifies. `suspect` records that the outlier ratio moved
+ *    without an absolute signal behind it — and an adversarial review measured
+ *    that the ratio tracks how a project is SPLIT between two work areas, not
+ *    how distorted it is. A dense cluster with a long feeder, or a 90/10 split
+ *    of two genuine areas, would have alerted every single night. Chronic false
+ *    alarms manufacture the muted channel this guard exists to prevent.
+ *
+ * 2. Only a TRANSITION into `distorted` qualifies. This cron runs nightly and
+ *    has no memory between runs, so `previous_aoi_status` — written by the same
+ *    refresh from the pre-update snapshot — is the dedupe. A distortion left
+ *    unfixed stays visible in `project_aois`; it does not message someone again
+ *    every night until they fix it.
+ *
+ * A project with no previous status has never been scored, so a brand-new
+ * project that arrives already distorted still alerts.
+ *
+ * `unassessed` is deliberately NOT handled here. A row the refresh never
+ * touched has no previous status either, so this path could not dedupe it and
+ * would alert nightly. That condition belongs to the liveness check in
+ * `/api/cron/db-health`, which watches it from outside this cron and has its
+ * own cooldown — see `./projectAoiStaleness`.
  */
 export function shouldAlert(rows: readonly ProjectAoiHealthRow[]): ProjectAoiHealthRow[] {
-  return rows.filter((r) => r.outlierPoleCount > 0 || r.aoiStatus === 'unassessed');
+  return rows.filter(
+    (r) => r.aoiStatus === ALERTING_STATUS && r.previousAoiStatus !== ALERTING_STATUS,
+  );
 }
 
 function km2(areaM2: number | null): string {
   return areaM2 === null ? '?' : `${(areaM2 / 1e6).toFixed(2)} km²`;
 }
 
+const REASON_TEXT: Record<string, string> = {
+  absolute_area: 'the hull is larger than any real project site',
+  area_growth: 'the hull jumped against its own previous refresh',
+  outlier_ratio: 'outlier poles moved the hull',
+  no_robust_hull: 'too few poles left to check the hull against',
+};
+
 function describe(row: ProjectAoiHealthRow): string {
   const name = row.projectName ?? 'Unknown project';
-  if (row.aoiStatus === 'unassessed') {
-    return `• ${name}: not scored by the last refresh — check the AOI cron`;
+  const why = REASON_TEXT[row.aoiStatusReason ?? ''] ?? 'flagged';
+  const parts = [`• ${name} — ${why}.`, `Geofence now ${km2(row.aoiAreaM2)}`];
+  if (row.aoiStatusReason === 'area_growth' && row.previousAoiAreaM2 !== null) {
+    parts.push(
+      `, up from ${km2(row.previousAoiAreaM2)}` +
+        (row.aoiGrowthRatio === null ? '' : ` (${row.aoiGrowthRatio.toFixed(1)}x)`),
+    );
+  } else if (row.robustAoiAreaM2 !== null) {
+    parts.push(` vs ${km2(row.robustAoiAreaM2)} without its outlier poles`);
   }
-  const ratio = row.aoiAreaRatio === null ? 'no robust hull' : `${row.aoiAreaRatio.toFixed(1)}x`;
-  const furthest = row.furthestOutlierM === null ? '?' : `${(row.furthestOutlierM / 1000).toFixed(1)} km`;
-  return (
-    `• ${name} [${row.aoiStatus}]: ${row.outlierPoleCount} of ${row.poleCount} pole(s) out of place, ` +
-    `furthest ${furthest}. Geofence ${km2(row.aoiAreaM2)} vs ${km2(row.robustAoiAreaM2)} without them (${ratio}).`
-  );
+  if (row.outlierPoleCount > 0) {
+    const furthest = row.furthestOutlierM === null ? '?' : `${(row.furthestOutlierM / 1000).toFixed(1)} km`;
+    parts.push(`. ${row.outlierPoleCount} of ${row.poleCount} pole(s) out of place, furthest ${furthest}`);
+  }
+  return `${parts.join('')}.`;
 }
 
 /**
@@ -90,7 +127,7 @@ function describe(row: ProjectAoiHealthRow): string {
 export function buildAlertMessage(flagged: readonly ProjectAoiHealthRow[], totalProjects: number): string {
   const lines: string[] = [];
   lines.push('*Project AOI check — attention needed*');
-  lines.push(`${flagged.length} of ${totalProjects} project AOI(s) look distorted.`);
+  lines.push(`${flagged.length} of ${totalProjects} project AOI(s) newly look distorted.`);
   lines.push('');
   for (const row of flagged) lines.push(describe(row));
   lines.push('');
@@ -110,7 +147,9 @@ export async function sendProjectAoiDistortionAlert(args: {
 }): Promise<{ alerted: boolean; flagged: ProjectAoiHealthRow[] }> {
   const flagged = shouldAlert(args.rows);
   if (flagged.length === 0) {
-    args.logger.info(`[project-aoi-refresh] no WA alert — all ${args.rows.length} AOI(s) clean`);
+    args.logger.info(
+      `[project-aoi-refresh] no WA alert — no new distortion across ${args.rows.length} AOI(s)`,
+    );
     return { alerted: false, flagged: [] };
   }
   const message = buildAlertMessage(flagged, args.rows.length);
