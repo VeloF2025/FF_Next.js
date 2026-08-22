@@ -14,5 +14,7 @@ export async function storeRun(r: RunResult): Promise<number> {
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
     [r.mode, r.model, r.gitSha, r.status, r.startedAt, JSON.stringify(summaries), null],
   )) as Array<{ id: number }>;
-  return rows[0].id;
+  const first = rows[0];
+  if (!first) throw new Error('vlm_bench_runs INSERT returned no id');
+  return first.id;
 }
