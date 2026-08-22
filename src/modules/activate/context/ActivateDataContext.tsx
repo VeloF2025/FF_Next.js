@@ -239,7 +239,9 @@ export function ActivateDataProvider({
     const term = filters.searchTerm.toLowerCase();
     return (
       drop.dropNumber.toLowerCase().includes(term) ||
-      drop.project?.toLowerCase().includes(term)
+      drop.project?.toLowerCase().includes(term) ||
+      drop.ontSerial?.toLowerCase().includes(term) ||
+      drop.upsSerial?.toLowerCase().includes(term)
     );
   });
 

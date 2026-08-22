@@ -9,6 +9,7 @@
 
 import pool from '@/lib/db';
 import { DropsFilters, Summary } from './types';
+import { unifiedSearchCondition } from './dropSearchCondition';
 
 /**
  * Projects that never belong on the Activate dashboard: marketing traffic, and
@@ -146,9 +147,7 @@ export function buildUnifiedConditions(
     paramIndex++;
   }
   if (filters?.search) {
-    conditions.push(
-      `(${dropNumberCol} ILIKE $${paramIndex} OR ${projectCol} ILIKE $${paramIndex})`
-    );
+    conditions.push(unifiedSearchCondition(`$${paramIndex}`, dropNumberCol, projectCol));
     params.push(`%${filters.search}%`);
     paramIndex++;
   }
@@ -186,7 +185,9 @@ export async function calculateSummary(filters?: DropsFilters): Promise<Summary>
     sumNextParam++;
   }
   if (filters?.search) {
-    sumSearchCond = `AND (oes.drop_number ILIKE $${sumNextParam} OR COALESCE(upr.project, p.project_name) ILIKE $${sumNextParam})`;
+    sumSearchCond =
+      `AND (${unifiedSearchCondition(`$${sumNextParam}`, 'oes.drop_number', 'COALESCE(upr.project, p.project_name)', 'upr.')}` +
+      ` OR oes.serial_number ILIKE $${sumNextParam})`;
     activatedParams.push(`%${filters.search}%`);
     sumNextParam++;
   }

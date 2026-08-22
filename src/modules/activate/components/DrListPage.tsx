@@ -464,7 +464,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                       type="text"
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
-                      placeholder="Search drop number or project..."
+                      placeholder="Search DR, project, ONT or Gizzu serial..."
                       className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:ring-2 focus:ring-[var(--ff-primary-500)] focus:border-transparent"
                     />
                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[var(--ff-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

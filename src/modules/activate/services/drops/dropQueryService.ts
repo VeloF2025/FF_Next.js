@@ -11,6 +11,7 @@ import pool from '@/lib/db';
 import { DropsFilters, PaginatedDropsResult, UnifiedDrop } from './types';
 import { transformDropRow } from './dropTransformService';
 import { unifiedEligibilityCondition, excludedProjectsCondition } from './dropStatsService';
+import { unifiedSearchCondition } from './dropSearchCondition';
 
 /** Builds the WHERE conditions and param list from the shared filter shape. */
 function buildWhereConditions(filters?: DropsFilters): {
@@ -28,7 +29,7 @@ function buildWhereConditions(filters?: DropsFilters): {
   conditions.push(excludedProjectsCondition('u.project'));
 
   if (filters?.search) {
-    conditions.push(`(u.drop_number ILIKE $${paramIndex} OR u.project ILIKE $${paramIndex})`);
+    conditions.push(unifiedSearchCondition(`$${paramIndex}`, 'u.drop_number', 'u.project', 'u.'));
     params.push(`%${filters.search}%`);
     paramIndex++;
   }
