@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { Pool } from 'pg';
+import { startTestContainer } from '../../support/startTestContainer';
 
 /**
  * An EPHEMERAL port, not the fixed 55432 this used to publish.
@@ -80,7 +81,9 @@ async function startContainerAndSeed() {
   // is not registered on this machine; standalone v2.32.0 is installed.
   // `docker run`, not compose: compose pins the published port in the YAML,
   // which is the thing that has to vary.
-  execFileSync('docker', [
+  // Retried: Docker's random host port can collide at bind time. See
+  // tests/support/startTestContainer.ts.
+  startTestContainer(CONTAINER, [
     'run', '--rm', '-d', '--name', CONTAINER,
     '--label', 'ff-db-tests',
     '--label', `ff-db-tests-run=${RUN_ID}`,
@@ -90,7 +93,7 @@ async function startContainerAndSeed() {
     '-p', '127.0.0.1::5432',
     '--tmpfs', '/var/lib/postgresql/data',
     'postgres:15-alpine',
-  ], { stdio: 'ignore' });
+  ], () => spawnSync('docker', ['rm', '-f', CONTAINER], { stdio: 'ignore' }));
   started = true;
 
   const binding = execFileSync('docker', ['port', CONTAINER, '5432/tcp'],
