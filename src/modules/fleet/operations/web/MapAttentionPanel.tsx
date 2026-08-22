@@ -60,7 +60,7 @@ function AttentionRows({ items, selectedStaffId, onFocusStaff, filters }: {
           aria-pressed={item.row.staffId === selectedStaffId} onClick={() => onFocusStaff(item.row.staffId)}
           className="min-w-0 flex-1 text-left focus:outline-none focus:ring-2 focus:ring-blue-500">
           <span className="font-medium">{item.row.staffName}</span>
-          <span className="ml-2 rounded bg-gray-100 px-2 py-1 text-xs">{STATUS_LABELS[item.row.status]}</span>
+          <span className="ml-2 rounded bg-secondary text-secondary-foreground px-2 py-1 text-xs">{STATUS_LABELS[item.row.status]}</span>
           <EvidenceText item={item} />
         </button>
         {href && <Link href={href} aria-label={`View incidents for ${item.row.staffName}`} className="shrink-0 rounded border px-2 py-1 text-xs">Incidents</Link>}
@@ -106,17 +106,17 @@ export function MapAttentionPanel({
   return (
     <>
       <div data-testid="map-attention-desktop" className="absolute right-3 top-3 z-[500] hidden max-h-[calc(100%-1.5rem)] w-80 lg:block">
-        {desktopExpanded ? <aside aria-label="Map attention" className="flex max-h-full flex-col rounded-lg border bg-white shadow-lg">
+        {desktopExpanded ? <aside aria-label="Map attention" className="flex max-h-full flex-col rounded-lg border bg-card shadow-lg">
           <div className="flex items-center justify-between border-b p-3"><strong>Needs attention ({attention.length})</strong>
             <button type="button" aria-expanded="true" aria-label="Collapse attention panel"
               onClick={() => setDesktopExpanded(false)}>Collapse</button></div>
           {isTruncated && truncated && <TruncationNotice truncated={truncated} />}
           <AttentionRows items={attention} selectedStaffId={selectedStaffId} onFocusStaff={onFocusStaff} filters={filters} />
         </aside> : <button type="button" aria-expanded="false" aria-label="Expand attention panel"
-          onClick={() => setDesktopExpanded(true)} className="rounded border bg-white px-3 py-2 shadow">Attention ({attention.length})</button>}
+          onClick={() => setDesktopExpanded(true)} className="rounded border bg-card px-3 py-2 shadow">Attention ({attention.length})</button>}
       </div>
       <div data-testid="map-attention-mobile" className="absolute inset-x-3 bottom-3 z-[500] lg:hidden">
-        <section aria-label="Mobile map attention" className="rounded-t-lg border bg-white shadow-lg">
+        <section aria-label="Mobile map attention" className="rounded-t-lg border bg-card shadow-lg">
           <button type="button" aria-expanded={mobileExpanded}
             aria-label={`${mobileExpanded ? 'Collapse' : 'Expand'} mobile attention sheet`}
             onClick={() => setMobileExpanded((value) => !value)} className="w-full p-3 text-left font-medium">
