@@ -50,10 +50,16 @@
 -- ADD COLUMN IF NOT EXISTS, and both constraints are added only when absent, so
 -- the file is safe to re-run.
 
+-- exit_reason_by carries the FK every other `_by UUID` column in this schema
+-- carries (26 of them reference users(id)). ON DELETE SET NULL rather than
+-- RESTRICT: who classified a pre-provision must not be a reason a user row
+-- cannot be removed, and losing the attribution is preferable to blocking a
+-- POPIA erasure. The reason and its timestamp survive regardless — the coherence
+-- constraint deliberately binds only those two, not the author.
 ALTER TABLE oes_pp_data
   ADD COLUMN IF NOT EXISTS exit_reason     TEXT,
   ADD COLUMN IF NOT EXISTS exit_reason_at  TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS exit_reason_by  UUID;
+  ADD COLUMN IF NOT EXISTS exit_reason_by  UUID REFERENCES users(id) ON DELETE SET NULL;
 
 -- Membership. Kept as a CHECK rather than an enum type: adding a value later is
 -- a constraint swap inside one transaction, where ALTER TYPE ADD VALUE has

@@ -85,9 +85,12 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
     ] = await Promise.all([
 
       pool.query<CountsRow>(
-        `SELECT COUNT(*) FILTER (WHERE resolution_status != 'activated') AS total,
-           COUNT(*) FILTER (WHERE resolution_status = 'not_found' AND maintenance_ticket_id IS NULL) AS open,
-           COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL AND resolution_status != 'activated') AS ticketed,
+        // The OPEN counts exclude classified rows (migration 524); `resolved` does
+        // NOT, because a row that exited and later activated is genuinely resolved
+        // and a shared WHERE would drop it from that count too.
+        `SELECT COUNT(*) FILTER (WHERE resolution_status != 'activated' AND exit_reason IS NULL) AS total,
+           COUNT(*) FILTER (WHERE resolution_status = 'not_found' AND maintenance_ticket_id IS NULL AND exit_reason IS NULL) AS open,
+           COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL AND resolution_status != 'activated' AND exit_reason IS NULL) AS ticketed,
            COUNT(*) FILTER (WHERE resolution_status = 'activated') AS resolved
          FROM oes_pp_data ${ppWhere}`,
         ppP,
@@ -136,9 +139,9 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
 
       pool.query<ProjCountsRow>(
         `SELECT project,
-           COUNT(*) FILTER (WHERE resolution_status != 'activated') AS total,
-           COUNT(*) FILTER (WHERE resolution_status = 'not_found' AND maintenance_ticket_id IS NULL) AS open,
-           COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL AND resolution_status != 'activated') AS ticketed,
+           COUNT(*) FILTER (WHERE resolution_status != 'activated' AND exit_reason IS NULL) AS total,
+           COUNT(*) FILTER (WHERE resolution_status = 'not_found' AND maintenance_ticket_id IS NULL AND exit_reason IS NULL) AS open,
+           COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL AND resolution_status != 'activated' AND exit_reason IS NULL) AS ticketed,
            COUNT(*) FILTER (WHERE resolution_status = 'activated') AS resolved
          FROM oes_pp_data ${ppWhere} GROUP BY project ORDER BY project`,
         ppP,

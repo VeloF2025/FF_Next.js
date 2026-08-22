@@ -206,7 +206,9 @@ async function getProjectStatus(
     `SELECT COUNT(*) AS count
      FROM oes_pp_data
      WHERE project ILIKE $1
-       AND resolution_status != 'activated'`,
+       AND resolution_status != 'activated'
+       -- a classified pre-provision has left the list (migration 524)
+       AND exit_reason IS NULL`,
     [project]
   );
   const ppOutstanding = parseInt(ppResult.rows[0]?.count ?? '0', 10);

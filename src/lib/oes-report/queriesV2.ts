@@ -99,6 +99,9 @@ export async function loadPpNotFoundRows(): Promise<NotFoundRow[]> {
       ON p.project = lb.project AND p.import_batch_id = lb.bid
     WHERE p.resolution_status = 'not_found'
       AND p.linked_via = '{}'
+      -- Residual = still unaccounted for. A dispositioned row IS accounted for,
+      -- so it is no longer residual (migration 524).
+      AND p.exit_reason IS NULL
     ORDER BY p.project NULLS LAST, p.date_registered NULLS LAST, p.serial_number
   `);
   return result.rows;

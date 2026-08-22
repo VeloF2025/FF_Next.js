@@ -24,6 +24,12 @@ const db = new Pool({ connectionString: SCOPED_URL, ssl: false, max: 1 });
 // express a non-activation exit — a fixture without that constraint would let a
 // wrong design pass.
 const PREREQUISITE = `
+  -- exit_reason_by FKs to users(id), so the fixture needs the referenced table.
+  -- Only the referenced column is modelled: a wider hand-rolled users table would
+  -- drift from production without the FK caring.
+  CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  );
   CREATE TABLE oes_pp_data (
     id                    SERIAL PRIMARY KEY,
     serial_number         TEXT NOT NULL,
@@ -141,6 +147,39 @@ describe('524 — PP exit reason', () => {
     await expect(
       db.query(`UPDATE oes_pp_data SET activated_at = now() WHERE id = $1`, [id]),
     ).resolves.toBeTruthy();
+  });
+
+  it('attributes the exit to a real user, and survives that user being erased', async () => {
+    // Every other `_by UUID` column in this schema FKs to users(id). ON DELETE
+    // SET NULL, not RESTRICT: who classified a row must never be a reason a
+    // POPIA erasure cannot proceed, and the reason itself outlives the author.
+    const { rows: u } = await db.query<{ id: string }>(
+      `INSERT INTO users DEFAULT VALUES RETURNING id`,
+    );
+    const userId = u[0].id;
+    const id = await seedOpenRow();
+
+    await expect(
+      db.query(
+        `UPDATE oes_pp_data SET exit_reason = 'no_access', exit_reason_at = now(),
+                exit_reason_by = '00000000-0000-4000-8000-000000000000' WHERE id = $1`,
+        [id],
+      ),
+    ).rejects.toThrow(/foreign key|violates/i);
+
+    await db.query(
+      `UPDATE oes_pp_data SET exit_reason = 'no_access', exit_reason_at = now(),
+              exit_reason_by = $2 WHERE id = $1`,
+      [id, userId],
+    );
+    await db.query(`DELETE FROM users WHERE id = $1`, [userId]);
+
+    const { rows } = await db.query<{ exit_reason: string; exit_reason_by: string | null }>(
+      `SELECT exit_reason, exit_reason_by FROM oes_pp_data WHERE id = $1`,
+      [id],
+    );
+    expect(rows[0].exit_reason).toBe('no_access');
+    expect(rows[0].exit_reason_by).toBeNull();
   });
 
   it('is re-runnable, and the rollback is too', async () => {

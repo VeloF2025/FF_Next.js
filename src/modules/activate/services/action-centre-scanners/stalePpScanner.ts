@@ -58,6 +58,11 @@ export async function scanStalePp(
               FLOOR(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400)::int AS age_days
          FROM oes_pp_data
         WHERE (resolution_status IS NULL OR resolution_status <> 'activated')
+          -- A classified pre-provision has left the list (migration 524). Without
+          -- this the scanner keeps raising stale-PP alerts for rows an operator
+          -- has already dispositioned, which is the fastest way to make the alert
+          -- ignored entirely.
+          AND exit_reason IS NULL
           AND created_at < NOW() - ($1 || ' days')::interval
         ORDER BY created_at ASC`,
       [staleDays],

@@ -211,18 +211,14 @@ export function ItemsTab() {
                     <div className="flex-shrink-0">
                       <PpExitReasonSelect
                         id={item.sourceId}
-                        onExited={(id) => {
-                          // Drop it locally rather than refetching: the row no
-                          // longer matches the query, so a refetch would return
-                          // the same list minus this row at the cost of a round
-                          // trip and a visible flicker.
-                          setItems((prev) =>
-                            prev.filter(
-                              (i) => !(i.source === 'pre_prov' && i.sourceId === id),
-                            ),
-                          );
-                          setCount((c) => Math.max(0, c - 1));
-                        }}
+                        // The row is NOT removed here. It stays, showing its new
+                        // state with an Undo, until the next refetch drops it —
+                        // that window is the only chance anyone has to notice a
+                        // mis-click, and the row is gone from every other screen
+                        // the moment the write lands. Only the count moves, so the
+                        // header reflects the real backlog immediately.
+                        onExited={() => setCount((c) => Math.max(0, c - 1))}
+                        onRestored={() => setCount((c) => c + 1)}
                       />
                     </div>
                   )}
