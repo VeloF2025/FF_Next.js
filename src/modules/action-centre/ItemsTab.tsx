@@ -8,8 +8,10 @@
  */
 
 import { useEffect, useState } from 'react';
+
+import PpExitReasonSelect from './PpExitReasonSelect';
 import { useRouter } from 'next/router';
-import { ChevronRight, Ticket as TicketIcon, ExternalLink } from 'lucide-react';
+import { ChevronRight, Ticket as TicketIcon } from 'lucide-react';
 
 type Source = 'deduction' | 'pre_prov' | 'olt_mismatch' | 'offline';
 
@@ -205,8 +207,24 @@ export function ItemsTab() {
                       <ChevronRight className="w-5 h-5" />
                     </a>
                   )}
-                  {!item.drNumber && item.source === 'pre_prov' && (
-                    <ExternalLink className="w-4 h-4 text-[var(--ff-text-tertiary)] flex-shrink-0" aria-hidden="true" />
+                  {item.source === 'pre_prov' && (
+                    <div className="flex-shrink-0">
+                      <PpExitReasonSelect
+                        id={item.sourceId}
+                        onExited={(id) => {
+                          // Drop it locally rather than refetching: the row no
+                          // longer matches the query, so a refetch would return
+                          // the same list minus this row at the cost of a round
+                          // trip and a visible flicker.
+                          setItems((prev) =>
+                            prev.filter(
+                              (i) => !(i.source === 'pre_prov' && i.sourceId === id),
+                            ),
+                          );
+                          setCount((c) => Math.max(0, c - 1));
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
               </li>

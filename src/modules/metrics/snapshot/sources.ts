@@ -18,6 +18,14 @@ export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
     //
     // `IS DISTINCT FROM` rather than `<>` so a NULL resolution_status counts as
     // not-activated. Zero NULLs exist today; this is future-proofing, not a fix.
+    //
+    // `exit_reason IS NULL` is THE EXIT PATH (migration 524). Without it the
+    // list only ever shrinks by activation, so faulty ONTs and false positives
+    // accumulate forever — and that balance gates Fibertime's ">100 open per
+    // POP, no new ports" rule, so the inflation blocks real port allocation.
+    // It is a separate clause from activated_at deliberately: the two exits are
+    // different events (activated->decommissioned vs never-activated->exited)
+    // and a row may legitimately carry both if a cancelled customer returns.
     sql: `
       SELECT
         p.id::text AS entity_id,
@@ -35,6 +43,7 @@ export const SNAPSHOT_SOURCES: readonly SnapshotSource[] = [
       FROM oes_pp_data p
       WHERE p.activated_at IS NULL
         AND p.resolution_status IS DISTINCT FROM 'activated'
+        AND p.exit_reason IS NULL
     `,
   },
   {
