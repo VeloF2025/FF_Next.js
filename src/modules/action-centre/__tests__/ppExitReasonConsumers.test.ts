@@ -20,6 +20,18 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+// ⚠️ COVERAGE LIMIT, worth knowing before relying on this.
+// The PR gate runs AFFECTED tests only (scripts/test-ratchet.sh --changed), and
+// vitest selects by static dependency graph. This test reads its targets with
+// readFileSync, so it has no static edge to any of them: a PR that adds a ninth
+// consumer WITHOUT touching this file will not select it, and the PR will go
+// green. The full suite on master push does run it, so the offender is caught
+// after merge rather than before.
+// Promoting this to a scripts/ci-local.sh gate (like the secret scan) would make
+// it a true per-PR gate; it lives here for now because a test is cheaper to keep
+// honest than a bash gate.
+
+
 const ROOTS = ['pages/api', 'src/modules', 'src/lib'];
 
 /**
