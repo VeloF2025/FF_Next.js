@@ -440,6 +440,53 @@ def main():
     check(raised is not None and raised.__context__ is not None,
           "and the original failure is preserved as its context")
 
+    # A row whose label_col is empty is DISCARDED with all its photos. That has always
+    # been true; what is new is that it is counted and reported. Without these scenarios
+    # the WARN could be deleted, or its count silently wrong, and every suite stays green
+    # while real field photos vanish — which is exactly how seven Botshabelo photos and
+    # ~164 more across Mamelodi/Cradock/Mohadin went unnoticed.
+    print("\nRows with no usable label are reported, not silently discarded")
+
+    found, upserted, out, _ = run(
+        columns=["NAME", STEP_1, STEP_2],
+        rows=[{"NAME": "P1", STEP_1: "DCIM/a.jpg"},
+              {"NAME": None, STEP_1: "DCIM/x.jpg", STEP_2: "DCIM/y.jpg"}],
+        dcim={"a.jpg": "k/a", "x.jpg": "k/x", "y.jpg": "k/y"})
+    check((found, upserted) == (1, 1),
+          f"the labelled pole still ingests alongside an unlabelled row, got ({found},{upserted})")
+    check("2 photo(s) DROPPED" in out,
+          f"the 2 photos on the NULL-label row are reported by count, got: {out!r}")
+    check("NAME" in out,
+          "the WARN names the label column that was empty, so the reader can check siblings")
+
+    # The SECOND falsy exit: label present but whitespace-only. A counter placed at only
+    # the first `continue` passes every check above and still under-reports this one.
+    _, _, out, _ = run(
+        columns=["NAME", STEP_1],
+        rows=[{"NAME": "   ", STEP_1: "DCIM/w.jpg"}],
+        dcim={"w.jpg": "k/w"})
+    check("1 photo(s) DROPPED" in out,
+          f"a whitespace-only label is counted too, not just NULL, got: {out!r}")
+
+    # Bias check in the other direction: the count must be of PHOTOS, not of rows, and
+    # must not fire on unlabelled rows that carry nothing to lose. A counter that
+    # incremented per row would report 1 here instead of staying silent.
+    _, _, out, _ = run(
+        columns=["NAME", STEP_1],
+        rows=[{"NAME": None, STEP_1: None}, {"NAME": "P1", STEP_1: "DCIM/a.jpg"}],
+        dcim={"a.jpg": "k/a"})
+    check("DROPPED" not in out,
+          f"an unlabelled row with no photos loses nothing and stays quiet, got: {out!r}")
+
+    # Extra (un-numbered) photo columns go through the second loop, but the discard
+    # happens before either loop — so they must be counted as well.
+    _, _, out, _ = run(
+        columns=["NAME", "Pole Photo"],
+        rows=[{"NAME": None, "Pole Photo": "DCIM/e.jpg"}],
+        dcim={"e.jpg": "k/e"})
+    check("1 photo(s) DROPPED" in out,
+          f"a photo in an extra column is counted when its row is unlabelled, got: {out!r}")
+
     print()
     if failures:
         print(f"FAILED: {len(failures)} characterization check(s) failed.")
