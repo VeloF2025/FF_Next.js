@@ -14,8 +14,8 @@ import {
   UNIFIED_DATE_COLUMN,
   unifiedEligibilityCondition,
   excludedProjectsCondition,
-  unifiedSearchCondition,
 } from './dropStatsService';
+import { unifiedSearchCondition } from './dropSearchCondition';
 
 /**
  * OPTIMIZED: Get per-project stats via parallel queries on unified reviews + OES.

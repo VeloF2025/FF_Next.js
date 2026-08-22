@@ -10,11 +10,8 @@
 import pool from '@/lib/db';
 import { DropsFilters, PaginatedDropsResult, UnifiedDrop } from './types';
 import { transformDropRow } from './dropTransformService';
-import {
-  unifiedEligibilityCondition,
-  excludedProjectsCondition,
-  unifiedSearchCondition,
-} from './dropStatsService';
+import { unifiedEligibilityCondition, excludedProjectsCondition } from './dropStatsService';
+import { unifiedSearchCondition } from './dropSearchCondition';
 
 /** Builds the WHERE conditions and param list from the shared filter shape. */
 function buildWhereConditions(filters?: DropsFilters): {
