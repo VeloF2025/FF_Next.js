@@ -34,6 +34,7 @@ import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 
 import { findAuthRowByPhone, normaliseSaPhone } from './credentialUtils';
+import { waBridgeJsonHeaders } from '@/lib/waBridgeAuth';
 
 // =============================================================================
 // Tunables
@@ -355,7 +356,7 @@ export async function sendOtpViaWhatsApp(params: {
   // hung; 8s still comfortably covers p99.
   const response = await fetch(`${WA_BRIDGE_URL}/send-message`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: waBridgeJsonHeaders(),
     body: JSON.stringify({ group_jid: jid, message }),
     signal: AbortSignal.timeout(8_000),
   });

@@ -12,6 +12,7 @@
  */
 
 import { log } from '@/lib/logger';
+import { waBridgeJsonHeaders } from '@/lib/waBridgeAuth';
 
 type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
@@ -159,7 +160,7 @@ class DbCircuitBreaker {
     try {
       await fetch(`${WA_BRIDGE_URL}/send-message`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: waBridgeJsonHeaders(),
         body: JSON.stringify({ group_jid: WA_GROUP_JID, message }),
         signal: AbortSignal.timeout(5000),
       });

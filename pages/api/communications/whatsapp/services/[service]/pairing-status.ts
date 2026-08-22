@@ -15,6 +15,7 @@ import type {
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { waBridgeAuthHeaders } from '@/lib/waBridgeAuth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -69,6 +70,7 @@ async function handler(
 
     const statusResponse = await fetch(`${serviceUrl}/pairing-status`, {
       method: 'GET',
+      headers: waBridgeAuthHeaders(),
       signal: controller.signal,
     });
 

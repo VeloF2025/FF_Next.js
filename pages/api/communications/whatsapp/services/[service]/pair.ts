@@ -13,6 +13,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import type { WaAdminApiResponse } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { waBridgeJsonHeaders } from '@/lib/waBridgeAuth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -73,7 +74,7 @@ async function handler(
 
     const pairResponse = await fetch(`${serviceUrl}/pair`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: waBridgeJsonHeaders(),
       body: JSON.stringify({ phone_number }),
       signal: controller.signal,
     });

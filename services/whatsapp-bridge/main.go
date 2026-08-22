@@ -1288,8 +1288,17 @@ func extractDirectPathFromURL(url string) string {
 
 // Start a REST API server to expose the WhatsApp client functionality
 func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port int) {
+	// Mutating endpoints run through the inbound secret check. Read-only
+	// endpoints (/health, /groups, /all-groups, /list-recent, /api/download,
+	// /api/lid-lookup) are left open: the healthcheck cron and the FibreFlow
+	// readiness probe poll them, and they disclose no message content.
+	handleGuarded := func(path string, h http.HandlerFunc) {
+		http.HandleFunc(path, guard(path, h))
+	}
+	registerPairingRoutes(client)
+
 	// Handler for sending messages
-	http.HandleFunc("/api/send", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/api/send", func(w http.ResponseWriter, r *http.Request) {
 		// Only allow POST requests
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -1429,7 +1438,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 
 	// Handler: /send-document - send an xlsx/document to a group (restored 2026-05-27)
-	http.HandleFunc("/send-document", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/send-document", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if r.Method != http.MethodPost {
@@ -1521,7 +1530,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 
 	// Handler: /send-message - Sender-compatible endpoint
-	http.HandleFunc("/send-message", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/send-message", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	
 		if r.Method != http.MethodPost {
@@ -1609,7 +1618,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 	
 	// Handler: /delete-message - Delete a sent message
-	http.HandleFunc("/delete-message", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/delete-message", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	
 		if r.Method != http.MethodPost {
@@ -1718,7 +1727,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 	
 	// Handler: /react - Send emoji reaction to a message
-	http.HandleFunc("/react", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/react", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	
 		if r.Method != http.MethodPost {
@@ -1789,7 +1798,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	
 
 	// Handler: /reload-groups - Reload groups from database
-	http.HandleFunc("/reload-groups", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/reload-groups", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Println("📥 /reload-groups endpoint called")
 		
