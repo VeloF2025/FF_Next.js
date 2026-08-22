@@ -39,7 +39,10 @@ describe('MCP endpoint catalogue', () => {
       // Asserted against literal prefixes, NOT against isDeniedGroup — reusing the
       // function under test here makes the assertion vacuous the moment that function
       // regresses, which is precisely when it needs to fire.
-      const WITHHELD_PREFIXES = ['/api/accounting', '/api/staff', '/api/my'];
+      // `/api/my` was removed from this list when the `my` group was opened: those
+      // routes are self-scoped by construction — the handler resolves the caller's own
+      // payslips and cannot return anyone else's — so RBAC bounds them without help.
+      const WITHHELD_PREFIXES = ['/api/accounting', '/api/staff'];
       const leaked = result.routes.filter((r) => WITHHELD_PREFIXES.some((p) => r.path.startsWith(p)));
       expect(leaked.map((r) => r.path)).toEqual([]);
     });

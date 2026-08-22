@@ -1,6 +1,35 @@
 {
-  "generatedAt": "2026-08-18T23:54:28.755Z",
+  "generatedAt": "2026-08-22T09:11:26.591Z",
   "routes": [
+    {
+      "path": "/api/action-items",
+      "methods": [
+        "GET"
+      ],
+      "group": "action-items"
+    },
+    {
+      "path": "/api/action-items/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "action-items"
+    },
+    {
+      "path": "/api/action-items/my-items",
+      "methods": [
+        "GET"
+      ],
+      "group": "action-items",
+      "description": "GET /api/action-items/my-items"
+    },
+    {
+      "path": "/api/action-items/stats",
+      "methods": [
+        "GET"
+      ],
+      "group": "action-items"
+    },
     {
       "path": "/api/activate/:dropNumber",
       "methods": [
@@ -1700,6 +1729,14 @@
       "description": "Daily Stock Reconciliation Report API"
     },
     {
+      "path": "/api/field/attendance",
+      "methods": [
+        "GET"
+      ],
+      "group": "field",
+      "description": "GET /api/field/attendance"
+    },
+    {
       "path": "/api/field/export",
       "methods": [
         "GET"
@@ -2011,6 +2048,56 @@
       "description": "Fleet Import Template Download API"
     },
     {
+      "path": "/api/fleet/incidents",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet"
+    },
+    {
+      "path": "/api/fleet/incidents/:incidentId",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet"
+    },
+    {
+      "path": "/api/fleet/incidents/:incidentId/retention-holds",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet"
+    },
+    {
+      "path": "/api/fleet/incidents/settings/driver-input",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet"
+    },
+    {
+      "path": "/api/fleet/incidents/settings/oversight-members",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet"
+    },
+    {
+      "path": "/api/fleet/incidents/settings/rules",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet"
+    },
+    {
+      "path": "/api/fleet/incidents/settings/user-search",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet",
+      "description": "Active FibreFlow user search + name resolution for the incident settings"
+    },
+    {
       "path": "/api/fleet/investigation",
       "methods": [
         "GET"
@@ -2097,6 +2184,27 @@
       ],
       "group": "fleet",
       "description": "Fleet Mileage Project Summaries API"
+    },
+    {
+      "path": "/api/fleet/operations/map-overlay",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet"
+    },
+    {
+      "path": "/api/fleet/operations/overview",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet"
+    },
+    {
+      "path": "/api/fleet/operations/project-options",
+      "methods": [
+        "GET"
+      ],
+      "group": "fleet"
     },
     {
       "path": "/api/fleet/operations/rules",
@@ -2792,6 +2900,42 @@
       "description": "FibreFlow read-only MCP tokens — self-serve mint + list."
     },
     {
+      "path": "/api/meetings",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings"
+    },
+    {
+      "path": "/api/meetings/:id/export",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings",
+      "description": "GET /api/meetings/[id]/export?type=summary|transcript|action-items"
+    },
+    {
+      "path": "/api/meetings/:id/recording",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings"
+    },
+    {
+      "path": "/api/meetings/:id/transcript",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings"
+    },
+    {
+      "path": "/api/meetings/webhook",
+      "methods": [
+        "GET"
+      ],
+      "group": "meetings"
+    },
+    {
       "path": "/api/metrics-list",
       "methods": [
         "GET"
@@ -2830,6 +2974,269 @@
       ],
       "group": "monitoring",
       "description": "Health endpoint alias for monitoring tools"
+    },
+    {
+      "path": "/api/my/attendance-corrections",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "POST /api/my/attendance-corrections — staff submit an exception-linked correction."
+    },
+    {
+      "path": "/api/my/attendance-corrections-hints",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/attendance-corrections-hints"
+    },
+    {
+      "path": "/api/my/attendance/current",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/attendance/current"
+    },
+    {
+      "path": "/api/my/attendance/history",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/attendance/history?limit=14"
+    },
+    {
+      "path": "/api/my/fleet/incidents",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/fleet/incidents — staff-scoped Fleet incident list (PR7 Task 4)."
+    },
+    {
+      "path": "/api/my/fleet/incidents/:incidentId",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/fleet/incidents/{incidentId} — staff-scoped Fleet incident"
+    },
+    {
+      "path": "/api/my/fleet/incidents/:incidentId/attendance-correction-link",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET/POST /api/my/fleet/incidents/{incidentId}/attendance-correction-link"
+    },
+    {
+      "path": "/api/my/geocode",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/geocode?lat=<number>&lon=<number>"
+    },
+    {
+      "path": "/api/my/hs/checkin",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET  /api/my/hs/checkin — today's H&S check-in status for the signed-in user"
+    },
+    {
+      "path": "/api/my/hs/checkin-crew",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET  /api/my/hs/checkin-crew — bootstrap lists for the crew check-in form"
+    },
+    {
+      "path": "/api/my/hub-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/hub-summary"
+    },
+    {
+      "path": "/api/my/payslips",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/payslips — list active payslips for the signed-in staff,"
+    },
+    {
+      "path": "/api/my/payslips/:id/download",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/payslips/[id]/download — stream the PDF for a single payslip."
+    },
+    {
+      "path": "/api/my/project",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET/POST /api/my/project — which project is the signed-in worker on today?"
+    },
+    {
+      "path": "/api/my/receipts",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/receipts — list staff's own active receipts."
+    },
+    {
+      "path": "/api/my/receipts/:id/download",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/receipts/[id]/download — stream the receipt image/PDF."
+    },
+    {
+      "path": "/api/my/register-sites",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/register-sites — PUBLIC, unauthenticated."
+    },
+    {
+      "path": "/api/my/session",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/session — return the current /my portal session + staff profile."
+    },
+    {
+      "path": "/api/my/sitecam/appeal-status/:drNumber/:step",
+      "methods": [
+        "GET"
+      ],
+      "group": "my"
+    },
+    {
+      "path": "/api/my/stores/contractors",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/stores/contractors — active contractors for the /my stores PWA dropdowns."
+    },
+    {
+      "path": "/api/my/stores/field-intake",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/stores/field-intake — serials taken in from a scanned carton"
+    },
+    {
+      "path": "/api/my/stores/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/stores/items — stock items for the /my stores PWA."
+    },
+    {
+      "path": "/api/my/stores/locations",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/stores/locations — stock locations for the /my stores PWA."
+    },
+    {
+      "path": "/api/my/stores/my-serials",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/stores/my-serials — serials currently held by the calling staff member."
+    },
+    {
+      "path": "/api/my/stores/pickings/:pickingId/confirm",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "POST /api/my/stores/pickings/[pickingId]/confirm — confirm a picking from the /my stores PWA."
+    },
+    {
+      "path": "/api/my/stores/pickings/:pickingId/process",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "POST /api/my/stores/pickings/[pickingId]/process — process a picking from the /my stores PWA."
+    },
+    {
+      "path": "/api/my/stores/pickings/:pickingId/sign",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "POST /api/my/stores/pickings/[pickingId]/sign — sign a picking from the /my stores PWA."
+    },
+    {
+      "path": "/api/my/stores/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/stores/projects — active projects for the /my stores PWA issue wizard."
+    },
+    {
+      "path": "/api/my/stores/returns",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET|POST /api/my/stores/returns — field-stock returns from the /my stores PWA."
+    },
+    {
+      "path": "/api/my/stores/serials/:serialNumber",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/stores/serials/[serialNumber] — look up a serial for the /my stores PWA."
+    },
+    {
+      "path": "/api/my/stores/technicians",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "/api/my/stores/technicians — list + create technicians for the /my stores PWA."
+    },
+    {
+      "path": "/api/my/stores/today",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "GET /api/my/stores/today"
+    },
+    {
+      "path": "/api/my/vehicle/parking",
+      "methods": [
+        "GET"
+      ],
+      "group": "my",
+      "description": "/api/my/vehicle/parking — the driver's overnight parking address."
     },
     {
       "path": "/api/noc/analytics/fault-trends",
@@ -3516,6 +3923,754 @@
         "GET"
       ],
       "group": "poles"
+    },
+    {
+      "path": "/api/procurement/adjustments",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Adjustments API"
+    },
+    {
+      "path": "/api/procurement/aggregate-metrics",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/approvals/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/approvals/all",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/approvals/all"
+    },
+    {
+      "path": "/api/procurement/approvals/pending",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/audit-logs",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq-lifecycle",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/boq-lifecycle?boqId=xxx"
+    },
+    {
+      "path": "/api/procurement/boq-spend-summary",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/boq-spend-summary"
+    },
+    {
+      "path": "/api/procurement/boq-stock-view",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/boq-stock-view"
+    },
+    {
+      "path": "/api/procurement/boq/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq/change-history",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq/compare-versions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq/templates",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/boq/versions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/budget/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Procurement Budget Dashboard API"
+    },
+    {
+      "path": "/api/procurement/budget/templates",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Budget Templates API"
+    },
+    {
+      "path": "/api/procurement/budget/templates/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Single Budget Template API"
+    },
+    {
+      "path": "/api/procurement/bundles",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Bundles API - List and Create"
+    },
+    {
+      "path": "/api/procurement/bundles/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Bundles API - Single Bundle Operations"
+    },
+    {
+      "path": "/api/procurement/bundles/:id/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Bundle Items API"
+    },
+    {
+      "path": "/api/procurement/bundles/:id/items/:itemId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Bundle Single Item API"
+    },
+    {
+      "path": "/api/procurement/bundles/reports/consumption",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bundle Item Consumption Report API"
+    },
+    {
+      "path": "/api/procurement/bundles/reports/cost-analysis",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bundle Cost Analysis Report API"
+    },
+    {
+      "path": "/api/procurement/bundles/reports/inventory-value",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bundle Inventory Value Report API"
+    },
+    {
+      "path": "/api/procurement/bundles/reports/usage",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bundle Usage Report API"
+    },
+    {
+      "path": "/api/procurement/categories",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Categories API - List and Create"
+    },
+    {
+      "path": "/api/procurement/categories/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Categories API - Single Category Operations"
+    },
+    {
+      "path": "/api/procurement/cost-centers",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Cost Centers API"
+    },
+    {
+      "path": "/api/procurement/cost-centers/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Single Cost Center API"
+    },
+    {
+      "path": "/api/procurement/cost-centers/:id/allocations",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Cost Center Allocations API"
+    },
+    {
+      "path": "/api/procurement/cost-centers/:id/transactions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Cost Center Transactions API"
+    },
+    {
+      "path": "/api/procurement/cost-centers/types",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Cost Center Types API"
+    },
+    {
+      "path": "/api/procurement/documents",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Procurement Documents API"
+    },
+    {
+      "path": "/api/procurement/fault-reports",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/fault-reports/:faultId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/fault-reports/analytics",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/field-stock/accountability/exceptions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Exceptions List API"
+    },
+    {
+      "path": "/api/procurement/field-stock/accountability/holders",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Holder Accountability List API"
+    },
+    {
+      "path": "/api/procurement/field-stock/accountability/holders/:holderId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Holder Accountability Detail API"
+    },
+    {
+      "path": "/api/procurement/field-stock/consumptions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Consumptions API"
+    },
+    {
+      "path": "/api/procurement/field-stock/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Dashboard API"
+    },
+    {
+      "path": "/api/procurement/field-stock/dashboard-v2",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Dashboard v2 API"
+    },
+    {
+      "path": "/api/procurement/field-stock/export-serials",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Bootstock Serial Export API"
+    },
+    {
+      "path": "/api/procurement/field-stock/items",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Items API"
+    },
+    {
+      "path": "/api/procurement/field-stock/locations",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Locations API"
+    },
+    {
+      "path": "/api/procurement/field-stock/locations/:locationId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Location by ID API"
+    },
+    {
+      "path": "/api/procurement/field-stock/my-serials",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/my-serials"
+    },
+    {
+      "path": "/api/procurement/field-stock/pickings",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Pickings API"
+    },
+    {
+      "path": "/api/procurement/field-stock/pickings/:pickingId",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Picking Detail API"
+    },
+    {
+      "path": "/api/procurement/field-stock/returns",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Returns API"
+    },
+    {
+      "path": "/api/procurement/field-stock/serial-drift",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Serial-register drift API (PR-11) — read-only reconciliation drift detection."
+    },
+    {
+      "path": "/api/procurement/field-stock/serial-recon",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Serial Reconciliation API"
+    },
+    {
+      "path": "/api/procurement/field-stock/serial-source",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/serial-source?serialNumber=XYZ"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Serials API"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/:serialNumber",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Field Stock Serial by Number API"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/projects",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/serials/projects"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/search",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/serials/search"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/timeline",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/field-stock/serials/warehouses",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/field-stock/serials/warehouses"
+    },
+    {
+      "path": "/api/procurement/grn",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/grn-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GRN Register CSV Export"
+    },
+    {
+      "path": "/api/procurement/grn/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/grn/:id/register-assets",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GRN Asset Registration API"
+    },
+    {
+      "path": "/api/procurement/grn/available-pos",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/metrics/aggregate",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Aggregate Procurement Metrics API"
+    },
+    {
+      "path": "/api/procurement/open-orders",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/open-orders"
+    },
+    {
+      "path": "/api/procurement/open-orders-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Open Orders CSV Export"
+    },
+    {
+      "path": "/api/procurement/projects/summaries",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Project Procurement Summaries API"
+    },
+    {
+      "path": "/api/procurement/purchase-orders",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/purchase-orders-approval",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "PO Approval Status API"
+    },
+    {
+      "path": "/api/procurement/purchase-orders-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Purchase Orders CSV Export"
+    },
+    {
+      "path": "/api/procurement/purchase-orders/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/quote-evaluations",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/reports-data",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Procurement Reports Data API"
+    },
+    {
+      "path": "/api/procurement/requisitions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/requisitions-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Purchase Requisitions CSV Export"
+    },
+    {
+      "path": "/api/procurement/requisitions/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/rfq",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/rfq-suppliers",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/rfq-suppliers?rfqId=xxx"
+    },
+    {
+      "path": "/api/procurement/rfq/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/soh-audit/template",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/soh-audit/template"
+    },
+    {
+      "path": "/api/procurement/soh-audit/versions",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET  /api/procurement/soh-audit/versions        — list all versions"
+    },
+    {
+      "path": "/api/procurement/soh-audit/warehouses",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET  /api/procurement/soh-audit/warehouses — list active warehouses"
+    },
+    {
+      "path": "/api/procurement/spend-by-supplier-export",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Spend by Supplier CSV Export"
+    },
+    {
+      "path": "/api/procurement/stock",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/stock-categories",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/stock-categories"
+    },
+    {
+      "path": "/api/procurement/stock-items-search",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/stock-snapshots",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/stock-snapshots"
+    },
+    {
+      "path": "/api/procurement/stock-takes",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Takes API - List and Create"
+    },
+    {
+      "path": "/api/procurement/stock-takes/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Takes API - Single Stock Take Operations"
+    },
+    {
+      "path": "/api/procurement/stock-takes/:id/lines",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Stock Take Lines API"
+    },
+    {
+      "path": "/api/procurement/stock-takes/reasons",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "Adjustment Reasons API"
+    },
+    {
+      "path": "/api/procurement/supplier-item-codes",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/tab-badges",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement"
+    },
+    {
+      "path": "/api/procurement/threads",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET  /api/procurement/threads  — List procurement threads with optional filters"
+    },
+    {
+      "path": "/api/procurement/threads/:id",
+      "methods": [
+        "GET"
+      ],
+      "group": "procurement",
+      "description": "GET /api/procurement/threads/[id] — Fetch a single procurement thread with linked document details"
     },
     {
       "path": "/api/project-import/status",

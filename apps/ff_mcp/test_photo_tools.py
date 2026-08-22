@@ -73,7 +73,7 @@ def _fake_response(photo_tools, monkeypatch, body: bytes, content_type: str = "i
 
 @pytest.mark.parametrize(
     "denied",
-    ["/api/accounting/ledger", "/api/staff/list", "/api/staff-documents/1", "/api/my/payslips"],
+    ["/api/accounting/ledger", "/api/staff/list", "/api/staff-documents/1", "/api/staff/list"],
 )
 def test_view_photo_refuses_denied_groups(photos, monkeypatch, denied):
     """The denylist must hold on the image path too, not just the text one."""

@@ -29,7 +29,29 @@ describe('isDeniedAreaViolation', () => {
   it('refuses a denied group for an MCP session', () => {
     expect(isDeniedAreaViolation(mcpUser, '/api/accounting/ledger')).toBe(true);
     expect(isDeniedAreaViolation(mcpUser, '/api/staff/list')).toBe(true);
-    expect(isDeniedAreaViolation(mcpUser, '/api/my/payslips')).toBe(true);
+  });
+
+  it('ALLOWS the areas RBAC is trusted to bound', () => {
+    // The denylist was a blunt instrument over a per-route RBAC layer that already
+    // works. These four are properly gated — people.meetings, procurement,
+    // dashboard.action-items — and /my/* is self-scoped by construction: the route
+    // resolves the caller's own payslips and can return nobody else's.
+    //
+    // Deliberate widening. An integration should reach what its user reaches, and
+    // denying by group made Cortex less useful without making anything safer.
+    expect(isDeniedAreaViolation(mcpUser, '/api/my/payslips')).toBe(false);
+    expect(isDeniedAreaViolation(mcpUser, '/api/meetings')).toBe(false);
+    expect(isDeniedAreaViolation(mcpUser, '/api/procurement/purchase-orders')).toBe(false);
+    expect(isDeniedAreaViolation(mcpUser, '/api/action-items')).toBe(false);
+  });
+
+  it('ALLOWS field attendance, which project managers need', () => {
+    // Previously the one path-level denial, because the route applies no supervisor
+    // scope. Opened deliberately: `people.staff.attendance.search` already grants
+    // manager / project_manager / site_supervisor, so RBAC is shaped for this, and
+    // with staff.reports_to empty a scope would return NOTHING rather than a
+    // narrower set — whole-workforce is the only behaviour that currently works.
+    expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance')).toBe(false);
   });
 
   it('refuses a hyphenated sibling of a denied group', () => {
@@ -38,12 +60,25 @@ describe('isDeniedAreaViolation', () => {
     expect(isDeniedAreaViolation(mcpUser, '/api/staff-documents/1')).toBe(true);
   });
 
-  it('refuses a denied PATH without denying its group', () => {
-    // /api/field/attendance is denied; the rest of `field` and all of `field-stock` are
-    // legitimate. Denying the group would remove the whole warehouse module.
-    expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance')).toBe(true);
+  it('leaves the whole field area reachable', () => {
     expect(isDeniedAreaViolation(mcpUser, '/api/field/workers')).toBe(false);
     expect(isDeniedAreaViolation(mcpUser, '/api/field-stock/reports/daily')).toBe(false);
+  });
+
+  it('still refuses the two areas RBAC does NOT bound', () => {
+    // accounting — the module is unused but the DATA is live: 5,201 GL journal lines,
+    // 1,043 Sage supplier invoices, 464 supplier invoices. Retiring the routes is the
+    // right fix, not exposing them to an agent.
+    //
+    // staff — `people.staff` grants admin + manager + super_admin, and that carries
+    // people.staff.sensitive and people.staff.tabs.disciplinary with it. 31 active
+    // accounts. Worse, super_admin bypasses RBAC entirely
+    // (src/lib/permissions/index.ts:234), so for 10 of those the phrase "bounded by
+    // the caller's permissions" is simply untrue. Open this once the bypass excludes
+    // kind='mcp', or once PMs move off the manager role.
+    expect(isDeniedAreaViolation(mcpUser, '/api/accounting/ledger')).toBe(true);
+    expect(isDeniedAreaViolation(mcpUser, '/api/staff/list')).toBe(true);
+    expect(isDeniedAreaViolation(mcpUser, '/api/staff-documents/1')).toBe(true);
   });
 
   it('ALLOWS a legitimate path for an MCP session', () => {
@@ -80,11 +115,11 @@ describe('isDeniedAreaViolation', () => {
 
     it('refuses a NEAR-MISS for a denied path', () => {
       // MCP_DENIED_PATHS is matched byte-exactly, so a trailing byte stopped it being
-      // recognised once the tail became permissive. Nothing routes to these today; the
-      // guard should not be relying on that.
-      expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance;x=1')).toBe(true);
-      expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance~')).toBe(true);
-      expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance%20')).toBe(true);
+      // recognised once the tail became permissive. The list is empty today — every
+      // path-level denial was opened — so this drives the rule directly rather than
+      // through whatever happens to be listed, and keeps it alive for the next entry.
+      expect(deniedAreaFor('/api/staff/list;x=1')).toBeDefined();
+      expect(deniedAreaFor('/api/staff/list~')).toBeDefined();
       // …while a genuinely different sibling route stays permitted.
       expect(isDeniedAreaViolation(mcpUser, '/api/field/attendance-policy')).toBe(false);
     });
@@ -114,7 +149,7 @@ describe('isDeniedAreaViolation', () => {
       // The bypass found in the Python guard: /api/./staff computes group "." and slips
       // past a literal comparison.
       expect(isDeniedAreaViolation(mcpUser, '/api/./staff/list')).toBe(true);
-      expect(isDeniedAreaViolation(mcpUser, '/api/field/./attendance')).toBe(true);
+      expect(isDeniedAreaViolation(mcpUser, '/api/./accounting/ledger')).toBe(true);
     });
 
     it('decodes percent-escapes, repeatedly', () => {
@@ -181,7 +216,7 @@ describe('isDeniedAreaViolation', () => {
     it('returns the group or path that matched', () => {
       expect(deniedAreaFor('/api/accounting/ledger')).toBe('accounting');
       expect(deniedAreaFor('/api/staff-documents/1')).toBe('staff');
-      expect(deniedAreaFor('/api/field/attendance')).toBe('/api/field/attendance');
+      expect(deniedAreaFor('/api/ff-remote-mcp/mcp')).toBe('ff-remote-mcp');
     });
 
     it('returns undefined for an allowed path', () => {

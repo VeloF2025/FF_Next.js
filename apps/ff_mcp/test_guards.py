@@ -23,7 +23,7 @@ from .test_tools import _with_token
         "/api/Staff/list",
         "/api/STAFF/list",
         "/api/Staff-Documents/1",
-        "/api/My/payslips",
+        "/api/Staff/list",
         # Percent-encoding: the server decodes before routing.
         "/api/%61ccounting/ledger",
         "/api/%73taff/list",
@@ -146,7 +146,7 @@ def test_rate_limit_keys_are_swept_once_they_age_out(svc, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "group", ["Accounting", "ACCOUNTING", "Staff", "Staff-Documents", "MY", "my"]
+    "group", ["Accounting", "ACCOUNTING", "Staff", "Staff-Documents", "STAFF", "staff"]
 )
 def test_denied_group_is_case_insensitive_on_its_own(svc, group):
     """The predicate is the guard, so it must not rely on every caller having
@@ -159,57 +159,76 @@ def test_denied_group_is_case_insensitive_on_its_own(svc, group):
 # ---------------------------------------------------------------------------
 # Path-level denial.
 #
-# `field` cannot go in DENIED_GROUPS: the hyphenated-sibling rule would match
-# `field-stock` and take out the whole warehouse module. So /api/field/attendance —
-# same permission key as the supervisor-scoped report, no scope applied — is denied by
-# path instead. These pin that it is actually refused, that it does not take the
-# warehouse with it, and that the refusal happens at the shared guard rather than in
-# one tool.
+# DENIED_PATHS is EMPTY today: /api/field/attendance was its only entry and was opened
+# deliberately on 2026-08-22, because `people.staff.attendance.search` already grants the
+# roles that need it and project managers have a real need to see attendance.
+#
+# The mechanism stays, and stays tested, because the next entry should cost one line
+# rather than a rediscovery of these properties. Driven through an INJECTED entry rather
+# than a live one — a test that needs a real denial to exist would quietly stop testing
+# anything the moment the list is emptied, which is exactly what just happened.
 # ---------------------------------------------------------------------------
 
+PROBE_PATH = "/api/probe/denied"
 
-def test_field_attendance_is_refused_by_path(svc):
+
+@pytest.fixture
+def path_denied(svc, monkeypatch):
+    """The guard with one synthetic path denial in place."""
     _, tools = svc
-    refusal = tools._guard_path("/api/field/attendance")
+    monkeypatch.setattr(tools, "DENIED_PATHS", (PROBE_PATH,))
+    return tools
+
+
+def test_a_denied_path_is_refused(path_denied):
+    refusal = path_denied._guard_path(PROBE_PATH)
     assert refusal is not None
-    assert "/api/field/attendance" in refusal["message"]
+    assert PROBE_PATH in refusal["message"]
 
 
-def test_field_attendance_refusal_survives_a_query_string_and_encoding(svc):
+def test_a_denied_path_refusal_survives_a_query_string_and_encoding(path_denied):
     """The guard runs on the canonical form, so neither trick reaches the route."""
-    _, tools = svc
-    assert tools._guard_path("/api/field/attendance?from=2026-01-01") is not None
-    assert tools._guard_path("/api/field/%61ttendance") is not None
+    assert path_denied._guard_path(f"{PROBE_PATH}?from=2026-01-01") is not None
+    assert path_denied._guard_path("/api/probe/%64enied") is not None
 
 
-def test_field_attendance_denies_its_subpaths(svc):
-    _, tools = svc
-    assert tools._guard_path("/api/field/attendance/2026-08") is not None
+def test_a_denied_path_denies_its_subpaths(path_denied):
+    assert path_denied._guard_path(f"{PROBE_PATH}/2026-08") is not None
 
 
-def test_field_stock_is_STILL_REACHABLE(svc):
-    """The mirror, and the reason this is a path deny rather than a group deny.
+def test_the_rest_of_that_group_is_STILL_REACHABLE(path_denied):
+    """The mirror, and the reason a path deny exists at all.
 
-    Without this, moving `field` into DENIED_GROUPS would satisfy every assertion
-    above while silently removing the entire warehouse module from the connector.
+    Without it, promoting the entry to a GROUP deny would satisfy every assertion above
+    while silently removing an entire unrelated area from the connector — which is what
+    `field` would have done to `field-stock`.
+    """
+    assert path_denied._guard_path("/api/probe/allowed") is None
+    assert path_denied._guard_path("/api/probe-adjacent/x") is None
+
+
+def test_denied_path_matches_on_a_segment_boundary(path_denied):
+    """A prefix match must not swallow a differently-named neighbouring route."""
+    assert path_denied._denied_path("/api/probe/denied-policy") is None
+    assert path_denied._denied_path(PROBE_PATH) == PROBE_PATH
+
+
+def test_field_attendance_is_now_REACHABLE(svc):
+    """The change itself: what used to be the one path denial is open.
+
+    Its lack of supervisor scope is real but currently moot — zero of the 32 active field
+    staff have staff.reports_to set, so a scope would return nothing rather than less.
     """
     _, tools = svc
+    assert tools._guard_path("/api/field/attendance") is None
     assert tools._guard_path("/api/field-stock/reports/daily-reconciliation") is None
-    assert tools._guard_path("/api/field/workers") is None
 
 
-def test_denied_path_matches_on_a_segment_boundary(svc):
-    """A prefix match must not swallow a differently-named neighbouring route."""
-    _, tools = svc
-    assert tools._denied_path("/api/field/attendance-policy") is None
-    assert tools._denied_path("/api/field/attendance") == "/api/field/attendance"
-
-
-def test_meetings_and_procurement_are_denied_as_groups(svc):
+def test_accounting_and_staff_are_denied_as_groups(svc):
     """These two do not over-match, so the coarser group denial is correct for them."""
     _, tools = svc
-    assert tools._guard_path("/api/meetings") is not None
-    assert tools._guard_path("/api/procurement/purchase-orders") is not None
+    assert tools._guard_path("/api/accounting/ledger") is not None
+    assert tools._guard_path("/api/staff/documents") is not None
     # …and the sanctioned reporting equivalents still work.
     assert tools._guard_path("/api/reporting/meetings") is None
     assert tools._guard_path("/api/reporting/project-section") is None
@@ -220,7 +239,7 @@ def test_meetings_and_procurement_are_denied_as_groups(svc):
 #
 # Next.js resolves "." before routing, so /api/field/./attendance reaches the same
 # handler as /api/field/attendance. The guards ran on the raw canonical string, so ONE
-# character defeated every deny here: _group_of("/api/./meetings") returned "." rather
+# character defeated every deny here: _group_of("/api/./accounting/ledger") returned "." rather
 # than "meetings", and the literal path match missed too.
 #
 # Measured: FibreFlow's router does NOT resolve dot segments (curl --path-as-is returns
@@ -233,11 +252,11 @@ def test_meetings_and_procurement_are_denied_as_groups(svc):
 @pytest.mark.parametrize(
     "path",
     [
-        "/api/field/./attendance",
-        "/api/./field/attendance",
-        "/api/field/./././attendance",
-        "/api/%2e/field/attendance",
-        "/api/%252e/field/attendance",
+        "/api/staff/./list",
+        "/api/./staff/list",
+        "/api/staff/./././list",
+        "/api/%2e/staff/list",
+        "/api/%252e/staff/list",
     ],
 )
 def test_dot_segments_do_not_bypass_the_path_deny(svc, path):
@@ -247,7 +266,7 @@ def test_dot_segments_do_not_bypass_the_path_deny(svc, path):
 
 @pytest.mark.parametrize(
     "path",
-    ["/api/./meetings", "/api/./procurement/purchase-orders", "/api/meetings/./123"],
+    ["/api/./accounting/ledger", "/api/./staff/list", "/api/accounting/./123"],
 )
 def test_dot_segments_do_not_bypass_the_group_deny(svc, path):
     _, tools = svc
@@ -281,7 +300,7 @@ def test_canonical_keeps_a_dotted_filename_intact(svc):
 #
 # The denylists match a canonical path against a literal, so any trailing byte that is
 # not "/" slipped past both of them: _group_of("/api/meetings\x00") is "meetings\x00",
-# which != "meetings", and "/api/field/attendance." is neither equal to the denied path
+# which != "meetings", and "/api/staff/list." is neither equal to the denied path
 # nor prefixed by it. FibreFlow's stack happens to 400/404 those today, so nothing was
 # reachable — but that is upstream leniency this module does not control.
 #
@@ -293,11 +312,11 @@ def test_canonical_keeps_a_dotted_filename_intact(svc):
 @pytest.mark.parametrize(
     "path",
     [
-        "/api/field/attendance\x00",
-        "/api/field/attendance.",
-        "/api/field/attendance ",
-        "/api/field/attendance\t",
-        "/api/field/attendance\n",
+        "/api/staff/list\x00",
+        "/api/staff/list.",
+        "/api/staff/list ",
+        "/api/staff/list\t",
+        "/api/staff/list\n",
         "/api/meetings\x00",
         "/api/meetings.",
         "/api/meetings\x7f",

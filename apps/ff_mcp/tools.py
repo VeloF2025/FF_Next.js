@@ -40,42 +40,37 @@ from .server import mcp
 # attendance-scoped report at /api/reporting/action-items is in the `reporting` group and
 # stays reachable.
 DENIED_GROUPS = (
+    # MIRRORS src/lib/auth/mcpDeniedAreas.ts, which ENFORCES this server-side for every
+    # kind='mcp' session. This copy saves a round-trip and stops the model proposing a
+    # path it would only be refused — it is not the boundary.
+    #
+    # Narrowed 2026-08-22. It used to include meetings, procurement, action-items, my and
+    # /api/field/attendance; all were opened because per-route RBAC already bounds them to
+    # the calling user, and denying by group made the connector less useful without making
+    # anything safer. What remains are the two areas where "bounded by the caller's own
+    # permissions" is NOT true:
+    #
+    #   accounting — the UI is unused but the data is live (5,201 GL journal lines,
+    #                1,043 Sage supplier invoices). Retire the routes rather than expose.
+    #   staff      — grants admin + manager + super_admin, carrying people.staff.sensitive
+    #                and .tabs.disciplinary (31 accounts); super_admin bypasses RBAC
+    #                entirely, so for 10 of them nothing bounds it at all.
     "accounting",
     "staff",
-    "my",
     "cortex-remote-mcp",
     "ff-remote-mcp",
-    "action-items",
-    # Added 2026-08-18 after an audit of the COMBINED surface: each of these holds a
-    # route that reads the same rows as a sanctioned tool under a weaker gate.
-    # `meetings` covers /api/meetings (withAuth-only, returns full summary text and a
-    # wider attendance predicate than find_meetings); `procurement` covers
-    # purchase-orders and boq-spend-summary (withAuth-only PO/BOQ money that
-    # get_procurement_summary withholds from callers lacking `procurement` view).
-    # The sanctioned tools are unaffected — they all call the `reporting` group.
-    #
-    # `field` is deliberately NOT here: the hyphenated-sibling rule would make it match
-    # `field-stock` and take out the whole warehouse module. See DENIED_PATHS.
-    "meetings",
-    "procurement",
 )
 
 # Individual routes withheld where denying the whole GROUP would be too broad.
 #
-# Matched on the canonical path, exactly or as a path prefix, so query strings and
-# trailing segments cannot walk around an entry. Group denial stays the default — this
-# exists for the case where one route in an otherwise legitimate area is the problem.
+# Empty by design. /api/field/attendance was the only entry and was opened deliberately:
+# `people.staff.attendance.search` already grants manager, project_manager and
+# site_supervisor, and project managers have a real need to see attendance. Its lack of
+# supervisor scope matters less than it sounds — zero of the 32 active field staff have
+# `staff.reports_to` set, so a scope would return NOTHING rather than a narrower set.
 #
-# /api/field/attendance carries the same permission key as the supervisor-scoped report
-# (`people.staff.attendance.search`) but applies NO scope: its only predicates are
-# `role IN ('technician','casual')` and a date range, so any holder gets the entire field
-# workforce with clock_in_at/clock_out_at and site_geofence_id. Denying the `field` group
-# instead would also deny `field-stock`, which is unrelated and legitimate.
-#
-# Like DENIED_GROUPS this is blast-radius, not a boundary — the route still needs its own
-# scope, which cannot be applied until staff.reports_to is populated (currently zero of
-# the 32 active field staff have a supervisor set).
-DENIED_PATHS = ("/api/field/attendance",)
+# The mechanism stays wired and tested so the next entry costs one line.
+DENIED_PATHS: tuple[str, ...] = ()
 
 MAX_RESPONSE_CHARS = 15_000
 
