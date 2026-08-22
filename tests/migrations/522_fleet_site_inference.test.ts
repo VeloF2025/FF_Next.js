@@ -53,7 +53,11 @@ const USER_B = '52200000-0000-0000-0000-0000000000c2';
  * 2026-08-21. The ones that matter and are easy to get wrong:
  *   projects.project_name       varchar(255)  (onemap.projects is varchar(100) - wrong table)
  *   fleet_vehicles.registration varchar(20)
- *   fleet_vehicle_positions.lat/lon/speed_kph  numeric, NOT double precision
+ *   fleet_vehicle_positions.lat/lon  numeric(10,7), NOT double precision and NOT
+ *                               bare numeric - production rounds coordinates to
+ *                               7 decimal places, so a bare NUMERIC fixture
+ *                               stores test points production could not hold
+ *   fleet_vehicle_positions.speed_kph  numeric(6,2)
  *   project_aois.aoi            geography(Geometry,4326) - the ::geometry cast
  *                               in the dwell SQL exists because of this
  *   vehicle_assignments.vehicle_registration varchar(20) - and on production 5 of
@@ -98,9 +102,9 @@ const PREREQUISITES = `
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id),
     recorded_at TIMESTAMPTZ NOT NULL,
-    lat NUMERIC NOT NULL,
-    lon NUMERIC NOT NULL,
-    speed_kph NUMERIC,
+    lat NUMERIC(10, 7) NOT NULL,
+    lon NUMERIC(10, 7) NOT NULL,
+    speed_kph NUMERIC(6, 2),
     ignition BOOLEAN
   );
 `;
@@ -212,6 +216,19 @@ describe('522_fleet_site_inference: schema invariants', () => {
 
     await pool.query(FORWARD);
     await pool.query('DELETE FROM fleet_site_inference_evidence');
+  });
+
+  it('stays re-runnable over a previous version of its own view', async () => {
+    // CREATE OR REPLACE VIEW only permits APPENDING columns. A column added in
+    // the middle of the select list makes the file fail against an older view
+    // with 42P16 - which nobody would notice while 522 is still unapplied.
+    await pool.query(FORWARD);
+    await pool.query(FORWARD);
+    const columns = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = $1 AND table_name = 'fleet_site_inference_proposals'
+      ORDER BY ordinal_position DESC LIMIT 1`, [SCHEMA]);
+    expect(columns.rows[0].column_name).toBe('decision_revision');
   });
 
   it('refuses a roaming row that still names a project', async () => {

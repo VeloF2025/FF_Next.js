@@ -3,12 +3,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
-import {
-  authorizedAssignmentProjectIds,
-  canEditAssignmentProject,
-} from '@/modules/fleet/assignments/projectScope';
+import { authorizedAssignmentProjectIds } from '@/modules/fleet/assignments/projectScope';
 import { getProposal, type SiteInferenceProposal } from '@/modules/fleet/assignments/inference/proposalQueries';
-import { scopeProposals } from '@/modules/fleet/assignments/inference/proposalScope';
+import { canDecideProposal, scopeProposals } from '@/modules/fleet/assignments/inference/proposalScope';
 import {
   InferenceDecisionError,
   recordDecision,
@@ -129,23 +126,16 @@ async function routeHandler(req: DecisionRequest, res: NextApiResponse) {
   const parsed = parseBody(req.body, proposal.inferredProjectId);
   if (typeof parsed === 'string') return apiResponse.badRequest(res, parsed);
 
-  // Two projects need authorizing, not one: the project being decided ONTO, and
-  // the project an existing decision already points AT. Checking only the former
-  // let a decision made for an out-of-scope project be taken over unseen.
-  //
-  // Rejecting or confirming roaming names no project, so it falls back to
-  // whatever the machine proposed.
-  const scopeProjectIds = [
-    parsed.scopeProjectId ?? proposal.inferredProjectId,
-    proposal.decidedProjectId,
-  ].filter((projectId): projectId is string => typeof projectId === 'string');
-  for (const projectId of new Set(scopeProjectIds)) {
-    if (!await canEditAssignmentProject(user.id, staffId, user.role, projectId)) {
-      return apiResponse.forbidden(res, 'You cannot decide proposals for this project');
-    }
-  }
-  if (scopeProjectIds.length === 0 && !isAdmin(user.role)) {
-    return apiResponse.forbidden(res, 'Only an administrator can decide a proposal with no project');
+  // Gated on the forwarded scope, not canEditAssignmentProject: that helper
+  // applies `projects.status = 'active'` BEFORE its admin branch, so a decision
+  // recorded against a project that later stops being active became
+  // unchangeable by anyone at all. canDecideProposal authorizes both the project
+  // being decided ONTO and the project an existing decision points AT - see its
+  // docstring for why apply deliberately authorizes fewer.
+  const authorized = await authorizedAssignmentProjectIds(user.id, staffId, user.role, 'edit');
+  const scope = { allProjects: isAdmin(user.role), authorizedProjectIds: authorized };
+  if (!canDecideProposal(proposal, parsed.scopeProjectId, scope)) {
+    return apiResponse.forbidden(res, 'You cannot decide proposals for this project');
   }
 
   // Compare-and-set is enforced in SQL too, but refusing here means a caller

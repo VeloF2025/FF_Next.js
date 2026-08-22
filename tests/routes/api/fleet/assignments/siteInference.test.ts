@@ -173,12 +173,27 @@ describe('site-inference per-vehicle route', () => {
   });
 
   it('refuses to decide a proposal on a project the caller cannot edit', async () => {
-    mocks.editScope.mockResolvedValue(false);
+    mocks.authorizedIds.mockResolvedValue([]);
     const state = await call(vehicleHandler, 'PATCH', {
       query: { vehicleId: VEHICLE }, body: { decision: 'assigned' },
     });
     expect(state.status).toBe(403);
     expect(mocks.recordDecision).not.toHaveBeenCalled();
+  });
+
+  it('lets an admin change a decision on a project that is no longer active', async () => {
+    mocks.authorizedIds.mockResolvedValue([]);
+    mocks.getProposal.mockResolvedValue(proposal({
+      inferredProjectId: null, inferredProjectName: null, effectiveProjectId: null,
+      breakdown: [], decision: 'assigned', decidedProjectId: 'deactivated-project',
+      decidedFrom: 'inference', decidedAt: DECIDED_AT, decisionRevision: REVISION,
+    }));
+    const state = await call(vehicleHandler, 'PATCH', {
+      query: { vehicleId: VEHICLE }, role: 'admin',
+      body: { decision: 'rejected', expectedRevision: REVISION },
+    });
+    expect(state.status).toBe(200);
+    expect(mocks.recordDecision).toHaveBeenCalled();
   });
 
   it('refuses to overwrite a decision made for a project the caller cannot edit', async () => {
@@ -190,7 +205,6 @@ describe('site-inference per-vehicle route', () => {
       decidedFrom: 'override', decidedAt: DECIDED_AT, decisionRevision: REVISION,
       effectiveProjectId: THEIRS,
     }));
-    mocks.editScope.mockImplementation(async (_u, _s, _r, projectId: string) => projectId === MINE);
     const state = await call(vehicleHandler, 'PATCH', {
       query: { vehicleId: VEHICLE },
       body: { decision: 'assigned', expectedRevision: REVISION },
@@ -206,7 +220,7 @@ describe('site-inference per-vehicle route', () => {
       decision: 'assigned', decidedProjectId: MINE, decidedFrom: 'inference',
       decidedAt: DECIDED_AT, decisionRevision: REVISION,
     }));
-    mocks.editScope.mockResolvedValue(false);
+    mocks.authorizedIds.mockResolvedValue([]);
     const state = await call(vehicleHandler, 'PATCH', {
       query: { vehicleId: VEHICLE },
       body: { decision: 'rejected', expectedRevision: REVISION - 1 },
@@ -264,27 +278,91 @@ describe('site-inference per-vehicle route', () => {
 });
 
 describe('site-inference apply route', () => {
-  it('refuses to revert a proposal on a project the caller cannot edit', async () => {
-    mocks.editScope.mockResolvedValue(false);
+  it('refuses to revert a proposal outside the caller scope', async () => {
+    mocks.getProposal.mockResolvedValue(proposal({
+      decision: 'assigned', decidedProjectId: THEIRS, decidedFrom: 'override' }));
     const state = await call(applyHandler, 'DELETE', {
       body: { vehicleId: VEHICLE, endDate: '2026-08-21' },
     });
-    expect(state.status).toBe(403);
+    expect(state.status).toBe(404);
     expect(mocks.revert).not.toHaveBeenCalled();
   });
 
-  it('refuses to apply a proposal on a project the caller cannot edit', async () => {
-    mocks.editScope.mockResolvedValue(false);
+  it('refuses to apply a proposal outside the caller scope', async () => {
+    mocks.getProposal.mockResolvedValue(proposal({
+      decision: 'assigned', decidedProjectId: THEIRS, decidedFrom: 'override' }));
     const state = await call(applyHandler, 'POST', {
       body: { vehicleId: VEHICLE, startDate: '2026-08-01', endDate: '2026-08-31' },
     });
-    expect(state.status).toBe(403);
+    expect(state.status).toBe(404);
     expect(mocks.apply).not.toHaveBeenCalled();
+  });
+
+  it('applies a cross-project override to a project the caller owns', async () => {
+    // The machine inferred THEIRS; a person overrode it to MINE. Gating on the
+    // inferred project blocked exactly this - the case overrides exist for.
+    mocks.getProposal.mockResolvedValue(proposal({
+      inferredProjectId: THEIRS, inferredProjectName: 'Mohadin',
+      decision: 'assigned', decidedProjectId: MINE, decidedFrom: 'override',
+    }));
+    const state = await call(applyHandler, 'POST', {
+      body: { vehicleId: VEHICLE, startDate: '2026-08-01', endDate: '2026-08-31' },
+    });
+    expect(state.status).toBe(201);
+    expect(mocks.apply).toHaveBeenCalled();
+  });
+
+  it('lets an admin revert a decision on a project that is no longer active', async () => {
+    // authorizedAssignmentProjectIds only ever returns ACTIVE projects, so a
+    // deactivated project appears in nobody's scope. Without the allProjects
+    // branch this decision is frozen forever.
+    mocks.authorizedIds.mockResolvedValue([]);
+    mocks.getProposal.mockResolvedValue(proposal({
+      decision: 'assigned', decidedProjectId: 'deactivated-project',
+      decidedFrom: 'inference', appliedAssignmentId: 'a-1',
+    }));
+    const state = await call(applyHandler, 'DELETE', {
+      body: { vehicleId: VEHICLE, endDate: '2026-08-21' }, role: 'admin',
+    });
+    expect(state.status).toBe(200);
+    expect(mocks.revert).toHaveBeenCalled();
+  });
+
+  it('answers a missing proposal exactly as it answers an unauthorized one', async () => {
+    // Distinguishing them would make this endpoint an oracle for which vehicles
+    // exist. Both are a neutral 404.
+    mocks.getProposal.mockResolvedValue(null);
+    const missing = await call(applyHandler, 'POST', {
+      body: { vehicleId: VEHICLE, startDate: '2026-08-01', endDate: '2026-08-31' },
+    });
+    expect(missing.status).toBe(404);
+    expect(mocks.apply).not.toHaveBeenCalled();
+
+    mocks.getProposal.mockResolvedValue(proposal({
+      decision: 'assigned', decidedProjectId: THEIRS, decidedFrom: 'override' }));
+    const unauthorized = await call(applyHandler, 'POST', {
+      body: { vehicleId: VEHICLE, startDate: '2026-08-01', endDate: '2026-08-31' },
+    });
+    expect(unauthorized.status).toBe(404);
+    // Compare the error payload only. apiResponse stamps meta.timestamp with
+    // the wall clock, so comparing whole bodies fails whenever the two calls
+    // straddle a millisecond - a flaky auth test, which is worse than none.
+    const errorOf = (state: CallState) => (state.body as { error: unknown }).error;
+    // Pinned to the concrete payload, not just "the two match" - two identical
+    // wrong answers would satisfy an equality-only assertion.
+    const expected = {
+      code: 'NOT_FOUND',
+      message: `Site inference proposal with identifier '${VEHICLE}' not found`,
+    };
+    expect(errorOf(missing)).toEqual(expected);
+    expect(errorOf(unauthorized)).toEqual(expected);
   });
 
   it('surfaces no_site_for_project as a 409 and applies nothing', async () => {
     const { ApplyProposalError } = await import(
       '@/modules/fleet/assignments/inference/applyService');
+    mocks.getProposal.mockResolvedValue(proposal({
+      decision: 'assigned', decidedProjectId: MINE, decidedFrom: 'inference' }));
     mocks.apply.mockRejectedValue(new ApplyProposalError(
       'no_site_for_project', 'That project has no active operational site.', 409));
     const state = await call(applyHandler, 'POST', {

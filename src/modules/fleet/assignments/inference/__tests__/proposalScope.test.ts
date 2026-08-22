@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scopeProposals } from '../proposalScope';
+import { canActOnProposal, canDecideProposal, scopeProposals } from '../proposalScope';
 import type { SiteInferenceProposal } from '../proposalQueries';
 
 const MINE = 'p-mine';
@@ -78,5 +78,63 @@ describe('scopeProposals', () => {
       effectiveProjectId: null, breakdown: [],
     });
     expect(scopeProposals([noProject], [MINE], false)).toEqual([]);
+  });
+});
+
+describe('canActOnProposal / canDecideProposal', () => {
+  const ADMIN = { allProjects: true };
+  const SCOPED = { allProjects: false, authorizedProjectIds: [MINE] };
+
+  it('lets an all-projects actor act on a project that is no longer active', () => {
+    // canEditAssignmentProject applies `status = 'active'` BEFORE its admin
+    // branch, so routing through it froze any decision on a deactivated project
+    // with no way back for anyone. allProjects carries no such rule.
+    expect(canActOnProposal({ decidedProjectId: 'a-deactivated-project' }, ADMIN)).toBe(true);
+  });
+
+  it('lets a scoped actor apply an override to a project they own', () => {
+    // The machine guessed THEIRS; the person overrode to MINE. Authorizing the
+    // inferred project too would block the one case overrides exist for.
+    expect(canActOnProposal({ decidedProjectId: MINE }, SCOPED)).toBe(true);
+  });
+
+  it('refuses a scoped actor applying to a project they do not own', () => {
+    expect(canActOnProposal({ decidedProjectId: THEIRS }, SCOPED)).toBe(false);
+  });
+
+  it('refuses a scoped actor when there is no decided project to target', () => {
+    // The `no target` branch: admin only.
+    expect(canActOnProposal({ decidedProjectId: null }, SCOPED)).toBe(false);
+    expect(canActOnProposal({ decidedProjectId: null }, ADMIN)).toBe(true);
+  });
+
+  it('treats an absent allProjects flag as restrictive, never permissive', () => {
+    // ActorScope.allProjects is optional, so undefined must fail closed.
+    expect(canActOnProposal({ decidedProjectId: MINE }, {})).toBe(false);
+    expect(canDecideProposal({ decidedProjectId: MINE, inferredProjectId: MINE }, MINE, {}))
+      .toBe(false);
+  });
+
+  it('requires BOTH projects to decide, unlike applying', () => {
+    const contested = { decidedProjectId: THEIRS, inferredProjectId: MINE };
+    // Someone else already decided this onto a project the actor cannot see.
+    expect(canDecideProposal(contested, MINE, SCOPED)).toBe(false);
+    // But applying only writes to the decided project, so the rules differ on
+    // purpose - this is the asymmetry, pinned.
+    expect(canActOnProposal({ decidedProjectId: MINE }, SCOPED)).toBe(true);
+  });
+
+  it('falls back to the inferred project when a decision names none', () => {
+    const undecided = { decidedProjectId: null, inferredProjectId: MINE };
+    expect(canDecideProposal(undecided, null, SCOPED)).toBe(true);
+    expect(canDecideProposal({ decidedProjectId: null, inferredProjectId: THEIRS }, null, SCOPED))
+      .toBe(false);
+  });
+
+  it('refuses a scoped actor deciding a proposal with no project at all', () => {
+    // The `touched.length === 0` branch: admin only.
+    const bare = { decidedProjectId: null, inferredProjectId: null };
+    expect(canDecideProposal(bare, null, SCOPED)).toBe(false);
+    expect(canDecideProposal(bare, null, ADMIN)).toBe(true);
   });
 });

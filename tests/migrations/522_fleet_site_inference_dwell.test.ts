@@ -39,8 +39,15 @@ const LAWLEY = '52210000-0000-0000-0000-0000000000a1';
 const POP1 = '52210000-0000-0000-0000-0000000000a2';
 const STAFF = '52210000-0000-0000-0000-0000000000b1';
 
-// Column types diffed against production information_schema on 2026-08-21.
-// lat/lon/speed_kph are NUMERIC on production, not double precision.
+// Column types, widths, and numeric precision/scale diffed against production
+// information_schema on 2026-08-22. lat/lon are numeric(10,7) - not double
+// precision, and not bare numeric either: production rounds coordinates to 7
+// decimal places, and a bare NUMERIC fixture would silently accept boundary
+// test points that production cannot represent. speed_kph is numeric(6,2).
+// registration columns are varchar(20). aoi is geography(Geometry,4326).
+//
+// project_aois carries additional columns from migration 523 (aoi_area_m2 and
+// friends); they are not declared here because migration 522 does not read them.
 const PREREQUISITES = `
   CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY);
   CREATE TABLE users (id UUID PRIMARY KEY);
@@ -61,8 +68,8 @@ const PREREQUISITES = `
   CREATE TABLE fleet_vehicle_positions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id),
-    recorded_at TIMESTAMPTZ NOT NULL, lat NUMERIC NOT NULL, lon NUMERIC NOT NULL,
-    speed_kph NUMERIC, ignition BOOLEAN);
+    recorded_at TIMESTAMPTZ NOT NULL, lat NUMERIC(10, 7) NOT NULL, lon NUMERIC(10, 7) NOT NULL,
+    speed_kph NUMERIC(6, 2), ignition BOOLEAN);
 `;
 
 // Overlapping in x=[2,3], mirroring the real Thembisa POP 1 / POP 3 overlap.

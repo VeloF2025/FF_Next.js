@@ -77,8 +77,14 @@ describe('SiteInferencePanel', () => {
   it('warns when the vehicle assignment records a different registration', () => {
     // 5 of 24 active rows on production carry a stale registration string.
     panel([proposal()]);
-    expect(screen.getByText(/records a different registration/)).toBeInTheDocument();
+    expect(screen.getByText('Registration mismatch')).toBeInTheDocument();
     expect(screen.getByText(/EMN889GP/)).toBeInTheDocument();
+    // Never a hard-coded light-surface or amber-on-white colour: this app's
+    // default theme is light, so those render at ~1.5:1 and vanish.
+    const badge = screen.getByText('Registration mismatch');
+    expect(badge.className).toContain('bg-destructive');
+    expect(badge.className).toContain('text-destructive-foreground');
+    expect(badge.className).not.toMatch(/bg-white|text-amber-300/);
   });
 
   it('assigns the inferred project when no override is chosen', async () => {

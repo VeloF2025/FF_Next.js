@@ -103,9 +103,18 @@ export function SiteInferencePanel({
             ? <p>No current driver</p>
             : <p>Driver: {proposal.drivers.map((driver) => driver.staffName).join(', ')}</p>}
           {proposal.drivers.some((driver) => driver.assignmentRegistration !== proposal.registration)
-            && <p className="text-amber-300">
-              The vehicle assignment records a different registration
-              ({proposal.drivers.map((driver) => driver.assignmentRegistration).join(', ')}).
+            && <p>
+              {/* Theme tokens, not a hard-coded colour. This app's default
+                  :root is the LIGHT theme, and the text-amber-300 used by the
+                  sibling panels renders at roughly 1.5:1 on white - effectively
+                  invisible. There is no --warning token, and --destructive is a
+                  SURFACE colour here (a dark red under .dark), so it only works
+                  as a badge with its paired foreground. */}
+              <span className="inline-block rounded bg-destructive px-1.5 py-0.5 text-destructive-foreground">
+                Registration mismatch
+              </span>
+              {' '}The vehicle assignment records
+              {' '}{proposal.drivers.map((driver) => driver.assignmentRegistration).join(', ')}.
             </p>}
           {proposal.breakdown.length > 1 && <ul aria-label={`${proposal.registration} breakdown`}>
             {proposal.breakdown.map((entry) => <li key={entry.projectId}>

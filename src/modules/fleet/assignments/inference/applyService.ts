@@ -4,6 +4,7 @@ import { listProjectSites } from '../projectSiteQueries';
 import type { AssignmentActor, ActorScope } from '../assignmentQueries';
 import type { AssignmentProposalRow } from '../types';
 import { getProposal, type SiteInferenceProposal } from './proposalQueries';
+import { canActOnProposal } from './proposalScope';
 import { clearApplied, markApplied } from './proposalRepository';
 
 /**
@@ -66,22 +67,19 @@ async function requireProposal(vehicleId: string): Promise<SiteInferenceProposal
 }
 
 /**
- * Authorizes the projects a proposal touches, BEFORE anything else is checked.
+ * Authorizes the proposal BEFORE anything else is checked.
  *
  * Ordering is the point. commitAssignments enforces scope too, but only once the
  * driver and site have already been resolved - so an out-of-scope caller could
  * read `no_driver` or `no_site_for_project` off a project they cannot see and
  * learn about it that way. Reverting never reached that check at all.
+ *
+ * Shares canActOnProposal with the route so the two gates cannot drift; the
+ * route needs its own call because it is reachable without this module.
  */
 function assertScope(proposal: SiteInferenceProposal, scope: ActorScope): void {
-  if (scope.allProjects) return;
-  const permitted = new Set(scope.authorizedProjectIds ?? []);
-  const touched = [proposal.decidedProjectId, proposal.inferredProjectId]
-    .filter((projectId): projectId is string => typeof projectId === 'string');
-  if (touched.length === 0 || touched.some((projectId) => !permitted.has(projectId))) {
-    throw new ApplyProposalError(
-      'out_of_scope', 'No proposal exists for that vehicle', 404);
-  }
+  if (canActOnProposal(proposal, scope)) return;
+  throw new ApplyProposalError('out_of_scope', 'No proposal exists for that vehicle', 404);
 }
 
 export async function applyProposal(

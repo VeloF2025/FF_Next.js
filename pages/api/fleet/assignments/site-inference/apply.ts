@@ -4,11 +4,9 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 import { AssignmentServiceError } from '@/modules/fleet/assignments/bulkAssignmentService';
-import {
-  authorizedAssignmentProjectIds,
-  canEditAssignmentProject,
-} from '@/modules/fleet/assignments/projectScope';
+import { authorizedAssignmentProjectIds } from '@/modules/fleet/assignments/projectScope';
 import { getProposal } from '@/modules/fleet/assignments/inference/proposalQueries';
+import { canActOnProposal, type ProposalActorScope } from '@/modules/fleet/assignments/inference/proposalScope';
 import { ApplyProposalError, applyProposal, revertProposal } from '@/modules/fleet/assignments/inference/applyService';
 import { resolveStaffIdForUser } from '@/modules/fleet/parking/staffLookup';
 import { isValidUUID } from '@/modules/fleet/services/mileageUtils';
@@ -48,25 +46,19 @@ function parseApplyBody(value: unknown): ApplyBody | string {
 }
 
 /**
- * Authorizes every project the proposal touches before either branch runs.
+ * Authorizes an apply or a revert against the SAME scope that is forwarded to
+ * the roster service, so the gate and the service cannot disagree.
  *
- * applyService asserts scope too, but that is defence in depth for callers that
- * bypass this route; the route needs its own check because reverting previously
- * had none at all, and applying only got one deep inside commitAssignments -
- * after `no_driver` and `no_site_for_project` had already leaked.
+ * A missing proposal and an unauthorized one deliberately return the same
+ * neutral 404: distinguishing them would turn this endpoint into an oracle for
+ * which vehicles exist.
  */
 async function authorizeVehicle(
-  vehicleId: string, userId: string, staffId: string | null, role: string,
+  vehicleId: string, scope: ProposalActorScope,
 ): Promise<boolean> {
   const proposal = await getProposal(vehicleId);
   if (!proposal) return false;
-  const touched = [proposal.decidedProjectId, proposal.inferredProjectId]
-    .filter((projectId): projectId is string => typeof projectId === 'string');
-  if (touched.length === 0) return role === 'super_admin' || role === 'admin';
-  for (const projectId of new Set(touched)) {
-    if (!await canEditAssignmentProject(userId, staffId, role, projectId)) return false;
-  }
-  return true;
+  return canActOnProposal(proposal, scope);
 }
 
 /** Maps a service error's own status onto the matching apiResponse helper. */
@@ -92,8 +84,8 @@ async function routeHandler(req: ApplyRequest, res: NextApiResponse) {
     if (req.method === 'POST') {
       const body = parseApplyBody(req.body);
       if (typeof body === 'string') return apiResponse.badRequest(res, body);
-      if (!await authorizeVehicle(body.vehicleId, user.id, staffId, user.role)) {
-        return apiResponse.forbidden(res, 'You cannot apply proposals for this project');
+      if (!await authorizeVehicle(body.vehicleId, scope)) {
+        return apiResponse.notFound(res, 'Site inference proposal', body.vehicleId);
       }
       const result = await applyProposal(body.vehicleId, {
         startDate: body.startDate, endDate: body.endDate, confirmWarnings: body.confirmWarnings,
@@ -109,8 +101,8 @@ async function routeHandler(req: ApplyRequest, res: NextApiResponse) {
     if (typeof body.endDate !== 'string' || !ISO_DATE.test(body.endDate)) {
       return apiResponse.badRequest(res, 'endDate must be YYYY-MM-DD');
     }
-    if (!await authorizeVehicle(body.vehicleId, user.id, staffId, user.role)) {
-      return apiResponse.forbidden(res, 'You cannot revert proposals for this project');
+    if (!await authorizeVehicle(body.vehicleId, scope)) {
+      return apiResponse.notFound(res, 'Site inference proposal', body.vehicleId);
     }
     await revertProposal(body.vehicleId, body.endDate, scope, actor);
     return apiResponse.success(res, { vehicleId: body.vehicleId }, 'Application reverted');

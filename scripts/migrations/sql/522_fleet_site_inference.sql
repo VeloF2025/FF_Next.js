@@ -151,7 +151,6 @@ SELECT
   d.note,
   d.decided_by,
   d.decided_at,
-  d.revision AS decision_revision,
   d.evidence_computed_at AS decided_against_computed_at,
   d.applied_assignment_id,
   d.applied_at,
@@ -164,7 +163,11 @@ SELECT
     WHEN d.decision IS NULL OR d.decided_project_id IS NULL THEN NULL
     ELSE d.decided_project_id IS NOT DISTINCT FROM e.inferred_project_id
   END AS decision_matches_inference,
-  COALESCE(dr.drivers, '[]'::jsonb) AS drivers
+  COALESCE(dr.drivers, '[]'::jsonb) AS drivers,
+  -- Appended, not inserted mid-list: CREATE OR REPLACE VIEW only permits adding
+  -- columns at the END of the select list, so putting this in the middle would
+  -- make the file un-re-runnable over a previous version of itself.
+  d.revision AS decision_revision
 FROM fleet_site_inference_evidence e
 JOIN fleet_vehicles v ON v.id = e.vehicle_id
 LEFT JOIN projects ip ON ip.id = e.inferred_project_id
