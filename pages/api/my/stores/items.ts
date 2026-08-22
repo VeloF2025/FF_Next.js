@@ -14,6 +14,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
+import { resolveItemLimit } from '@/modules/procurement/field-stock/lib/itemQueryLimit';
 import { log } from '@/lib/logger';
 import { withMySession } from '@/modules/attendance/portal/authMiddleware';
 import { requireStoresActor } from '@/modules/field-stock-pwa/lib/storesActor';
@@ -29,6 +30,7 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
   try {
     const trackingType = req.query.trackingType as string | undefined;
     const rawSearch = req.query.search as string | undefined;
+    const limit = resolveItemLimit(req.query.limit);
     const search = rawSearch ? `%${rawSearch}%` : undefined;
 
     let rows: Record<string, unknown>[];
@@ -39,7 +41,7 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
         FROM stock_items
         WHERE is_active = true AND tracking_type = ${trackingType}
           AND (name ILIKE ${search} OR item_code ILIKE ${search})
-        ORDER BY category, name LIMIT 100
+        ORDER BY category, name LIMIT ${limit}
       `;
     } else if (trackingType) {
       rows = await sql`
@@ -47,7 +49,7 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
           uom, standard_cost, currency, is_returnable, is_active, qty_available
         FROM stock_items
         WHERE is_active = true AND tracking_type = ${trackingType}
-        ORDER BY category, name LIMIT 100
+        ORDER BY category, name LIMIT ${limit}
       `;
     } else if (search) {
       rows = await sql`
@@ -56,7 +58,7 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
         FROM stock_items
         WHERE is_active = true
           AND (name ILIKE ${search} OR item_code ILIKE ${search})
-        ORDER BY tracking_type = 'serial' DESC, category, name LIMIT 100
+        ORDER BY tracking_type = 'serial' DESC, category, name LIMIT ${limit}
       `;
     } else {
       rows = await sql`
@@ -64,7 +66,7 @@ export default withMySession(async (req: NextApiRequest, res: NextApiResponse, s
           uom, standard_cost, currency, is_returnable, is_active, qty_available
         FROM stock_items
         WHERE is_active = true
-        ORDER BY tracking_type = 'serial' DESC, category, name LIMIT 100
+        ORDER BY tracking_type = 'serial' DESC, category, name LIMIT ${limit}
       `;
     }
 

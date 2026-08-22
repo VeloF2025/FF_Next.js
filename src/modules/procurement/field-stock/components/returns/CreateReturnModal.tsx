@@ -7,12 +7,13 @@
 
 import { useState } from 'react';
 import { X, Plus, Trash2, Package } from 'lucide-react';
+import { StockItemPicker } from '../items/StockItemPicker';
 import type {
   StockLocation,
   StockItem,
   CreateReturnDTO,
   ReturnReason,
-  SerialCondition
+  SerialCondition,
 } from '../../types';
 
 interface CreateReturnModalProps {
@@ -38,7 +39,7 @@ const RETURN_REASONS: { value: ReturnReason; label: string }[] = [
   { value: 'job_cancelled', label: 'Job cancelled' },
   { value: 'wrong_item', label: 'Wrong item issued' },
   { value: 'faulty', label: 'Faulty/Defective' },
-  { value: 'customer_refused', label: 'Customer refused' }
+  { value: 'customer_refused', label: 'Customer refused' },
 ];
 
 const CONDITIONS: { value: SerialCondition; label: string }[] = [
@@ -47,7 +48,7 @@ const CONDITIONS: { value: SerialCondition; label: string }[] = [
   { value: 'fair', label: 'Fair' },
   { value: 'poor', label: 'Poor' },
   { value: 'damaged', label: 'Damaged' },
-  { value: 'non_functional', label: 'Non-functional' }
+  { value: 'non_functional', label: 'Non-functional' },
 ];
 
 export function CreateReturnModal({
@@ -55,39 +56,33 @@ export function CreateReturnModal({
   onClose,
   onSubmit,
   locations,
-  stockItems
+  stockItems,
 }: CreateReturnModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [returnedByName, setReturnedByName] = useState('');
   const [returnToLocationId, setReturnToLocationId] = useState('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<ReturnLineForm[]>([
-    { stockItemId: '', quantity: 1, condition: 'good', returnReason: 'unused' }
+    { stockItemId: '', quantity: 1, condition: 'good', returnReason: 'unused' },
   ]);
 
   const warehouseLocations = locations.filter(
-    loc => loc.locationType === 'warehouse' || loc.locationType === 'site_store'
+    (loc) => loc.locationType === 'warehouse' || loc.locationType === 'site_store'
   );
 
   const handleAddLine = () => {
-    setLines(prev => [
+    setLines((prev) => [
       ...prev,
-      { stockItemId: '', quantity: 1, condition: 'good', returnReason: 'unused' }
+      { stockItemId: '', quantity: 1, condition: 'good', returnReason: 'unused' },
     ]);
   };
 
   const handleRemoveLine = (index: number) => {
-    setLines(prev => prev.filter((_, i) => i !== index));
+    setLines((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleLineChange = (
-    index: number,
-    field: keyof ReturnLineForm,
-    value: string | number
-  ) => {
-    setLines(prev =>
-      prev.map((line, i) => (i === index ? { ...line, [field]: value } : line))
-    );
+  const handleLineChange = (index: number, field: keyof ReturnLineForm, value: string | number) => {
+    setLines((prev) => prev.map((line, i) => (i === index ? { ...line, [field]: value } : line)));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,14 +95,14 @@ export function CreateReturnModal({
         returnedByName,
         returnToLocationId,
         notes,
-        lines: lines.map(line => ({
+        lines: lines.map((line) => ({
           stockItemId: line.stockItemId,
           serialNumber: line.serialNumber,
           quantity: line.quantity,
           condition: line.condition,
           returnReason: line.returnReason,
-          notes: line.notes
-        }))
+          notes: line.notes,
+        })),
       });
       onClose();
     } catch (error) {
@@ -123,9 +118,7 @@ export function CreateReturnModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card shadow-xl dark:bg-gray-800">
         <div className="flex items-center justify-between border-b border-border p-4 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-foreground">
-            Create Stock Return
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Create Stock Return</h2>
           <button
             onClick={onClose}
             className="rounded-lg p-2 text-gray-400 hover:bg-secondary hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
@@ -161,7 +154,7 @@ export function CreateReturnModal({
                 className="w-full rounded-lg border border-border bg-card py-2 px-3 text-foreground focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
                 <option value="">Select location...</option>
-                {warehouseLocations.map(loc => (
+                {warehouseLocations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
                     {loc.name} ({loc.code})
                   </option>
@@ -173,9 +166,7 @@ export function CreateReturnModal({
           {/* Return Lines */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-muted-foreground">
-                Items to Return
-              </label>
+              <label className="text-sm font-medium text-muted-foreground">Items to Return</label>
               <button
                 type="button"
                 onClick={handleAddLine}
@@ -199,19 +190,13 @@ export function CreateReturnModal({
                         <label className="mb-1 block text-xs font-medium text-muted-foreground">
                           Item
                         </label>
-                        <select
-                          value={line.stockItemId}
-                          onChange={(e) => handleLineChange(index, 'stockItemId', e.target.value)}
-                          required
-                          className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        >
-                          <option value="">Select item...</option>
-                          {stockItems.map(item => (
-                            <option key={item.id} value={item.id}>
-                              {item.name} ({item.itemCode})
-                            </option>
-                          ))}
-                        </select>
+                        <StockItemPicker
+                          items={stockItems}
+                          selectedItemId={line.stockItemId}
+                          onSelect={(itemId: string) =>
+                            handleLineChange(index, 'stockItemId', itemId)
+                          }
+                        />
                       </div>
 
                       <div>
@@ -235,7 +220,9 @@ export function CreateReturnModal({
                           type="number"
                           min="1"
                           value={line.quantity}
-                          onChange={(e) => handleLineChange(index, 'quantity', Number(e.target.value))}
+                          onChange={(e) =>
+                            handleLineChange(index, 'quantity', Number(e.target.value))
+                          }
                           className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         />
                       </div>
@@ -249,7 +236,7 @@ export function CreateReturnModal({
                           onChange={(e) => handleLineChange(index, 'condition', e.target.value)}
                           className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         >
-                          {CONDITIONS.map(c => (
+                          {CONDITIONS.map((c) => (
                             <option key={c.value} value={c.value}>
                               {c.label}
                             </option>
@@ -266,7 +253,7 @@ export function CreateReturnModal({
                           onChange={(e) => handleLineChange(index, 'returnReason', e.target.value)}
                           className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         >
-                          {RETURN_REASONS.map(r => (
+                          {RETURN_REASONS.map((r) => (
                             <option key={r.value} value={r.value}>
                               {r.label}
                             </option>
@@ -292,9 +279,7 @@ export function CreateReturnModal({
 
           {/* Notes */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-muted-foreground">
-              Notes
-            </label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
