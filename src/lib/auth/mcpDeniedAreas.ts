@@ -53,12 +53,40 @@ import type { AuthUser } from './types';
  * across several group names and `staff` must also cover `staff-documents`.
  */
 export const MCP_DENIED_GROUPS: readonly string[] = [
+  // The module is unused, but the DATA is live: 5,201 GL journal lines, 2,400 journal
+  // entries, 1,043 Sage supplier invoices, 464 supplier invoices, 74 customer invoices.
+  // "The accounting module is dead" is true of the UI and false of the tables. Retiring
+  // the routes is the right fix; exposing them to an agent is not.
   'accounting',
-  'staff',
-  'my',
-  'action-items',
+  // Kept after review measured what "RBAC bounds it" is actually worth here:
+  //   meetings       0 of 8 routes carry withPermission
+  //   action-items   0 of 6
+  //   procurement   10 of 139
+  //
+  // The permission keys people.meetings / dashboard.action-items / procurement DO exist
+  // and DO gate the /api/reporting/* routes. They do not gate these groups. An earlier
+  // audit of the reporting routes was generalised to the whole group; that was wrong.
+  // /api/procurement/purchase-orders and boq-spend-summary — the two examples cited as
+  // audited — are withAuth-only, as are audit-logs, cost-center transactions, budget
+  // dashboard and the spend exports.
+  //
+  // withAuth-only means any authenticated session reaches them regardless of role, so
+  // there is nothing here for an integration token to be bounded BY. Opening these needs
+  // the missing withPermission checks first, not a denylist edit.
   'meetings',
+  'action-items',
   'procurement',
+  // `people.staff` grants admin + manager + super_admin, and carries
+  // people.staff.sensitive and people.staff.tabs.disciplinary with it — 31 active
+  // accounts. More importantly super_admin bypasses RBAC entirely (see
+  // src/lib/permissions/index.ts:234), so for 10 of those accounts "bounded by the
+  // caller's own permissions" is not true, and staff records are where that costs most.
+  //
+  // Open this when either holds: the RBAC bypass stops applying to kind='mcp' sessions,
+  // or project managers move off the `manager` role so it no longer implies disciplinary
+  // access. Today there are ZERO active project_manager accounts — the role exists in
+  // the permission table with nobody in it, and PMs sit in `manager` instead.
+  'staff',
   // The MCP edge proxies are transport, not data: they forward any method and body to an
   // internal service and are unauthenticated by design.
   'cortex-remote-mcp',
@@ -68,12 +96,22 @@ export const MCP_DENIED_GROUPS: readonly string[] = [
 /**
  * Individual routes denied where denying the whole group would be too broad.
  *
- * `/api/field/attendance` carries the same permission key as the supervisor-scoped
- * report but applies no scope, so any holder gets the whole field workforce with clock
- * times and geofence ids. `field` cannot be a denied GROUP because the sibling rule would
- * also match `field-stock` — the entire warehouse module.
+ * Empty by design, not by neglect. `/api/field/attendance` was the only entry and was
+ * opened deliberately: `people.staff.attendance.search` already grants manager,
+ * project_manager and site_supervisor, so RBAC is shaped for the people who need it, and
+ * project managers have a real need to see attendance.
+ *
+ * Its known weakness — the route applies no supervisor scope, so a holder gets the whole
+ * field workforce — is weaker than it sounds: ZERO active field staff have `staff.reports_to`
+ * set — measured three times over two days at 32, 34 and 36 headcount, always zero with
+ * a supervisor — so a scope would return NOTHING rather than a narrower set.
+ * Whole-workforce is the only behaviour that currently works. If reports_to is ever
+ * populated, that route should adopt the same resolveScope the reporting route uses, and
+ * this decision should be revisited rather than assumed still correct.
+ *
+ * The mechanism stays wired and tested so the next entry costs one line.
  */
-export const MCP_DENIED_PATHS: readonly string[] = ['/api/field/attendance'];
+export const MCP_DENIED_PATHS: readonly string[] = [];
 
 /** What a segment carrying a routing DECISION may contain. */
 const SEGMENT_SHAPE = /^[a-z0-9][a-z0-9._-]*$/;

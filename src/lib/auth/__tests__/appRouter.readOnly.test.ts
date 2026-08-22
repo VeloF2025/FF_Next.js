@@ -180,7 +180,7 @@ describe('requireAuth / requirePermission — denied-area gate', () => {
     // reimplements it independently, this fails.
     givenSession('mcp');
 
-    const [user, denial] = await requirePermission(req('GET', '/api/my/payslips'), 'projects', 'view');
+    const [user, denial] = await requirePermission(req('GET', '/api/staff/list'), 'projects', 'view');
 
     expect(user).toBeNull();
     expect(denial?.status).toBe(403);

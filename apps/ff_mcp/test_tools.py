@@ -52,7 +52,14 @@ def test_fibreflow_get_rejects_paths_that_are_not_plain_api_paths(svc, monkeypat
 
 @pytest.mark.parametrize(
     "denied",
-    ["/api/accounting/ledger", "/api/staff/list", "/api/staff-documents/1", "/api/my/payslips"],
+    [
+        "/api/accounting/ledger",
+        "/api/staff/list",
+        "/api/staff-documents/1",
+        "/api/meetings",
+        "/api/procurement/purchase-orders",
+        "/api/action-items",
+    ],
 )
 def test_fibreflow_get_refuses_denied_groups_with_a_stop_signal(svc, denied):
     _, tools = svc

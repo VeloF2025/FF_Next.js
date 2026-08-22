@@ -112,7 +112,11 @@ def test_catalogue_excludes_the_path_denied_route():
     from ff_mcp import tools
 
     paths = {r["path"] for r in catalogue._load_routes()}
-    assert "/api/field/attendance" not in paths
+    # DENIED_PATHS is empty today, so there is no specific path to assert absent. The
+    # invariant below is the one that matters and holds either way: nothing catalogued
+    # may be something the runtime guard refuses.
+    for denied in tools.DENIED_PATHS:
+        assert denied not in paths
 
     # And every catalogued path must survive the runtime guard, so the generator's
     # denylists and tools.py's cannot drift apart in either direction.
