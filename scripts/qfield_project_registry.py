@@ -299,6 +299,48 @@ PROJECTS = {
         "pon_col": "pon_no",
         "zone_col": "zone_no",
     },
+    # Botshabelo was uploading to QFieldCloud since 2026-08-06 and was in NONE of the
+    # three allow-lists, so 2,595 DCIM files and 331 planted poles were invisible to
+    # Works QA. Nothing alerted: the coverage check only examines projects that have a
+    # qfield_projects/qfield_project_links row, and Botshabelo had neither, so it was
+    # never a candidate for EXTRACT-GAP in the first place. Registering it here is only
+    # one third of the fix — the links rows and QFIELD_TO_FIBREFLOW are the other two.
+    #
+    # Read off the live file (Civil Audit.gpkg v20260821030151), not inferred:
+    #   table_name  "civil_audit__civil_audit__civil_audit" — the triple suffix is a
+    #               real publish artefact, it is the ONLY table in gpkg_contents.
+    #   label_col   "LABEL" (upper) — 1,940 of 1,941 rows, e.g. "HT_BOTH_0087PL".
+    #               "NAME" is byte-identical wherever LABEL is set and covers the one
+    #               extra row, but that row is an unlabelled "New Pole" (see below), so
+    #               it buys nothing real. Lowercase "label" does not exist here and
+    #               would fail LOUD; there is no all-NULL near-miss to fail silent on.
+    #
+    # This is an HT_ form, so its photo columns are shifted +1 by a leading
+    # "1. Permission Slip Photo": "2. Before…" is step 1 through "9. Clear…" is step 8.
+    # STEP_PATTERNS is leading-word anchored precisely for this, and detect_step_columns
+    # maps all 8 civil steps on the live columns. The permission-slip column matches
+    # nothing and is dropped (2 values) — same as every other HT_ project.
+    #
+    # pon_col/zone_col deliberately omitted, as for Cradock/Middelburg/Ben Farm: the
+    # layer's "PON No" column exists but is NULL in all 1,941 rows, so resolve_hierarchy
+    # would yield (None, None) for every row anyway. Poles ingest unzoned rather than
+    # wrong. `poles` is also empty for this project, so syncQfieldCore's
+    # v_pole_planning LEFT JOIN contributes no zone/PON either — that is a pole-import
+    # prerequisite, not something this entry can supply, and it is the same reason
+    # Mahikeng's zone-delivery gate stays shut (see qfieldIngestionService).
+    #
+    # Known data-quality wart, upstream of us: FIVE rows are labelled literally
+    # "New Pole" (crew added poles without labelling them) and all five are
+    # "Pole Planted/ All Photos". They collapse into a single pole_qa_photos row keyed
+    # "New Pole". Left alone rather than filtered — dropping them would hide the photos
+    # entirely; surfaced under a junk label, a reviewer can at least see and re-key them.
+    "Botshabelo": {
+        "qf_project_id": "d6c40724-8778-4929-bcf3-797b5b994123",
+        "ff_project_id": "8de6942c-a57e-45ce-8b74-0291187546d3",
+        "gpkg_path": "Civil Audit.gpkg",
+        "table_name": "civil_audit__civil_audit__civil_audit",
+        "label_col": "LABEL",
+    },
 }
 
 # Also check these alternate GPKGs per project (civil audit vs poles audit)
