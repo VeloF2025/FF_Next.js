@@ -116,29 +116,30 @@ else
   fi
 fi
 
-# ─── Gate 2: Silent catches (API routes) ─────────────────────────────────────
+# ─── Gate 2: Silent catches (src/ + pages/, three scopes) ────────────────────
+# Was `npx eslint pages/api` + grep. That scanned 77 of the repo's 1443
+# no-silent-catch findings: the rule is declared only in .eslintrc.json, which
+# .eslintrc.cjs shadows under ESLint 8 precedence, so this gate's --rulesdir run
+# was its entire enforcement and src/ had never been scanned at all.
+#
+# The scoring moved into scripts/silent-catch-ratchet.mjs so local and CI run
+# one implementation, and so the "scanned nothing" case can be detected by
+# asserting linted-file counts per scope rather than inferred from an exit code.
+# The script exits 2 when it could not run and 1 on a real regression.
 echo -e "\n${CYAN}── Gate 2: Error Handling (no-silent-catch) ──${NC}\n"
 
 CATCH_RC=0
-CATCH_OUTPUT=$(npx eslint pages/api --ext .ts --rulesdir scripts/eslint-rules --rule '{"no-silent-catch": "warn"}' 2>&1) || CATCH_RC=$?
-# `grep -c` exits 1 when it finds 0 matches, which combined with `pipefail`
-# and a `|| echo "0"` fallback produced a "0\n0" multi-line count that broke
-# the `[ -le ]` numeric comparison. Count with grep + wc + tr, with `|| true`
-# so no-matches doesn't trip pipefail.
-CATCH_COUNT=$( { echo "$CATCH_OUTPUT" | grep "no-silent-catch" || true; } | wc -l | tr -d ' ')
+CATCH_OUTPUT=$(node scripts/silent-catch-ratchet.mjs 2>&1) || CATCH_RC=$?
 
-# ESLint exits 2 when it fails BEFORE linting anything — a bad --rulesdir, a
-# target path that no longer exists, a broken config. Its output then contains
-# no rule messages, so CATCH_COUNT is 0 and the gate would report a clean pass
-# having scanned nothing. The old `|| true` swallowed exactly that.
-if [ "$CATCH_RC" -ge 2 ]; then
-  fail "Silent catches: eslint failed to run (exit ${CATCH_RC}) — gate scanned nothing"
-  echo "$CATCH_OUTPUT" | tail -5 | sed 's/^/    /'
-elif [ "$CATCH_COUNT" -le "$MAX_SILENT_CATCHES" ]; then
-  pass "Silent catches: ${CATCH_COUNT} (≤${MAX_SILENT_CATCHES})"
+if [ "$CATCH_RC" -eq 0 ]; then
+  pass "Silent catches: within baseline in all three scopes"
+  echo "$CATCH_OUTPUT" | sed 's/^/    /'
+elif [ "$CATCH_RC" -ge 2 ]; then
+  fail "Silent catches: the ratchet failed to run (exit ${CATCH_RC}) — gate scanned nothing"
+  echo "$CATCH_OUTPUT" | tail -10 | sed 's/^/    /'
 else
-  fail "Silent catches: ${CATCH_COUNT} (max ${MAX_SILENT_CATCHES}) — new silent catch blocks added"
-  echo "$CATCH_OUTPUT" | grep "no-silent-catch" | tail -5 | sed 's/^/    /'
+  fail "Silent catches: over baseline — new silent catch block(s) added"
+  echo "$CATCH_OUTPUT" | sed 's/^/    /'
 fi
 
 # ─── Gate 2c: Neon-shim SQL divergence (must be 0) ───────────────────────────
@@ -345,11 +346,15 @@ fi
 # of configured severity, and is the single source of truth for the detection.
 echo -e "\n${CYAN}── Gate 2e: Serial Lifecycle Discipline ──${NC}\n"
 
+# no-silent-catch was the only rule in scripts/eslint-rules/ with no test, while
+# this gate vouched for the other two. It now scores three baselines (Gate 2), so
+# a mis-fire would move three numbers.
 if RULE_TEST_OUT=$(node scripts/eslint-rules/__tests__/no-direct-serial-status-write.test.js 2>&1 \
-                   && node scripts/eslint-rules/__tests__/no-neon-shim-sql-divergence.test.js 2>&1); then
+                   && node scripts/eslint-rules/__tests__/no-neon-shim-sql-divergence.test.js 2>&1 \
+                   && node scripts/eslint-rules/__tests__/no-silent-catch.test.js 2>&1); then
   pass "Custom ESLint rule tests: pass"
 else
-  fail "Custom ESLint rule tests FAILED — the detection behind Gate 2c/2e is not trustworthy"
+  fail "Custom ESLint rule tests FAILED — the detection behind Gate 2/2c/2e is not trustworthy"
   echo "$RULE_TEST_OUT" | grep -E '✗|Error' | head -10 | sed 's/^/    /'
 fi
 

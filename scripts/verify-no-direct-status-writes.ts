@@ -55,7 +55,12 @@ const ROOT = path.join(__dirname, '..');
 async function main(): Promise<void> {
   const eslint = new ESLint({
     cwd: ROOT,
-    useEslintrc: true, // load the TS parser + ignore patterns from .eslintrc.json
+    // Loads .eslintrc.CJS for the TS parser and ignore patterns — not
+    // .eslintrc.json, which this file's own header correctly calls dead config
+    // and which ESLint 8 never resolves while .eslintrc.cjs exists. The
+    // practical difference: .eslintrc.cjs ignores only `dist`, so the scan is
+    // WIDER than the .eslintrc.json ignore list would have made it.
+    useEslintrc: true,
     rulePaths: [path.join(ROOT, 'scripts', 'eslint-rules')],
     // Force the rule on irrespective of its "off" pre-cutover setting.
     overrideConfig: { rules: { [RULE_ID]: 'error' } },
