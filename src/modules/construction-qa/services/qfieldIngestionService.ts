@@ -108,6 +108,14 @@ const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   // rows have been deleted and re-extracted, and all 121 resolve to a GRA.P.* label
   // matching a row in `poles`. Only then is this line safe.
   'aa6aba62-e57e-4701-8b55-30d2cce996c8': '574a7856-3582-46aa-9094-1c434855d176', // Grabouw QA → Grabouw
+  // Botshabelo: never registered anywhere, so its 2,595 photos and 331 planted poles
+  // had no route to Works QA at all. Added together with the qfield_project_registry
+  // entry and the qfield_projects/qfield_project_links rows — all three are required,
+  // and this one is what lets reviews be created from the extracted validations.
+  // Same caveat as the five HT_ projects above: `poles` is empty for Botshabelo, so
+  // every review lands with zone_no/pon_no NULL and the zone-delivery gate stays shut.
+  // That needs a pole import, not this line.
+  'd6c40724-8778-4929-bcf3-797b5b994123': '8de6942c-a57e-45ce-8b74-0291187546d3', // HT_Botshabelo → Botshabelo
 };
 
 /** Reverse map: FibreFlow project UUID → QFieldCloud project UUIDs */
