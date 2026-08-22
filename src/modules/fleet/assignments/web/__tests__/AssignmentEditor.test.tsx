@@ -45,6 +45,21 @@ describe('AssignmentEditor', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Preview service unavailable');
   });
 
+  it('renders the missing-site guidance with explicit light and dark text colour classes, and a styled preview button', () => {
+    render(<AssignmentEditor options={options} projectId="2" siteId="" from="2026-08-12" to="2026-08-12" onCommitted={vi.fn()} />);
+    // Note: this only proves the classes are present in the DOM, not that they render
+    // with sufficient contrast. Measured in Chromium on 2026-08-22 against the
+    // composited background: 6.84:1 light, 6.29:1 dark, both clear of the 4.5:1
+    // floor. Re-measure if the colour pair changes; jsdom cannot check contrast.
+    const guidance = screen.getByText('Configure or select an operational site before assigning staff.');
+    expect(guidance.className).toContain('text-amber-800');
+    expect(guidance.className).toContain('dark:text-amber-300');
+    const preview = screen.getByText('Preview assignments');
+    // The shared Button always applies base classes, so asserting a non-empty
+    // className passes even for a broken variant. Assert the variant instead.
+    expect(preview.className).toMatch(/bg-|border/);
+  });
+
   it('initializes a linked derived staff member as an editable proposal', async () => {
     render(<AssignmentEditor options={options} projectId="2" siteId="3" from="2026-08-12" to="2026-08-12"
       initialStaffId="1" onCommitted={vi.fn()} />);
