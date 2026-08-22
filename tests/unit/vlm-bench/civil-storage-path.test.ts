@@ -43,4 +43,12 @@ describe('resolveStoragePath', () => {
     // /home/velo/storage/qa-photos-backup must NOT pass a naive startsWith check
     expect(resolveStoragePath('../qa-photos-backup/secret.jpg')).toBeNull();
   });
+
+  // Documents current behaviour rather than asserting a security property: an
+  // empty key is not an escape, so it is returned. The read then fails EISDIR
+  // in seal.ts and the case is dropped. Pinned so a future "tighten the guard"
+  // change has to decide about this case deliberately.
+  it('returns the root itself for an empty key (caller fails EISDIR on read)', () => {
+    expect(resolveStoragePath('')).toBe(ROOT);
+  });
 });

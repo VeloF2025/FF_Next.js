@@ -65,6 +65,18 @@ const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-phot
  * `storage_key` comes from a DB column, so it is not trusted to stay inside
  * STORAGE_ROOT. Resolve it and require the result to still be under the root,
  * or the harvest would happily read arbitrary files off the box.
+ *
+ * The check is LEXICAL: path.resolve + a `root + sep` prefix compare. It does
+ * not call realpath, so a symlink planted inside qa-photos/ that points outside
+ * the root would still be followed at read time. Closing that needs realpath,
+ * which we deliberately skip — placing a symlink in that directory already
+ * requires a foothold on velo far larger than control of a DB row, so it would
+ * buy nothing here. Revisit if this ever runs against untrusted storage.
+ *
+ * Returns the resolved absolute path, or null if the key escapes the root.
+ * An empty key resolves to the root directory itself; seal.ts's readFile then
+ * fails EISDIR and the case is reported as dropped, which is the intended
+ * outcome — a bad row is skipped loudly, never read.
  */
 export function resolveStoragePath(storageKey: string): string | null {
   if (storageKey.includes('\0')) return null;
