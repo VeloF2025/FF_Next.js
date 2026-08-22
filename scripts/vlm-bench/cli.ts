@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { serialsPack } from './packs/serials';
 import { categorizationPack } from './packs/categorization';
-import { civilQaPack } from './packs/civilQa';
+import { civilQaPack, civilQaHoldoutPack } from './packs/civilQa';
 import { stepMetrics, strataBreakdown } from './scoring/steps';
 import { harvest, closeHarvestPool } from './harvest';
 import { runPack } from './engine/runner';
@@ -22,6 +22,7 @@ const PACKS: Record<string, VlmTestPack> = {
   serials: serialsPack,
   categorization: categorizationPack,
   'civil-qa': civilQaPack,
+  'civil-qa-holdout': civilQaHoldoutPack,
 };
 const MIN_GOLDEN = 100;
 
@@ -70,6 +71,15 @@ async function cmdRun(): Promise<void> {
 
   // Step packs: one pass rate hides which step the model actually confuses, and
   // hides whether it only passed the easy stratum. Print both.
+  // Per-case detail is deliberately NOT stored in vlm_bench_runs (resultStore
+  // strips it), so a confusion matrix needs a local dump. Opt-in, local file
+  // only — the stored row is unchanged.
+  const dump = arg('dump');
+  if (dump) {
+    fs.writeFileSync(dump, `${JSON.stringify({ runId: id, pack: pack.id, cases: packResult.cases }, null, 2)}\n`);
+    process.stdout.write(`  per-case detail → ${dump}\n`);
+  }
+
   const metrics = stepMetrics(packResult.cases);
   if (metrics.length > 0) {
     for (const [stratum, s] of Object.entries(strataBreakdown(packResult.cases))) {
@@ -116,9 +126,15 @@ function cmdCoverage(): void {
   else if (cmd === 'coverage') cmdCoverage();
   else if (cmd === 'harvest') await cmdHarvest();
   else {
-    process.stdout.write('usage: cli.ts run|coverage|harvest [--pack <id>] [--mode golden|live] [--size N] [--seed S]\n');
+    process.stdout.write('usage: cli.ts run|coverage|harvest [--pack <id>] [--mode golden|live] [--size N] [--seed S] [--dump FILE]\n');
     process.exit(1);
   }
+  // `run` writes through @/lib/db-pool, whose pool has no exported close and
+  // keeps the event loop alive indefinitely — the run finishes, prints its
+  // result, then hangs. Close what we own and exit explicitly so a sequence of
+  // packs can't stall on a completed run.
+  await closeHarvestPool();
+  process.exit(0);
 })().catch((e) => {
   process.stderr.write(`${(e as Error).message}\n`);
   process.exit(1);

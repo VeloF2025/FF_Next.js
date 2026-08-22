@@ -25,39 +25,57 @@ export function buildPhotoPrompt(
   const classificationBlock = isClassification ? `
 You must CLASSIFY which checklist step this photo belongs to.
 
-CIVIL CHECKLIST STEPS (in order of the installation process):
-  Step 1 - Before Photo: Ground-level photo BEFORE digging. Shows chalk/spray paint markings (circle, square, X) on INTACT undisturbed ground OR just flat ground where the pole will go. NO hole, NO pole, NO digging yet. Can be a simple photo of the ground/area.
-  Step 2 - During Photo: Active excavation — an OPEN HOLE visible in the ground, workers digging, spade/pick visible, freshly dug earth piled beside hole. Ground has been BROKEN OPEN. NO pole installed yet. The hole is EMPTY (no pole in it).
-  Step 3 - Depth Photo: Measuring tape, ruler, or marked stick placed INSIDE the hole showing depth measurement. The measuring instrument is the key visual element.
-  Step 4 - End Plates: Close-up of metal end-plates, HDPE strapping, cap plates, or metal brackets bolted/attached to the pole. Shows hardware/fittings on the pole itself. Can show metal straps, bolts, or rectangular plates at pole base or top. THIS IS NOT ground — it's metal hardware ON the pole.
-  Step 5 - Compaction / Backfill: Ground AROUND the base of a STANDING pole that has been filled and compacted with sand+cement mix. The pole is already installed and the hole is FILLED (not open). Surface is packed/tamped — NOT a loose heap.
-  Step 6 - Level Check: A spirit level (bubble level tool) held AGAINST the side of an upright pole. The yellow/green bubble tool is the key visual indicator.
-  Step 7 - After Photo: Wide shot taken from a DISTANCE showing the full pole standing upright. You can see the entire pole from base to top, usually with sky/background visible. Taken standing BACK from the pole.
-  Step 0 - Unrelated: ONLY use this for optical/fibre equipment (splice trays, domes, ONTs, fibre cables) or photos completely unrelated to pole installation.
+Work through this ordered decision procedure and STOP at the first step that matches.
+Each test is about what is VISIBLE in the frame, not about what the crew was doing.
+
+  1. Is the flat CUT END of a pole the subject of the photo — a round/octagonal
+     end face, usually with a stamped metal cap and a coloured (often red)
+     centre plug, normally a close-up? → Step 4 (End Plates).
+     The pole is usually LYING ON THE GROUND for this photo. Soil, gravel or
+     rubble around it does NOT make it a ground photo.
+  2. Is a spirit level (bubble level) held against a pole? → Step 6 (Level Check).
+  3. Is a tape measure, ruler or marked stick inside a hole? → Step 3 (Depth).
+  4. Is a pole STANDING UPRIGHT in the ground?
+     a. Can you see the WHOLE pole, base AND top, with sky or open background
+        above it (a wide shot taken from a distance)? → Step 7 (After).
+     b. Otherwise the frame is cropped to the pole BASE and the ground around
+        it → Step 5 (Compaction / Backfill).
+  5. No pole is standing and none is the subject. Is the ground BROKEN OPEN —
+     an open hole, a trench, piled excavated soil, someone digging? → Step 2 (During).
+  6. Is the ground INTACT — flat, undisturbed, possibly with chalk or spray-paint
+     marks where the pole will go? → Step 1 (Before).
+  7. Optical/fibre equipment or something with nothing to do with pole
+     installation → Step 0 (Unrelated).
+
+CIVIL CHECKLIST STEPS:
+  Step 1 - Before Photo: Intact undisturbed ground where the pole will go, often with chalk/spray markings. NO hole, NO pole.
+  Step 2 - During Photo: Broken ground with NO POLE ANYWHERE IN THE FRAME — an open hole, trench, or excavation in progress.
+  Step 3 - Depth Photo: Tape measure, ruler or marked stick inside the hole, showing depth.
+  Step 4 - End Plates: Close-up of the pole's CUT END FACE and its end cap/plate — a round or octagonal stamped plate, usually with a coloured centre plug. The pole is typically lying horizontally on the ground.
+  Step 5 - Compaction / Backfill: Close-up of the base of a STANDING pole and the ground around it, being filled or already filled. The material may be loose, wet, heaped or packed — all of these are Step 5. A worker tamping with a rod, or a base plate sitting on the soil, is Step 5.
+  Step 6 - Level Check: A spirit level held against an upright pole.
+  Step 7 - After Photo: Wide shot from a distance showing the ENTIRE standing pole, base to top, against sky or open background.
+  Step 0 - Unrelated: ONLY optical/fibre equipment, or photos with nothing to do with pole installation.
+
+⚠️ A PERSON OR A HAND TOOL IN THE FRAME DECIDES NOTHING.
+  Workers appear at every stage. A worker beside a standing pole is Step 5 or 7,
+  never Step 2. Step 2 requires that NO pole is present at all.
 
 ⚠️ CRITICAL RULE: DO NOT classify as "Unrelated" (Step 0) unless the photo shows:
   - Optical/fibre equipment (splice trays, domes, fibre cables, ONTs, patch panels)
   - Something completely unrelated to pole installation (vehicles, people posing, documents)
   If the photo shows ANYTHING related to a pole, ground, hole, or construction → it is NOT Unrelated.
-  Based on 1212 human corrections, 38% of all VLM errors are valid civil photos wrongly classified as Unrelated.
+  A close-up of a pole end cap is Step 4, not Unrelated.
 
-⚠️ TOP CONFUSION PAIRS (from 1212 human corrections — avoid these mistakes):
-  1. During (2) vs Compaction (5): 208 errors. KEY: Is the hole OPEN and EMPTY → Step 2. Is the hole FILLED with pole standing → Step 5.
-  2. Unrelated (0) vs End Plates (4): 200 errors. Close-up of metal hardware on a pole = Step 4, NOT unrelated.
-  3. Unrelated (0) vs Before Photo (1): 152 errors. Ground-level photo without a hole = Step 1, NOT unrelated.
-  4. Compaction (5) vs End Plates (4): 66 errors. Metal fittings/straps = Step 4. Packed earth surface = Step 5.
-  5. Unrelated (0) vs After Photo (7): 62 errors. Wide shot showing a standing pole = Step 7, NOT unrelated.
-  6. During (2) vs After Photo (7): 47 errors. If a pole is STANDING in the photo → Step 7. Step 2 has NO pole.
-
-⚠️ BEFORE vs DURING:
-  Step 1 (Before): Ground is FLAT and UNBROKEN. Paint/chalk marks on intact soil. NO hole.
-  Step 2 (During): Ground is BROKEN. A DUG HOLE, piled dirt, or active digging. NO pole yet.
-  → Intact ground = Step 1. Broken ground with hole = Step 2.
-
-⚠️ DURING vs COMPACTION (most confused pair — 208 errors):
-  Step 2 (During): Hole is OPEN and EMPTY. No pole installed. Workers may be digging.
-  Step 5 (Compaction): Pole is STANDING. Hole is FILLED and PACKED around the pole base.
-  → No pole + open hole = Step 2. Pole standing + filled ground = Step 5.
+⚠️ THE THREE MISTAKES THIS MODEL ACTUALLY MAKES (measured on 160 human-labelled photos):
+  1. End Plates (4) called Compaction (5): the pole's cut end lying on soil is
+     read as "ground at a pole base". If the END FACE of the pole is what you
+     are looking at, it is Step 4 — no matter what is under the pole.
+  2. Compaction (5) called During (2): backfill in progress is read as digging.
+     If a pole is STANDING in the frame it can never be Step 2.
+  3. After (7) called During (2) or Before (1): a distant pole is missed and the
+     photo is judged on its foreground ground. Look for the pole first; if the
+     whole pole is visible against the sky, it is Step 7.
 
 ⚠️ OPTICAL EQUIPMENT = UNRELATED (Step 0):
 Only these are unrelated: splice trays, fibre closures, dome joints, dome interiors, ODF panels, patch panels, fibre labels, cable termination boxes, ONTs, loose fibre strands.

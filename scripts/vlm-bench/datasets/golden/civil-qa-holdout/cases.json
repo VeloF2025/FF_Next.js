@@ -1,0 +1,1442 @@
+[
+  {
+    "id": "civilho-0001",
+    "imageRef": "civilho-0001.jpg",
+    "sha256": "1e99c60312e624cbfa10944781104e82470081d23d10f233714a1aabda73013f",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "2a33e30a-3918-555c-b702-5b7a08da09bf",
+      "photoId": "b49e87b1-aac0-5584-998c-a6a7c4cb32d6",
+      "storageKey": "thembisa-pop-1/TEM.P.C620/c9fe5caf-db71-41da-ab01-2d6f803e2a8b.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "b49e87b1-aac0-5584-998c-a6a7c4cb32d6"
+      }
+    }
+  },
+  {
+    "id": "civilho-0002",
+    "imageRef": "civilho-0002.jpeg",
+    "sha256": "7967adfd717f00367b17981362910b71e89978d566975e2101c48923e5dfdc7b",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "feab3c88-8f95-402f-81c8-a2f2a0ab3608",
+      "photoId": "37e59b17-3fb0-5687-a72d-52a91a5295a0",
+      "storageKey": "thembisa-pop-1/TEM.P.C568/WhatsApp Image 2026-04-29 at 11.12.27 AM.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "37e59b17-3fb0-5687-a72d-52a91a5295a0"
+      }
+    }
+  },
+  {
+    "id": "civilho-0003",
+    "imageRef": "civilho-0003.jpg",
+    "sha256": "a82abcdc0a659be96c8dd3ffbb12b7fc95560c2465356ef87625109a8ba400a7",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "d0767731-cc43-51e0-8fce-b6fa74d5a8ad",
+      "photoId": "eb6a8ae4-f75a-5e17-aaaa-eb0a63a69ffb",
+      "storageKey": "thembisa-pop-1/TEM.P.C627/bd1f5174-9af4-4680-8111-fe0830494c4f.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "eb6a8ae4-f75a-5e17-aaaa-eb0a63a69ffb"
+      }
+    }
+  },
+  {
+    "id": "civilho-0004",
+    "imageRef": "civilho-0004.jpg",
+    "sha256": "d75b80e4aab9f08b076a7ab8facc00161c6db463372e3b3421e606285c5d0ff2",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_wrong",
+      "reviewId": "54968f8b-6118-5f98-845e-f80d87d2ad9f",
+      "photoId": "f121f605-a4f4-5a37-a4af-6d7c29ab5a19",
+      "storageKey": "thembisa-pop-1/TEM.P.C296/31283fd2-7d0f-4be4-96ce-9d97a230b9d2.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "f121f605-a4f4-5a37-a4af-6d7c29ab5a19"
+      }
+    }
+  },
+  {
+    "id": "civilho-0005",
+    "imageRef": "civilho-0005.jpg",
+    "sha256": "a94415517cbfa33b0f7ec652c86a479e18972f1c3bd2c79f4dd59a8db05cad62",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "0d5c3d77-dddb-5cdf-a742-0fef7292dc21",
+      "photoId": "f3c51110-7d92-5b58-9f5a-8c9ad90cba7b",
+      "storageKey": "thembisa-pop-1/TEM.P.C800/96ff00e6-f53a-4fb9-abad-9e757ccb4bbf.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "f3c51110-7d92-5b58-9f5a-8c9ad90cba7b"
+      }
+    }
+  },
+  {
+    "id": "civilho-0006",
+    "imageRef": "civilho-0006.jpg",
+    "sha256": "cab5eff24ee042af8699652ea06aa69b2294a7c8899d2c93083c8db1125181d8",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "445f2dad-ef11-47b7-9e6e-c29a5e239ecf",
+      "photoId": "cb55455e-29f2-49ff-a99c-4d4c5a4d0b7c",
+      "storageKey": "etwatwa/ETW.P.F794/5de01a62-59e5-4738-bb64-cccc645194b6.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "cb55455e-29f2-49ff-a99c-4d4c5a4d0b7c"
+      }
+    }
+  },
+  {
+    "id": "civilho-0007",
+    "imageRef": "civilho-0007.jpg",
+    "sha256": "c2a5e7960fca4b8416a1845da4a053d30675b8c32fef8256c57594ea3ea8ad4a",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "787f27fa-64e2-5d43-85b0-1745aca015a5",
+      "photoId": "7f5b9b37-8ca0-5aa9-9e95-cb250f655040",
+      "storageKey": "thembisa-pop-1/TEM.P.C649/63b8fa67-4483-456c-81fe-053d3b098388.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "7f5b9b37-8ca0-5aa9-9e95-cb250f655040"
+      }
+    }
+  },
+  {
+    "id": "civilho-0008",
+    "imageRef": "civilho-0008.jpg",
+    "sha256": "7c5f561aecd560d56317e9a64852174bed5f94d731dc98ae3a6617522e5a27b4",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "3eaf89f9-f40e-476d-96d7-e4d80d57b53d",
+      "photoId": "06b86fc2-ce03-4f1d-9e72-68020f5cfdfe",
+      "storageKey": "etwatwa/ETW.P.H297/6690e157-bbb0-4d29-93a9-4f39e8cedd20.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "06b86fc2-ce03-4f1d-9e72-68020f5cfdfe"
+      }
+    }
+  },
+  {
+    "id": "civilho-0009",
+    "imageRef": "civilho-0009.jpeg",
+    "sha256": "df4de74fd7a8c14d22fc0edcba2053e5c52754181dd319c63b3b06eae48be0b5",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "8214dfee-4dce-56f4-bd74-eaa4af789130",
+      "photoId": "172c40ac-1882-4eab-b331-d352bcaa7a9b",
+      "storageKey": "etwatwa/ETW.P.H450/WhatsApp Image 2026-02-26 at 20.21.05.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "172c40ac-1882-4eab-b331-d352bcaa7a9b"
+      }
+    }
+  },
+  {
+    "id": "civilho-0010",
+    "imageRef": "civilho-0010.jpeg",
+    "sha256": "f6dc7e067b7fa9e9f995d7fc8543a82944b213abeb5ce4ad428087e23d3bff1c",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_wrong",
+      "reviewId": "2c23b3cf-9292-4261-85b2-4a9edd7e562b",
+      "photoId": "261e7cec-d454-4529-9b7e-acb8edfa983f",
+      "storageKey": "etwatwa/ETW.P.H731/WhatsApp Image 2026-02-24 at 16.48.36.stamper.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "261e7cec-d454-4529-9b7e-acb8edfa983f"
+      }
+    }
+  },
+  {
+    "id": "civilho-0011",
+    "imageRef": "civilho-0011.jpeg",
+    "sha256": "2d36ec7f94383efe3d48f8e969e6ecfbb0ff4c8a57a01d2d02689b78e5999518",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "bbf02bd6-2f0b-5ad8-8f0e-8fac3fb8beaf",
+      "photoId": "05271f67-b73d-5757-ba30-d3dd1d368e4f",
+      "storageKey": "thembisa-pop-1/TEM.P.C428/WhatsApp Image 2026-02-10 at 3.09.01 PM (2).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "05271f67-b73d-5757-ba30-d3dd1d368e4f"
+      }
+    }
+  },
+  {
+    "id": "civilho-0012",
+    "imageRef": "civilho-0012.jpg",
+    "sha256": "996bcd4f55b9dfac91a17e63e256ce3e7bb32cd8ad5b82e42dbf5cf99a364e03",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "e6f24f1c-ddde-5335-8ecd-cfeb4c75539a",
+      "photoId": "58bcda4c-166a-535e-ad70-6b8ee2b6777e",
+      "storageKey": "thembisa-pop-1/TEM.P.C686/a0a13085-b292-45e1-afc6-2491c1fd42bc.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "58bcda4c-166a-535e-ad70-6b8ee2b6777e"
+      }
+    }
+  },
+  {
+    "id": "civilho-0013",
+    "imageRef": "civilho-0013.jpg",
+    "sha256": "66d0d36db5acb187e75ab455ff95f9e54028457cc9bbc8a9c6e38eac19936f30",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "a240b95a-0e6c-5ce8-bb50-6c428e882e41",
+      "photoId": "98f57c87-5b78-53a7-9615-28983cc590f9",
+      "storageKey": "thembisa-pop-1/TEM.P.C730/aa68b930-0746-4969-870a-dab561889e8d.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "98f57c87-5b78-53a7-9615-28983cc590f9"
+      }
+    }
+  },
+  {
+    "id": "civilho-0014",
+    "imageRef": "civilho-0014.jpeg",
+    "sha256": "b28f8343bb1a5d4eb42562784d4ee9895549cd34dbaf8093d293bcbdf94a263d",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "6847428a-053a-4f8a-919a-e403205cba41",
+      "photoId": "df76b044-d9b8-50e0-be31-4b7c6e851158",
+      "storageKey": "thembisa-pop-1/TEM.P.C566/WhatsApp Image 2026-04-29 at 11.07.03 AM.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "df76b044-d9b8-50e0-be31-4b7c6e851158"
+      }
+    }
+  },
+  {
+    "id": "civilho-0015",
+    "imageRef": "civilho-0015.jpg",
+    "sha256": "713f409316bde080899677968858b974136d495e9afdec75e9a5317a231d78f1",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "d0767731-cc43-51e0-8fce-b6fa74d5a8ad",
+      "photoId": "0c8927ce-ce4c-592f-b6b0-e362947fe039",
+      "storageKey": "thembisa-pop-1/TEM.P.C627/0bc1e837-2f15-4d65-937f-bf8328922777.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "0c8927ce-ce4c-592f-b6b0-e362947fe039"
+      }
+    }
+  },
+  {
+    "id": "civilho-0016",
+    "imageRef": "civilho-0016.jpeg",
+    "sha256": "eedfbfaecfd60de85c592cae72d000ba14058c312526deaaf52ba47394a18071",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "6bafa3b1-469f-4339-86ed-af2aec6513c1",
+      "photoId": "63776891-c2eb-4f0b-8e46-19396c3fc935",
+      "storageKey": "etwatwa/ETW.P.H252/WhatsApp Image 2026-03-15 at 18.51.40.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "63776891-c2eb-4f0b-8e46-19396c3fc935"
+      }
+    }
+  },
+  {
+    "id": "civilho-0017",
+    "imageRef": "civilho-0017.jpg",
+    "sha256": "773b9d71f9acd59ae82c7978debe5ddf25ce555a0e9b5ca0448b3d55cfeabc2b",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "29b00b3e-6316-530f-a12e-abe3c1396797",
+      "photoId": "27733c90-5aca-51a1-bdd9-7636d43f4add",
+      "storageKey": "thembisa-pop-1/TEM.P.C707/3e34a97f-4e2a-47ee-ac5b-49058c077129.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "27733c90-5aca-51a1-bdd9-7636d43f4add"
+      }
+    }
+  },
+  {
+    "id": "civilho-0018",
+    "imageRef": "civilho-0018.jpeg",
+    "sha256": "e46719bb0d71b22ff60436f326eaaa5b50082f271fb50344884fc0f74174a875",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "4fbbfb1e-df44-4426-a459-d8a1a1fe9981",
+      "photoId": "eed3b5a2-7457-56e8-a0b2-a3d372d25739",
+      "storageKey": "thembisa-pop-1/TEM.P.C555/WhatsApp Image 2026-04-22 at 1.02.04 PM.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "eed3b5a2-7457-56e8-a0b2-a3d372d25739"
+      }
+    }
+  },
+  {
+    "id": "civilho-0019",
+    "imageRef": "civilho-0019.jpg",
+    "sha256": "a473a42769316a4b35aff5d3bea80fe9a9a23ed0d71dc9906456df72c1b551ae",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "d95224d1-1e11-51db-bbaa-af36569c1a1a",
+      "photoId": "9483b037-71c2-537d-bf93-4af7997cd038",
+      "storageKey": "thembisa-pop-1/TEM.P.C335/5cc8e68d-666c-425e-a096-64c2e2c74da3.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "9483b037-71c2-537d-bf93-4af7997cd038"
+      }
+    }
+  },
+  {
+    "id": "civilho-0020",
+    "imageRef": "civilho-0020.jpg",
+    "sha256": "e0296c4f8290bf61f9365beffdf808c8232e1f59efa8d55a06af95dc2e951f72",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "0529427d-63c8-4077-91c3-82d256e741bb",
+      "photoId": "a4442186-f3ba-43b5-93c5-0d84d4bc6b4f",
+      "storageKey": "etwatwa/ETW.P.H877/146f9458-596b-410a-8634-c2d17db717e8.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "a4442186-f3ba-43b5-93c5-0d84d4bc6b4f"
+      }
+    }
+  },
+  {
+    "id": "civilho-0021",
+    "imageRef": "civilho-0021.jpg",
+    "sha256": "36ec7d7edf11843bd6d46756a7fa5d92d24b04f71f7f6851e6264fd3be12b527",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "a240b95a-0e6c-5ce8-bb50-6c428e882e41",
+      "photoId": "b678022e-6ada-5a06-bfd1-94ae97ed8acb",
+      "storageKey": "thembisa-pop-1/TEM.P.C730/5525c047-f72f-4647-82a4-2fe6c0b2789b.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "b678022e-6ada-5a06-bfd1-94ae97ed8acb"
+      }
+    }
+  },
+  {
+    "id": "civilho-0022",
+    "imageRef": "civilho-0022.jpeg",
+    "sha256": "6516835f2b07200f1d8a790a7966bb9fae7ae3e0d35f875301b98caaddf39050",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_wrong",
+      "reviewId": "507894df-877e-55f8-9739-f412dc940405",
+      "photoId": "2145bebd-c8be-5b0d-98de-d6185c8fbd75",
+      "storageKey": "etwatwa/ETW.P.H569/attachment_5198_308579_2849394.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "2145bebd-c8be-5b0d-98de-d6185c8fbd75"
+      }
+    }
+  },
+  {
+    "id": "civilho-0023",
+    "imageRef": "civilho-0023.jpeg",
+    "sha256": "ff25c139adf7db893aec105a03c9b1327a83da789ed9f55971f7404640cbbd8d",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "3d695fc0-8649-5e0f-90ba-0a568a1aa3c0",
+      "photoId": "7857b5df-7bc3-5a94-b225-4ba43d40fcd6",
+      "storageKey": "thembisa-pop-1/TEM.P.C422/WhatsApp Image 2026-02-10 at 2.47.30 PM.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "7857b5df-7bc3-5a94-b225-4ba43d40fcd6"
+      }
+    }
+  },
+  {
+    "id": "civilho-0024",
+    "imageRef": "civilho-0024.jpg",
+    "sha256": "41a1b1516801b681919a1b93e54ba9468e22eafbd974e7c2746c120186f529bb",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "22578f2f-938c-5870-850b-06c8450de25c",
+      "photoId": "a7b2adf3-624a-5dae-9ca6-89c6bb140e61",
+      "storageKey": "thembisa-pop-1/TEM.P.C207/c94db0a9-cac9-422e-bf0b-73d1a50e0bfe.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "a7b2adf3-624a-5dae-9ca6-89c6bb140e61"
+      }
+    }
+  },
+  {
+    "id": "civilho-0025",
+    "imageRef": "civilho-0025.jpg",
+    "sha256": "ce03dfdaeb4c40cb66e8b995db8ea6069513b444fcbd1cd948102aa99da940e0",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "3239cb49-31ab-5207-9df9-70db03eab589",
+      "photoId": "faff195e-1ab8-5ed4-b67c-0b3cab84ae07",
+      "storageKey": "thembisa-pop-1/TEM.P.C656/a71d8fec-ffb7-4a41-acde-59d23a590956.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "faff195e-1ab8-5ed4-b67c-0b3cab84ae07"
+      }
+    }
+  },
+  {
+    "id": "civilho-0026",
+    "imageRef": "civilho-0026.jpg",
+    "sha256": "264771bb65771cccad27b5c546938df90032fc8910479d1e2daf3b7dc58cf0a1",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "0515f537-9a09-5623-b744-06f63b849fc0",
+      "photoId": "c5309a24-8b08-5b76-87f3-e455f55be3d5",
+      "storageKey": "thembisa-pop-1/TEM.P.C037/98c83678-e8b3-41a0-b48e-8bfb17645b46.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "c5309a24-8b08-5b76-87f3-e455f55be3d5"
+      }
+    }
+  },
+  {
+    "id": "civilho-0027",
+    "imageRef": "civilho-0027.jpeg",
+    "sha256": "b2b94baa47fc390d1b207c08f2fc7c9bc503ef5f9ba54a6ceae528fff690f289",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "d83492e7-3cfb-5f62-b581-ea18d2296a51",
+      "photoId": "460057d2-a9f4-58b0-ba61-012e2bcc35ae",
+      "storageKey": "etwatwa/ETW.P.H342/attachment_5198_308352_2897713.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "460057d2-a9f4-58b0-ba61-012e2bcc35ae"
+      }
+    }
+  },
+  {
+    "id": "civilho-0028",
+    "imageRef": "civilho-0028.jpeg",
+    "sha256": "04cc8c9f4b845320ed2c16c939ed0eeb16b5ebcb49d4c54f93ea214ef3cba64e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "0e69bcbb-b85f-5822-815e-0b59801442ea",
+      "photoId": "bed1e91a-e9a7-562d-933a-199b0ca90ce6",
+      "storageKey": "thembisa-pop-1/TEM.P.C511/WhatsApp Image 2026-02-11 at 16.36.07 (1).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "bed1e91a-e9a7-562d-933a-199b0ca90ce6"
+      }
+    }
+  },
+  {
+    "id": "civilho-0029",
+    "imageRef": "civilho-0029.jpeg",
+    "sha256": "7bc6b0809317445075305a2d3862a2b3660d480e2390fbb204d856b857ddca27",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "00b5e1d8-4bb9-5072-b4cb-f4fb751881d3",
+      "photoId": "3f9bbc8b-02cc-51e8-b817-4437bbb57d89",
+      "storageKey": "thembisa-pop-3/TEM.P.I405/WhatsApp Image 2026-02-17 at 10.43.43 (2).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "3f9bbc8b-02cc-51e8-b817-4437bbb57d89"
+      }
+    }
+  },
+  {
+    "id": "civilho-0030",
+    "imageRef": "civilho-0030.jpg",
+    "sha256": "be7f4004a9f3f7d9bf685d8fda4b609798b8167aa792e95a7951ce936ab66105",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "48a6f30c-e843-5d17-8519-59b24b7b9615",
+      "photoId": "f597a343-674e-5cb5-9bef-bc032471ee11",
+      "storageKey": "thembisa-pop-3/TEM.P.H251/37331711-551d-4b5e-abb8-c6e8f591f1f0.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "f597a343-674e-5cb5-9bef-bc032471ee11"
+      }
+    }
+  },
+  {
+    "id": "civilho-0031",
+    "imageRef": "civilho-0031.jpeg",
+    "sha256": "c7ac77eeb316dc36197190e879e38f4c0a2bead2f5d8673588d8732def628876",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_wrong",
+      "reviewId": "659cb74a-585f-559e-ba2d-98f530ce9d72",
+      "photoId": "9e5dd7b3-3586-587d-9ba9-a135edf36fb9",
+      "storageKey": "thembisa-pop-1/TEM.P.A005/WhatsApp Image 2026-02-18 at 15.35.04.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "9e5dd7b3-3586-587d-9ba9-a135edf36fb9"
+      }
+    }
+  },
+  {
+    "id": "civilho-0032",
+    "imageRef": "civilho-0032.jpg",
+    "sha256": "1bd53fd3487ec4ef51036390be5d79ec15b56f309b052d89a6437fa4b994ef70",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "b9930125-8e02-5541-801b-c36ee5b485b1",
+      "photoId": "966b2471-542d-5777-b93b-96b692bb1218",
+      "storageKey": "thembisa-pop-1/TEM.P.C342/acb35624-d6a7-48c8-be99-3060d262bca6.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "966b2471-542d-5777-b93b-96b692bb1218"
+      }
+    }
+  },
+  {
+    "id": "civilho-0033",
+    "imageRef": "civilho-0033.jpg",
+    "sha256": "0066d1c4c44e53f1cc717702c3f50f097e70d4beb192bf8880c820e018f0564e",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "14efd5c9-d664-5e25-be4b-4cf403187fca",
+      "photoId": "922fe5b2-4dd7-535f-bca5-245737a31343",
+      "storageKey": "thembisa-pop-1/TEM.P.C341/b6bb1d50-f157-4c08-b04a-55e390e4c3c4.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "922fe5b2-4dd7-535f-bca5-245737a31343"
+      }
+    }
+  },
+  {
+    "id": "civilho-0034",
+    "imageRef": "civilho-0034.jpeg",
+    "sha256": "5b9a00ecafa685826dcb9187d8c64845f6f143cacd79eb47364f7d4bc61dadf7",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "3f1182df-8ce9-44a8-a73d-47f7472ffd7a",
+      "photoId": "d2e8ef11-3555-5f85-b179-1b0a3d648b43",
+      "storageKey": "thembisa-pop-1/TEM.P.C280/WhatsApp Image 2026-03-11 at 2.52.15 PM.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "d2e8ef11-3555-5f85-b179-1b0a3d648b43"
+      }
+    }
+  },
+  {
+    "id": "civilho-0035",
+    "imageRef": "civilho-0035.jpg",
+    "sha256": "e5baabace1409a225cefe25d6c44b85dfd43dc12246d425c23e58bd159829ef5",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "3efd5530-21be-4ac4-989f-8c33cfbf37ce",
+      "photoId": "5d3a7858-a505-4db3-8499-b800c000d73e",
+      "storageKey": "etwatwa/ETW.P.H876/8e4aa7db-8cc8-45cb-893b-b980019ae5f2.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "5d3a7858-a505-4db3-8499-b800c000d73e"
+      }
+    }
+  },
+  {
+    "id": "civilho-0036",
+    "imageRef": "civilho-0036.jpeg",
+    "sha256": "22c2baed5c5a33da2ea38c7d0d04eaa96c53de58ae0de85d0f98d5ca49dfe8f6",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "26836e43-8b11-5a75-9132-60957f1d2aea",
+      "photoId": "91123afb-1c1f-51e8-93d5-bbfc2a7da363",
+      "storageKey": "etwatwa/ETW.P.H519/attachment_5198_308529_2883133.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "91123afb-1c1f-51e8-93d5-bbfc2a7da363"
+      }
+    }
+  },
+  {
+    "id": "civilho-0037",
+    "imageRef": "civilho-0037.jpg",
+    "sha256": "2f27528719e2c8895e47a1d87166b5dda5a7bb9470701c7b18cc3524c85528ea",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "0c143d2a-29b6-5dcf-b439-c07577162883",
+      "photoId": "27311d85-6468-5a03-adfb-142dbcf3b859",
+      "storageKey": "thembisa-pop-1/TEM.P.C632/03515030-e097-444f-8e1c-df8630a75ac3.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "27311d85-6468-5a03-adfb-142dbcf3b859"
+      }
+    }
+  },
+  {
+    "id": "civilho-0038",
+    "imageRef": "civilho-0038.jpg",
+    "sha256": "20ffaa7cf96e3c3117eb8d58563962e38c3a10e604f0f76637ad3e71d7e8c6c1",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_wrong",
+      "reviewId": "facc2820-4596-448f-a2b7-318a1bf190db",
+      "photoId": "39cae1dd-e198-4a08-bf49-36cac498a585",
+      "storageKey": "etwatwa/ETW.P.H266/v20260223092831-30370a56",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "39cae1dd-e198-4a08-bf49-36cac498a585"
+      }
+    }
+  },
+  {
+    "id": "civilho-0039",
+    "imageRef": "civilho-0039.jpg",
+    "sha256": "d7e8ea08b92241a4521c9114cb0d0649161ebefcb0c607013a25443293056705",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "442e6db5-4c2d-4c83-9189-85c93fdf308a",
+      "photoId": "40af8ab2-38bd-5b6e-a606-49a63dde5e6c",
+      "storageKey": "thembisa-pop-1/TEM.P.C324/fe92c045-977f-458e-a9b9-34563dbb1ee5.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "40af8ab2-38bd-5b6e-a606-49a63dde5e6c"
+      }
+    }
+  },
+  {
+    "id": "civilho-0040",
+    "imageRef": "civilho-0040.jpg",
+    "sha256": "eaed45213bf6466566dc8433c256616936673c7dcc724122e36fd7b4121d2131",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "78fb6f48-ecdf-5441-803a-6cdac836cd74",
+      "photoId": "43c4af0f-c7fb-5cfb-99e2-3109515652a3",
+      "storageKey": "thembisa-pop-1/TEM.P.C461/d09e9b5a-61d9-4f0a-8df6-1cfbc4540c15.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "43c4af0f-c7fb-5cfb-99e2-3109515652a3"
+      }
+    }
+  },
+  {
+    "id": "civilho-0041",
+    "imageRef": "civilho-0041.jpg",
+    "sha256": "1fe7fd4b2941f60b0a645bea1cce8dbe03a588403e64fd6b0e9bc89cd6925c70",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "reviewId": "633e7359-22a8-4432-8e0b-7f0610b0e0b5",
+      "photoId": "ed47abf2-22d4-441e-9f91-4e60f36fbd20",
+      "storageKey": "thembisa-pop-3/TEM.P.I416/thm-3-poles-thm-3-poles_20260219103037496.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "ed47abf2-22d4-441e-9f91-4e60f36fbd20"
+      }
+    }
+  },
+  {
+    "id": "civilho-0042",
+    "imageRef": "civilho-0042.jpg",
+    "sha256": "a9de068a048697fddbb4960ad79bc07103637303a5b0225e7e7da929ad5231b6",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "64ce733b-81a6-4b31-82c4-0422082a064a",
+      "photoId": "842c5bb8-e061-4bfd-be54-9fbe057fa389",
+      "storageKey": "etwatwa/ETW.P.H247/539fb698-c6e3-4db2-a4a9-bc0ab194f2e2.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "842c5bb8-e061-4bfd-be54-9fbe057fa389"
+      }
+    }
+  },
+  {
+    "id": "civilho-0043",
+    "imageRef": "civilho-0043.jpeg",
+    "sha256": "adc1182d7a925754850087fbf2a42d3758e0b4fb7a6ba1d4ef8f83c08b28df36",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "6a539089-f687-59c9-8f7c-51d31f8f320a",
+      "photoId": "ef2542e3-bb81-5659-b263-e98a8be4bef2",
+      "storageKey": "thembisa-pop-1/TEM.P.C136/WhatsApp Image 2026-04-10 at 10.15.16 AM (2).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "ef2542e3-bb81-5659-b263-e98a8be4bef2"
+      }
+    }
+  },
+  {
+    "id": "civilho-0044",
+    "imageRef": "civilho-0044.jpg",
+    "sha256": "8fe0f93995aed7b64d00fbaba313ccb804e8711f73539ab4cbe5a51a7dee6be2",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "91535c59-7b82-4ee7-87ba-5190e0d0a8de",
+      "photoId": "8281c9dc-a208-4ac2-8144-c6f19b0e3596",
+      "storageKey": "etwatwa/ETW.P.H335/civil-audit_20260518145409819.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "8281c9dc-a208-4ac2-8144-c6f19b0e3596"
+      }
+    }
+  },
+  {
+    "id": "civilho-0045",
+    "imageRef": "civilho-0045.jpg",
+    "sha256": "172acece107b64d23703bb296996bceb13ed6ac3a93eefe15246276d404d890b",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "reviewId": "dc6be93c-f2f9-587e-8ae4-5b822135082f",
+      "photoId": "ecea177c-b1c2-4bfa-b1dc-4096e758ac31",
+      "storageKey": "etwatwa/ETW.P.F541/v20260720225658-95956a71",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "ecea177c-b1c2-4bfa-b1dc-4096e758ac31"
+      }
+    }
+  },
+  {
+    "id": "civilho-0046",
+    "imageRef": "civilho-0046.jpg",
+    "sha256": "7d5ffe2fa4ad65f22acbb109265527d221f17a83cde095e85205f11860179b8f",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "reviewId": "414cae16-f753-5b53-8d0e-ff1161d40a34",
+      "photoId": "0ab3da22-2d62-5399-8ec0-e056be212014",
+      "storageKey": "thembisa-pop-1/TEM.P.C718/ba025ba3-d347-4984-999b-260460a88183.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "0ab3da22-2d62-5399-8ec0-e056be212014"
+      }
+    }
+  },
+  {
+    "id": "civilho-0047",
+    "imageRef": "civilho-0047.jpg",
+    "sha256": "5588d275df99f548d2fd82d27e908378deeb7aad673d2b043c5420fcd99fdf99",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "4e1912a1-c60b-57b7-840b-5bb7a0c9d762",
+      "photoId": "a3c62652-88d6-522f-9934-784096af439d",
+      "storageKey": "thembisa-pop-1/TEM.P.C245/245dd95c-eb51-4ca4-8050-709b54fb7bd9.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "a3c62652-88d6-522f-9934-784096af439d"
+      }
+    }
+  },
+  {
+    "id": "civilho-0048",
+    "imageRef": "civilho-0048.jpg",
+    "sha256": "916a0891db217b689737a83212197487b89ea7cbe9a2d2cc2df4800824393fcd",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "reviewId": "6b71f3c1-93aa-5f9b-a1e0-ea4cc07b5bbe",
+      "photoId": "3977307c-e2f1-428b-a2cb-d3b104abebc2",
+      "storageKey": "thembisa pop 1/TEM.P.C118/v20260803173519-2c196ddb",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "3977307c-e2f1-428b-a2cb-d3b104abebc2"
+      }
+    }
+  },
+  {
+    "id": "civilho-0049",
+    "imageRef": "civilho-0049.jpeg",
+    "sha256": "062c4f4699cf412b64da4291007f73a7ea84b0f7fd30222f23dd6b1b9d0739c5",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "reviewId": "a3d4158f-0f05-41b6-94ef-16e8ac7b85ba",
+      "photoId": "345def43-5460-48ba-b1b3-ca43a3e6acc8",
+      "storageKey": "etwatwa/ETW.P.H665/WhatsApp Image 2026-03-09 at 12.12.05 (2).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "345def43-5460-48ba-b1b3-ca43a3e6acc8"
+      }
+    }
+  },
+  {
+    "id": "civilho-0050",
+    "imageRef": "civilho-0050.jpg",
+    "sha256": "c3d6ee1b5122af6de8851247d87107ccb553495411bf68920ac9729efd8121a6",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "reviewId": "3b206885-6fab-51c6-98e6-0170128a0c79",
+      "photoId": "a4f19f35-f664-50a3-a51b-5a688f8a0bd4",
+      "storageKey": "thembisa-pop-1/TEM.P.C812/c08c1d21-ec34-4e13-8fe5-327415f9abc7.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "a4f19f35-f664-50a3-a51b-5a688f8a0bd4"
+      }
+    }
+  },
+  {
+    "id": "civilho-0051",
+    "imageRef": "civilho-0051.jpeg",
+    "sha256": "2456613a3580da8a2e2fb046073611ba52a0e243f6104724aa389bc9629c4c0d",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "reviewId": "3b0a8f1a-98e9-4f69-8736-55c5e8ed415e",
+      "photoId": "dedd1f45-55a4-4ec2-9939-eefaf40478e1",
+      "storageKey": "etwatwa/ETW.P.G668/WhatsApp Image 2026-02-23 at 10.13.41.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "dedd1f45-55a4-4ec2-9939-eefaf40478e1"
+      }
+    }
+  },
+  {
+    "id": "civilho-0052",
+    "imageRef": "civilho-0052.jpg",
+    "sha256": "4436718dd2e5913f37dcae7c7f0944ab65a9ab8819946a787003ddc2e5a4da75",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "reviewId": "9ff58a07-9560-43ce-9c25-f8c2b0ff8f93",
+      "photoId": "876ec085-490d-4b34-a51c-c4e27658e7a4",
+      "storageKey": "etwatwa/ETW.P.F792/a694ef5c-b541-4f26-8fd5-544138fb6398.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "876ec085-490d-4b34-a51c-c4e27658e7a4"
+      }
+    }
+  },
+  {
+    "id": "civilho-0053",
+    "imageRef": "civilho-0053.jpg",
+    "sha256": "570b4c6a867d89ccedb74784379715f481616e3411581a6e5437c2063e3c0ac0",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "reviewId": "79331991-7c65-5812-a2ba-b20d0027c123",
+      "photoId": "b5a7ea80-8a46-5314-8b20-6027cc4868a7",
+      "storageKey": "thembisa-pop-1/TEM.P.C687/b403f42b-538d-4fb6-89d5-46f7d0d121ea.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "b5a7ea80-8a46-5314-8b20-6027cc4868a7"
+      }
+    }
+  },
+  {
+    "id": "civilho-0054",
+    "imageRef": "civilho-0054.jpg",
+    "sha256": "7b3b0d8d3ddab34de44f8979b93e5ebe858e350468fc76e6ae7bacacec5f8ceb",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "reviewId": "eeb5e9f6-bade-5633-aa2e-a73f51b8d82a",
+      "photoId": "c6e0e1e5-5f68-5823-a7c9-382facdc58f6",
+      "storageKey": "thembisa-pop-1/TEM.P.C367/0bf541c6-0619-4bd9-b6c1-c1bcc472f4a6.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "c6e0e1e5-5f68-5823-a7c9-382facdc58f6"
+      }
+    }
+  },
+  {
+    "id": "civilho-0055",
+    "imageRef": "civilho-0055.jpeg",
+    "sha256": "706a04405f940750f148de4527094a5a453cd3c8ac46c412d28cf0157281abf4",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "reviewId": "27818d84-3b13-53bc-b343-481b7680de02",
+      "photoId": "5b960794-b7df-54a9-adbc-a9fad47e7ade",
+      "storageKey": "thembisa-pop-1/TEM.P.C356/WhatsApp Image 2026-02-08 at 08.12.46 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "5b960794-b7df-54a9-adbc-a9fad47e7ade"
+      }
+    }
+  },
+  {
+    "id": "civilho-0056",
+    "imageRef": "civilho-0056.jpg",
+    "sha256": "4d6d84ec432eb9673b3027d52553c80520507e40cdb48cb6cde5cc25d6b5549c",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "a74ecdc8-5b2c-53fb-812e-93b678310e0e",
+      "photoId": "e03ca221-ac62-5f0a-ad8a-822d3f2acdb7",
+      "storageKey": "thembisa-pop-1/TEM.P.C079/377d78a0-5fca-4f89-8580-07f91ebfe28e.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "e03ca221-ac62-5f0a-ad8a-822d3f2acdb7"
+      }
+    }
+  },
+  {
+    "id": "civilho-0057",
+    "imageRef": "civilho-0057.jpg",
+    "sha256": "39353497f6279828050e9d8ec8f31a2acc42806fea7d3594e7ea904160cb7fd3",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "0d9f94f2-d22f-5a1d-9e09-0c59ec51e8bf",
+      "photoId": "00d2e269-632e-4200-8590-4f4a85ecd14c",
+      "storageKey": "etwatwa/ETW.P.H416/civil-audit_20260423093709331.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "00d2e269-632e-4200-8590-4f4a85ecd14c"
+      }
+    }
+  },
+  {
+    "id": "civilho-0058",
+    "imageRef": "civilho-0058.jpeg",
+    "sha256": "037706c8a019eba3c0e3bff43150857aee489b19cb407f4720fd455c8b246a08",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "b90803a1-f97c-4328-9122-f0c0c9069dfb",
+      "photoId": "fdb2bc4c-66e1-474f-84ab-29b04cd0394e",
+      "storageKey": "etwatwa/ETW.P.H264/WhatsApp Image 2026-03-16 at 12.32.51 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "fdb2bc4c-66e1-474f-84ab-29b04cd0394e"
+      }
+    }
+  },
+  {
+    "id": "civilho-0059",
+    "imageRef": "civilho-0059.jpg",
+    "sha256": "14d01779f7e6f8d527f6bf29692ffde3a782867819ba848f1f82420d4e17f729",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "reviewId": "01308021-fc9f-50d7-a5df-a5ccaf5bf959",
+      "photoId": "07a53df3-8a5c-475b-a991-1743d48a0b91",
+      "storageKey": "etwatwa/ETW.P.H442/civil-audit_20260506111955095.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "07a53df3-8a5c-475b-a991-1743d48a0b91"
+      }
+    }
+  },
+  {
+    "id": "civilho-0060",
+    "imageRef": "civilho-0060.jpg",
+    "sha256": "792a0c009618ee37c46df20b7ec52bbe74002e2bb15b4c838fe0c00e517c7991",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "reviewId": "1180e0d3-9172-5175-a1cb-648d624db62a",
+      "photoId": "05725758-4efe-4451-a807-6f9bbf34887f",
+      "storageKey": "etwatwa/ETW.P.H349/civil-audit_20260414141615110.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "05725758-4efe-4451-a807-6f9bbf34887f"
+      }
+    }
+  },
+  {
+    "id": "civilho-0061",
+    "imageRef": "civilho-0061.jpg",
+    "sha256": "8d13ffa1988a935bae445e965189bcc2d05d40296c88d4af776534de4a78f4bb",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "e45b65dd-93d3-54a5-89fa-19962371a814",
+      "photoId": "030006af-4cfb-5629-86b7-9855b109fab3",
+      "storageKey": "thembisa-pop-1/TEM.P.C205/P-TEM.P.C205_04_end_plates.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "030006af-4cfb-5629-86b7-9855b109fab3"
+      }
+    }
+  },
+  {
+    "id": "civilho-0062",
+    "imageRef": "civilho-0062.jpg",
+    "sha256": "38f8cc2f6ab5c1fc74986b6f45763fac21e639473525f72122dcde6791a060b9",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "61a90f71-a71d-528e-9c69-d39df5760d67",
+      "photoId": "8a3df471-1cef-4c25-8e07-7d8d18b0e37b",
+      "storageKey": "etwatwa/ETW.P.H355/civil-audit_20260414123133083.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "8a3df471-1cef-4c25-8e07-7d8d18b0e37b"
+      }
+    }
+  },
+  {
+    "id": "civilho-0063",
+    "imageRef": "civilho-0063.jpeg",
+    "sha256": "c0242534405f2e59ee5723707e0abebb1ce4c5e8e448fa6b0c79c2c8565b8842",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "83a2d5f5-c503-527a-9388-8ed5ba18e078",
+      "photoId": "2cd8cdb5-a7e8-53c0-a382-900db12c082f",
+      "storageKey": "thembisa-pop-1/TEM.P.C175/P-TEM.P.C175_WhatsApp Image 2026-04-02 at 11.18.31 AM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "2cd8cdb5-a7e8-53c0-a382-900db12c082f"
+      }
+    }
+  },
+  {
+    "id": "civilho-0064",
+    "imageRef": "civilho-0064.jpg",
+    "sha256": "1aab4613097ca93e75802ce7c7b4b7b23a237c6144e2e599d2f2d76543f89503",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "3ef96b3f-819b-524c-9020-0f71d2dfd005",
+      "photoId": "64590ba7-f425-548c-8ae2-ff1d3e77e868",
+      "storageKey": "thembisa-pop-3/TEM.P.I394/24e105dd-b716-4f90-9525-216d66565569.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "64590ba7-f425-548c-8ae2-ff1d3e77e868"
+      }
+    }
+  },
+  {
+    "id": "civilho-0065",
+    "imageRef": "civilho-0065.jpg",
+    "sha256": "8e27605fee9867f8e310d32ff8d8b4f226c7beaabb499c28016cc788248cd8c2",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "reviewId": "a8442ecb-cf94-5636-8326-89302875f808",
+      "photoId": "9a28f11e-92dd-4acd-b82b-f9d74bbcaf71",
+      "storageKey": "etwatwa/ETW.P.H396/civil-audit_20260506143254592.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "9a28f11e-92dd-4acd-b82b-f9d74bbcaf71"
+      }
+    }
+  },
+  {
+    "id": "civilho-0066",
+    "imageRef": "civilho-0066.jpg",
+    "sha256": "ce48635a6f3dd092fe7e390814c45626aee53412b55f631e13fa39ee2b823a29",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "reviewId": "4e246a5d-b77a-4e46-9e01-a7909f165479",
+      "photoId": "f154143a-9f22-4d13-a58b-bfbfff0e1128",
+      "storageKey": "thembisa-pop-1/TEM.P.C545/civil-audit_20260424102100526.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "f154143a-9f22-4d13-a58b-bfbfff0e1128"
+      }
+    }
+  },
+  {
+    "id": "civilho-0067",
+    "imageRef": "civilho-0067.jpg",
+    "sha256": "f0499b840867568d1206903baf8d33e805a3a4eee27e6c4c51a1d970b2ac1585",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "reviewId": "2943a18d-9d0a-4567-ae2e-5ba4a53f1032",
+      "photoId": "eb07183b-ebdd-4d28-ab71-5bf94479aff7",
+      "storageKey": "etwatwa/ETW.P.H299/f583dd63-4bab-4aee-a408-e64d6adffeb0.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "eb07183b-ebdd-4d28-ab71-5bf94479aff7"
+      }
+    }
+  },
+  {
+    "id": "civilho-0068",
+    "imageRef": "civilho-0068.jpg",
+    "sha256": "6b4cb1ef692ba96002e11f803eb6a92323a778813d0f4a033d00332d1bc5122e",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "reviewId": "94435b88-ab86-5dfb-bc72-0eab2902fee8",
+      "photoId": "17c56d9a-5ec7-404c-bf4d-c5aee5f754a7",
+      "storageKey": "thembisa pop 3/TEM.P.H265/v20260305210934-197fcd8a",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "17c56d9a-5ec7-404c-bf4d-c5aee5f754a7"
+      }
+    }
+  },
+  {
+    "id": "civilho-0069",
+    "imageRef": "civilho-0069.jpg",
+    "sha256": "915038d80217e12458b08e2e9c990ba7d5d8b9f5c87be285b8a32ed1e765d498",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "reviewId": "84b33d57-b3ea-4b27-b139-10720387d8a9",
+      "photoId": "bf16eb63-cbd4-449e-815a-9dd0d3205841",
+      "storageKey": "etwatwa/ETW.P.H711/99d0ec01-1b27-456c-9a78-79c1151d20cd.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "bf16eb63-cbd4-449e-815a-9dd0d3205841"
+      }
+    }
+  },
+  {
+    "id": "civilho-0070",
+    "imageRef": "civilho-0070.jpeg",
+    "sha256": "cce398fc668b2abbca752b63d53cfba34d7233eb3c7c675b6af860a188fe779f",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "reviewId": "ad91aacd-a4af-58cc-bac6-0a32ec275a12",
+      "photoId": "caa6449a-be57-520b-ba1b-7a88dadcfea3",
+      "storageKey": "thembisa-pop-3/TEM.P.H225/WhatsApp Image 2026-02-18 at 13.59.59.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "caa6449a-be57-520b-ba1b-7a88dadcfea3"
+      }
+    }
+  },
+  {
+    "id": "civilho-0071",
+    "imageRef": "civilho-0071.jpeg",
+    "sha256": "e32c7801a58ff61dbae85637466e4cd515a62d3ac535cbbbf3b1f839677ab866",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "904ee6a0-851f-4988-8cb4-899739a5b865",
+      "photoId": "af1a7da2-72c0-4176-b575-3c2c51edcbef",
+      "storageKey": "etwatwa/ETW.P.H551/WhatsApp Image 2026-03-09 at 13.26.34.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "af1a7da2-72c0-4176-b575-3c2c51edcbef"
+      }
+    }
+  },
+  {
+    "id": "civilho-0072",
+    "imageRef": "civilho-0072.jpeg",
+    "sha256": "9ef3db3fe241b493c96d61fffcc8ec4b132306fb2b62f33aab525e1b64997846",
+    "expected": {
+      "step": 0,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_right",
+      "reviewId": "9d504c63-2c55-5b20-9930-549c03fc4f73",
+      "photoId": "9bc0f187-27ba-515c-ad58-78547b094df1",
+      "storageKey": "thembisa-pop-3/TEM.P.H235/WhatsApp Image 2026-04-21 at 2.31.44 PM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "9bc0f187-27ba-515c-ad58-78547b094df1"
+      }
+    }
+  },
+  {
+    "id": "civilho-0073",
+    "imageRef": "civilho-0073.jpeg",
+    "sha256": "f77c0f302961a90af64fc2b397f1ee58a0f1e185d76a6540a75a64aa11ef0c21",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "0771678b-8fd2-564c-b61c-a34105bd69f3",
+      "photoId": "b75c30ad-c691-5e01-86ba-104c65df2884",
+      "storageKey": "thembisa-pop-1/TEM.P.C320/WhatsApp Image 2026-07-16 at 16.46.29 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "b75c30ad-c691-5e01-86ba-104c65df2884"
+      }
+    }
+  },
+  {
+    "id": "civilho-0074",
+    "imageRef": "civilho-0074.jpeg",
+    "sha256": "3fec36d2dc647662abf75fc0640c7340f6eaecf734ddd0340f6c27f0dacb24e5",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "reviewId": "69bb7fc7-6bec-5552-9f9c-2653b4c48118",
+      "photoId": "9584d7a2-1bc1-52f7-966c-5171ba4ba7d1",
+      "storageKey": "thembisa-pop-3/TEM.P.H269/WhatsApp Image 2026-02-24 at 12.10.03 PM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "9584d7a2-1bc1-52f7-966c-5171ba4ba7d1"
+      }
+    }
+  },
+  {
+    "id": "civilho-0075",
+    "imageRef": "civilho-0075.jpeg",
+    "sha256": "d47a45c435ed85bf17adca2e0de31306b30cc8e752e021ff0c14fceef6afea53",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "c2d07865-b3d3-5cb0-8dda-e215fb35ce47",
+      "photoId": "b76c89ea-23f0-5def-be2b-cdf8a6a21bcc",
+      "storageKey": "thembisa-pop-1/TEM.P.C151/WhatsApp Image 2026-03-07 at 10.07.53 AM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "b76c89ea-23f0-5def-be2b-cdf8a6a21bcc"
+      }
+    }
+  },
+  {
+    "id": "civilho-0076",
+    "imageRef": "civilho-0076.jpg",
+    "sha256": "22e1c9c917d57e31119319aec9bff905a54778a137150d059e8351a38e3131e4",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "reviewId": "e16a230d-bd2c-559c-8d11-8f7a60eb6289",
+      "photoId": "efe1b5cb-a64a-5101-9371-22646abf383d",
+      "storageKey": "thembisa-pop-1/TEM.P.C137/93e99668-3818-40ec-876c-12ac3ba4e2ae.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "efe1b5cb-a64a-5101-9371-22646abf383d"
+      }
+    }
+  },
+  {
+    "id": "civilho-0077",
+    "imageRef": "civilho-0077.jpg",
+    "sha256": "e417ade74d8a33bbe48f9b17878511442ac42e18df6cf4761f6061241ef874d1",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "2317b639-2828-5301-98dd-5e4e8d6af7d5",
+      "photoId": "91ad078a-d047-44e9-a897-dcdef4093ac6",
+      "storageKey": "thembisa-pop-3/TEM.P.H261/thm-3-poles_20260505154757695.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "91ad078a-d047-44e9-a897-dcdef4093ac6"
+      }
+    }
+  },
+  {
+    "id": "civilho-0078",
+    "imageRef": "civilho-0078.jpg",
+    "sha256": "055b0e9fcd4df158d35c81ba4bb4dfc7e3cb534b78abfc1654cc9631f8f3d1fd",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "reviewId": "8463a5ce-207c-5820-ac2e-b981dce9ed7b",
+      "photoId": "53e9cc35-d40f-5c12-9767-0862c1ca93ad",
+      "storageKey": "thembisa-pop-1/TEM.P.C802/c9a3bff7-5ce1-42d7-a088-816747ef9d07.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "53e9cc35-d40f-5c12-9767-0862c1ca93ad"
+      }
+    }
+  },
+  {
+    "id": "civilho-0079",
+    "imageRef": "civilho-0079.jpg",
+    "sha256": "29ef2c850cf130821338d0b0a048b52dfed239bd43cd805a61e0315f8dd47b98",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "reviewId": "85461146-3729-5fc4-8340-4073bc953fbd",
+      "photoId": "fa617c55-34fa-5205-8957-f3435ad7ab9c",
+      "storageKey": "thembisa-pop-1/TEM.P.C152/a94b9394-53cb-47ce-8f4c-dce242de5355.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "fa617c55-34fa-5205-8957-f3435ad7ab9c"
+      }
+    }
+  },
+  {
+    "id": "civilho-0080",
+    "imageRef": "civilho-0080.jpg",
+    "sha256": "a829bd08fc39e8502353fbf114499a86174598d9ed194d5cd18ca1533e921f77",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "reviewId": "7da62da8-80f4-4c55-a47a-0dd8cce98837",
+      "photoId": "ee4b6889-e456-5ee1-bb44-3ca2b9165943",
+      "storageKey": "thembisa-pop-1/TEM.P.C553/12dbbc5f-c005-4102-a000-25bdb90aa012.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "ee4b6889-e456-5ee1-bb44-3ca2b9165943"
+      }
+    }
+  }
+]
