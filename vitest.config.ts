@@ -86,6 +86,7 @@ export default defineConfig({
       'tests/migrations/513_fleet_assignment_preview_state.test.ts',
       'tests/migrations/518_fleet_operational_analytics_retention.test.ts',
       'tests/migrations/523_project_aoi_outlier_guard.test.ts',
+      'tests/migrations/523_project_aoi_staleness_probe.test.ts',
       'tests/migrations/metric-registry-execution.test.ts',
       // Not runnable as written. Excluded with the diagnosis recorded so that
       // picking them up does not start from zero.
