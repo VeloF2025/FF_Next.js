@@ -47,6 +47,22 @@ const MODULE = 'VlmHealthAlert';
  */
 const FAILED_TICKS_BEFORE_ALERT = 3;
 
+/**
+ * How far back the gate counts. At the 5-minute cadence this is a 25-minute
+ * window.
+ *
+ * A WINDOW, not a consecutive run — the distinction is load-bearing. A VLM
+ * flapping down/up/down/up is genuinely half down, but a consecutive counter
+ * resets on every healthy tick, never reaches the threshold, and so pages
+ * nobody at all. That is worse than the outage this file was written for,
+ * because it fails silently for as long as the flapping lasts.
+ *
+ * The sibling wa-bridge-health monitor hit exactly this and was retuned from a
+ * consecutive run to 3-of-5 (661429226, f79d34b37). Same shape here, for the
+ * same reason.
+ */
+export const FAILED_WINDOW_TICKS = 5;
+
 /** While still down, re-page at most this often (ticks). 12 x 5min = 1 hour. */
 const REMINDER_EVERY_TICKS = 12;
 
@@ -56,13 +72,20 @@ const REMINDER_EVERY_TICKS = 12;
  * adds a DB dependency to the one endpoint that must keep working when things
  * are broken.
  */
-let consecutiveFailures = 0;
+/**
+ * Whether each of the last FAILED_WINDOW_TICKS probes failed, oldest first.
+ * Bounded, so it cannot grow across a long-running process.
+ */
+let failureWindow: boolean[] = [];
+/** Ticks observed failing since the outage began — reported, not used to gate. */
+let failedTicks = 0;
 let ticksSinceLastPage = 0;
 let alerted = false;
 
 /** Exported for tests — there is no other way to reset module state. */
 export function __resetVlmAlertState(): void {
-  consecutiveFailures = 0;
+  failureWindow = [];
+  failedTicks = 0;
   ticksSinceLastPage = 0;
   alerted = false;
 }
@@ -89,10 +112,24 @@ export default async function handler(
   // ---- Recovered ---------------------------------------------------------
   if (health.available) {
     const wasAlerted = alerted;
-    const downForTicks = consecutiveFailures;
-    __resetVlmAlertState();
+    const downForTicks = failedTicks;
 
-    if (wasAlerted) {
+    // A healthy tick is RECORDED in the window, not a reset of it. Wiping the
+    // window here is precisely what makes a flapping service invisible: every
+    // recovery tick would erase the evidence of the failures around it.
+    failureWindow = [...failureWindow, false].slice(-FAILED_WINDOW_TICKS);
+    const failuresInWindow = failureWindow.filter(Boolean).length;
+
+    // Only a window that has actually drained counts as recovery. While
+    // failures are still inside it the service is flapping, not restored, so
+    // the alert state stands and a later tick can still page.
+    if (failuresInWindow === 0) {
+      failedTicks = 0;
+      ticksSinceLastPage = 0;
+      alerted = false;
+    }
+
+    if (wasAlerted && failureWindow.filter(Boolean).length === 0) {
       const minutes = downForTicks * 5;
       await dispatchBridgeAlert(
         'RECOVERED: VLM is serving again',
@@ -112,26 +149,30 @@ export default async function handler(
     return apiResponse.success(res, {
       available: true,
       model: health.model,
-      recovered: wasAlerted,
+      recovered: wasAlerted && failureWindow.filter(Boolean).length === 0,
+      failuresInWindow: failureWindow.filter(Boolean).length,
       alerted: false,
     });
   }
 
   // ---- Still / newly down -------------------------------------------------
-  consecutiveFailures += 1;
+  failedTicks += 1;
+  failureWindow = [...failureWindow, true].slice(-FAILED_WINDOW_TICKS);
+  const failuresInWindow = failureWindow.filter(Boolean).length;
   const reason = health.error ?? 'no models served';
 
   // Below the gate: log only. A single stalled probe is not an outage.
-  if (consecutiveFailures < FAILED_TICKS_BEFORE_ALERT) {
+  if (failuresInWindow < FAILED_TICKS_BEFORE_ALERT) {
     log.warn(
-      `VLM probe failed (${consecutiveFailures}/${FAILED_TICKS_BEFORE_ALERT}): ${reason}`,
+      `VLM probe failed (${failuresInWindow}/${FAILED_TICKS_BEFORE_ALERT} in the last ${FAILED_WINDOW_TICKS} ticks): ${reason}`,
       undefined,
       MODULE
     );
     return apiResponse.success(res, {
       available: false,
       error: reason,
-      consecutiveFailures,
+      failedTicks,
+      failuresInWindow,
       alerted: false,
     });
   }
@@ -145,19 +186,17 @@ export default async function handler(
     return apiResponse.success(res, {
       available: false,
       error: reason,
-      consecutiveFailures,
+      failedTicks,
+      failuresInWindow,
       alerted: false,
     });
   }
 
-  alerted = true;
-  ticksSinceLastPage = 0;
-
-  const minutes = consecutiveFailures * 5;
-  await dispatchBridgeAlert(
+  const minutes = failedTicks * 5;
+  const dispatch = await dispatchBridgeAlert(
     firstPage ? 'VLM IS DOWN — activate pipeline stalled' : 'VLM STILL DOWN',
     [
-      `The VLM has failed ${consecutiveFailures} consecutive health probes (~${minutes} minutes).`,
+      `The VLM has failed ${failuresInWindow} of the last ${FAILED_WINDOW_TICKS} health probes (~${minutes} minutes since the first failure).`,
       `Last error: ${reason}`,
       '',
       'Impact: photo categorization is failing. Auto-QA only runs on categorized',
@@ -169,12 +208,31 @@ export default async function handler(
       '  journalctl -u vllm-qwen.service -n 50',
     ].join('\n')
   );
-  log.error(`VLM down for ~${minutes} minutes: ${reason}`, undefined, MODULE);
+  // Mark as paged ONLY if a channel actually took it. Setting this optimistically
+  // before the dispatch resolves means a tick where email AND WhatsApp both fail
+  // — likeliest during a real outage, when both are under stress — records a page
+  // nobody received and then suppresses retries for a full REMINDER_EVERY_TICKS
+  // hour. On total delivery failure we leave `alerted` alone so the next tick
+  // tries again.
+  const delivered = dispatch.delivered.length > 0;
+  if (delivered) {
+    alerted = true;
+    ticksSinceLastPage = 0;
+    log.error(`VLM down for ~${minutes} minutes: ${reason}`, undefined, MODULE);
+  } else {
+    log.error(
+      `VLM down for ~${minutes} minutes and the page could not be delivered: ${reason}`,
+      { problems: dispatch.problems },
+      MODULE
+    );
+  }
 
   return apiResponse.success(res, {
     available: false,
     error: reason,
-    consecutiveFailures,
-    alerted: true,
+    failedTicks,
+    failuresInWindow,
+    alerted: delivered,
+    deliveryProblems: dispatch.problems,
   });
 }

@@ -14,6 +14,7 @@ import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
+import { checkVlmHealth } from '@/lib/vlm/config';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -133,6 +134,29 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         processed: 0,
         results: [],
       });
+    }
+
+    // Same guard as the crons. This endpoint is documented in .claude/skills/dr
+    // and .claude/skills/vlm-ops as the "force retry" troubleshooting step —
+    // which is exactly what an on-call human reaches for DURING an outage, and
+    // exactly when it would burn the retry budget the crons just protected.
+    //
+    // Refused rather than given a `force` flag: a flag here would be used in
+    // precisely the situation it must not be, and there is no case where
+    // retrying against a dead VLM helps. Waiting costs time; retrying costs the
+    // DR's ability to ever self-heal.
+    const health = await checkVlmHealth();
+    if (!health.available) {
+      log.error(
+        `Retry refused — VLM unavailable: ${health.error ?? 'no models served'}`
+      );
+      return apiResponse.error(
+        res,
+        ErrorCode.SERVICE_UNAVAILABLE,
+        `VLM is unavailable (${health.error ?? 'no models served'}). Retrying now would ` +
+          `consume the retry budget of ${drsToRetry.length} DR(s) and could strand them ` +
+          `permanently once it recovers. Bring the VLM back first, then retry.`
+      );
     }
 
     log.info(`Retrying ${drsToRetry.length} failed DR(s)`);

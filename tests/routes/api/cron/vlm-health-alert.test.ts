@@ -96,17 +96,64 @@ describe('POST /api/cron/vlm-health-alert', () => {
     expect(mockAlert.mock.calls[1][0]).toContain('STILL DOWN');
   });
 
-  it('sends a recovery notice only if it had paged', async () => {
+  it('sends a recovery notice once the failure window has drained', async () => {
     down();
     await run();
     await run();
     await run();
     expect(mockAlert).toHaveBeenCalledTimes(1);
 
+    // One healthy tick is not recovery — the window still holds 3 failures, so
+    // the service is flapping rather than restored and the alert state stands.
     up();
+    await run();
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+
+    // Drain the remaining failures out of the 5-tick window.
+    await run();
+    await run();
+    await run();
     await run();
     expect(mockAlert).toHaveBeenCalledTimes(2);
     expect(mockAlert.mock.calls[1][0]).toContain('RECOVERED');
+  });
+
+  it('PAGES a flapping VLM that never fails 3 ticks in a row', async () => {
+    // The whole reason this gate counts a window instead of a consecutive run.
+    // down, up, down, up, down: no two failures are adjacent, so a consecutive
+    // counter resets every other tick and reaches 1 forever — silent while the
+    // service is down 60% of the time. The window sees 3 of the last 5.
+    for (const state of [down, up, down, up, down]) {
+      state();
+      await run();
+    }
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+    expect(mockAlert.mock.calls[0][0]).toContain('VLM IS DOWN');
+  });
+
+  it('does not page a single failure surrounded by healthy ticks', async () => {
+    // The other side of the same gate: one blip must stay quiet.
+    for (const state of [up, down, up, up, up]) {
+      state();
+      await run();
+    }
+    expect(mockAlert).not.toHaveBeenCalled();
+  });
+
+  it('retries the page on the next tick when every channel failed to deliver', async () => {
+    // Marking the outage as paged before the dispatch resolves would suppress
+    // retries for a full hour while nobody had actually been told.
+    mockAlert.mockResolvedValueOnce({ delivered: [], problems: ['smtp down', 'wa bridge down'] });
+    down();
+    await run();
+    await run();
+    await run();
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+
+    await run();
+    expect(mockAlert).toHaveBeenCalledTimes(2);
+    // Still the first-page subject, because the first page never landed.
+    expect(mockAlert.mock.calls[1][0]).toContain('VLM IS DOWN');
   });
 
   it('does not send a recovery notice when it never paged', async () => {
