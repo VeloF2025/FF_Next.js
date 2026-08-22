@@ -33,9 +33,22 @@ def ingest_rows(cur, qf_id, table, combined_dcim, existing_keys, existing_filena
                 existing_photo_keys, dry_run):
     """Upsert every photo referenced by the GPKG's rows.
 
-    Returns (photos_found, photos_upserted, photos_skipped_missing). The caller records
-    photos_skipped_missing as pending_count so the next run re-scans an unchanged GPKG
-    whose binaries had not finished uploading.
+    Returns (photos_found, photos_upserted, photos_skipped_missing,
+    photos_dropped_unlabelled). The caller records photos_skipped_missing as
+    pending_count so the next run re-scans an unchanged GPKG whose binaries had not
+    finished uploading.
+
+    photos_dropped_unlabelled counts photos on rows this loop discards for having no
+    usable label_col value. Those rows were ALWAYS discarded — a photo cannot be filed
+    against a pole we cannot name — but until now it happened with no counter and no
+    log line, so the loss was indistinguishable from the row simply having no photos.
+    That silence hid seven Botshabelo photos behind a NULL LABEL on a row whose NAME was
+    populated, and an audit of the other registered GPKGs then found ~164 more across
+    Mamelodi's optical layer, Cradock and Mohadin. Counting is deliberately all this
+    does: choosing a fallback column is a per-project judgement (Mamelodi's `label` and
+    `label_1` are DIFFERENT fields, not a publish collision, so falling back there would
+    re-key rows), and a silent fallback would trade a visible loss for an invisible
+    mis-filing. Make it loud; decide the fix per project.
 
     existing_keys / existing_filenames are MUTATED as rows are ingested — that is what
     stops the same photo being inserted twice within a single run, since there is no
@@ -46,6 +59,7 @@ def ingest_rows(cur, qf_id, table, combined_dcim, existing_keys, existing_filena
     photos_found = 0
     photos_upserted = 0
     photos_skipped_missing = 0
+    photos_dropped_unlabelled = 0
 
     def _resolve_key(dcim_path):
         """Return (storage_key, resolved_qf_id, upload_status) for a DCIM-relative path.
@@ -70,12 +84,27 @@ def ingest_rows(cur, qf_id, table, combined_dcim, existing_keys, existing_filena
             return versioned, qf_id, "available"
         return f"projects/{qf_id}/files/{dcim_path}", qf_id, "pending_upload"
 
+    all_photo_cols = list(step_cols) + list(extra_cols)
+
+    def _count_unlabelled(row):
+        """Photos on a row we are about to discard for having no usable label."""
+        return sum(
+            1 for col in all_photo_cols
+            if col in row.keys() and is_photo_value(row[col])
+        )
+
     for row in rows:
         feature_id = row[label_col] if label_col in row.keys() else None
+        # Two separate falsy checks, both of which drop the row: label_col absent or
+        # NULL, and label_col present but whitespace-only. Counted at BOTH exits — an
+        # early return that counted only the first would under-report exactly the
+        # whitespace case a careless crew entry produces.
         if not feature_id:
+            photos_dropped_unlabelled += _count_unlabelled(row)
             continue
         feature_id = str(feature_id).strip()
         if not feature_id:
+            photos_dropped_unlabelled += _count_unlabelled(row)
             continue
 
         # Collect photos from step columns
@@ -190,4 +219,5 @@ def ingest_rows(cur, qf_id, table, combined_dcim, existing_keys, existing_filena
     if photos_skipped_missing:
         print(f"  Skipped {photos_skipped_missing} photos not yet uploaded to MinIO")
 
-    return photos_found, photos_upserted, photos_skipped_missing
+    return (photos_found, photos_upserted, photos_skipped_missing,
+            photos_dropped_unlabelled)

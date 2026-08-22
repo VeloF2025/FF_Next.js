@@ -169,7 +169,8 @@ def extract_gpkg(conn, config, gpkg_path, shared, dry_run=False, force=False):
         spatial_pon_map, combined_dcim, _linked_qf_ids = shared.photo_index()
         existing_keys, existing_filenames, existing_photo_keys = shared.dedup_sets()
 
-        photos_found, photos_upserted, photos_skipped_missing = ingest_rows(
+        (photos_found, photos_upserted, photos_skipped_missing,
+         photos_dropped_unlabelled) = ingest_rows(
             cur, qf_id, table, combined_dcim,
             existing_keys, existing_filenames, existing_photo_keys, dry_run)
 
@@ -179,6 +180,13 @@ def extract_gpkg(conn, config, gpkg_path, shared, dry_run=False, force=False):
                  spatial_pon_map, photos_skipped_missing, dry_run)
 
         print(f"  Photos found: {photos_found}, New upserted: {photos_upserted}, Skipped (no MinIO): {photos_skipped_missing}")
+        if photos_dropped_unlabelled:
+            # WARN, not a raise: these photos are unusable as they stand (nothing names
+            # the pole) and failing the run would block the rows that ARE fine. The
+            # point is that it can no longer happen in silence.
+            print(f"  WARN: {photos_dropped_unlabelled} photo(s) DROPPED — their rows "
+                  f"have no '{config['label_col']}' value. Check whether a sibling "
+                  f"column names those poles before assuming the field data is lost.")
         return photos_found, photos_upserted
 
     finally:
