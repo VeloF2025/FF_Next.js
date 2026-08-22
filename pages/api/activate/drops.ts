@@ -9,7 +9,8 @@
  *   id           - fetch single drop by UUID
  *   dropNumber   - fetch single drop by drop number
  *   page         - page number (default 1)
- *   search       - text search across drop_number and project
+ *   search       - text search across drop_number, project, and device serials
+ *                  (ont_serial_scanned, ups_serial_scanned, oes_serial)
  *   skipSummary  - 'true' to skip the summary aggregation query
  *   dateFrom     - ISO date lower bound (submitted_date)
  *   dateTo       - ISO date upper bound (submitted_date)

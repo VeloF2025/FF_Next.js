@@ -14,6 +14,7 @@ import {
   UNIFIED_DATE_COLUMN,
   unifiedEligibilityCondition,
   excludedProjectsCondition,
+  unifiedSearchCondition,
 } from './dropStatsService';
 
 /**
@@ -40,7 +41,9 @@ export async function getProjectStats(filters?: DropsFilters): Promise<ProjectSt
     activatedNextParam++;
   }
   if (filters?.search) {
-    activatedSearchCond = `AND (oes.drop_number ILIKE $${activatedNextParam} OR COALESCE(upr.project, p.project_name) ILIKE $${activatedNextParam})`;
+    activatedSearchCond =
+      `AND (${unifiedSearchCondition(`$${activatedNextParam}`, 'oes.drop_number', 'COALESCE(upr.project, p.project_name)', 'upr.')}` +
+      ` OR oes.serial_number ILIKE $${activatedNextParam})`;
     activatedParams.push(`%${filters.search}%`);
     activatedNextParam++;
   }
