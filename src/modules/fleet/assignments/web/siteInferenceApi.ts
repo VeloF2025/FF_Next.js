@@ -29,7 +29,10 @@ export const siteInferenceApi = {
     request(BASE, { method: 'POST', body: JSON.stringify({ windowDays }) }),
   decide: (
     vehicleId: string,
-    body: { decision: string; overrideProjectId?: string | null; note?: string | null },
+    body: {
+      decision: string; overrideProjectId?: string | null; note?: string | null;
+      expectedRevision: number | null;
+    },
   ): Promise<SiteInferenceProposal> =>
     request(`${BASE}/${vehicleId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   apply: (

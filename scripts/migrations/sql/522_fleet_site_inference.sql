@@ -63,6 +63,11 @@ CREATE TABLE IF NOT EXISTS fleet_site_inference_decisions (
   note TEXT,
   decided_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   decided_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Compare-and-set token for concurrent editors. A monotonic counter rather
+  -- than decided_at: timestamptz keeps microseconds that a JS Date cannot
+  -- round-trip, and two writes inside one millisecond are indistinguishable by
+  -- clock. Neither problem exists for an integer.
+  revision INTEGER NOT NULL DEFAULT 1,
   applied_assignment_id UUID REFERENCES fleet_operational_assignments(id) ON DELETE SET NULL,
   applied_at TIMESTAMPTZ,
   applied_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -81,6 +86,7 @@ CREATE TABLE IF NOT EXISTS fleet_site_inference_decisions (
   CONSTRAINT fleet_site_inference_decisions_note_nonblank CHECK (
     note IS NULL OR btrim(note) <> ''
   ),
+  CONSTRAINT fleet_site_inference_decisions_revision_positive CHECK (revision > 0),
   -- Only an `assigned` decision can have been pushed onto the roster.
   CONSTRAINT fleet_site_inference_decisions_applied_requires_assigned CHECK (
     applied_assignment_id IS NULL OR decision = 'assigned'
@@ -145,13 +151,17 @@ SELECT
   d.note,
   d.decided_by,
   d.decided_at,
+  d.revision AS decision_revision,
   d.evidence_computed_at AS decided_against_computed_at,
   d.applied_assignment_id,
   d.applied_at,
   d.applied_by,
   COALESCE(d.decided_project_id, e.inferred_project_id) AS effective_project_id,
+  -- NULL means "not applicable", not "they agree". A rejected or
+  -- roaming_confirmed decision names no project, so there is nothing to compare
+  -- against the inference; reading NULL = NULL as agreement said the opposite.
   CASE
-    WHEN d.decision IS NULL THEN NULL
+    WHEN d.decision IS NULL OR d.decided_project_id IS NULL THEN NULL
     ELSE d.decided_project_id IS NOT DISTINCT FROM e.inferred_project_id
   END AS decision_matches_inference,
   COALESCE(dr.drivers, '[]'::jsonb) AS drivers

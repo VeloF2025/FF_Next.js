@@ -63,8 +63,14 @@ export const VEHICLE_DWELL_SQL = `
            a.project_id,
            count(*) OVER (PARTITION BY pos.id) AS aoi_count
     FROM pos
+    -- ST_Intersects, deliberately, not ST_Contains: the AOI is a convex hull of
+    -- the project's poles, so a position at a hull vertex lies exactly ON the
+    -- boundary. ST_Contains excludes the boundary and would credit that
+    -- position to no project at all - but a vehicle standing on the edge of a
+    -- site is at the site. Overlap double-counting is already handled by the
+    -- 1/N attribution below.
     JOIN project_aois a
-      ON ST_Contains(a.aoi::geometry, ST_SetSRID(ST_MakePoint(pos.lon, pos.lat), 4326))
+      ON ST_Intersects(a.aoi::geometry, ST_SetSRID(ST_MakePoint(pos.lon, pos.lat), 4326))
   ),
   agg AS (
     SELECT h.vehicle_id, h.project_id,

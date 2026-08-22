@@ -50,7 +50,7 @@ export default function AssignmentPage() {
   useEffect(() => { if (routeReady) void loadProposals(); }, [loadProposals, routeReady]);
   // The roster window doubles as the assignment window for an applied proposal,
   // so applying never invents dates the user has not seen on this page.
-  async function decide(vehicleId: string, body: { decision: string; overrideProjectId?: string | null }) { await siteInferenceApi.decide(vehicleId, body); await loadProposals(); }
+  async function decide(vehicleId: string, body: { decision: string; overrideProjectId?: string | null; expectedRevision: number | null }) { await siteInferenceApi.decide(vehicleId, body); await loadProposals(); }
   async function applyProposal(vehicleId: string, confirmWarnings: boolean) { await siteInferenceApi.apply(vehicleId, filters.from, filters.to, confirmWarnings); await loadProposals(); await load(); }
   async function revertProposal(vehicleId: string) { await siteInferenceApi.revert(vehicleId, filters.from); await loadProposals(); await load(); }
   async function recompute() { await siteInferenceApi.recompute(); await loadProposals(); }

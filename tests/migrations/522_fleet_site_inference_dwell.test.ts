@@ -47,16 +47,16 @@ const PREREQUISITES = `
   CREATE TABLE staff (id UUID PRIMARY KEY, first_name VARCHAR(100) NOT NULL,
                       last_name VARCHAR(100) NOT NULL);
   CREATE TABLE projects (id UUID PRIMARY KEY, project_name VARCHAR(255) NOT NULL);
-  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(50) NOT NULL);
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(20) NOT NULL);
   CREATE TABLE vehicle_assignments (
     id UUID PRIMARY KEY, staff_id UUID NOT NULL REFERENCES staff(id),
     fleet_vehicle_id UUID REFERENCES fleet_vehicles(id),
-    vehicle_registration VARCHAR(50) NOT NULL, assignment_start DATE NOT NULL,
+    vehicle_registration VARCHAR(20) NOT NULL, assignment_start DATE NOT NULL,
     is_active BOOLEAN DEFAULT TRUE);
   CREATE TABLE fleet_operational_assignments (id UUID PRIMARY KEY);
   CREATE TABLE project_aois (
     project_id UUID PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
-    aoi GEOGRAPHY NOT NULL, pole_count INTEGER NOT NULL,
+    aoi GEOGRAPHY(Geometry, 4326) NOT NULL, pole_count INTEGER NOT NULL,
     computed_at TIMESTAMPTZ NOT NULL DEFAULT now());
   CREATE TABLE fleet_vehicle_positions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -180,6 +180,27 @@ describe('dwell SQL: overlapping AOIs', () => {
     // Total attributed dwell equals the real elapsed dwell, not double it.
     expect(sample.shares.reduce((total, s) => total + s.dwellSeconds, 0)).toBe(60);
     expect(sample.totalPositions).toBe(2);
+  });
+});
+
+describe('dwell SQL: AOI boundary', () => {
+  it('counts a position sitting exactly on the AOI edge', async () => {
+    // The AOI is a convex hull of poles, so a pole-adjacent position lands on a
+    // hull vertex. x=0,y=1 is on the Lawley square's western edge. ST_Contains
+    // would drop this silently; ST_Intersects keeps it.
+    await ping('2026-08-10T08:00:00Z', 0, 1);
+    await ping('2026-08-10T08:01:00Z', 0, 1);
+    const sample = sampleFor(await run(), VEHICLE);
+    expect(sample.shares).toHaveLength(1);
+    expect(sample.shares[0].projectId).toBe(LAWLEY);
+    expect(sample.shares[0].dwellSeconds).toBe(60);
+  });
+
+  it('still excludes a position outside the edge', async () => {
+    await ping('2026-08-10T08:00:00Z', -0.0001, 1);
+    const sample = sampleFor(await run(), VEHICLE);
+    expect(sample.shares).toEqual([]);
+    expect(sample.totalPositions).toBe(1);
   });
 });
 

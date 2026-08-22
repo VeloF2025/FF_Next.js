@@ -8,7 +8,7 @@ export interface SiteInferencePanelProps {
   canEdit: boolean;
   onDecide: (
     vehicleId: string,
-    body: { decision: string; overrideProjectId?: string | null },
+    body: { decision: string; overrideProjectId?: string | null; expectedRevision: number | null },
   ) => Promise<void>;
   onApply: (vehicleId: string, confirmWarnings: boolean) => Promise<void>;
   onRevert: (vehicleId: string) => Promise<void>;
@@ -33,6 +33,19 @@ function hours(seconds: number): string {
 function evidence(proposal: SiteInferenceProposal): string {
   return `${percent(proposal.dominantShare)} of ${hours(proposal.dwellSeconds)} dwell · `
     + `${Math.round(proposal.pings)} pings · ${proposal.distinctDays} days`;
+}
+
+function day(iso: string | null): string {
+  return typeof iso === 'string' ? iso.slice(0, 10) : 'unknown';
+}
+
+/**
+ * Without this a vehicle that stopped reporting keeps its last `confident` row
+ * looking identical to one recomputed this morning.
+ */
+function provenance(proposal: SiteInferenceProposal): string {
+  return `Measured ${day(proposal.windowStart)} to ${day(proposal.windowEnd)}, `
+    + `computed ${day(proposal.computedAt)}`;
 }
 
 /**
@@ -85,6 +98,7 @@ export function SiteInferencePanel({
             {proposal.inferredProjectName !== null && ` · ${proposal.inferredProjectName}`}
           </p>
           <p>{evidence(proposal)}</p>
+          <p>{provenance(proposal)}</p>
           {proposal.drivers.length === 0
             ? <p>No current driver</p>
             : <p>Driver: {proposal.drivers.map((driver) => driver.staffName).join(', ')}</p>}
@@ -103,6 +117,9 @@ export function SiteInferencePanel({
             {proposal.decidedProjectName !== null && ` → ${proposal.decidedProjectName}`}
             {proposal.decisionMatchesInference === false && ' · differs from the current GPS reading'}
             {proposal.appliedAssignmentId !== null && ' · applied to the roster'}
+            {typeof proposal.decidedAgainstComputedAt === 'string'
+              && proposal.decidedAgainstComputedAt !== proposal.computedAt
+              && ` · decided against evidence from ${day(proposal.decidedAgainstComputedAt)}`}
           </p>}
           {canEdit && <div className="flex flex-wrap gap-2">
             <select
@@ -122,19 +139,22 @@ export function SiteInferencePanel({
               onClick={() => void run(proposal.vehicleId, () => onDecide(proposal.vehicleId, {
                 decision: 'assigned',
                 overrideProjectId: override === '' ? null : override,
+                expectedRevision: proposal.decisionRevision,
               }))}
             >Assign</button>
             <button
               type="button"
               disabled={busy}
-              onClick={() => void run(proposal.vehicleId, () => onDecide(
-                proposal.vehicleId, { decision: 'roaming_confirmed' }))}
+              onClick={() => void run(proposal.vehicleId, () => onDecide(proposal.vehicleId, {
+                decision: 'roaming_confirmed', expectedRevision: proposal.decisionRevision,
+              }))}
             >Confirm roaming</button>
             <button
               type="button"
               disabled={busy}
-              onClick={() => void run(proposal.vehicleId, () => onDecide(
-                proposal.vehicleId, { decision: 'rejected' }))}
+              onClick={() => void run(proposal.vehicleId, () => onDecide(proposal.vehicleId, {
+                decision: 'rejected', expectedRevision: proposal.decisionRevision,
+              }))}
             >Reject</button>
             <label>
               <input

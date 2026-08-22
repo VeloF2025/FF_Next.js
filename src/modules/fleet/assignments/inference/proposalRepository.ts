@@ -26,11 +26,18 @@ export interface DecisionInput {
   decidedFrom: DecisionProvenance | null;
   evidenceComputedAt: Date | null;
   note: string | null;
+  /**
+   * The `decisionRevision` the caller read, or null if they read no decision at
+   * all. The write is conditional on it, so two people deciding the same
+   * vehicle cannot silently overwrite each other - the second one is told.
+   */
+  expectedRevision: number | null;
 }
 
 export class InferenceDecisionError extends Error {
   constructor(
-    public readonly code: 'invalid_decision' | 'unknown_vehicle' | 'unknown_project' | 'already_applied',
+    public readonly code: 'invalid_decision' | 'unknown_vehicle' | 'unknown_project'
+      | 'already_applied' | 'stale_decision',
     message: string,
   ) {
     super(message);
@@ -97,8 +104,8 @@ export async function recordDecision(
   const written = await query(`
     INSERT INTO fleet_site_inference_decisions (
       vehicle_id, decision, decided_project_id, decided_from, evidence_computed_at,
-      note, decided_by, decided_at
-    ) VALUES ($1::uuid, $2, $3::uuid, $4, $5::timestamptz, $6, $7::uuid, now())
+      note, decided_by, decided_at, revision
+    ) VALUES ($1::uuid, $2, $3::uuid, $4, $5::timestamptz, $6, $7::uuid, now(), 1)
     ON CONFLICT (vehicle_id) DO UPDATE SET
       decision = EXCLUDED.decision,
       decided_project_id = EXCLUDED.decided_project_id,
@@ -106,11 +113,20 @@ export async function recordDecision(
       evidence_computed_at = EXCLUDED.evidence_computed_at,
       note = EXCLUDED.note,
       decided_by = EXCLUDED.decided_by,
-      decided_at = EXCLUDED.decided_at
-    -- Changing a decision that already reached the roster would leave the
-    -- assignment behind with nothing pointing at it. The revert path exists;
-    -- this makes taking it mandatory rather than optional.
+      decided_at = EXCLUDED.decided_at,
+      revision = fleet_site_inference_decisions.revision + 1
+    -- Two preconditions on one statement, both about not destroying something
+    -- silently:
+    --   applied_assignment_id IS NULL - changing a decision that already
+    --     reached the roster would leave the assignment behind with nothing
+    --     pointing at it. The revert path exists; this makes taking it
+    --     mandatory rather than optional.
+    --   revision = $8 - compare-and-set against the row the caller actually
+    --     read. When $8 is NULL this is NULL, which is not true, so a caller
+    --     who believed there was no decision is refused rather than allowed to
+    --     overwrite one that appeared in between.
     WHERE fleet_site_inference_decisions.applied_assignment_id IS NULL
+      AND fleet_site_inference_decisions.revision = $8
     RETURNING vehicle_id`, [
     vehicleId,
     input.decision,
@@ -119,13 +135,30 @@ export async function recordDecision(
     input.evidenceComputedAt?.toISOString() ?? null,
     input.note,
     actorUserId,
+    input.expectedRevision,
   ]);
-  if (written.length === 0) {
+  if (written.length === 0) await explainRefusal(vehicleId);
+}
+
+/**
+ * Zero rows means one of two preconditions failed. Re-read to say which, so the
+ * caller gets an instruction rather than "something went wrong".
+ */
+async function explainRefusal(vehicleId: string): Promise<never> {
+  const rows = await query<{ applied_assignment_id: string | null }>(`
+    SELECT applied_assignment_id
+    FROM fleet_site_inference_decisions
+    WHERE vehicle_id = $1::uuid`, [vehicleId]);
+  if (rows[0]?.applied_assignment_id) {
     throw new InferenceDecisionError(
       'already_applied',
       'That proposal has been applied to the roster; revert the application before changing it',
     );
   }
+  throw new InferenceDecisionError(
+    'stale_decision',
+    'Someone else changed this decision while you were looking at it; reload and decide again',
+  );
 }
 
 function assertDecisionShape(input: DecisionInput): void {

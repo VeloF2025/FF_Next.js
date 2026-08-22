@@ -36,6 +36,10 @@ export interface SiteInferenceProposal {
   note: string | null;
   decidedBy: string | null;
   decidedAt: string | null;
+  /** Compare-and-set token; pass it back when changing the decision. */
+  decisionRevision: number | null;
+  /** The evidence generation the decision was taken against, for staleness. */
+  decidedAgainstComputedAt: string | null;
   decisionMatchesInference: boolean | null;
   effectiveProjectId: string | null;
   appliedAssignmentId: string | null;
@@ -52,7 +56,8 @@ interface ProposalRow extends Record<string, unknown> {
   computed_at: Date; decision: InferenceDecision | null;
   decided_project_id: string | null; decided_project_name: string | null;
   decided_from: DecisionProvenance | null; note: string | null;
-  decided_by: string | null; decided_at: Date | null;
+  decided_by: string | null; decided_at: Date | null; decision_revision: number | null;
+  decided_against_computed_at: Date | null;
   decision_matches_inference: boolean | null; effective_project_id: string | null;
   applied_assignment_id: string | null; applied_at: Date | null;
   drivers: ProposalDriver[];
@@ -93,6 +98,8 @@ function mapProposal(row: ProposalRow): SiteInferenceProposal {
     note: row.note,
     decidedBy: row.decided_by,
     decidedAt: row.decided_at?.toISOString() ?? null,
+    decisionRevision: row.decision_revision === null ? null : Number(row.decision_revision),
+    decidedAgainstComputedAt: row.decided_against_computed_at?.toISOString() ?? null,
     decisionMatchesInference: row.decision_matches_inference,
     effectiveProjectId: row.effective_project_id,
     appliedAssignmentId: row.applied_assignment_id,

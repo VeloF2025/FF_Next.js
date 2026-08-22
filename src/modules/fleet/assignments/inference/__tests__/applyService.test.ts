@@ -182,18 +182,46 @@ describe('applyProposal', () => {
   });
 });
 
+describe('project scope', () => {
+  const SCOPED = { allProjects: false, authorizedProjectIds: ['some-other-project'] };
+
+  it('refuses to apply before it resolves a driver or a site', async () => {
+    getProposal.mockResolvedValue(proposal({ drivers: [] }));
+    const error = await applyProposal(VEHICLE, RANGE, SCOPED, ACTOR).catch((caught) => caught);
+    // Not `no_driver`: that answer would confirm the vehicle and its project
+    // exist to someone who may not see either.
+    expect(error.code).toBe('out_of_scope');
+    expect(error.status).toBe(404);
+    expect(listProjectSites).not.toHaveBeenCalled();
+    expect(previewAssignments).not.toHaveBeenCalled();
+  });
+
+  it('refuses to revert outside scope', async () => {
+    getProposal.mockResolvedValue(proposal({ appliedAssignmentId: 'assign-1' }));
+    await expect(revertProposal(VEHICLE, '2026-08-05', SCOPED, ACTOR))
+      .rejects.toMatchObject({ code: 'out_of_scope' });
+    expect(endAssignment).not.toHaveBeenCalled();
+  });
+
+  it('allows a scoped actor whose scope covers the proposal', async () => {
+    await applyProposal(VEHICLE, RANGE,
+      { allProjects: false, authorizedProjectIds: [PROJECT] }, ACTOR);
+    expect(commitAssignments).toHaveBeenCalled();
+  });
+});
+
 describe('revertProposal', () => {
   it('ends the assignment it created and clears the applied stamp', async () => {
     getProposal.mockResolvedValue(proposal({ appliedAssignmentId: 'assign-1' }));
     endAssignment.mockResolvedValue({ id: 'assign-1' });
-    await revertProposal(VEHICLE, '2026-08-05', ACTOR);
+    await revertProposal(VEHICLE, '2026-08-05', SCOPE, ACTOR);
     expect(endAssignment).toHaveBeenCalledWith('assign-1',
       { endDate: '2026-08-05', reason: 'GPS site inference application reverted' }, ACTOR);
     expect(clearApplied).toHaveBeenCalledWith(VEHICLE);
   });
 
   it('refuses to revert something that was never applied', async () => {
-    await expect(revertProposal(VEHICLE, '2026-08-05', ACTOR))
+    await expect(revertProposal(VEHICLE, '2026-08-05', SCOPE, ACTOR))
       .rejects.toMatchObject({ code: 'not_applied' });
     expect(endAssignment).not.toHaveBeenCalled();
   });
@@ -201,7 +229,7 @@ describe('revertProposal', () => {
   it('leaves the stamp in place when ending the assignment fails', async () => {
     getProposal.mockResolvedValue(proposal({ appliedAssignmentId: 'assign-1' }));
     endAssignment.mockRejectedValue(new Error('not active'));
-    await expect(revertProposal(VEHICLE, '2026-08-05', ACTOR)).rejects.toThrow('not active');
+    await expect(revertProposal(VEHICLE, '2026-08-05', SCOPE, ACTOR)).rejects.toThrow('not active');
     expect(clearApplied).not.toHaveBeenCalled();
   });
 });

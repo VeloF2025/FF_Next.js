@@ -19,6 +19,7 @@ function proposal(overrides: Partial<SiteInferenceProposal> = {}): SiteInference
     ],
     computedAt: '2026-08-21T00:00:00.000Z', decision: null, decidedProjectId: null,
     decidedProjectName: null, decidedFrom: null, note: null, decidedBy: null, decidedAt: null,
+    decisionRevision: null, decidedAgainstComputedAt: null,
     decisionMatchesInference: null, effectiveProjectId: LAWLEY, appliedAssignmentId: null,
     appliedAt: null,
     drivers: [{ staffId: 's-1', staffName: 'Marthinus Van De Venter',
@@ -43,6 +44,29 @@ beforeEach(() => {
 });
 
 describe('SiteInferencePanel', () => {
+  it('shows when the evidence was measured and computed, not just the verdict', () => {
+    // A vehicle that stopped reporting keeps a `confident` row that otherwise
+    // looks identical to one recomputed this morning.
+    panel([proposal()]);
+    expect(screen.getByText('Measured 2026-07-17 to 2026-08-21, computed 2026-08-21'))
+      .toBeInTheDocument();
+  });
+
+  it('flags a decision taken against older evidence than the row now shows', () => {
+    panel([proposal({ decision: 'assigned', decidedProjectId: LAWLEY,
+      decidedProjectName: 'Lawley', decidedFrom: 'inference', decisionRevision: 1,
+      decidedAgainstComputedAt: '2026-07-30T00:00:00.000Z', decisionMatchesInference: true })]);
+    expect(screen.getByText(/decided against evidence from 2026-07-30/)).toBeInTheDocument();
+  });
+
+  it('forwards the revision it read so a concurrent edit cannot be clobbered', async () => {
+    panel([proposal({ decision: 'assigned', decidedProjectId: LAWLEY,
+      decidedProjectName: 'Lawley', decidedFrom: 'inference', decisionRevision: 4 })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    await waitFor(() => expect(handlers.onDecide).toHaveBeenCalledWith(
+      'v-1', { decision: 'rejected', expectedRevision: 4 }));
+  });
+
   it('shows the evidence behind a suggestion, not just the answer', () => {
     panel([proposal()]);
     expect(screen.getByText(/MW94RBGP/)).toBeInTheDocument();
@@ -61,7 +85,7 @@ describe('SiteInferencePanel', () => {
     panel([proposal()]);
     await userEvent.click(screen.getByRole('button', { name: 'Assign' }));
     await waitFor(() => expect(handlers.onDecide).toHaveBeenCalledWith(
-      'v-1', { decision: 'assigned', overrideProjectId: null }));
+      'v-1', { decision: 'assigned', overrideProjectId: null, expectedRevision: null }));
   });
 
   it('sends the override when one is chosen', async () => {
@@ -70,7 +94,7 @@ describe('SiteInferencePanel', () => {
       screen.getByLabelText('Override project for MW94RBGP'), MOHADIN);
     await userEvent.click(screen.getByRole('button', { name: 'Assign' }));
     await waitFor(() => expect(handlers.onDecide).toHaveBeenCalledWith(
-      'v-1', { decision: 'assigned', overrideProjectId: MOHADIN }));
+      'v-1', { decision: 'assigned', overrideProjectId: MOHADIN, expectedRevision: null }));
   });
 
   it('offers roaming as an answer rather than leaving the row flagged', async () => {
@@ -79,7 +103,7 @@ describe('SiteInferencePanel', () => {
     expect(screen.getByText(/Roams between sites/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Confirm roaming' }));
     await waitFor(() => expect(handlers.onDecide).toHaveBeenCalledWith(
-      'v-1', { decision: 'roaming_confirmed' }));
+      'v-1', { decision: 'roaming_confirmed', expectedRevision: null }));
   });
 
   it('cannot assign a roaming proposal until a project is picked', async () => {

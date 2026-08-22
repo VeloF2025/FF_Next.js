@@ -66,7 +66,13 @@ describe('scopeProposals', () => {
     expect(scoped.decidedProjectName).toBeNull();
   });
 
-  it('keeps a proposal with no project at all only when its breakdown has one', () => {
+  // DOCUMENTED LIMITATION, not an oversight: a vehicle with no GPS names no
+  // project, so there is nothing to scope it by, and showing it would disclose
+  // the existence of vehicles and drivers company-wide to a project-scoped
+  // manager. The 6 drivers whose vehicles never report are therefore visible to
+  // all-projects actors only. If that needs to change, scoping has to run off
+  // staff visibility rather than project ids.
+  it('hides a project-less proposal from a scoped actor rather than leaking the fleet', () => {
     const noProject = proposal({
       outcome: 'no_aoi_coverage', inferredProjectId: null, inferredProjectName: null,
       effectiveProjectId: null, breakdown: [],

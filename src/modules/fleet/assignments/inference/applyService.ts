@@ -24,6 +24,7 @@ export type ApplyProposalCode =
   | 'no_site_for_project'
   | 'blocking_conflicts'
   | 'unconfirmed_warnings'
+  | 'out_of_scope'
   | 'not_applied';
 
 export class ApplyProposalError extends Error {
@@ -64,6 +65,25 @@ async function requireProposal(vehicleId: string): Promise<SiteInferenceProposal
   return proposal;
 }
 
+/**
+ * Authorizes the projects a proposal touches, BEFORE anything else is checked.
+ *
+ * Ordering is the point. commitAssignments enforces scope too, but only once the
+ * driver and site have already been resolved - so an out-of-scope caller could
+ * read `no_driver` or `no_site_for_project` off a project they cannot see and
+ * learn about it that way. Reverting never reached that check at all.
+ */
+function assertScope(proposal: SiteInferenceProposal, scope: ActorScope): void {
+  if (scope.allProjects) return;
+  const permitted = new Set(scope.authorizedProjectIds ?? []);
+  const touched = [proposal.decidedProjectId, proposal.inferredProjectId]
+    .filter((projectId): projectId is string => typeof projectId === 'string');
+  if (touched.length === 0 || touched.some((projectId) => !permitted.has(projectId))) {
+    throw new ApplyProposalError(
+      'out_of_scope', 'No proposal exists for that vehicle', 404);
+  }
+}
+
 export async function applyProposal(
   vehicleId: string,
   range: ApplyDateRange,
@@ -71,6 +91,7 @@ export async function applyProposal(
   actor: AssignmentActor,
 ): Promise<ApplyResult> {
   const proposal = await requireProposal(vehicleId);
+  assertScope(proposal, scope);
   const projectId = proposal.decidedProjectId;
   if (proposal.decision !== 'assigned' || projectId === null) {
     throw new ApplyProposalError(
@@ -172,9 +193,11 @@ async function resolveSite(projectId: string): Promise<string> {
 export async function revertProposal(
   vehicleId: string,
   endDate: string,
+  scope: ActorScope,
   actor: AssignmentActor,
 ): Promise<void> {
   const proposal = await requireProposal(vehicleId);
+  assertScope(proposal, scope);
   const assignmentId = proposal.appliedAssignmentId;
   if (assignmentId === null) {
     throw new ApplyProposalError('not_applied', 'That proposal has not been applied', 409);

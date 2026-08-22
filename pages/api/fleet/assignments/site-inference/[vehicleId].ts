@@ -3,8 +3,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
-import { canEditAssignmentProject } from '@/modules/fleet/assignments/projectScope';
-import { getProposal } from '@/modules/fleet/assignments/inference/proposalQueries';
+import {
+  authorizedAssignmentProjectIds,
+  canEditAssignmentProject,
+} from '@/modules/fleet/assignments/projectScope';
+import { getProposal, type SiteInferenceProposal } from '@/modules/fleet/assignments/inference/proposalQueries';
+import { scopeProposals } from '@/modules/fleet/assignments/inference/proposalScope';
 import {
   InferenceDecisionError,
   recordDecision,
@@ -19,6 +23,25 @@ interface DecisionRequest extends NextApiRequest {
 }
 
 const DECISIONS: readonly InferenceDecision[] = ['assigned', 'rejected', 'roaming_confirmed'];
+
+function isAdmin(role: string): boolean {
+  return role === 'super_admin' || role === 'admin';
+}
+
+/**
+ * Redacts a single proposal the same way the list route redacts many. Returns
+ * null when nothing of it is visible - the caller gets a 404 rather than a 403,
+ * so the response does not confirm that the vehicle exists.
+ */
+async function visibleProposal(
+  proposal: SiteInferenceProposal,
+  userId: string,
+  staffId: string | null,
+  role: string,
+): Promise<SiteInferenceProposal | null> {
+  const authorized = await authorizedAssignmentProjectIds(userId, staffId, role, 'view');
+  return scopeProposals([proposal], authorized, isAdmin(role))[0] ?? null;
+}
 
 interface ParsedDecision {
   input: DecisionInput;
@@ -40,9 +63,19 @@ function parseBody(value: unknown, inferredProjectId: string | null): ParsedDeci
   }
   const note = typeof body.note === 'string' ? body.note.trim() : null;
 
+  const expected = body.expectedRevision;
+  if (expected !== undefined && expected !== null
+    && (typeof expected !== 'number' || !Number.isInteger(expected) || expected < 1)) {
+    return 'expectedRevision must be a positive whole number';
+  }
+  const expectedRevision = typeof expected === 'number' ? expected : null;
+
   if (decision !== 'assigned') {
     return {
-      input: { decision, decidedProjectId: null, decidedFrom: null, evidenceComputedAt: null, note },
+      input: {
+        decision, decidedProjectId: null, decidedFrom: null, evidenceComputedAt: null,
+        note, expectedRevision,
+      },
       scopeProjectId: null,
     };
   }
@@ -66,6 +99,7 @@ function parseBody(value: unknown, inferredProjectId: string | null): ParsedDeci
       decidedFrom: overrideProjectId === null ? 'inference' : 'override',
       evidenceComputedAt: null,
       note,
+      expectedRevision,
     },
     scopeProjectId: decidedProjectId,
   };
@@ -82,23 +116,44 @@ async function routeHandler(req: DecisionRequest, res: NextApiResponse) {
 
   const proposal = await getProposal(vehicleId);
   if (!proposal) return apiResponse.notFound(res, 'Site inference proposal', vehicleId);
+  const staffId = await resolveStaffIdForUser(user.id);
 
-  if (req.method === 'GET') return apiResponse.success(res, proposal);
+  if (req.method === 'GET') {
+    // The list route redacts; this one used to hand back the raw row, which let
+    // a scoped manager read any proposal by guessing a vehicle id.
+    const visible = await visibleProposal(proposal, user.id, staffId, user.role);
+    if (!visible) return apiResponse.notFound(res, 'Site inference proposal', vehicleId);
+    return apiResponse.success(res, visible);
+  }
 
   const parsed = parseBody(req.body, proposal.inferredProjectId);
   if (typeof parsed === 'string') return apiResponse.badRequest(res, parsed);
 
-  // Rejecting or confirming roaming names no project, so it is authorized
-  // against whatever the machine proposed instead - otherwise a scoped manager
-  // could dismiss a proposal belonging to a project they cannot see.
-  const scopeProjectId = parsed.scopeProjectId ?? proposal.inferredProjectId;
-  const staffId = await resolveStaffIdForUser(user.id);
-  if (scopeProjectId !== null
-    && !await canEditAssignmentProject(user.id, staffId, user.role, scopeProjectId)) {
-    return apiResponse.forbidden(res, 'You cannot decide proposals for this project');
+  // Two projects need authorizing, not one: the project being decided ONTO, and
+  // the project an existing decision already points AT. Checking only the former
+  // let a decision made for an out-of-scope project be taken over unseen.
+  //
+  // Rejecting or confirming roaming names no project, so it falls back to
+  // whatever the machine proposed.
+  const scopeProjectIds = [
+    parsed.scopeProjectId ?? proposal.inferredProjectId,
+    proposal.decidedProjectId,
+  ].filter((projectId): projectId is string => typeof projectId === 'string');
+  for (const projectId of new Set(scopeProjectIds)) {
+    if (!await canEditAssignmentProject(user.id, staffId, user.role, projectId)) {
+      return apiResponse.forbidden(res, 'You cannot decide proposals for this project');
+    }
   }
-  if (scopeProjectId === null && user.role !== 'super_admin' && user.role !== 'admin') {
+  if (scopeProjectIds.length === 0 && !isAdmin(user.role)) {
     return apiResponse.forbidden(res, 'Only an administrator can decide a proposal with no project');
+  }
+
+  // Compare-and-set is enforced in SQL too, but refusing here means a caller
+  // working from a stale view never reaches the write at all.
+  if (parsed.input.expectedRevision !== proposal.decisionRevision) {
+    return apiResponse.conflict(res,
+      'Someone else changed this decision while you were looking at it; reload and decide again',
+      { code: 'stale_decision' });
   }
 
   try {
@@ -106,10 +161,15 @@ async function routeHandler(req: DecisionRequest, res: NextApiResponse) {
       ...parsed.input,
       evidenceComputedAt: new Date(proposal.computedAt),
     }, user.id);
-    return apiResponse.success(res, await getProposal(vehicleId), 'Decision recorded');
+    const updated = await getProposal(vehicleId);
+    return apiResponse.success(res,
+      updated === null ? null : await visibleProposal(updated, user.id, staffId, user.role),
+      'Decision recorded');
   } catch (error) {
     if (error instanceof InferenceDecisionError) {
-      return apiResponse.badRequest(res, error.message, { code: error.code });
+      return error.code === 'already_applied' || error.code === 'stale_decision'
+        ? apiResponse.conflict(res, error.message, { code: error.code })
+        : apiResponse.badRequest(res, error.message, { code: error.code });
     }
     log.error('Failed to record a site inference decision', { error, vehicleId }, 'fleet');
     return apiResponse.internalError(res, error);

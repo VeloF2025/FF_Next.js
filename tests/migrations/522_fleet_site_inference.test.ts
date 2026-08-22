@@ -52,11 +52,11 @@ const USER_B = '52200000-0000-0000-0000-0000000000c2';
  * Column types were diffed against production information_schema on
  * 2026-08-21. The ones that matter and are easy to get wrong:
  *   projects.project_name       varchar(255)  (onemap.projects is varchar(100) - wrong table)
- *   fleet_vehicles.registration varchar
+ *   fleet_vehicles.registration varchar(20)
  *   fleet_vehicle_positions.lat/lon/speed_kph  numeric, NOT double precision
  *   project_aois.aoi            geography(Geometry,4326) - the ::geometry cast
  *                               in the dwell SQL exists because of this
- *   vehicle_assignments.vehicle_registration varchar - and on production 5 of
+ *   vehicle_assignments.vehicle_registration varchar(20) - and on production 5 of
  *                               24 active rows disagree with
  *                               fleet_vehicles.registration for the same
  *                               fleet_vehicle_id, which is why nothing joins on it.
@@ -77,20 +77,20 @@ const PREREQUISITES = `
   );
   CREATE TABLE fleet_vehicles (
     id UUID PRIMARY KEY,
-    registration VARCHAR(50) NOT NULL
+    registration VARCHAR(20) NOT NULL
   );
   CREATE TABLE vehicle_assignments (
     id UUID PRIMARY KEY,
     staff_id UUID NOT NULL REFERENCES staff(id),
     fleet_vehicle_id UUID REFERENCES fleet_vehicles(id),
-    vehicle_registration VARCHAR(50) NOT NULL,
+    vehicle_registration VARCHAR(20) NOT NULL,
     assignment_start DATE NOT NULL,
     is_active BOOLEAN DEFAULT TRUE
   );
   CREATE TABLE fleet_operational_assignments (id UUID PRIMARY KEY);
   CREATE TABLE project_aois (
     project_id UUID PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
-    aoi GEOGRAPHY NOT NULL,
+    aoi GEOGRAPHY(Geometry, 4326) NOT NULL,
     pole_count INTEGER NOT NULL,
     computed_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
@@ -295,6 +295,26 @@ describe('522_fleet_site_inference: the human override cannot be overwritten', (
     expect(view.rows[0].effective_project_id).toBe(LAWLEY);
   });
 
+  it('reports decision_matches_inference NULL when the decision names no project', async () => {
+    // Both sides null used to read as `true` - "the human agreed" - when in
+    // fact there was nothing to agree about.
+    await insertEvidence({ outcome: 'roaming', inferred_project_id: null, dominant_share: 0.4 });
+    await insertDecision('roaming_confirmed', null, null);
+    const view = await pool.query(
+      `SELECT decision_matches_inference FROM fleet_site_inference_proposals
+       WHERE vehicle_id = $1`, [VEHICLE]);
+    expect(view.rows[0].decision_matches_inference).toBeNull();
+  });
+
+  it('reports false when the human named a project and the machine named none', async () => {
+    await insertEvidence({ outcome: 'roaming', inferred_project_id: null, dominant_share: 0.4 });
+    await insertDecision('assigned', LAWLEY, 'override');
+    const view = await pool.query(
+      `SELECT decision_matches_inference FROM fleet_site_inference_proposals
+       WHERE vehicle_id = $1`, [VEHICLE]);
+    expect(view.rows[0].decision_matches_inference).toBe(false);
+  });
+
   it('has no column on the evidence table for a decision to be written into', async () => {
     // This is the actual guard: the recompute cannot clobber the decision
     // because the table it writes to has nowhere to put one. If someone later
@@ -373,15 +393,21 @@ describe('522_fleet_site_inference: the view surfaces the driver', () => {
 });
 
 describe('522_fleet_site_inference: an applied decision cannot be quietly rewritten', () => {
-  const assigned = (projectId: string): DecisionInput => ({
+  const assigned = (projectId: string, expectedRevision: number | null = null): DecisionInput => ({
     decision: 'assigned', decidedProjectId: projectId, decidedFrom: 'override',
-    evidenceComputedAt: null, note: null,
+    evidenceComputedAt: null, note: null, expectedRevision,
   });
 
-  it('lets a decision be changed while it has not reached the roster', async () => {
+  async function currentRevision(): Promise<number> {
+    const row = await pool.query(
+      `SELECT revision FROM fleet_site_inference_decisions WHERE vehicle_id = $1`, [VEHICLE]);
+    return row.rows[0].revision as number;
+  }
+
+  it('lets a decision be changed by someone working from the row they read', async () => {
     await insertEvidence();
     await recordDecision(VEHICLE, assigned(LAWLEY), USER_A);
-    await recordDecision(VEHICLE, assigned(POP1), USER_B);
+    await recordDecision(VEHICLE, assigned(POP1, await currentRevision()), USER_B);
     const row = await pool.query(
       `SELECT decided_project_id, decided_by FROM fleet_site_inference_decisions
        WHERE vehicle_id = $1`, [VEHICLE]);
@@ -389,9 +415,53 @@ describe('522_fleet_site_inference: an applied decision cannot be quietly rewrit
     expect(row.rows[0].decided_by).toBe(USER_B);
   });
 
+  it('refuses a write from someone who read the row before it last changed', async () => {
+    await insertEvidence();
+    await recordDecision(VEHICLE, assigned(LAWLEY), USER_A);
+    const stale = await currentRevision();
+    // A third person decides in between. Both people believe they are editing
+    // the same row; only one of them is. A clock-based token cannot tell these
+    // two writes apart when they land in the same millisecond; a counter can.
+    await recordDecision(VEHICLE, assigned(POP1, stale), USER_B);
+
+    const error = await recordDecision(VEHICLE, assigned(LAWLEY, stale), USER_A)
+      .catch((caught) => caught);
+    expect(error).toBeInstanceOf(InferenceDecisionErrorClass);
+    expect(error.code).toBe('stale_decision');
+
+    const row = await pool.query(
+      `SELECT decided_project_id, decided_by FROM fleet_site_inference_decisions
+       WHERE vehicle_id = $1`, [VEHICLE]);
+    expect(row.rows[0].decided_project_id).toBe(POP1);
+    expect(row.rows[0].decided_by).toBe(USER_B);
+  });
+
+  it('increments the revision on every accepted change', async () => {
+    await insertEvidence();
+    await recordDecision(VEHICLE, assigned(LAWLEY), USER_A);
+    expect(await currentRevision()).toBe(1);
+    await recordDecision(VEHICLE, assigned(POP1, 1), USER_B);
+    expect(await currentRevision()).toBe(2);
+    await recordDecision(VEHICLE, assigned(LAWLEY, 2), USER_A);
+    expect(await currentRevision()).toBe(3);
+  });
+
+  it('refuses a write that claims no decision exists when one does', async () => {
+    await insertEvidence();
+    await recordDecision(VEHICLE, assigned(LAWLEY), USER_A);
+    const error = await recordDecision(VEHICLE, assigned(POP1, null), USER_B)
+      .catch((caught) => caught);
+    expect(error.code).toBe('stale_decision');
+    const row = await pool.query(
+      `SELECT decided_project_id FROM fleet_site_inference_decisions WHERE vehicle_id = $1`,
+      [VEHICLE]);
+    expect(row.rows[0].decided_project_id).toBe(LAWLEY);
+  });
+
   it('refuses to change a decision that is already on the roster, and changes nothing', async () => {
     await insertEvidence();
     await recordDecision(VEHICLE, assigned(LAWLEY), USER_A);
+    const revision = await currentRevision();
     const assignmentId = '52200000-0000-0000-0000-0000000000e1';
     await pool.query(`INSERT INTO fleet_operational_assignments (id) VALUES ($1)`, [assignmentId]);
     await pool.query(`
@@ -399,7 +469,8 @@ describe('522_fleet_site_inference: an applied decision cannot be quietly rewrit
       SET applied_assignment_id = $1, applied_at = now(), applied_by = $2
       WHERE vehicle_id = $3`, [assignmentId, USER_A, VEHICLE]);
 
-    const error = await recordDecision(VEHICLE, assigned(POP1), USER_B).catch((caught) => caught);
+    const error = await recordDecision(VEHICLE, assigned(POP1, revision), USER_B)
+      .catch((caught) => caught);
     expect(error).toBeInstanceOf(InferenceDecisionErrorClass);
     expect(error.code).toBe('already_applied');
 
