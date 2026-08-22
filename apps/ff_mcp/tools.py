@@ -43,11 +43,15 @@ DENIED_GROUPS = (
     # kind='mcp' session. This copy saves a round-trip and stops the model proposing a
     # path it would only be refused — it is not the boundary.
     #
-    # Narrowed 2026-08-22. It used to include meetings, procurement, action-items, my and
-    # /api/field/attendance; all were opened because per-route RBAC already bounds them to
-    # the calling user, and denying by group made the connector less useful without making
-    # anything safer. What remains are the two areas where "bounded by the caller's own
-    # permissions" is NOT true:
+    # Narrowed 2026-08-22, then re-narrowed the same day. The first pass opened
+    # meetings, procurement, action-items, my and /api/field/attendance on the claim that
+    # per-route RBAC already bounds them. Blind review measured that claim and it was
+    # false for three of the five: procurement, meetings and action-items are withAuth-only
+    # (counts below), so authentication bounds them, not permissions. Only `my` and
+    # /api/field/attendance stayed open.
+    #
+    # The areas below are the ones where "bounded by the caller's own permissions" is
+    # NOT true:
     #
     #   accounting — the UI is unused but the data is live (5,201 GL journal lines,
     #                1,043 Sage supplier invoices). Retire the routes rather than expose.

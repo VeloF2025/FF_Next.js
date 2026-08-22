@@ -40,9 +40,20 @@ describe('MCP endpoint catalogue', () => {
       // function under test here makes the assertion vacuous the moment that function
       // regresses, which is precisely when it needs to fire.
       // `/api/my` was removed from this list when the `my` group was opened: those
-      // routes are self-scoped by construction — the handler resolves the caller's own
-      // payslips and cannot return anyone else's — so RBAC bounds them without help.
-      const WITHHELD_PREFIXES = ['/api/accounting', '/api/staff'];
+      // routes authenticate via the separate ff_my_session cookie, which an MCP bearer
+      // token cannot present, so they are unreachable rather than merely scoped.
+      //
+      // meetings / action-items / procurement are listed because they were opened and
+      // then re-denied: they are withAuth-only, so authentication bounds them and RBAC
+      // does not. Leaving them out let the leak assertion pass while saying nothing
+      // about the three groups whose exposure prompted the re-narrow.
+      const WITHHELD_PREFIXES = [
+        '/api/accounting',
+        '/api/staff',
+        '/api/meetings',
+        '/api/action-items',
+        '/api/procurement',
+      ];
       const leaked = result.routes.filter((r) => WITHHELD_PREFIXES.some((p) => r.path.startsWith(p)));
       expect(leaked.map((r) => r.path)).toEqual([]);
     });
