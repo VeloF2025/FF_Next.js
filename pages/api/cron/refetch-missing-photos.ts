@@ -25,6 +25,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { createLogger } from '@/lib/logger';
+import { checkVlmHealth } from '@/lib/vlm/config';
 
 const log = createLogger('RefetchMissingPhotos');
 
@@ -94,6 +95,31 @@ export default async function handler(
         recovered: 0,
         stillMissing: 0,
         failed: 0,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Same guard as retry-categorizations, for the same reason and through the
+    // same door: this loop calls process-new-dr, which runs VLM categorization
+    // and increments `vlm_retry_count` on failure (drCategorizationService).
+    // Running it against a dead VLM burns the DR's retry budget on an outage,
+    // and once the count passes MAX_RETRY_ATTEMPTS that DR can never self-heal.
+    //
+    // At */5 with limit=10 this cron alone would consume budget for ~120 DRs an
+    // hour of outage, so guarding retry-categorizations without guarding this
+    // one would leave the hole open on a timer.
+    const health = await checkVlmHealth();
+    if (!health.available) {
+      log.error(
+        `VLM unavailable (${health.error ?? 'no models served'}) — skipping ${rows.length} DR(s) without consuming retry budget`
+      );
+      return apiResponse.success(res, {
+        processed: 0,
+        recovered: 0,
+        stillMissing: 0,
+        failed: 0,
+        skipped: rows.length,
+        skipReason: 'vlm_unavailable',
         timestamp: new Date().toISOString(),
       });
     }

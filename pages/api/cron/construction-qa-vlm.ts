@@ -20,6 +20,7 @@ import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { validateReviewPhotos } from '@/modules/construction-qa/services/vlmConstructionService';
+import { checkVlmHealth } from '@/lib/vlm/config';
 import type { Discipline } from '@/modules/construction-qa/types/construction.types';
 
 const MAX_RETRY_COUNT = 3;
@@ -189,6 +190,34 @@ export default async function handler(
         return acc;
       }, {}),
     });
+
+    // Same guard as retry-categorizations and refetch-missing-photos, for the
+    // same reason: processReview -> validateReviewPhotos increments
+    // construction_qa_reviews.vlm_retry_count on any VLM failure, and the
+    // selection above only takes rows under MAX_RETRY_COUNT. Running against a
+    // dead VLM burns all attempts on the outage and permanently excludes those
+    // reviews once it recovers.
+    //
+    // This table has 0 rows stranded today, unlike the DR side which has 468 —
+    // the door is simply open rather than already walked through, and this cron
+    // runs */5 with limit=10.
+    const health = await checkVlmHealth();
+    if (!health.available) {
+      log.error('ConstructionQaVlm', {
+        action: 'skipped_vlm_unavailable',
+        reason: health.error ?? 'no models served',
+        pending: pendingReviews.length,
+      });
+      return apiResponse.success(res, {
+        processed: 0,
+        succeeded: 0,
+        failed: 0,
+        skipped: pendingReviews.length,
+        skipReason: 'vlm_unavailable',
+        results: [],
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     const results: ReviewResult[] = [];
     let succeeded = 0;

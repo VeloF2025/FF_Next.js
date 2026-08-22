@@ -2,6 +2,10 @@ vi.mock('@/lib/db', () => ({
   default: { query: vi.fn() },
 }));
 
+vi.mock('@/lib/vlm/config', () => ({
+  checkVlmHealth: vi.fn(async () => ({ available: true, model: 'Qwen3-VL' })),
+}));
+
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -11,9 +15,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createMocks } from 'node-mocks-http';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
+import { checkVlmHealth } from '@/lib/vlm/config';
 import handler from '@/pages/api/cron/refetch-missing-photos';
 
 const mockQuery = vi.mocked(pool.query);
+const mockHealth = vi.mocked(checkVlmHealth);
 const SECRET = 'test-cron-secret';
 const AUTH = { authorization: `Bearer ${SECRET}` };
 
@@ -143,5 +149,26 @@ describe('POST /api/cron/refetch-missing-photos', () => {
     }) as never);
     const res = await run(AUTH);
     expect(res._getStatusCode()).toBe(500);
+  });
+
+  it('skips every DR without consuming retry budget when the VLM is down', async () => {
+    // This cron calls process-new-dr, which runs VLM categorization and
+    // increments vlm_retry_count on failure. At */5 with limit=10 an outage
+    // would burn ~120 DRs' budget an hour and strand them permanently once the
+    // count passes MAX_RETRY_ATTEMPTS.
+    mockHealth.mockResolvedValueOnce({ available: false, model: null, error: 'ECONNREFUSED' });
+    stubQuery([{ drop_number: 'DR111' }, { drop_number: 'DR222' }]);
+    mockFetch(3);
+
+    const res = await run(AUTH);
+
+    expect(res._getStatusCode()).toBe(200);
+    expect(JSON.parse(res._getData()).data).toMatchObject({
+      processed: 0,
+      skipped: 2,
+      skipReason: 'vlm_unavailable',
+    });
+    // The real assertion: process-new-dr was never called, so no counter moved.
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
