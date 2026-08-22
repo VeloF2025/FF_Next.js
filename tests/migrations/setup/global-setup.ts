@@ -23,6 +23,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { Pool } from 'pg';
+import { startTestContainer } from '../../support/startTestContainer';
 
 // Production evidence queries use PostGIS geography predicates. Keep the
 // disposable harness on PostgreSQL 15 while including the production extension.
@@ -95,7 +96,10 @@ export async function setup() {
     }
   }
 
-  containerId = docker([
+  // Retried: Docker's random host port can collide at bind time. See
+  // tests/support/startTestContainer.ts. This harness publishes no --name, so
+  // a failed attempt is addressed by its run label instead.
+  containerId = startTestContainer(`ff-migration-run=${RUN_ID}`, [
     'run', '-d', '--label', LABEL, '--label', `ff-migration-run=${RUN_ID}`,
     '-e', `POSTGRES_USER=${USER}`,
     '-e', `POSTGRES_PASSWORD=${USER}`,
@@ -105,7 +109,17 @@ export async function setup() {
     // Data is disposable; tmpfs keeps it off disk and makes startup faster.
     '--tmpfs', '/var/lib/postgresql/data',
     IMAGE,
-  ]);
+  ], () => {
+    for (const id of docker([
+      'ps', '-aq', '--filter', `label=ff-migration-run=${RUN_ID}`,
+    ]).split('\n').filter(Boolean)) {
+      try {
+        docker(['rm', '-f', id]);
+      } catch {
+        // Already gone — nothing to clean up.
+      }
+    }
+  });
 
   // "127.0.0.1:49153" -> 49153
   const mapped = docker(['port', containerId, '5432/tcp']).split('\n')[0] ?? '';

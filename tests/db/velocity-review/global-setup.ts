@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
+import { startTestContainer } from '../../support/startTestContainer';
 
 const CONTAINER = `ff-velocity-review-test-${process.pid}`;
 const DATABASE = 'velocity_review_test';
@@ -47,7 +48,9 @@ async function waitForReady(url: string, timeoutMs = 30_000): Promise<void> {
 
 export async function setup(): Promise<void> {
   try {
-    execFileSync('docker', [
+    // Retried: Docker's random host port can collide at bind time. See
+    // tests/support/startTestContainer.ts.
+    startTestContainer(CONTAINER, [
       'run', '--rm', '-d', '--name', CONTAINER,
       '--label', 'ff-velocity-review-tests',
       '--label', `ff-velocity-review-run=${RUN_ID}`,
@@ -56,7 +59,7 @@ export async function setup(): Promise<void> {
       '-e', `POSTGRES_DB=${DATABASE}`,
       '-p', '127.0.0.1::5432',
       'postgres:16-alpine',
-    ], { stdio: 'ignore' });
+    ], () => spawnSync('docker', ['rm', '-f', CONTAINER], { stdio: 'ignore' }));
     started = true;
 
     const binding = execFileSync('docker', ['port', CONTAINER, '5432/tcp'], {
