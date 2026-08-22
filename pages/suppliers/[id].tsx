@@ -253,7 +253,10 @@ export default function SupplierDetailPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch((parseErr) => {
+          log.debug('Failed to parse delete error response:', { data: parseErr }, 'SupplierDetailPage');
+          return {};
+        });
 
         // Handle 409 Conflict - supplier has dependencies
         if (response.status === 409) {
