@@ -1288,12 +1288,30 @@ func extractDirectPathFromURL(url string) string {
 
 // Start a REST API server to expose the WhatsApp client functionality
 func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port int) {
-	// Mutating endpoints run through the inbound secret check. Read-only
-	// endpoints (/health, /groups, /all-groups, /list-recent, /api/download,
-	// /api/lid-lookup) are left open: the healthcheck cron and the FibreFlow
-	// readiness probe poll them, and they disclose no message content.
+	// Mutating endpoints run through the inbound secret check in the configured
+	// mode; handleStrict rejects unconditionally.
+	//
+	// What stays open, and why each one is a deliberate choice rather than a
+	// blanket "read-only is safe" claim:
+	//
+	//	/health         - the local healthcheck cron polls it and holds no secret.
+	//	                  Discloses link state and the bridge's own phone number.
+	//	/groups         - group names and JIDs. Read by the FibreFlow admin UI.
+	//	/all-groups     - as above, for groups not yet registered in the DB.
+	//	/api/download   - media by ID. Callers in field-ops and NOC photo services.
+	//	/api/lid-lookup - a phone-number to LID oracle.
+	//
+	// The last three disclose real data to an unauthenticated caller and should
+	// be closed once their callers send the secret; they are left open here only
+	// because migrating them is a wider change than this one. /list-recent is
+	// NOT in that list: it returns message text for everything sent in the last
+	// hour, has no caller anywhere in the repo, on the VPS, or in cron, so it is
+	// closed outright below.
 	handleGuarded := func(path string, h http.HandlerFunc) {
 		http.HandleFunc(path, guard(path, h))
+	}
+	handleStrict := func(path string, h http.HandlerFunc) {
+		http.HandleFunc(path, guardStrict(h))
 	}
 	registerPairingRoutes(client)
 
@@ -1679,7 +1697,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 	
 	// Handler: /list-recent - List recently sent messages
-	http.HandleFunc("/list-recent", func(w http.ResponseWriter, r *http.Request) {
+	handleStrict("/list-recent", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	
 		sentMessagesMu.RLock()

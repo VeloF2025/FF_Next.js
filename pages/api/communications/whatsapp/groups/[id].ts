@@ -13,6 +13,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import type { WaMonitoredGroup, WaMonitoredGroupInput, WaAdminApiResponse } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { waBridgeAuthHeaders } from '@/lib/waBridgeAuth';
 
 async function handler(
   req: NextApiRequest,
@@ -157,7 +158,10 @@ async function handlePut(
 
   // Trigger bridge reload
   try {
-    await fetch('http://72.61.197.178:8083/reload-groups', { method: 'GET' });
+    await fetch('http://72.61.197.178:8083/reload-groups', {
+      method: 'GET',
+      headers: waBridgeAuthHeaders(),
+    });
   } catch (e) {
     log.warn('[WA Groups] Failed to trigger bridge reload', { error: e });
   }
@@ -196,7 +200,10 @@ async function handleDelete(
 
   // Trigger bridge reload
   try {
-    await fetch('http://72.61.197.178:8083/reload-groups', { method: 'GET' });
+    await fetch('http://72.61.197.178:8083/reload-groups', {
+      method: 'GET',
+      headers: waBridgeAuthHeaders(),
+    });
   } catch (e) {
     log.warn('[WA Groups] Failed to trigger bridge reload', { error: e });
   }

@@ -13,7 +13,7 @@ import type {
   WaAdminApiResponse,
   WaPairingStatus,
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { waBridgeAuthHeaders } from '@/lib/waBridgeAuth';
 
@@ -142,4 +142,7 @@ async function handler(
   }
 }
 
-export default withAuth(handler);
+// Requesting or reading a pairing code is enough to link a device to the
+// company WhatsApp account, so this needs more than a valid session:
+// withAuth alone authenticates every role down to 'viewer'.
+export default withAuth(withRole('admin')(handler));
