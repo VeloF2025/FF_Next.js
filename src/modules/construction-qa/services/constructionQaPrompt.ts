@@ -1,11 +1,15 @@
 /**
  * Construction QA VLM prompt builder.
  *
- * Extracted verbatim from vlmConstructionService.ts so the prompt has a single
- * home that can be imported without pulling in that module's top-level
+ * Lifted out of vlmConstructionService.ts so the prompt has a single home that
+ * can be imported without pulling in that module's top-level
  * `neon(process.env.DATABASE_URL!)` side effect. The VLM benchmark pack
  * (scripts/vlm-bench/packs/civilQa.ts) imports this so bench prompts cannot
  * drift from what production sends.
+ *
+ * The move was verbatim; the classification block has since been rewritten as
+ * an ordered decision procedure (see git log for the measured before/after).
+ * Do not assume this text matches the original production prompt.
  */
 
 import type { Discipline } from '../types';

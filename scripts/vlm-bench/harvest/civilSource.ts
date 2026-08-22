@@ -1,4 +1,5 @@
 // scripts/vlm-bench/harvest/civilSource.ts
+import * as path from 'path';
 import { selectRows } from './db';
 import type { Candidate } from './sample';
 import type { HarvestItem } from './seal';
@@ -60,6 +61,18 @@ WHERE p.source = 'local' AND p.upload_status = 'available'
 /** Civil photos live on velo's filesystem; the harvest runs there, so read them directly. */
 const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-photos';
 
+/**
+ * `storage_key` comes from a DB column, so it is not trusted to stay inside
+ * STORAGE_ROOT. Resolve it and require the result to still be under the root,
+ * or the harvest would happily read arbitrary files off the box.
+ */
+export function resolveStoragePath(storageKey: string): string | null {
+  if (storageKey.includes('\0')) return null;
+  const root = path.resolve(STORAGE_ROOT);
+  const full = path.resolve(root, storageKey);
+  return full === root || full.startsWith(`${root}${path.sep}`) ? full : null;
+}
+
 export async function civilCandidates(): Promise<Array<Candidate & HarvestItem>> {
   const rows = await selectRows<Row>(SQL);
   const items: Array<Candidate & HarvestItem> = [];
@@ -67,10 +80,12 @@ export async function civilCandidates(): Promise<Array<Candidate & HarvestItem>>
     const corrected = r.corrected_new_step !== null;
     const step = corrected ? (r.corrected_new_step as number) : r.checklist_step;
     if (step === null || step < 0 || step > 7) continue;
+    const fullPath = resolveStoragePath(r.storage_key);
+    if (fullPath === null) continue; // storage_key escapes STORAGE_ROOT — skip, never read it
     items.push({
       key: r.photo_id,
       stratum: corrected ? 'vlm_wrong' : 'vlm_right',
-      fetchUrl: `file://${STORAGE_ROOT}/${r.storage_key}`,
+      fetchUrl: `file://${fullPath}`,
       filename: r.filename ?? r.storage_key.split('/').pop() ?? r.photo_id,
       expected: {
         step,
