@@ -92,14 +92,15 @@ export function ThemeToggle({
 
         {isOpen && (
           <>
-            {/* Backdrop */}
+            {/* Backdrop — z-40 so it sits above the module nav strip (z-30) */}
             <div 
-              className="fixed inset-0 z-10" 
+              className="fixed inset-0 z-40" 
               onClick={() => setIsOpen(false)} 
             />
             
-            {/* Dropdown */}
-            <div className="absolute right-0 top-full mt-2 z-20 w-48 py-2 bg-[var(--ff-surface-elevated)] border border-[var(--ff-border-primary)] rounded-lg shadow-lg">
+            {/* Dropdown — z-50 matches the other header dropdowns (notifications,
+                user menu, pin). Below z-30 the module nav strip covers its first row. */}
+            <div className="absolute right-0 top-full mt-2 z-50 w-48 py-2 bg-[var(--ff-surface-elevated)] border border-[var(--ff-border-primary)] rounded-lg shadow-lg">
               <div className="px-3 py-2 text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
                 Select Theme
               </div>
@@ -186,14 +187,15 @@ export function ThemeToggle({
 
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop — z-40 so it sits above the module nav strip (z-30) */}
           <div 
-            className="fixed inset-0 z-10" 
+            className="fixed inset-0 z-40" 
             onClick={() => setIsOpen(false)} 
           />
           
-          {/* Dropdown */}
-          <div className="absolute right-0 top-full mt-2 z-20 w-64 py-2 bg-[var(--ff-surface-elevated)] border border-[var(--ff-border-primary)] rounded-lg shadow-lg">
+          {/* Dropdown — z-50 matches the other header dropdowns (notifications,
+              user menu, pin). Below z-30 the module nav strip covers its first row. */}
+          <div className="absolute right-0 top-full mt-2 z-50 w-64 py-2 bg-[var(--ff-surface-elevated)] border border-[var(--ff-border-primary)] rounded-lg shadow-lg">
             <div className="px-3 py-2 text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
               Select Theme
             </div>

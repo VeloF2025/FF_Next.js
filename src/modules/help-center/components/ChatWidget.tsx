@@ -53,6 +53,41 @@ interface ChatWidgetProps {
 const STORAGE_KEY = 'ff-chat-widget';
 const BTN_SIZE = 56;
 const DRAG_THRESHOLD = 5;
+/** The pre-fix bottom-left corner offset, kept only to recognise un-dragged positions. */
+const LEGACY_DEFAULT_OFFSET = 24;
+/** Gap between the button and the viewport edge for the bottom-right default. */
+const EDGE_GAP = 24;
+/** Minimum on-screen margin; the button must never be fully outside the viewport. */
+const MIN_EDGE = 4;
+
+export interface WidgetPosition { x: number; y: number }
+
+/**
+ * Clamps a position so the button stays reachable in a viewport of the given
+ * size. `x` is a left offset and `y` a bottom offset, both in CSS pixels.
+ *
+ * This must be applied to RESTORED positions, not only to live drags. A
+ * position dragged to the right edge of a 2560px desktop and restored on a
+ * 390px phone puts the button ~2.1k px off-screen — and because dragging it
+ * back requires grabbing the button first, the widget becomes permanently
+ * unreachable for that user. Drag-time clamping cannot prevent this: the
+ * viewport that invalidates the value is a later one.
+ *
+ * Exported for direct test; a viewport smaller than the button collapses to
+ * MIN_EDGE rather than producing a negative upper bound.
+ */
+export function clampToViewport(
+  pos: WidgetPosition,
+  viewportWidth: number,
+  viewportHeight: number,
+): WidgetPosition {
+  const maxX = Math.max(MIN_EDGE, viewportWidth - BTN_SIZE - MIN_EDGE);
+  const maxY = Math.max(MIN_EDGE, viewportHeight - BTN_SIZE - MIN_EDGE);
+  return {
+    x: Math.min(maxX, Math.max(MIN_EDGE, pos.x)),
+    y: Math.min(maxY, Math.max(MIN_EDGE, pos.y)),
+  };
+}
 
 export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, userId }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,16 +105,40 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
   const btnRef = useRef<HTMLButtonElement>(null);
   const dragState = useRef({ dragging: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0 });
 
-  // Restore persisted position + hidden state
+  // Restore persisted position + hidden state.
+  // With no stored position, park the button bottom-RIGHT. The old bottom-left
+  // default sat on top of the leading text of every full-width bottom bar
+  // (e.g. /fleet/map rendered "Not on the map:" as "t on the map:"). Lowering
+  // the widget's z-index is not the fix — it must stay clickable above page
+  // content — so the corner it occupies is what has to change.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.x !== undefined) setPosition({ x: parsed.x, y: parsed.y });
+        // A stored position identical to the old bottom-left default means the
+        // user never dragged the button — re-park it rather than preserving a
+        // default they did not choose. A genuinely dragged position is kept.
+        const isLegacyDefault = parsed.x === LEGACY_DEFAULT_OFFSET && parsed.y === LEGACY_DEFAULT_OFFSET;
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number' && !isLegacyDefault) {
+          // Clamp on restore: the stored value was clamped to a DIFFERENT
+          // viewport, which says nothing about this one.
+          setPosition(clampToViewport({ x: parsed.x, y: parsed.y }, window.innerWidth, window.innerHeight));
+          if (parsed.hidden) setIsHidden(true);
+          return;
+        }
         if (parsed.hidden) setIsHidden(true);
       }
     } catch { /* ignore corrupt storage */ }
+    setPosition({ x: Math.max(4, window.innerWidth - BTN_SIZE - EDGE_GAP), y: EDGE_GAP });
+  }, []);
+
+  // Re-clamp when the viewport shrinks (rotation, window resize, devtools open),
+  // which can strand a previously valid position off-screen.
+  useEffect(() => {
+    const onResize = () => setPosition(prev => clampToViewport(prev, window.innerWidth, window.innerHeight));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   // Persist position + hidden state
@@ -100,12 +159,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
     const dy = e.clientY - ds.startY;
     if (!ds.moved && Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
     ds.moved = true;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    setPosition({
-      x: Math.max(4, Math.min(vw - BTN_SIZE - 4, ds.origX + dx)),
-      y: Math.max(4, Math.min(vh - BTN_SIZE - 4, ds.origY - dy)),
-    });
+    setPosition(clampToViewport(
+      { x: ds.origX + dx, y: ds.origY - dy },
+      window.innerWidth,
+      window.innerHeight,
+    ));
   }, []);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {

@@ -446,8 +446,16 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
         {isSystem && <SystemNav />}
 
         {/* Page Content */}
+        {/*
+          `relative` (no z-index) is deliberate. Adding a z-index here makes <main>
+          a stacking context, which traps every descendant — including page modals
+          that use `fixed inset-0 z-50` — beneath that single index. The module nav
+          above renders at z-30, so a z-10 main put every dialog behind the tab
+          strip regardless of its own z-index. Keep this element z-index-free so
+          modal descendants compete in the root stacking context.
+        */}
         <main
-          className={`flex-1 overflow-y-auto overflow-x-hidden bg-[var(--ff-background-primary)] relative z-10${currentUser?.isImpersonation ? ' pt-10' : ''}`}
+          className={`flex-1 overflow-y-auto overflow-x-hidden bg-[var(--ff-background-primary)] relative${currentUser?.isImpersonation ? ' pt-10' : ''}`}
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className="min-h-full">
