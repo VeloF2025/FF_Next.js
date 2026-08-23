@@ -4,6 +4,8 @@ import { categorizationCandidates } from './categorizationSource';
 import { civilCandidates } from './civilSource';
 import { civilHoldoutCandidates } from './civilHoldoutSource';
 import { civilPairCandidates, civilPairHoldoutCandidates } from './civilPairSource';
+import { civilRepCandidates } from './civilRepSource';
+import { categorizationRepCandidates } from './categorizationRepSource';
 import { serialsCandidates } from './serialsSource';
 import { closeHarvestPool } from './db';
 import { stratifiedSample, type Candidate } from './sample';
@@ -17,6 +19,8 @@ const SOURCES: Record<string, { dir: string; idPrefix: string; load: () => Promi
   'civil-qa-holdout': { dir: 'civil-qa-holdout', idPrefix: 'civilho', load: civilHoldoutCandidates },
   'civil-pair': { dir: 'civil-pair', idPrefix: 'civilpair', load: civilPairCandidates },
   'civil-pair-holdout': { dir: 'civil-pair-holdout', idPrefix: 'civilpairho', load: civilPairHoldoutCandidates },
+  'civil-rep': { dir: 'civil-rep', idPrefix: 'civilrep', load: civilRepCandidates },
+  'categorization-rep': { dir: 'categorization-rep', idPrefix: 'catrep', load: categorizationRepCandidates },
   serials: { dir: 'serials', idPrefix: 'serial', load: serialsCandidates },
 };
 
@@ -26,6 +30,16 @@ export interface HarvestOpts {
   seed: string;
   /** Total cases; split evenly between the vlm_wrong and vlm_right strata. */
   size: number;
+  /**
+   * 'balanced' (default) forces a 50/50 wrong/right split — a comparison
+   * instrument, deliberately harder than production.
+   *
+   * 'natural' keeps the population's own ratio instead, so the score estimates
+   * accuracy on the labelled workload rather than on a hard slice. Use it to
+   * decide WHETHER a pack is worth tuning; use 'balanced' to measure a change.
+   * The two are not comparable to each other.
+   */
+  mix?: 'balanced' | 'natural';
   out: (line: string) => void;
 }
 
@@ -45,10 +59,21 @@ export async function harvest(opts: HarvestOpts): Promise<void> {
   const wrong = candidates.filter((c) => c.stratum === 'vlm_wrong').length;
   opts.out(`${opts.packId}: ${candidates.length} candidates (${wrong} vlm_wrong / ${candidates.length - wrong} vlm_right)\n`);
 
-  const half = Math.floor(opts.size / 2);
+  const mix = opts.mix ?? 'balanced';
+  let wantWrong: number;
+  if (mix === 'natural') {
+    // Round the population ratio, then clamp so neither stratum is empty —
+    // a set with zero wrong cases cannot show an error and a set with zero
+    // right cases cannot show a false positive.
+    const ratio = candidates.length === 0 ? 0 : wrong / candidates.length;
+    wantWrong = Math.min(opts.size - 1, Math.max(1, Math.round(opts.size * ratio)));
+  } else {
+    wantWrong = Math.floor(opts.size / 2);
+  }
+  opts.out(`${opts.packId}: mix=${mix} -> ${wantWrong} wrong / ${opts.size - wantWrong} right\n`);
   const picked = stratifiedSample(candidates, `${opts.seed}:${opts.packId}`, {
-    vlm_wrong: half,
-    vlm_right: opts.size - half,
+    vlm_wrong: wantWrong,
+    vlm_right: opts.size - wantWrong,
   });
 
   const dir = path.join(opts.goldenRoot, source.dir);

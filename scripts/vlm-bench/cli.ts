@@ -7,8 +7,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { serialsPack } from './packs/serials';
-import { categorizationPack } from './packs/categorization';
+import { categorizationPack, categorizationRepPack } from './packs/categorization';
 import { civilQaPack, civilQaHoldoutPack, civilPairPack, civilPairHoldoutPack } from './packs/civilQa';
+import { civilRepPack, civilRepFewshotPack } from './packs/civilQa';
 import { stepMetrics, strataBreakdown } from './scoring/steps';
 import { harvest, closeHarvestPool } from './harvest';
 import { runPack } from './engine/runner';
@@ -25,6 +26,9 @@ const PACKS: Record<string, VlmTestPack> = {
   'civil-qa-holdout': civilQaHoldoutPack,
   'civil-pair': civilPairPack,
   'civil-pair-holdout': civilPairHoldoutPack,
+  'civil-rep': civilRepPack,
+  'civil-rep-fewshot': civilRepFewshotPack,
+  'categorization-rep': categorizationRepPack,
 };
 const MIN_GOLDEN = 100;
 
@@ -59,7 +63,7 @@ async function cmdRun(): Promise<void> {
   const resolved: VlmTestPack = {
     ...pack,
     buildPrompt(c) {
-      const ref = mode === 'golden' ? fileToDataUrl(path.join(GOLDEN_ROOT, pack.id, c.imageRef)) : c.imageRef;
+      const ref = mode === 'golden' ? fileToDataUrl(path.join(GOLDEN_ROOT, pack.goldenDir ?? pack.id, c.imageRef)) : c.imageRef;
       return pack.buildPrompt({ ...c, imageRef: ref });
     },
   };
@@ -106,6 +110,7 @@ async function cmdHarvest(): Promise<void> {
       goldenRoot: GOLDEN_ROOT,
       seed: arg('seed', 'v1')!,
       size: Number(arg('size', '80')),
+      mix: arg('mix', 'balanced') as 'balanced' | 'natural',
       out: (line) => process.stdout.write(line),
     });
   } finally {
@@ -115,7 +120,7 @@ async function cmdHarvest(): Promise<void> {
 
 function cmdCoverage(): void {
   for (const [id, pack] of Object.entries(PACKS)) {
-    const manifest = path.join(GOLDEN_ROOT, pack.id, 'cases.json');
+    const manifest = path.join(GOLDEN_ROOT, pack.goldenDir ?? pack.id, 'cases.json');
     const n = fs.existsSync(manifest) ? (JSON.parse(fs.readFileSync(manifest, 'utf8')) as unknown[]).length : 0;
     const flag = n < MIN_GOLDEN ? `  ⚠️ below ${MIN_GOLDEN}` : '';
     process.stdout.write(`${id}: ${n} golden cases${flag}\n`);
@@ -128,7 +133,7 @@ function cmdCoverage(): void {
   else if (cmd === 'coverage') cmdCoverage();
   else if (cmd === 'harvest') await cmdHarvest();
   else {
-    process.stdout.write('usage: cli.ts run|coverage|harvest [--pack <id>] [--mode golden|live] [--size N] [--seed S] [--dump FILE]\n');
+    process.stdout.write('usage: cli.ts run|coverage|harvest [--pack <id>] [--mode golden|live] [--size N] [--seed S] [--mix balanced|natural] [--dump FILE]\n');
     process.exit(1);
   }
   // `run` writes through @/lib/db-pool, whose pool has no exported close and

@@ -1,0 +1,10 @@
+### CORRECTION EXAMPLES (Learn from past mistakes):
+
+❌ WRONG: "2 - During Photo"
+✅ CORRECT: "5 - Compaction / Backfill"
+
+❌ WRONG: "2 - During Photo"
+✅ CORRECT: "7 - After Photo"
+
+❌ WRONG: "2 - During Photo"
+✅ CORRECT: "5 - Compaction / Backfill"
