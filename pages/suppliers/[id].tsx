@@ -435,7 +435,7 @@ export default function SupplierDetailPage() {
           </div>
 
           {/* Tab Content */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-white text-gray-900 rounded-lg border border-gray-200 p-6">
             {activeTab === 'profile' && (
               <div className="space-y-6">
                 {isEditing ? (
@@ -741,7 +741,7 @@ export default function SupplierDetailPage() {
                 {purchaseOrders.length > 0 ? (
                   <div className="space-y-4">
                     {purchaseOrders.map((po) => (
-                      <div key={po.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div key={po.id} className="flex items-center justify-between p-4 bg-gray-50 text-gray-900 rounded-lg">
                         <div>
                           <p className="font-medium text-gray-900">{po.po_number}</p>
                           <p className="text-sm text-gray-500">
@@ -772,7 +772,7 @@ export default function SupplierDetailPage() {
                     {rfqInvites.map((rfq) => (
                       <div
                         key={rfq.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                        className="flex items-center justify-between p-4 bg-gray-50 text-gray-900 rounded-lg cursor-pointer hover:bg-gray-100"
                         onClick={() => router.push(`/procurement/rfq/${rfq.id}`)}
                       >
                         <div>
@@ -806,7 +806,7 @@ export default function SupplierDetailPage() {
           {/* Delete Confirmation Dialog */}
           {showDeleteDialog && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+              <div className="bg-white text-gray-900 rounded-lg p-6 max-w-md mx-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete Supplier</h3>
                 <p className="text-gray-600 mb-6">
                   How would you like to remove this supplier?

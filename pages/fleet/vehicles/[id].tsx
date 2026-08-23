@@ -2153,7 +2153,7 @@ function OdometerTab({
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Current Level</p>
                 <div className="flex items-center gap-2">
-                  <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="w-full h-4 bg-[var(--ff-border-medium)] rounded-full overflow-hidden">
                     <div
                       className={`h-full ${
                         fuelHistory[0]!.fuelLevel > 50 ? 'bg-green-500' :
@@ -2233,7 +2233,7 @@ function OdometerTab({
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 justify-center">
-                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="w-20 h-2 bg-[var(--ff-border-medium)] rounded-full overflow-hidden">
                               <div
                                 className={`h-full ${
                                   reading.fuelLevel > 50 ? 'bg-green-500' :

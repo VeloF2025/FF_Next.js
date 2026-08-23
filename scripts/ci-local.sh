@@ -46,6 +46,7 @@ fi
 : "${MAX_PAGES_LINT_WARNINGS:?not set by ci-baselines.env}"
 : "${MAX_PAGES_LINT_ERRORS:?not set by ci-baselines.env}"
 : "${MAX_SILENT_CATCHES:?not set by ci-baselines.env}"
+: "${MAX_UNTHEMED_LIGHT_SURFACES:?not set by ci-baselines.env}"
 
 pass() { echo -e "${GREEN}  ✓ $*${NC}"; PASSED=$((PASSED + 1)); }
 fail() { echo -e "${RED}  ✗ $*${NC}"; FAILED=$((FAILED + 1)); }
@@ -165,6 +166,78 @@ elif [ "$DIVERGENCE_COUNT" -eq 0 ]; then
 else
   fail "Neon-shim SQL divergence: ${DIVERGENCE_COUNT} (must be 0) — fragment interpolation or sql.unsafe() executor"
   echo "$DIVERGENCE_OUTPUT" | grep -B1 "no-neon-shim-sql-divergence" | tail -20 | sed 's/^/    /'
+fi
+
+# ─── Gate 2f: Unthemed light surfaces (no-unthemed-light-surface) ────────────
+# Bans a hard-coded light background (bg-white, bg-gray-50/100/200,
+# bg-slate-50/100) in a className that has neither a `dark:` variant nor a
+# paired explicit dark-safe text colour. Text follows the theme; a hard-coded
+# white surface does not — so in dark mode the text goes near-white on a white
+# panel and the whole component disappears. The Fleet map attention panel
+# shipped to production this way at 1.04:1 contrast; a user found it, four code
+# reviewers did not, because contrast is not visible in a diff.
+#
+# Run via --rulesdir (same mechanism as Gates 2/2c) rather than through
+# .eslintrc: `npm run lint` is `eslint src` and would miss pages/ entirely, and
+# .eslintrc.json is dead config (see the Gate 2e note below — a rule declared
+# only there enforced nothing for two months). --rulesdir is the only wiring in
+# this repo that demonstrably runs.
+#
+# Ratcheted rather than hard-zero ONLY because of a known in-flight fix; the
+# target is 0 and the provenance line in ci-baselines.env says when it drops.
+echo -e "\n${CYAN}── Gate 2f: Unthemed light surfaces ──${NC}\n"
+
+# A count alone cannot tell a clean scan from a scan that linted nothing: both
+# report 0. So this reads ESLint's JSON output and asserts the number of files
+# actually linted, the same fail-loud shape as scripts/silent-catch-ratchet.mjs.
+SURFACE_MIN_FILES=1500
+
+SURFACE_RC=0
+SURFACE_JSON=$(npx eslint src pages --ext .tsx --rulesdir scripts/eslint-rules \
+  --rule '{"no-unthemed-light-surface": "error"}' -f json 2>/dev/null) || SURFACE_RC=$?
+
+SURFACE_STATS=$(printf '%s' "$SURFACE_JSON" | node -e '
+  let raw = "";
+  process.stdin.on("data", (c) => { raw += c; });
+  process.stdin.on("end", () => {
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch { console.log("PARSE_ERROR 0 0"); return; }
+    if (!Array.isArray(parsed)) { console.log("PARSE_ERROR 0 0"); return; }
+    const findings = parsed.reduce((n, file) =>
+      n + file.messages.filter((m) => m.ruleId === "no-unthemed-light-surface").length, 0);
+    console.log(`OK ${parsed.length} ${findings}`);
+  });
+' 2>/dev/null || echo "PARSE_ERROR 0 0")
+
+SURFACE_STATUS=$(echo "$SURFACE_STATS" | awk '{print $1}')
+SURFACE_FILES=$(echo "$SURFACE_STATS" | awk '{print $2}')
+SURFACE_COUNT=$(echo "$SURFACE_STATS" | awk '{print $3}')
+
+if [ "$SURFACE_RC" -ge 2 ] || [ "$SURFACE_STATUS" != "OK" ]; then
+  fail "Unthemed light surfaces: eslint failed to run (exit ${SURFACE_RC}) — gate scanned nothing"
+  printf '%s' "$SURFACE_JSON" | tail -c 400 | sed 's/^/    /'
+elif [ "$SURFACE_FILES" -lt "$SURFACE_MIN_FILES" ]; then
+  # Guards the sampling frame, not the findings: a moved directory or a bad
+  # --ext would shrink the frame to nothing and still report a clean zero.
+  fail "Unthemed light surfaces: only ${SURFACE_FILES} files linted (expected >= ${SURFACE_MIN_FILES}) — the scan frame collapsed, so a 0 finding count proves nothing"
+elif [ "$SURFACE_COUNT" -le "$MAX_UNTHEMED_LIGHT_SURFACES" ]; then
+  pass "Unthemed light surfaces: ${SURFACE_COUNT} (max ${MAX_UNTHEMED_LIGHT_SURFACES}, ${SURFACE_FILES} files linted)"
+  if [ "$SURFACE_COUNT" -lt "$MAX_UNTHEMED_LIGHT_SURFACES" ]; then
+    info "Below baseline — ratchet MAX_UNTHEMED_LIGHT_SURFACES down to ${SURFACE_COUNT}."
+  fi
+else
+  fail "Unthemed light surfaces: ${SURFACE_COUNT} (max ${MAX_UNTHEMED_LIGHT_SURFACES}) — light-on-light in dark mode"
+  printf '%s' "$SURFACE_JSON" | node -e '
+    let raw = "";
+    process.stdin.on("data", (c) => { raw += c; });
+    process.stdin.on("end", () => {
+      for (const file of JSON.parse(raw)) {
+        for (const m of file.messages.filter((x) => x.ruleId === "no-unthemed-light-surface")) {
+          console.log(`    ${file.filePath}:${m.line}`);
+        }
+      }
+    });
+  ' 2>/dev/null | head -20
 fi
 
 # ─── Gate 2d: QField step-detection (pure-logic regression) ──────────────────
@@ -351,7 +424,8 @@ echo -e "\n${CYAN}── Gate 2e: Serial Lifecycle Discipline ──${NC}\n"
 # a mis-fire would move three numbers.
 if RULE_TEST_OUT=$(node scripts/eslint-rules/__tests__/no-direct-serial-status-write.test.js 2>&1 \
                    && node scripts/eslint-rules/__tests__/no-neon-shim-sql-divergence.test.js 2>&1 \
-                   && node scripts/eslint-rules/__tests__/no-silent-catch.test.js 2>&1); then
+                   && node scripts/eslint-rules/__tests__/no-silent-catch.test.js 2>&1 \
+                   && node scripts/eslint-rules/__tests__/no-unthemed-light-surface.test.js 2>&1); then
   pass "Custom ESLint rule tests: pass"
 else
   fail "Custom ESLint rule tests FAILED — the detection behind Gate 2/2c/2e is not trustworthy"

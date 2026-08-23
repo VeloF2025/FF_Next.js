@@ -568,7 +568,7 @@ export default function DesignAuditDashboard() {
             </div>
             <div className="p-4 rounded-lg border border-orange-500/30 bg-orange-500/5">
               <p className="text-xs font-semibold text-orange-400 mb-3">window.confirm() (24)</p>
-              <div className="h-28 flex items-center justify-center"><div className="bg-white rounded p-3 text-black text-xs shadow-lg border w-3/4"><p className="font-semibold mb-1">localhost says</p><p className="mb-2">Delete this item?</p><div className="flex gap-2 justify-end"><button type="button" className="px-2 py-1 text-xs bg-gray-200 rounded">Cancel</button><button type="button" className="px-2 py-1 text-xs bg-blue-500 text-white rounded">OK</button></div></div></div>
+              <div className="h-28 flex items-center justify-center"><div className="bg-white rounded p-3 text-black text-xs shadow-lg border w-3/4"><p className="font-semibold mb-1">localhost says</p><p className="mb-2">Delete this item?</p><div className="flex gap-2 justify-end"><button type="button" className="px-2 py-1 text-xs bg-gray-200 text-black rounded">Cancel</button><button type="button" className="px-2 py-1 text-xs bg-blue-500 text-white rounded">OK</button></div></div></div>
             </div>
             <div className="p-4 rounded-lg border-2 border-dashed border-green-500/30 bg-green-500/5">
               <p className="text-xs font-semibold text-green-400 mb-3">TARGET: ConfirmDialog</p>
