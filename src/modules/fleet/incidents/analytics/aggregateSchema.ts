@@ -134,6 +134,21 @@ export const PUBLIC_AGGREGATE_COLUMNS = [
 ] as const;
 
 /**
+ * The metric kind a row must carry, mirroring the migration's
+ * `histogram_pairing` CHECK: it makes `metric_key LIKE 'timing.%'` and
+ * `metric_kind = 'duration_histogram'` the same condition, so the kind is a
+ * function of the key and never a caller's choice. A non-timing metric is a
+ * ratio when it has a denominator to divide by, and a plain count otherwise.
+ */
+export function metricKindFor(
+  metricKey: OperationsMetricKey,
+  denominator: number | null,
+): AggregateMetricKind {
+  if (metricKey.startsWith('timing.')) return 'duration_histogram';
+  return denominator === null ? 'count' : 'ratio';
+}
+
+/**
  * Substrings that may not appear in an aggregate column name. Task 2's release
  * step reuses this to reject a forbidden key at serialization time as well.
  */
