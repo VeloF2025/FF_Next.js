@@ -212,7 +212,11 @@ func startGroupsReloader() {
 			fmt.Println("🔄 Reloading groups from database...")
 			if err := loadGroupsFromDB(); err != nil {
 				fmt.Printf("❌ Failed to reload groups: %v\n", err)
+				continue
 			}
+			// Membership can change without the DB changing, so re-check on
+			// every reload rather than only at startup.
+			runGroupReconciliation(context.Background(), reconcileClient)
 		}
 	}()
 }
@@ -1605,7 +1609,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 		// Send message
 		resp, err := client.SendMessage(context.Background(), groupJID, msg)
 		if err != nil {
-			fmt.Printf("❌ Failed to send message: %v\n", err)
+			fmt.Printf("❌ Failed to send message to %s (%s): %v\n", groupJID.String(), getGroupNameOrUnknown(groupJID.String()), err)
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": fmt.Sprintf("Failed to send: %v", err)})
 			return
@@ -1741,6 +1745,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 			"phone_number":  phoneNumber,
 			"pairing_state": func() string { if sessionValid { return "connected" } else { return "needs_pairing" } }(),
 			"recent_count":  len(recentMessages),
+			"group_membership": membershipHealth(),
 		})
 	})
 	
@@ -2063,6 +2068,11 @@ func main() {
 	}
 
 	fmt.Println("\n✓ Connected to WhatsApp! Type 'help' for commands.")
+
+	// Check membership once the session is live. A number that was swapped or
+	// removed from groups looks completely healthy until something tries to send.
+	reconcileClient = client
+	runGroupReconciliation(context.Background(), reconcileClient)
 
 	// Start REST API server
 	startRESTServer(client, messageStore, 8083)
