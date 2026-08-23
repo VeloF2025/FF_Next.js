@@ -216,7 +216,7 @@ func startGroupsReloader() {
 			}
 			// Membership can change without the DB changing, so re-check on
 			// every reload rather than only at startup.
-			runGroupReconciliation(context.Background(), reconcileClient)
+			runGroupReconciliation(context.Background(), getReconcileClient())
 		}
 	}()
 }
@@ -2071,8 +2071,8 @@ func main() {
 
 	// Check membership once the session is live. A number that was swapped or
 	// removed from groups looks completely healthy until something tries to send.
-	reconcileClient = client
-	runGroupReconciliation(context.Background(), reconcileClient)
+	setReconcileClient(client)
+	runGroupReconciliation(context.Background(), getReconcileClient())
 
 	// Start REST API server
 	startRESTServer(client, messageStore, 8083)

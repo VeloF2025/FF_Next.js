@@ -114,9 +114,26 @@ type joinedGroupsLister interface {
 	GetJoinedGroups(ctx context.Context) ([]*types.GroupInfo, error)
 }
 
-// reconcileClient is set once the WhatsApp client exists. The reloader
-// goroutine starts before that, so a nil here is expected early and handled.
-var reconcileClient joinedGroupsLister
+// The reloader goroutine starts before the WhatsApp client exists, so this is
+// written by main() while that goroutine is already reading it. An interface
+// value is two words; an unsynchronised concurrent read can tear, so both sides
+// go through the mutex rather than relying on the write landing first.
+var (
+	reconcileClientMu sync.RWMutex
+	reconcileClient   joinedGroupsLister
+)
+
+func setReconcileClient(c joinedGroupsLister) {
+	reconcileClientMu.Lock()
+	defer reconcileClientMu.Unlock()
+	reconcileClient = c
+}
+
+func getReconcileClient() joinedGroupsLister {
+	reconcileClientMu.RLock()
+	defer reconcileClientMu.RUnlock()
+	return reconcileClient
+}
 
 // getGroupNameOrUnknown resolves a JID for log messages. A send failure that
 // names only the JID still costs someone a lookup to act on.
@@ -145,8 +162,14 @@ func runGroupReconciliation(ctx context.Context, client joinedGroupsLister) {
 	}
 	groups, err := client.GetJoinedGroups(ctx)
 	if err != nil {
+		// Clear the cached result, not just record the error. Leaving the last
+		// successful counts in place would report checked=true with
+		// unreachable=0 while the check is actually failing, and a monitor
+		// gating on those two fields would call an outage healthy.
 		membershipMu.Lock()
 		membershipErrStr = err.Error()
+		membershipKnown = false
+		lastMembership = GroupMembershipReport{}
 		membershipMu.Unlock()
 		fmt.Printf("⚠️  Could not check group membership: %v\n", err)
 		return

@@ -226,3 +226,61 @@ func TestRunGroupReconciliationSurvivesNilClientAndNilGroups(t *testing.T) {
 		t.Fatal("a nil group entry aborted the check")
 	}
 }
+
+// The gap the original tests missed: they only covered never-run -> failure.
+// After a SUCCESSFUL run, a later failure used to leave checked=true with the
+// previous run's counts, so a monitor gating on checked + unreachable_with_ack
+// would read an active outage as healthy.
+func TestMembershipHealthDoesNotInheritPreviousSuccessOnFailure(t *testing.T) {
+	resetMembership(t)
+	groupsMutex.Lock()
+	monitoredGroups = []MonitoredGroup{grp("Reachable", "1@g.us", "dr_submission", true, true)}
+	groupsMutex.Unlock()
+
+	jid, err := types.ParseJID("1@g.us")
+	if err != nil {
+		t.Fatalf("ParseJID: %v", err)
+	}
+	runGroupReconciliation(context.Background(), &fakeLister{groups: []*types.GroupInfo{{JID: jid}}})
+	if membershipHealth()["checked"] != true {
+		t.Fatal("setup: the successful run should have recorded a check")
+	}
+
+	runGroupReconciliation(context.Background(), &fakeLister{err: errors.New("boom")})
+
+	h := membershipHealth()
+	if h["checked"] != false {
+		t.Fatalf("checked = %v after a failure following a success, want false", h["checked"])
+	}
+	if h["error"] != "boom" {
+		t.Fatalf("error = %v, want the upstream cause", h["error"])
+	}
+	// The stale counts are what actually fooled a monitor, so assert they are gone.
+	for _, k := range []string{"monitored", "joined", "unreachable", "unreachable_with_ack"} {
+		if v, ok := h[k]; ok {
+			t.Fatalf("stale %q = %v survived a failed check", k, v)
+		}
+	}
+}
+
+// reconcileClient is written by main() while the reloader goroutine is already
+// reading it. Run under -race; without the mutex this reports a data race.
+func TestReconcileClientAccessorIsRaceFree(t *testing.T) {
+	t.Cleanup(func() { setReconcileClient(nil) })
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 200; i++ {
+			_ = getReconcileClient()
+		}
+	}()
+	for i := 0; i < 200; i++ {
+		setReconcileClient(&fakeLister{})
+	}
+	<-done
+
+	if getReconcileClient() == nil {
+		t.Fatal("client was lost")
+	}
+}
