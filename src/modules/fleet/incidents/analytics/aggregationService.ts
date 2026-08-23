@@ -24,6 +24,7 @@ import { loadMonitorRunFacts } from './monitorFactQueries';
 import { loadPresenceFacts, loadProjectsWithOperationalSites } from './presenceFactQueries';
 import { getEffectiveAnalyticsRetentionSettings } from './settingsRepository';
 import { releaseAnonymousGroups } from './suppression';
+import { sastMonthStart, shiftMonth } from './sastDates';
 
 const MODULE = 'FleetOperationalAggregation';
 
@@ -38,24 +39,6 @@ export interface AggregationResult {
   rowsWritten: number;
 }
 
-/** The SAST month an instant falls in, as `YYYY-MM-01`. */
-export function sastMonthStart(at: string): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit',
-  }).formatToParts(new Date(at));
-  const year = parts.find((p) => p.type === 'year')?.value;
-  const month = parts.find((p) => p.type === 'month')?.value;
-  if (!year || !month) throw new Error(`Could not resolve a SAST month for ${at}`);
-  return `${year}-${month}-01`;
-}
-
-/** `monthStart` shifted by `delta` months, still as `YYYY-MM-01`. */
-export function shiftMonth(monthStart: string, delta: number): string {
-  const [year, month] = monthStart.split('-').map(Number);
-  if (!year || !month) throw new Error(`Not a month start: ${monthStart}`);
-  const shifted = new Date(Date.UTC(year, month - 1 + delta, 1));
-  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}-01`;
-}
 
 /**
  * The months this run rebuilds: the current SAST month and the `window - 1`
@@ -164,3 +147,6 @@ export async function aggregateOperationsMonths(requestedAt: string): Promise<Ag
 }
 
 export { hasCompleteAggregateCoverage };
+// Re-exported so callers of the aggregation pipeline get its month arithmetic
+// from one place; the implementations live in ./sastDates with their tests.
+export { sastMonthStart, shiftMonth };

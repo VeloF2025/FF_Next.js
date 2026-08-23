@@ -87,35 +87,54 @@ interface Candidate {
 /**
  * Decides which children of one parent may be published.
  *
- * Children below the threshold are always withheld. The complementary rule
- * follows: if that leaves exactly ONE withheld child, the parent's residual is
- * that child, so the smallest publishable sibling is withheld alongside it.
- * Ties break on the lower id, so two runs over the same month produce the same
- * rows and therefore the same checksum.
+ * Children below the threshold are always withheld. What matters after that is
+ * the RESIDUAL - what a reader recovers by subtracting the published children
+ * from the parent. The residual is the union of every withheld child, and it
+ * must itself describe at least `minimumContributors` people.
  *
- * When there is no sibling to pair with, nothing is published at this level and
- * the parent alone carries the numbers.
+ * Requiring merely that two or more children be withheld is NOT enough, and
+ * that error is why this comment is long: two sites of two people each leave a
+ * four-person residual that the parent row hands over exactly, with
+ * `contributor_count` even stating the headcount. So siblings are withheld,
+ * smallest first, until the residual clears the threshold or nothing is left to
+ * publish. Ties break on the lower id, so two runs over the same month produce
+ * the same rows and therefore the same checksum.
+ *
+ * When everything ends up withheld, nothing is published at this level and the
+ * parent alone carries the numbers - which discloses nothing, because the
+ * residual is then the parent itself.
+ *
+ * Contributors are UNIONED, never summed: one person working two sites is one
+ * person in the residual.
  */
 function applyComplementarySuppression(
   children: readonly Candidate[],
   minimumContributors: number,
 ): { published: Candidate[]; withheldCount: number } {
-  const passing = children.filter((c) => c.accumulator.contributors.size >= minimumContributors);
-  const withheldCount = children.length - passing.length;
+  const published = children.filter((c) => c.accumulator.contributors.size >= minimumContributors);
+  const withheld = children.filter((c) => c.accumulator.contributors.size < minimumContributors);
 
-  if (withheldCount !== 1) return { published: passing, withheldCount };
-
-  const ordered = [...passing].sort(
+  // Smallest first, then lowest id: the order siblings are sacrificed in, and
+  // deterministic so a re-run produces byte-identical rows.
+  published.sort(
     (a, b) => a.accumulator.contributors.size - b.accumulator.contributors.size
       || a.id.localeCompare(b.id),
   );
-  const sacrificed = ordered[0];
-  if (!sacrificed) return { published: [], withheldCount };
 
-  return {
-    published: passing.filter((c) => c.id !== sacrificed.id),
-    withheldCount: withheldCount + 1,
-  };
+  const residual = new Set<string>();
+  for (const child of withheld) {
+    for (const contributor of child.accumulator.contributors) residual.add(contributor);
+  }
+
+  // Nothing withheld means no residual to protect.
+  while (withheld.length > 0 && residual.size < minimumContributors && published.length > 0) {
+    const sacrificed = published.shift();
+    if (!sacrificed) break;
+    withheld.push(sacrificed);
+    for (const contributor of sacrificed.accumulator.contributors) residual.add(contributor);
+  }
+
+  return { published, withheldCount: withheld.length };
 }
 
 function toRow(

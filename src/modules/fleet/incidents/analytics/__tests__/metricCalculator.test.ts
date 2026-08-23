@@ -187,6 +187,38 @@ describe('calculateMonthlyMetrics', () => {
       expect(find(groups, 'input.responses_on_time')?.denominator).toBe(3);
     });
 
+    it('does NOT count an unsolicited submission as a response to a request', () => {
+      // A driver may submit with no request outstanding — computeResponseEligibility
+      // permits it. Counting that in the numerator while the denominator counts
+      // only requests produces numerator > denominator, which the aggregate
+      // table refuses with a CHECK violation. That does not skew a percentage;
+      // it fails the month's aggregation, and keeps failing it every night.
+      const groups = calculateMonthlyMetrics(
+        [incident({ driverInputRequested: false, driverInputResponded: true, driverInputOnTime: true })],
+        VERSION,
+      );
+
+      expect(find(groups, 'input.requests_sent')?.numerator).toBe(0);
+      expect(find(groups, 'input.responses_received')?.numerator).toBe(0);
+      expect(find(groups, 'input.responses_on_time')?.numerator).toBe(0);
+      const received = find(groups, 'input.responses_received');
+      expect(received?.numerator).toBeLessThanOrEqual(received?.denominator ?? 0);
+    });
+
+    it('never lets a duration run backwards into sum_seconds', () => {
+      // A superseded request can leave a submission that predates it. The
+      // aggregate table enforces sum_seconds >= 0, so a negative sample would
+      // fail the month rather than skew an average.
+      const groups = calculateMonthlyMetrics(
+        [incident({ acknowledgementSeconds: -500 }), incident({ acknowledgementSeconds: 600 })],
+        VERSION,
+      );
+      const histogram = find(groups, 'timing.acknowledgement')?.histogram;
+      expect(histogram?.sampleCount).toBe(1);
+      expect(histogram?.sumSeconds).toBe(600);
+      expect(histogram?.sumSeconds).toBeGreaterThanOrEqual(0);
+    });
+
     it('divides evidence availability and recurrence by incidents', () => {
       const groups = calculateMonthlyMetrics(
         [
@@ -238,6 +270,67 @@ describe('calculateMonthlyMetrics', () => {
     });
   });
 
+  describe('anonymity support', () => {
+    it('describes a metric by WHO CONTRIBUTED to it, not by the site roster', () => {
+      // Eight rostered staff; one of them has one accident. Publishing the
+      // accident metrics under the roster's eight claims a protection that does
+      // not exist -- and with a single sample, sum_seconds IS that one person's
+      // exact duration, retained after the incident row is purged.
+      const facts: OperationsFact[] = [];
+      for (let s = 0; s < 8; s += 1) facts.push(presence(`a-${s}`, 'confirmed'));
+      facts.push(incident({
+        contributorKey: 'a-3', incidentType: 'accident_sos',
+        outcome: 'confirmed', resolutionSeconds: 4271,
+      }));
+
+      const groups = calculateMonthlyMetrics(facts, VERSION);
+
+      expect(find(groups, 'incident.accident_sos')?.contributors).toEqual(new Set(['a-3']));
+      expect(find(groups, 'timing.resolution')?.contributors).toEqual(new Set(['a-3']));
+      expect(find(groups, 'outcome.confirmed')?.contributors).toEqual(new Set(['a-3']));
+      // The presence metrics genuinely are about all eight.
+      expect(find(groups, 'presence.scheduled_days')?.contributors.size).toBe(8);
+    });
+
+    it('credits a timing metric only for durations actually measured', () => {
+      const groups = calculateMonthlyMetrics(
+        [
+          incident({ contributorKey: 'a', resolutionSeconds: 600 }),
+          incident({ contributorKey: 'b', resolutionSeconds: null }),
+        ],
+        VERSION,
+      );
+      // 'b' never reached resolution, so it is not part of the group that
+      // metric's histogram describes.
+      expect(find(groups, 'timing.resolution')?.contributors).toEqual(new Set(['a']));
+      expect(find(groups, 'incident.late')?.contributors).toEqual(new Set(['a', 'b']));
+    });
+
+    it('gives a true zero the roster, since it singles nobody out', () => {
+      const groups = calculateMonthlyMetrics(
+        [presence('a', 'confirmed'), presence('b', 'confirmed')],
+        VERSION,
+      );
+      const never = find(groups, 'incident.severe_driving');
+      expect(never?.numerator).toBe(0);
+      expect(never?.contributors).toEqual(new Set(['a', 'b']));
+    });
+
+    it('does not let monitor-run facts inflate a presence group', () => {
+      // Six people are assigned; only two appear on the roster evaluation.
+      const facts: OperationsFact[] = [
+        presence('b-0', 'confirmed'), presence('b-1', 'confirmed'),
+        {
+          kind: 'monitor_run', workDate: '2026-07-14', dimension: DIMENSION,
+          contributorKeys: ['b-0', 'b-1', 'b-2', 'b-3', 'b-4', 'b-5'], completed: true,
+        },
+      ];
+      const groups = calculateMonthlyMetrics(facts, VERSION);
+      expect(find(groups, 'presence.scheduled_days')?.contributors.size).toBe(2);
+      expect(find(groups, 'reliability.monitor_runs_expected')?.contributors.size).toBe(6);
+    });
+  });
+
   describe('grouping', () => {
     it('splits on the SAST month the work date falls in', () => {
       const groups = calculateMonthlyMetrics(
@@ -262,6 +355,8 @@ describe('calculateMonthlyMetrics', () => {
         VERSION,
       );
       expect(find(groups, 'presence.scheduled_days')?.contributors).toEqual(new Set(['a', 'b']));
+      // 'a' appears in both confirmation states; each is credited its own.
+      expect(find(groups, 'presence.unconfirmed_days')?.contributors).toEqual(new Set(['a']));
     });
 
     it('stamps the metric version it was asked for', () => {
@@ -281,6 +376,11 @@ describe('calculateMonthlyMetrics', () => {
       incident({ outcome: 'confirmed', driverInputRequested: true, driverInputResponded: true }),
       incident({ outcome: 'duplicate', evidenceAvailable: true, isRecurrence: true }),
       incident(),
+      // The combinations that actually threaten the CHECK: a response with no
+      // request, and a backwards duration. Without these the sweep below passes
+      // whether or not the invariants are enforced.
+      incident({ driverInputRequested: false, driverInputResponded: true, driverInputOnTime: true }),
+      incident({ acknowledgementSeconds: -900, resolutionSeconds: -1 }),
       { kind: 'notification', workDate: '2026-07-14', dimension: DIMENSION, contributorKey: 'a', delivered: true },
       { kind: 'monitor_run', workDate: '2026-07-14', dimension: DIMENSION, contributorKeys: ['a'], completed: true },
     ];
@@ -290,6 +390,11 @@ describe('calculateMonthlyMetrics', () => {
       expect(group.numerator).toBeGreaterThanOrEqual(0);
       if (group.denominator !== null) {
         expect(group.numerator).toBeLessThanOrEqual(group.denominator);
+      }
+      if (group.histogram) {
+        expect(group.histogram.sumSeconds).toBeGreaterThanOrEqual(0);
+        expect(group.histogram.sampleCount).toBeGreaterThanOrEqual(0);
+        expect(group.histogram.buckets.every((b) => b >= 0)).toBe(true);
       }
     }
   });

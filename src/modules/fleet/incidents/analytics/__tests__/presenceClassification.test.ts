@@ -47,13 +47,23 @@ describe('presenceConfirmationFor', () => {
     expect(presenceConfirmationFor('off_duty')).toBeNull();
   });
 
-  it('has a decision recorded for every status in the union', () => {
+  it('has a decision recorded for every status this test knows about', () => {
     for (const status of ALL_STATUSES) {
       const result = presenceConfirmationFor(status);
       expect(['confirmed', 'unconfirmed', 'vehicle_only', null]).toContain(result);
     }
-    // Guards the list above against silently drifting from the union it mirrors.
-    expect(new Set(ALL_STATUSES).size).toBe(13);
+    expect(new Set(ALL_STATUSES).size).toBe(ALL_STATUSES.length); // no duplicates
+  });
+
+  it('is exhaustive over ALL_STATUSES by construction, and nothing more', () => {
+    // HONEST SCOPE: ALL_STATUSES is hand-written and this repo excludes test
+    // files from tsc entirely (tsconfig.json excludes **/__tests__/**), so no
+    // type-level trick here can catch the union gaining a 14th member -- a
+    // mapped type would compile-check nothing and merely LOOK like a guard.
+    // What actually protects `presenceConfirmationFor` against an unknown
+    // status is its fail-closed default, asserted in the next test.
+    expect(ALL_STATUSES).toHaveLength(13);
+    expect(new Set(ALL_STATUSES).size).toBe(ALL_STATUSES.length);
   });
 
   it('defaults an unknown status to unconfirmed, never to present', () => {

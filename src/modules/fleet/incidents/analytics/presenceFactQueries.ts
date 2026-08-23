@@ -23,6 +23,7 @@ import { query } from '@/lib/db-pool';
 import { getOperationalRosterStatus } from '@/modules/fleet/operations/statusService';
 import type { PresenceFact } from './facts';
 import { presenceConfirmationFor } from './presenceClassification';
+import { datesInMonth, endOfWorkDate } from './sastDates';
 
 const MODULE = 'FleetAnalyticsPresenceFacts';
 
@@ -54,21 +55,6 @@ export async function loadProjectsWithOperationalSites(): Promise<string[]> {
   return rows.map((row) => row.project_id);
 }
 
-/** Every calendar date in the month starting at `monthStart`, as `YYYY-MM-DD`. */
-export function datesInMonth(monthStart: string): string[] {
-  const [year, month] = monthStart.split('-').map(Number);
-  if (!year || !month) throw new Error(`Not a month start: ${monthStart}`);
-  const dayCount = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  return Array.from(
-    { length: dayCount },
-    (_, i) => `${monthStart.slice(0, 8)}${String(i + 1).padStart(2, '0')}`,
-  );
-}
-
-/** End of the work date in SAST - the instant the day's statuses are final. */
-function endOfWorkDate(workDate: string): string {
-  return new Date(`${workDate}T23:59:59+02:00`).toISOString();
-}
 
 async function presenceForProjectDay(projectId: string, workDate: string): Promise<PresenceFact[]> {
   const asOf = endOfWorkDate(workDate);

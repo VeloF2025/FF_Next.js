@@ -23,6 +23,7 @@ function group(
 ): CalculatedMetricGroup {
   return {
     monthStart: MONTH,
+    metricVersion: 1,
     projectId,
     operationalSiteId,
     metricKey: 'presence.scheduled_days',
@@ -52,7 +53,10 @@ describe('releaseAnonymousGroups', () => {
   });
 
   it('withholds a site below the threshold and folds it into its project', () => {
-    // Two sites so the complementary rule is not what does the folding here.
+    // 'small' has 3 people, so the residual would be 3 - under the threshold -
+    // and the smallest passing sibling is withheld with it. Both foldings are
+    // the residual rule doing its job; this test asserts the below-threshold
+    // site never appears, not that it was the only one withheld.
     const released = releaseAnonymousGroups(
       [
         group('p1', 'small', people('a', 3), 30),
@@ -83,16 +87,97 @@ describe('releaseAnonymousGroups', () => {
     );
 
     const sites = released.filter((r) => r.dimensionLevel === 'site').map((r) => r.dimensionSiteId);
-    // The smallest passing sibling is folded in alongside the failing site, so
-    // the project's residual covers two sites and isolates neither.
     expect(sites).toEqual(['large']);
 
+    // The property that matters is not "more than one site was withheld" -- it
+    // is that the RESIDUAL describes at least K people. Two withheld sites of
+    // two people each would satisfy the former and leak under the latter.
     const project = released.find((r) => r.dimensionLevel === 'project');
-    const publishedSiteTotal = released
-      .filter((r) => r.dimensionLevel === 'site')
-      .reduce((sum, r) => sum + r.numerator, 0);
-    const residual = (project?.numerator ?? 0) - publishedSiteTotal;
-    expect(residual).toBe(90); // 30 + 60 — two sites, not one
+    const publishedSites = released.filter((r) => r.dimensionLevel === 'site');
+    const residualHeadcount = (project?.contributorCount ?? 0)
+      - publishedSites.reduce((sum, r) => sum + r.contributorCount, 0);
+    expect(residualHeadcount).toBeGreaterThanOrEqual(K);
+  });
+
+  it('THE REAL GUARD: a residual of two small sites is still withheld', () => {
+    // The defect this replaced: the rule fired only when EXACTLY ONE child was
+    // withheld. Two sites of two people each leave a four-person residual that
+    // the project row hands over by subtraction -- and contributor_count states
+    // the headcount outright. Reproduced against the real implementation before
+    // the fix: residual of 84 over 4 people.
+    const released = releaseAnonymousGroups(
+      [
+        group('p1', 'big', people('a', 20), 400),
+        group('p1', 'tiny-1', people('b', 2), 40),
+        group('p1', 'tiny-2', people('c', 2), 44),
+      ],
+      K,
+    );
+
+    // 'big' must NOT be published: doing so leaves 84 days over 4 people.
+    expect(released.some((r) => r.dimensionLevel === 'site')).toBe(false);
+
+    const project = released.find((r) => r.dimensionLevel === 'project');
+    expect(project?.numerator).toBe(484);
+    expect(project?.contributorCount).toBe(24);
+  });
+
+  it('measures the residual by UNION, so shared staff cannot pad it', () => {
+    // Two withheld sites of three, sharing two people: four distinct people in
+    // the residual, not six. Summing the child headcounts reaches the threshold
+    // and publishes 'big', handing over a four-person group by subtraction.
+    const shared = ['shared-1', 'shared-2'];
+    const released = releaseAnonymousGroups(
+      [
+        group('p1', 'big', people('a', 20), 400),
+        group('p1', 'tiny-1', [...shared, 'only-1'], 30),
+        group('p1', 'tiny-2', [...shared, 'only-2'], 33),
+      ],
+      K,
+    );
+
+    expect(released.some((r) => r.dimensionLevel === 'site')).toBe(false);
+    const project = released.find((r) => r.dimensionLevel === 'project');
+    // 20 + 4 distinct, not 20 + 6.
+    expect(project?.contributorCount).toBe(24);
+  });
+
+  it('withholds down to nothing rather than leave a sub-threshold residual', () => {
+    // Three one-person sites alongside a large one: the residual only clears K
+    // once every site is withheld.
+    const released = releaseAnonymousGroups(
+      [
+        group('p1', 'big', people('a', 20), 400),
+        group('p1', 's1', people('b', 1), 21),
+        group('p1', 's2', people('c', 1), 19),
+        group('p1', 's3', people('d', 1), 17),
+      ],
+      K,
+    );
+    expect(released.filter((r) => r.dimensionLevel === 'site')).toHaveLength(0);
+  });
+
+  it('publishes every site when none is withheld, leaving no residual at all', () => {
+    const released = releaseAnonymousGroups(
+      [
+        group('p1', 'a', people('a', 6), 60),
+        group('p1', 'b', people('b', 7), 70),
+      ],
+      K,
+    );
+    const sites = released.filter((r) => r.dimensionLevel === 'site').map((r) => r.dimensionSiteId);
+    expect(sites).toEqual(['a', 'b']);
+    const project = released.find((r) => r.dimensionLevel === 'project');
+    expect(project?.generalizedFromLevel).toBeNull();
+  });
+
+  it('keeps metric versions in separate slices', () => {
+    const v2 = { ...group('p1', 's1', people('a', 6), 99), metricVersion: 2 };
+    const released = releaseAnonymousGroups([group('p1', 's1', people('a', 6), 50), v2], K);
+    const siteRows = released.filter((r) => r.dimensionLevel === 'site');
+    expect(siteRows).toHaveLength(2);
+    expect(siteRows.map((r) => [r.metricVersion, r.numerator]).sort())
+      .toEqual([[1, 50], [2, 99]]);
   });
 
   it('breaks the complementary tie deterministically, smallest then lowest id', () => {

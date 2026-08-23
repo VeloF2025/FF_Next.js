@@ -16,6 +16,7 @@
  */
 import { query } from '@/lib/db-pool';
 import type { IncidentFact, NotificationFact } from './facts';
+import { toWorkDate } from './sastDates';
 
 /** How far back a prior incident of the same type still counts as a recurrence. */
 export const RECURRENCE_WINDOW_DAYS = 90;
@@ -38,17 +39,6 @@ interface IncidentRow extends Record<string, unknown> {
   is_recurrence: boolean;
 }
 
-/**
- * `work_date` is a DATE column, and node-postgres hands DATE back as a local
- * midnight `Date`. Formatting it with `toISOString()` would shift it a day
- * backwards in SAST, so the calendar parts are read directly.
- */
-function toWorkDate(value: string | Date): string {
-  if (typeof value === 'string') return value.slice(0, 10);
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  return `${value.getFullYear()}-${month}-${day}`;
-}
 
 function toSeconds(value: string | number | null): number | null {
   if (value === null) return null;
@@ -83,10 +73,18 @@ const INCIDENT_FACT_SQL = `/* fleet-analytics-facts:incidents */
     ORDER BY r.requested_at
     LIMIT 1
   ) req ON true
+  -- Tied to the request above, NOT to the incident. A driver may submit with no
+  -- request at all (an unsolicited explanation -- computeResponseEligibility
+  -- permits it), and a superseded request leaves an older submission that
+  -- answered a DIFFERENT request. Counting either as a response breaks two CHECK
+  -- constraints on the aggregate table: responses_received would exceed
+  -- requests_sent, and a submission predating that request would contribute
+  -- a negative duration to sum_seconds. Both fail the month, every night.
   LEFT JOIN LATERAL (
     SELECT MIN(s.created_at) AS first_submitted_at
     FROM fleet_incident_driver_submissions s
     WHERE s.incident_id = i.id
+      AND s.input_request_id = req.id
   ) sub ON true
   LEFT JOIN LATERAL (
     SELECT COUNT(*) AS evidence_count

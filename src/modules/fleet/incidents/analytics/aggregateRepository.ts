@@ -109,20 +109,28 @@ export async function replaceMonth(
 ): Promise<ReplaceMonthResult> {
   const checksums = rows.map((row) => checksumForAggregate(row));
   const stored = await storedChecksums(monthStart, metricVersion);
-  if (isUnchanged(stored, checksums)) return { changed: false, rowsWritten: 0 };
+  const changed = !isUnchanged(stored, checksums);
 
   await transaction(async (client) => {
-    await client.query(
-      `/* fleet-analytics-aggregates:clear */
-       DELETE FROM fleet_operational_monthly_aggregates
-       WHERE month_start = $1::date AND metric_version = $2`,
-      [monthStart, metricVersion],
-    );
-    for (const [index, row] of rows.entries()) {
-      await client.query(INSERT_SQL, insertParams(row, runId, checksums[index] ?? ''));
+    if (changed) {
+      await client.query(
+        `/* fleet-analytics-aggregates:clear */
+         DELETE FROM fleet_operational_monthly_aggregates
+         WHERE month_start = $1::date AND metric_version = $2`,
+        [monthStart, metricVersion],
+      );
+      for (const [index, row] of rows.entries()) {
+        await client.query(INSERT_SQL, insertParams(row, runId, checksums[index] ?? ''));
+      }
     }
-    // Only once this version's rows are in place: retire the other versions of
-    // this month, so a failure above leaves the older answer active.
+    // ALWAYS, even when this version's rows did not change - including when
+    // this version publishes NOTHING. Tightening the anonymity policy is
+    // exactly the case that recomputes to an empty set: `stored` is empty,
+    // `rows` is empty, the two compare equal, and an early return here would
+    // leave the LOOSER previous version's rows active forever. A retraction
+    // that only runs when there is something to replace is not a retraction.
+    // Sequenced after the insert so a failure above leaves the older answer
+    // active rather than leaving the month with nothing.
     await client.query(
       `/* fleet-analytics-aggregates:retire-other-versions */
        UPDATE fleet_operational_monthly_aggregates SET is_active = false, updated_at = now()
@@ -131,7 +139,7 @@ export async function replaceMonth(
     );
   });
 
-  return { changed: true, rowsWritten: rows.length };
+  return { changed, rowsWritten: changed ? rows.length : 0 };
 }
 
 /**

@@ -19,6 +19,7 @@
  */
 import { query } from '@/lib/db-pool';
 import type { MonitorRunFact } from './facts';
+import { toWorkDate } from './sastDates';
 
 /** The run kind that evaluates the operational roster. */
 export const ROSTER_MONITOR_RUN_KIND = 'status_monitor';
@@ -29,13 +30,6 @@ interface MonitorRunRow extends Record<string, unknown> {
   operational_site_id: string;
   contributor_keys: string[];
   completed: boolean;
-}
-
-function toWorkDate(value: string | Date): string {
-  if (typeof value === 'string') return value.slice(0, 10);
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  return `${value.getFullYear()}-${month}-${day}`;
 }
 
 /**

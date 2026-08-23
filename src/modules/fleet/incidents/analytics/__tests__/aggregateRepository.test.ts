@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 
 describe('replaceMonth', () => {
-  it('writes nothing when the computed rows match what is stored', async () => {
+  it('rewrites nothing when the computed rows match what is stored', async () => {
     const rows = [row(), row({ dimensionSiteId: 's2' })];
     mocks.query.mockResolvedValue(rows.map((r) => ({ checksum: checksumForAggregate(r) })));
     const { calls } = captureTransaction();
@@ -59,8 +59,39 @@ describe('replaceMonth', () => {
     const result = await replaceMonth('2026-07-01', 1, rows, 'run-1');
 
     expect(result).toEqual({ changed: false, rowsWritten: 0 });
-    expect(mocks.transaction).not.toHaveBeenCalled();
-    expect(calls).toHaveLength(0);
+    // No pointless DELETE and re-INSERT of identical rows every night -- that
+    // is what the checksum comparison is for. The retire step still runs; see
+    // the retraction tests below for why it must.
+    expect(calls.some((c) => c.sql.includes('aggregates:clear'))).toBe(false);
+    expect(calls.some((c) => c.sql.includes('aggregates:insert'))).toBe(false);
+  });
+
+  it('RETIRES the previous version even when the new one publishes nothing', async () => {
+    // Tightening the anonymity policy is exactly the case that recomputes to an
+    // empty set: stored is empty, rows is empty, the two compare equal. An
+    // early return here would leave the LOOSER previous version's rows active
+    // forever -- a retraction that only runs when there is something to replace
+    // is not a retraction.
+    mocks.query.mockResolvedValue([]);
+    const { calls } = captureTransaction();
+
+    const result = await replaceMonth('2026-07-01', 2, [], 'run-9');
+
+    expect(result).toEqual({ changed: false, rowsWritten: 0 });
+    const retire = calls.find((c) => c.sql.includes('retire-other-versions'));
+    expect(retire).toBeDefined();
+    expect(retire?.params).toEqual(['2026-07-01', 2]);
+    expect(calls.some((c) => c.sql.includes('aggregates:insert'))).toBe(false);
+  });
+
+  it('still retires when an unchanged month has rows', async () => {
+    const rows = [row()];
+    mocks.query.mockResolvedValue(rows.map((r) => ({ checksum: checksumForAggregate(r) })));
+    const { calls } = captureTransaction();
+
+    await replaceMonth('2026-07-01', 1, rows, 'run-1');
+
+    expect(calls.some((c) => c.sql.includes('retire-other-versions'))).toBe(true);
   });
 
   it('DOES write when a row disappears, even though every new checksum is stored', async () => {
