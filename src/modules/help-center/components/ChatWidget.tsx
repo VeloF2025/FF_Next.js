@@ -12,6 +12,9 @@ import { cn } from '@/lib/utils';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
+import {
+  BTN_SIZE, clampToViewport, defaultPosition, keepStoredPosition, STORAGE_VERSION,
+} from './chatWidgetPosition';
 
 interface ChatMessage {
   id: string;
@@ -51,44 +54,7 @@ interface ChatWidgetProps {
 }
 
 const STORAGE_KEY = 'ff-chat-widget';
-const BTN_SIZE = 56;
 const DRAG_THRESHOLD = 5;
-/** The pre-fix bottom-left corner offset, kept only to recognise un-dragged positions. */
-const LEGACY_DEFAULT_OFFSET = 24;
-/** Gap between the button and the viewport edge for the bottom-right default. */
-const EDGE_GAP = 24;
-/** Minimum on-screen margin; the button must never be fully outside the viewport. */
-const MIN_EDGE = 4;
-
-export interface WidgetPosition { x: number; y: number }
-
-/**
- * Clamps a position so the button stays reachable in a viewport of the given
- * size. `x` is a left offset and `y` a bottom offset, both in CSS pixels.
- *
- * This must be applied to RESTORED positions, not only to live drags. A
- * position dragged to the right edge of a 2560px desktop and restored on a
- * 390px phone puts the button ~2.1k px off-screen — and because dragging it
- * back requires grabbing the button first, the widget becomes permanently
- * unreachable for that user. Drag-time clamping cannot prevent this: the
- * viewport that invalidates the value is a later one.
- *
- * Exported for direct test; a viewport smaller than the button collapses to
- * MIN_EDGE rather than producing a negative upper bound.
- */
-export function clampToViewport(
-  pos: WidgetPosition,
-  viewportWidth: number,
-  viewportHeight: number,
-): WidgetPosition {
-  const maxX = Math.max(MIN_EDGE, viewportWidth - BTN_SIZE - MIN_EDGE);
-  const maxY = Math.max(MIN_EDGE, viewportHeight - BTN_SIZE - MIN_EDGE);
-  return {
-    x: Math.min(maxX, Math.max(MIN_EDGE, pos.x)),
-    y: Math.min(maxY, Math.max(MIN_EDGE, pos.y)),
-  };
-}
-
 export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, userId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
@@ -99,6 +65,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
   const [dataAccess, setDataAccess] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
   const [position, setPosition] = useState({ x: 24, y: 24 });
+  // False until the mount effect has read storage and settled on a position.
+  // The button is not painted before then, so it never flashes at the initial
+  // placeholder coordinates, and nothing is persisted over a stored record that
+  // has not been read yet.
+  const [positioned, setPositioned] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -116,35 +87,49 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        // A stored position identical to the old bottom-left default means the
-        // user never dragged the button — re-park it rather than preserving a
-        // default they did not choose. A genuinely dragged position is kept.
-        const isLegacyDefault = parsed.x === LEGACY_DEFAULT_OFFSET && parsed.y === LEGACY_DEFAULT_OFFSET;
-        if (typeof parsed.x === 'number' && typeof parsed.y === 'number' && !isLegacyDefault) {
+        if (parsed.hidden) setIsHidden(true);
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number' && keepStoredPosition(parsed)) {
           // Clamp on restore: the stored value was clamped to a DIFFERENT
           // viewport, which says nothing about this one.
           setPosition(clampToViewport({ x: parsed.x, y: parsed.y }, window.innerWidth, window.innerHeight));
-          if (parsed.hidden) setIsHidden(true);
+          setPositioned(true);
           return;
         }
-        if (parsed.hidden) setIsHidden(true);
       }
     } catch { /* ignore corrupt storage */ }
-    setPosition({ x: Math.max(4, window.innerWidth - BTN_SIZE - EDGE_GAP), y: EDGE_GAP });
+    setPosition(defaultPosition(window.innerWidth, window.innerHeight));
+    setPositioned(true);
   }, []);
 
   // Re-clamp when the viewport shrinks (rotation, window resize, devtools open),
   // which can strand a previously valid position off-screen.
+  //
+  // Returning `prev` unchanged when the clamp is a no-op matters: clampToViewport
+  // always allocates a new object, so an unconditional setPosition would re-render
+  // AND write to localStorage on every resize tick — dozens of synchronous writes
+  // during one interactive window drag, none of which change anything.
   useEffect(() => {
-    const onResize = () => setPosition(prev => clampToViewport(prev, window.innerWidth, window.innerHeight));
+    const onResize = () => setPosition((prev) => {
+      const next = clampToViewport(prev, window.innerWidth, window.innerHeight);
+      return next.x === prev.x && next.y === prev.y ? prev : next;
+    });
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Persist position + hidden state
+  // Persist position + hidden state. Gated on `positioned`: without it, this
+  // effect fires on mount with the placeholder coordinates and overwrites the
+  // stored record before the restore effect's state update has landed.
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ x: position.x, y: position.y, hidden: isHidden }));
-  }, [position, isHidden]);
+    if (!positioned) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ x: position.x, y: position.y, hidden: isHidden, v: STORAGE_VERSION }));
+    } catch (error) {
+      // Private mode / quota. The widget still works this session; only the
+      // remembered position is lost, so this warns rather than surfacing.
+      log.warn('Chat widget position could not be persisted', { error });
+    }
+  }, [position, isHidden, positioned]);
 
   // Drag handlers — pointer events for mouse + touch
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -359,8 +344,10 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
         </Button>
       )}
 
-      {/* Floating Button — draggable, right-click to hide */}
-      {!isHidden && (
+      {/* Floating Button — draggable, right-click to hide.
+          Held back until `positioned` so it never paints for a frame at the
+          placeholder coordinates before storage has been read. */}
+      {!isHidden && positioned && (
         <button
           ref={btnRef}
           onPointerDown={handlePointerDown}

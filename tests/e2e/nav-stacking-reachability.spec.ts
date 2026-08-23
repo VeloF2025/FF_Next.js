@@ -140,14 +140,29 @@ test.describe('Floating chat widget does not sit on page content', () => {
     // full-width bottom bar. Anywhere in the right half is acceptable.
     expect(centreX).toBeGreaterThan(DESKTOP.width / 2);
 
-    // If the map is currently rendering its "Not on the map:" bar, its leading
-    // label must be readable rather than sitting under the widget.
-    const label = page.locator('aside', { hasText: 'Not on the map:' }).locator('strong').first();
-    if (await label.count()) {
-      const result = await hitTest(label);
-      expect(result.reachable, `topmost element at "Not on the map:": ${result.topmost}`).toBe(true);
-    }
+    // The actual regression was the widget covering the leading label of the
+    // "Not on the map:" bar. That bar only renders when at least one vehicle
+    // failed to plot, so the assertion CANNOT be written as
+    // `if (await label.count()) { ... }` — in an environment where every
+    // vehicle happens to plot, that block never runs and the test passes
+    // having checked nothing. Inject the bar deterministically instead, so the
+    // hit-test always executes.
+    await page.evaluate(() => {
+      const bar = document.createElement('aside');
+      bar.setAttribute('data-testid', 'not-on-map-probe');
+      bar.className = 'px-4 py-2 border-t text-sm';
+      // Mirror the real bar's box: full-width, pinned to the bottom of the
+      // viewport, which is what put it under a bottom-corner widget.
+      bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;margin:0;background:#fff;color:#111';
+      bar.innerHTML = '<strong>Not on the map:</strong> PROBE-1 (no recent fix)';
+      document.body.appendChild(bar);
+    });
 
+    const label = page.locator('[data-testid="not-on-map-probe"] strong');
+    await expect(label).toBeVisible();
+
+    const result = await hitTest(label);
     await page.screenshot({ path: 'tests/e2e-results/stacking-chat-widget-map.png' });
+    expect(result.reachable, `topmost element at "Not on the map:": ${result.topmost}`).toBe(true);
   });
 });

@@ -49,7 +49,15 @@ describe('Leaflet z-index scale stays contained', () => {
 
   it('the fleet map wrapper isolates the attention panel overlay', () => {
     const page = read('pages/fleet/map.tsx');
-    // The wrapper that holds both <FleetMap> and <MapAttentionPanel> (z-[500]).
-    expect(page).toMatch(/className="relative isolate flex-1 min-h-0"/);
+    // Match on the class TOKENS rather than the exact literal string: the
+    // invariant is "this wrapper is relative and isolated", and an exact-string
+    // assertion would break on a harmless reorder (Tailwind class sorting)
+    // without the invariant being violated.
+    const wrapper = [...page.matchAll(/className="([^"]*\bflex-1[^"]*\bmin-h-0[^"]*)"/g)]
+      .map((m) => m[1]!.split(/\s+/))
+      .find((classes) => classes.includes('relative'));
+
+    expect(wrapper, 'no relative flex-1 min-h-0 map wrapper found in pages/fleet/map.tsx').toBeDefined();
+    expect(wrapper).toContain('isolate');
   });
 });
