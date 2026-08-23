@@ -26,9 +26,6 @@ interface ChecksumRow extends Record<string, unknown> {
   checksum: string | null;
 }
 
-interface CountRow extends Record<string, unknown> {
-  row_count: string | number;
-}
 
 /** The stored active checksums for one (month, version), as a set. */
 async function storedChecksums(monthStart: string, metricVersion: number): Promise<Set<string>> {
@@ -143,32 +140,18 @@ export async function replaceMonth(
 }
 
 /**
- * Whether retention may treat this month as aggregated.
+ * NOTE: there is deliberately NO coverage query here.
  *
- * KNOWN LIMITATION, and deliberately left failing closed: this infers "the
- * month was aggregated" from "the month stored rows", and those are not the
- * same thing. A month whose data was entirely suppressed - every group under
- * the anonymity threshold, every metric with no support, or every incident
- * missing an operational site - stores no rows, so this reports false and its
- * incidents are never purged.
+ * Retention's gate lives in `../retention/retentionRepository.ts`
+ * (`hasCompleteAggregateCoverage`) and is the only one. An earlier version of
+ * this file carried a second, identical implementation that nothing in
+ * production called - two implementations of a gate that authorises deletion
+ * is exactly the pair that drifts apart, and the one with no caller is the one
+ * that drifts silently.
  *
- * That case became MORE likely once zero-support metrics stopped publishing
- * (see `anonymitySetFor`), and it is the current blocker on retention actually
- * running: with no operational data at all, no month ever reports coverage.
- * Blocking a deletion is the safe direction to be wrong in, but it is not a
- * working retention path. Coverage should be recorded explicitly per month on
- * the aggregation run rather than inferred here - which needs a migration, and
- * so its own approval. See `.claude/modules/fleet-analytics-disclosure.md`.
+ * That gate infers "this month was aggregated" from "this month stored rows",
+ * which are not the same thing: a month whose every metric was withheld stores
+ * nothing and so reports no coverage, and is never purged. Failing closed is
+ * the right direction for a deletion gate but it is not a working retention
+ * path. See `.claude/modules/fleet-analytics-disclosure.md`.
  */
-export async function hasCompleteAggregateCoverage(
-  monthStart: string,
-  metricVersion: number,
-): Promise<boolean> {
-  const rows = await query<CountRow>(
-    `/* fleet-analytics-aggregates:coverage */
-     SELECT count(*) AS row_count FROM fleet_operational_monthly_aggregates
-     WHERE month_start = $1::date AND metric_version = $2 AND is_active = true`,
-    [monthStart, metricVersion],
-  );
-  return Number(rows[0]?.row_count ?? 0) > 0;
-}

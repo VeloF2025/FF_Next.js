@@ -11,8 +11,11 @@ work — but the guarantee originally claimed for them does not hold, and the cl
 from the code rather than left standing.
 
 Its one consumer today is retention's coverage gate: `hasCompleteAggregateCoverage` in
-`aggregateRepository.ts`, which retention consults before purging a month. Nothing reads it for
-analytics, because the read path (stage 8 tasks 6–10) is not built.
+**`src/modules/fleet/incidents/retention/retentionRepository.ts`** — the only implementation, and
+the one `retentionService` calls. (A second, identical copy briefly existed in
+`aggregateRepository.ts` with no production caller; it was removed. Two implementations of a gate
+that authorises deletion is the pair that drifts, and the one with no caller drifts silently.)
+Nothing reads the table for analytics, because the read path (stage 8 tasks 6–10) is not built.
 
 ## What the guarantee was meant to be
 
@@ -21,16 +24,35 @@ analytics, because the read path (stage 8 tasks 6–10) is not built.
 ## What actually holds
 
 - **Row shape.** No column can hold a person. The allow-list in `aggregateSchema.ts` and the
-  forbidden-token test are real enforcement, checked against `information_schema`.
+  forbidden-token test are real enforcement, checked against `information_schema` in a blocking CI
+  step. Limit worth knowing: the check applies migration 518 into a scratch schema, so it pins
+  edits to 518 — a LATER migration doing `ALTER TABLE … ADD COLUMN` would not appear there and
+  would be caught by neither contract test.
 - **Per-row threshold.** `contributor_count >= 5` is a table CHECK. A group of four cannot be
   stored, so it cannot leak through a query bug.
 - **Cross-level differencing.** Subtracting a parent's published children from the parent yields a
-  residual describing at least `k` people. Siblings are withheld smallest-first, by contributor
-  UNION, until that holds. Verified against the configurations that broke the first attempt.
+  residual whose SUPPORT is at least `k` people. Siblings are withheld smallest-first, by
+  contributor UNION, until that holds. Verified against the configurations that broke the first
+  attempt, and independently against 200,000 randomised configurations with 0 violations.
+
+  **This bounds how many people are in the residual, not how much of it is any one of them.**
+  There is no l-diversity and no bounded-contribution rule. A residual of 1,005 over six people can
+  be 1,000 one person's and 1 each for the other five:
+
+  ```
+  sites: a = 5 people num 5 | b = 5 people num 5 | c = 1 person num 1000
+  published: site b (5), project (1010, cc=11)
+  residual = 1005 over 6 people — of which 1000 belongs to one of them
+  ```
+
+  Anyone who knows the site is dominated by one driver recovers that driver's figure. Read the
+  claim as "at least k people are in the bucket", never as "no individual is exposed".
 - **Metric support.** A metric is described by whoever actually contributed to it, never by the
   wider site roster, at every level. No row publishes a value whose support is a single person.
-- **Writers.** `replaceMonth` is the only writer, reached only from `aggregationService`, whose
-  rows come straight from `releaseAnonymousGroups`.
+- **Writers.** `replaceMonth` is the only writer *in this codebase*, reached only from
+  `aggregationService`, whose rows come straight from `releaseAnonymousGroups`. This is a property
+  of the code, not of the database: the application role holds full DML on the table (see open
+  item 2), so a stray query or a future module can write it directly.
 
 ## What is still open — read before exposing anything
 
@@ -64,9 +86,15 @@ residual.
 ### 2. Retired rows are unprotected
 
 `is_active = false` rows are never deleted and nothing but a `WHERE` predicate protects them. There
-is no view, no RLS, no grant. The first reader that forgets `AND is_active = true` reads withheld
-groups. If a read path ships, it must go through a view that hard-codes the predicate — not through
-a convention.
+is no view and no RLS; the grant that exists makes it worse rather than better — migration 518
+grants `SELECT, INSERT, UPDATE, DELETE` on this table to `fibreflow_user`, the application role, so
+the "only writer" property below is a property of the codebase and not one the database enforces.
+The first reader that forgets `AND is_active = true` reads withheld groups. If a read path ships,
+it must go through a view that hard-codes the predicate — not through a convention.
+
+Note also that raising `k` is exactly the case that recomputes a month to nothing (see
+`replaceMonth`), which leaves the PRE-TIGHTENING, more disclosive generation sitting in the table
+with only `is_active = false` between it and a reader.
 
 ### 3. Weaker, documented, not closed
 
@@ -75,6 +103,9 @@ a convention.
   the next says a specific small group crossed the threshold.
 - **Absence as inference.** A metric's absence at a level implies a support between 1 and `k-1`
   (or zero — zero-support metrics are also withheld, which is what provides the cover).
+- **`generalized_from_level` announces suppression outright.** A project row carrying
+  `generalized_from_level = 'site'` states that at least one site beneath it was withheld. That is
+  a stronger signal than absence, and it is published on the row.
 
 ## Consequences of withholding zero-support metrics
 
@@ -90,9 +121,12 @@ presence of aggregate rows.** That needs a migration and is the next piece of wo
 
 ## History
 
-- Migration 518 shipped the schema with a comment asserting the table "cannot smuggle an exact
-  duration into `sum_seconds`". That was false: a `timing.*` row with `sample_count = 1` is one
-  person's exact duration. The migration is applied and is not edited; this note is the correction.
+- Migration 518's comment says a **non-timing** row "cannot smuggle an exact duration into
+  `sum_seconds`" — which is true, and enforced by `histogram_pairing`. An earlier draft of this
+  note quoted it with the subject dropped and called it false; that was this note's own error, now
+  corrected. The substantive point stands on its own: a `timing.*` row with `sample_count = 1` IS
+  one person's exact duration, no schema constraint can prevent it, and the calculator is what
+  does.
 - Two rounds of adversarial review, five findings between them, one of which was introduced by the
   fix for an earlier one. The pattern — each fix revealing another channel — is why the published
   surface is now treated as unbuilt rather than patched again.

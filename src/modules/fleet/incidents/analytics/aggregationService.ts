@@ -16,7 +16,7 @@
  */
 import { log } from '@/lib/logger';
 import { query, queryOne } from '@/lib/db-pool';
-import { hasCompleteAggregateCoverage, replaceMonth } from './aggregateRepository';
+import { replaceMonth } from './aggregateRepository';
 import type { OperationsFact } from './facts';
 import { loadIncidentFacts, loadNotificationFacts } from './incidentFactQueries';
 import { calculateMonthlyMetrics } from './metricCalculator';
@@ -145,8 +145,6 @@ export async function aggregateOperationsMonths(requestedAt: string): Promise<Ag
 
   return { runId, metricVersion: policy.metricVersion, ...result };
 }
-
-export { hasCompleteAggregateCoverage };
 // Re-exported so callers of the aggregation pipeline get its month arithmetic
 // from one place; the implementations live in ./sastDates with their tests.
 export { sastMonthStart, shiftMonth };

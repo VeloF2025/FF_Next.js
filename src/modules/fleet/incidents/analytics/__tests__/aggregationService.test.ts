@@ -38,10 +38,7 @@ vi.mock('../incidentFactQueries', () => ({
   loadNotificationFacts: mocks.loadNotificationFacts,
 }));
 vi.mock('../monitorFactQueries', () => ({ loadMonitorRunFacts: mocks.loadMonitorRunFacts }));
-vi.mock('../aggregateRepository', () => ({
-  replaceMonth: mocks.replaceMonth,
-  hasCompleteAggregateCoverage: vi.fn(),
-}));
+vi.mock('../aggregateRepository', () => ({ replaceMonth: mocks.replaceMonth }));
 
 import { aggregateOperationsMonths, sastMonthStart, shiftMonth, targetMonths } from '../aggregationService';
 

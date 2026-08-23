@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ query: vi.fn(), transaction: vi.fn() }));
 vi.mock('@/lib/db-pool', () => ({ query: mocks.query, transaction: mocks.transaction }));
 
-import { hasCompleteAggregateCoverage, replaceMonth } from '../aggregateRepository';
+import { replaceMonth } from '../aggregateRepository';
 import { checksumForAggregate } from '../aggregateChecksum';
 import type { ReleasedAggregate } from '../suppression';
 
@@ -156,20 +156,5 @@ describe('replaceMonth', () => {
     const plain = inserts[1]?.params.slice(10, 18);
     expect(timing).toEqual([3, 60, 3, 0, 0, 0, 0, 0]);
     expect(plain?.every((v) => v === null)).toBe(true);
-  });
-});
-
-describe('hasCompleteAggregateCoverage', () => {
-  it('is true only when active rows exist for that month and version', async () => {
-    mocks.query.mockResolvedValue([{ row_count: '4' }]);
-    await expect(hasCompleteAggregateCoverage('2026-07-01', 1)).resolves.toBe(true);
-
-    mocks.query.mockResolvedValue([{ row_count: '0' }]);
-    await expect(hasCompleteAggregateCoverage('2026-07-01', 1)).resolves.toBe(false);
-  });
-
-  it('fails closed when the count comes back empty', async () => {
-    mocks.query.mockResolvedValue([]);
-    await expect(hasCompleteAggregateCoverage('2026-07-01', 1)).resolves.toBe(false);
   });
 });
