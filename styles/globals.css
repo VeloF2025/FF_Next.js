@@ -265,3 +265,25 @@
     @apply bg-background text-foreground;
   }
 }
+
+/*
+  Leaflet assigns its internal panes z-index 200–1000 (tile 200, overlay 400,
+  shadow 500, marker 600, tooltip 650, popup 700, controls 800–1000). Those
+  values only ever made sense relative to the map. `.leaflet-container` is
+  `position: relative` with no z-index, so it does NOT establish a stacking
+  context and those panes resolve against whatever ancestor does.
+
+  <main> in AppLayout used to supply that context via `relative z-10`, which
+  also trapped every page modal beneath the module nav (z-30). Removing the
+  z-index there frees the modals — and would simultaneously free Leaflet's
+  panes to reach the root context, where a z-700 popup paints over the z-50
+  header dropdowns.
+
+  `isolation: isolate` creates a stacking context WITHOUT assigning a z-index,
+  so the map still participates in normal document flow order while its
+  internal scale stays contained. This is the containment that main's z-index
+  was accidentally providing.
+*/
+.leaflet-container {
+  isolation: isolate;
+}

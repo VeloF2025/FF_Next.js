@@ -142,7 +142,14 @@ export default function FleetMapPage() {
             <FleetMapLegend counts={statusCounts} />
           </div>
         </header>
-        <div className="relative flex-1 min-h-0">
+        {/*
+          `isolate` keeps MapAttentionPanel's z-[500] inside the map area. That
+          value is meaningful only against the Leaflet panes it has to clear; at
+          the root stacking context it would also clear the header (z-30) and
+          every modal (z-50). Without a z-index of its own this wrapper still
+          paints in normal flow order.
+        */}
+        <div className="relative isolate flex-1 min-h-0">
           <FleetMap vehicles={vehicles} operationalOverlay={showOperations ? visibleOverlay : undefined}
             focusRequestId={focusRequest.id} focusStaffId={focusRequest.staffId}
             onStaffSelect={selectStaff} selectedStaffId={filters.staffId ?? null}
