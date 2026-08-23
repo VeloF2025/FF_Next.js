@@ -4,10 +4,13 @@
 // 0.053. Nothing in the type system stops someone re-adding it, and the damage
 // is invisible without re-running the benchmark, so pin it here.
 //
-// This guards the IMPORT SURFACE rather than behaviour: driving the real
-// service needs a live DB and a VLM, so a behavioural test here would be a
-// mock asserting against itself. An import-level guard cannot be satisfied
-// accidentally — re-adding few-shot to this module requires importing it.
+// This guards the SOURCE rather than behaviour: driving this service needs a
+// live DB and a VLM (it has a top-level `neon(process.env.DATABASE_URL!)`), so
+// a behavioural test here would be a mock asserting against itself.
+//
+// The check is on executable code with comments stripped, NOT on import syntax.
+// An import-shape check is defeated by `import * as x` + `x.getVlmFewShotExamples()`
+// — a false pass, which is far worse here than a false failure.
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -17,46 +20,42 @@ const SERVICE = path.join(
   '../../../src/modules/construction-qa/services/vlmConstructionService.ts',
 );
 
-const source = (): string => fs.readFileSync(SERVICE, 'utf8');
-
-/** Import statements only — comments mentioning these names are fine. */
-const importedNames = (src: string): string[] => {
-  const names: string[] = [];
-  for (const m of src.matchAll(/^import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['"][^'"]+['"];?/gm)) {
-    for (const raw of m[1]!.split(',')) {
-      const n = raw.trim().split(/\s+as\s+/)[0]?.trim();
-      if (n) names.push(n);
-    }
-  }
-  return names;
-};
+/** Source with comments and string literals removed, so prose can't mask or trip a match. */
+function executableSource(): string {
+  return fs
+    .readFileSync(SERVICE, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ') // block comments
+    .replace(/(^|[^:])\/\/.*$/gm, '$1 ') // line comments (not protocol-relative URLs)
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''") // single-quoted strings
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""'); // double-quoted strings
+}
 
 describe('construction QA does not use few-shot', () => {
-  it('imports neither few-shot helper', () => {
-    const imported = importedNames(source());
-    expect(imported).not.toContain('getVlmFewShotExamples');
-    expect(imported).not.toContain('buildVlmFewShotPrompt');
-  });
+  // Catches every reintroduction shape: named import, namespace access,
+  // default import, alias, dynamic import — all must NAME the function to call it.
+  it.each(['getVlmFewShotExamples', 'buildVlmFewShotPrompt'])(
+    'never references %s in executable code',
+    (name) => {
+      expect(executableSource()).not.toContain(name);
+    },
+  );
 
-  it('still imports recordCorrectExtraction', () => {
+  it('still records corrections', () => {
     // The learning signal is still WRITTEN — only the read-back into the prompt
-    // is disabled. If this disappears, corrections stop being recorded and a
-    // future re-enable would have nothing to learn from.
-    expect(importedNames(source())).toContain('recordCorrectExtraction');
+    // is disabled. If this disappears, a future re-enable has nothing to learn
+    // from.
+    expect(executableSource()).toContain('recordCorrectExtraction');
   });
 
-  it('passes an empty few-shot section to the prompt builder', () => {
-    const src = source();
-    expect(src).toMatch(/const fewShotSection = '';/);
-    // buildPhotoPrompt's 4th argument must be that constant, not a rebuilt value.
-    expect(src).toMatch(/buildPhotoPrompt\(discipline, step, stepDef \?\? null, fewShotSection\)/);
-  });
-
-  it('records why, so the next person does not silently re-enable it', () => {
-    // A bare `= ''` with no rationale invites "cleanup". The measurement is the
-    // reason this line exists; keep them together.
-    const src = source();
-    expect(src).toContain('civil-rep');
-    expect(src).toMatch(/65\.7|66\.0/);
+  it('assigns fewShotSection the empty string and never reassigns it', () => {
+    const src = executableSource();
+    // Every assignment to fewShotSection must be the empty literal. Tolerant of
+    // formatting (const/let, spacing) but not of a value coming from anywhere
+    // else — which is the thing that would actually change what the VLM sees.
+    const assignments = [...src.matchAll(/\bfewShotSection\s*=\s*([^;]+);/g)].map((m) =>
+      m[1]!.trim(),
+    );
+    expect(assignments.length).toBeGreaterThan(0);
+    for (const value of assignments) expect(value).toBe("''");
   });
 });
