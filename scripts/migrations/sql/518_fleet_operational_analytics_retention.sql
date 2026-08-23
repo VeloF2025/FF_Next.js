@@ -190,7 +190,17 @@ CREATE TABLE IF NOT EXISTS fleet_operational_monthly_aggregates (
     OR (dimension_level = 'site' AND dimension_project_id IS NOT NULL AND dimension_site_id IS NOT NULL)
   ),
   -- Histogram columns exist for the timing metrics and for nothing else, so a
-  -- non-timing row cannot smuggle an exact duration into sum_seconds.
+  -- non-timing row cannot carry a duration at all.
+  --
+  -- NOTE (2026-08-23, PR #2594, comment only - this migration is applied and
+  -- its DDL is unchanged). The sentence above is true and narrow: it is about
+  -- NON-timing rows, and the constraint does force sum_seconds NULL for them.
+  -- It is worth reading carefully, because it is easy to take for a stronger
+  -- guarantee than it makes. A TIMING row with sample_count = 1 has a
+  -- sum_seconds that IS one person's exact duration, and no constraint here can
+  -- prevent that - the row is perfectly well-formed. It is prevented in the
+  -- calculator, which withholds any metric whose support is below the anonymity
+  -- threshold. See .claude/modules/fleet-analytics-disclosure.md.
   CONSTRAINT fleet_operational_monthly_aggregates_histogram_pairing CHECK (
     (metric_key LIKE 'timing.%') = (metric_kind = 'duration_histogram')
     AND (

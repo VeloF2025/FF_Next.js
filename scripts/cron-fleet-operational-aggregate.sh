@@ -1,26 +1,23 @@
 #!/usr/bin/env bash
-# Fleet operational retention pass.
+# Fleet operational aggregation pass.
 #
-# Calls pages/api/cron/fleet-operational-retention.ts on localhost. The secret
+# Calls pages/api/cron/fleet-operational-aggregate.ts on localhost. The secret
 # is read from the deploy dir's env file at run time and passed as an
 # x-cron-secret header (this Fleet module's own convention), so it never
 # appears in the crontab, in `ps`, or in this file.
 #
-# DRY RUN ONLY. This wrapper sends {"dryRun": true} and has no switch to send
-# anything else: a scheduled job that can delete evidence about named people
-# should not be one edit away from doing so. Enabling live retention is a
-# deliberate, separately approved act — flip live_retention_enabled in the
-# effective Fleet analytics settings and invoke the endpoint with an explicit
-# {"dryRun": false}, with someone watching.
+# This job only writes anonymous aggregate rows and deletes nothing but its own
+# previous output, so unlike the retention wrapper it has no dry-run mode and
+# needs none.
 #
-# Install on velo (SAST — velo cron runs in local time), 03:30 daily, after the
-# 01:00 aggregation run, because retention cannot purge a month the aggregate
-# pipeline has not covered:
-#   30 3 * * * /home/velo/fibreflow-production/scripts/cron-fleet-operational-retention.sh >> /home/velo/logs/fleet-operational-retention.log 2>&1
+# Install on velo (SAST -- velo cron runs in local time), 01:00 daily, AHEAD of
+# retention at 03:30: retention refuses to purge a month this job has not
+# covered, so running it second would block every purge for a day.
+#   0 1 * * * /home/velo/fibreflow-production/scripts/cron-fleet-operational-aggregate.sh >> /home/velo/logs/fleet-operational-aggregate.log 2>&1
 #
-# Registering this crontab line is a deployment action requiring separate
-# approval; this script only exists so that approval has something correct
-# to install.
+# Registering that crontab line is a deployment action requiring separate
+# approval; this script only exists so that approval has something correct to
+# install.
 #
 # Exits non-zero on a failed run so cron mail and the log both surface it.
 set -euo pipefail
@@ -55,26 +52,25 @@ if [ -z "${PORT:-}" ]; then
 fi
 PORT="${PORT:-3000}"
 
-URL="http://localhost:${PORT}/api/cron/fleet-operational-retention"
+URL="http://localhost:${PORT}/api/cron/fleet-operational-aggregate"
 
-echo "$LOG_PREFIX === Fleet operational retention dry run start (port ${PORT}) ==="
+echo "$LOG_PREFIX === Fleet operational aggregation start (port ${PORT}) ==="
 
 # -sS keeps it quiet on success but prints the error on failure; -f makes an
 # HTTP 4xx/5xx a non-zero exit so a rejected secret is not logged as a success.
 # The body is inspected because this endpoint answers 200 even when the RUN
-# failed -- see scripts/lib/cron-run-status.sh. Without this a failed retention
-# pass logged "done" and exited 0, which is the exact bug #2570 fixed for the
-# monitor wrappers and this one shipped without.
+# failed -- see scripts/lib/cron-run-status.sh. `if !` rather than capturing $?:
+# under `set -e` an assignment from a failing command substitution aborts before
+# $? can be read, which would make the check below dead code.
 if ! RESPONSE=$(curl -sS -f -m 300 -X POST \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -H "Content-Type: application/json" \
-  -d '{"dryRun": true}' \
   "$URL"); then
-  echo "$LOG_PREFIX ERROR: retention request failed" >&2
+  echo "$LOG_PREFIX ERROR: aggregation request failed" >&2
   exit 1
 fi
 echo "$RESPONSE"
-report_run_status "operational retention" "$RESPONSE" "$LOG_PREFIX" || exit 1
+report_run_status "operational aggregation" "$RESPONSE" "$LOG_PREFIX" || exit 1
 
 echo ""
-echo "$LOG_PREFIX === Fleet operational retention dry run done ==="
+echo "$LOG_PREFIX === Fleet operational aggregation done ==="

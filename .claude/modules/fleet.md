@@ -1310,3 +1310,11 @@ from **Cartrack's observed ~20-attempt lockout**. Netstar's and Ituran's real lo
 behaviour is **undocumented** — those numbers became their default without being verified for
 them. Better than the unbounded retries they had before, but it is an assumption: if either
 starts throttling unexpectedly, check that tuning first. See the breaker section above.
+
+## Operational analytics aggregates
+
+`fleet_operational_monthly_aggregates` is **internal** and is NOT a publishable anonymous dataset,
+despite being designed as one. Adversarial review (PR #2594, 2026-08-23) found differencing
+channels that per-key suppression does not close. Read
+[`fleet-analytics-disclosure.md`](./fleet-analytics-disclosure.md) before exposing it through any
+API, export, report, or UI.
