@@ -31,7 +31,13 @@ describe('extractApiErrorMessage', () => {
   });
 
   it('flattens array-valued details', () => {
-    const body = { error: { message: 'Validation failed', details: { qty: ['too low', 'too high'] } } };
+    const body = {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        details: { qty: ['too low', 'too high'] },
+      },
+    };
     expect(extractApiErrorMessage(body, FALLBACK)).toBe('Validation failed: too low; too high');
   });
 
@@ -47,7 +53,41 @@ describe('extractApiErrorMessage', () => {
   });
 
   it('ignores non-string detail values rather than stringifying them', () => {
-    const body = { error: { message: 'Validation failed', details: { stack: { deep: 1 } } } };
+    const body = {
+      error: { code: 'VALIDATION_ERROR', message: 'Validation failed', details: { stack: { deep: 1 } } },
+    };
     expect(extractApiErrorMessage(body, FALLBACK)).toBe('Validation failed');
+  });
+
+  it('does NOT fold details for a non-validation code — they carry internal ids', () => {
+    // Exactly what process.ts returns when the recipient holder is blocked:
+    // apiResponse.conflict(res, 'holder_blocked', { holderId, blockedReason }).
+    // holderId is a stock_holders primary key and must never reach the banner.
+    const holderId = '3f2a91c4-7b1e-4a0d-9c55-2e8d6f0a1b33';
+    const body = {
+      success: false,
+      error: {
+        code: 'CONFLICT',
+        message: 'holder_blocked',
+        details: { holderId, blockedReason: 'Aged unaccounted stock over threshold', autoBlocked: true },
+      },
+    };
+    expect(extractApiErrorMessage(body, FALLBACK)).toBe('holder_blocked');
+    expect(extractApiErrorMessage(body, FALLBACK)).not.toContain(holderId);
+  });
+
+  it('does NOT fold badRequest details carrying a stock_items id', () => {
+    const stockItemId = '7e6d8c41-48d7-470c-864a-592e6ae0cb77';
+    const body = {
+      error: {
+        code: 'BAD_REQUEST',
+        message: 'Unit value for stock item is not set.',
+        details: { code: 'PENDING_TECH_VALUE_UNKNOWN', stockItemId },
+      },
+    };
+    const message = extractApiErrorMessage(body, FALLBACK);
+    expect(message).toBe('Unit value for stock item is not set.');
+    expect(message).not.toContain(stockItemId);
+    expect(message).not.toContain('PENDING_TECH_VALUE_UNKNOWN');
   });
 });

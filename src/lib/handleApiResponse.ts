@@ -254,9 +254,15 @@ export default handleApiResponse;
  * — an OBJECT. Callers that did `new Error(body.error || fallback)` therefore
  * rendered the literal string "[object Object]" to the user, hiding the real
  * reason (Lizelle, 2026-08-23: a transfer refused for insufficient stock showed
- * only "[object Object]"). Validation details are field-keyed messages that name
- * the item and warehouse, so they are folded into the message — they are the
- * actionable part.
+ * only "[object Object]").
+ *
+ * `details` is only folded into the message for VALIDATION_ERROR. That is the
+ * one code whose contract — `apiResponse.validationError(res, errors)` — makes
+ * `details` a map of field-keyed messages written for a human. Every other code
+ * treats `details` as an arbitrary metadata bag: `conflict(res, 'holder_blocked',
+ * { holderId, blockedReason })` and `badRequest(..., { code, stockItemId })` both
+ * put internal UUIDs in there, and folding those would render a stock_holders /
+ * stock_items primary key into the user's error banner.
  */
 export function extractApiErrorMessage(body: unknown, fallback: string): string {
   if (typeof body !== 'object' || body === null) return fallback;
@@ -264,10 +270,14 @@ export function extractApiErrorMessage(body: unknown, fallback: string): string 
   if (typeof raw === 'string' && raw.trim()) return raw;
   if (typeof raw !== 'object' || raw === null) return fallback;
 
-  const { message, details } = raw as { message?: unknown; details?: unknown };
+  const { code, message, details } = raw as {
+    code?: unknown;
+    message?: unknown;
+    details?: unknown;
+  };
   const base = typeof message === 'string' && message.trim() ? message : fallback;
 
-  if (typeof details === 'object' && details !== null) {
+  if (code === 'VALIDATION_ERROR' && typeof details === 'object' && details !== null) {
     const lines = Object.values(details as Record<string, unknown>)
       .flatMap((v) => (Array.isArray(v) ? v : [v]))
       .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
