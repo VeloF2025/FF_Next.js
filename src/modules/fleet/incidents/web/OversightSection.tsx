@@ -84,17 +84,22 @@ export function OversightSection({ canEdit }: { canEdit: boolean }) {
   return (
     <section aria-label="Fleet oversight membership" className="space-y-2">
       <h3 className="font-semibold text-[var(--ff-text-primary)]">Oversight membership</h3>
+      <p className="text-sm text-[var(--ff-text-secondary)]">
+        Oversight members can see every driver&apos;s incident explanations and evidence — not just their own project or team —
+        and receive incident notifications alongside the assigned manager. Grant it only to people who need that unrestricted view.
+      </p>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <ul>{members.map((member) => <li key={member.id} className="flex items-center gap-2 text-sm">
-        <span>{displayName(member.userId)}</span>
+      <ul className="space-y-1">{members.map((member) => <li key={member.id} className="grid grid-cols-[minmax(8rem,1fr)_auto_auto] items-center gap-2 text-sm">
+        <span className="truncate">{displayName(member.userId)}</span>
         {canEdit && <><input aria-label={`Reason to end membership for ${displayName(member.userId)}`} value={endReasons[member.id] ?? ''}
-          onChange={(event) => setEndReasons({ ...endReasons, [member.id]: event.target.value })} placeholder="Reason to end" className="rounded border px-2 py-1" />
+          onChange={(event) => setEndReasons({ ...endReasons, [member.id]: event.target.value })} placeholder="Reason to end" className="w-48 rounded border px-2 py-1" />
         <button type="button" disabled={!(endReasons[member.id] ?? '').trim() || busy === member.id} onClick={() => void end(member)} className="rounded border px-2 py-1 disabled:opacity-50">End</button></>}
       </li>)}</ul>
       {canEdit && <div className="space-y-1">
         <label className="text-sm">Search active FibreFlow users
           <input aria-label="Search active FibreFlow users" value={query} onChange={(event) => setQuery(event.target.value)} className="ml-2 rounded border px-2 py-1" />
         </label>
+        <p className="text-xs text-[var(--ff-text-tertiary)]">Type at least part of a name, then click Add next to the match to grant oversight.</p>
         <ul>{matches.map((match) => <li key={match.id} className="text-sm">{match.name}{' '}
           <button type="button" disabled={busy === match.id} onClick={() => void add(match)} className="rounded border px-2 py-1">Add</button>
         </li>)}</ul>

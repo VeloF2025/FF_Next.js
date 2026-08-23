@@ -21,6 +21,7 @@ import type { KeyboardEvent } from 'react';
 import { OUTCOMES } from '../reviewValidation';
 import type { IncidentOutcome, IncidentRule, IncidentSeverity, IncidentType } from '../types';
 import { incidentApi, IncidentApiError, type DriverInputSettingsRequestBody } from './incidentApi';
+import { INCIDENT_TYPE_LABELS, OUTCOME_LABELS, SEVERITY_LABELS } from './incidentLabels';
 import { OversightSection } from './OversightSection';
 import type { DriverInputSettings } from '../driver/types';
 
@@ -99,7 +100,8 @@ function DriverInputSection({ canEdit }: { canEdit: boolean }) {
         <label className="block text-sm">Change reason
           <textarea aria-label="Driver input settings change reason" value={changeReason} onChange={(event) => setChangeReason(event.target.value)} className="block w-full rounded border px-2 py-1" />
         </label>
-        <button type="button" disabled={!valid || saving} onClick={() => void save()} className="rounded bg-[var(--ff-primary)] px-3 py-2 text-sm text-white disabled:opacity-50">
+        {/* text-black — see the matching note on the "Create rule version" button below. */}
+        <button type="button" disabled={!valid || saving} onClick={() => void save()} className="rounded bg-[var(--ff-primary)] px-3 py-2 text-sm text-black disabled:opacity-50">
           {saving ? 'Updating…' : 'Update driver input settings'}
         </button>
       </div>}
@@ -177,7 +179,7 @@ function RulesSection({ canEdit }: { canEdit: boolean }) {
       <h3 className="font-semibold text-[var(--ff-text-primary)]">Rules</h3>
       <label className="text-sm">Incident type
         <select aria-label="Rule incident type" value={incidentType} onChange={(event) => setIncidentType(event.target.value as IncidentType)} className="ml-2 rounded border px-2 py-1">
-          {RULED_TYPES.map((type) => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}
+          {RULED_TYPES.map((type) => <option key={type} value={type}>{INCIDENT_TYPE_LABELS[type]}</option>)}
         </select>
       </label>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
@@ -187,22 +189,26 @@ function RulesSection({ canEdit }: { canEdit: boolean }) {
         </label>)}
         <label className="block text-sm">Severity
           <select aria-label="Rule severity" value={draft.severity} onChange={(event) => setDraft({ ...draft, severity: event.target.value as IncidentSeverity })} className="ml-2 rounded border px-2 py-1">
-            {SEVERITIES.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
+            {SEVERITIES.map((severity) => <option key={severity} value={severity}>{SEVERITY_LABELS[severity]}</option>)}
           </select>
         </label>
         {NUMBER_FIELDS.map((field) => <label key={field.key} className="mr-3 inline-block text-sm">{field.label}
           <input aria-label={field.label} type="number" min={field.min} value={draft[field.key]} onChange={(event) => setDraft({ ...draft, [field.key]: event.target.value })} className="ml-2 w-20 rounded border px-2 py-1" />
         </label>)}
         <fieldset className="text-sm"><legend>Evidence required for outcome</legend>
-          {OUTCOMES.map((outcome) => <label key={outcome} className="mr-3 inline-block"><input type="checkbox" checked={draft.evidenceRequiredOutcomes.includes(outcome)} onChange={() => toggleOutcome(outcome)} /> {outcome.replaceAll('_', ' ')}</label>)}
+          {OUTCOMES.map((outcome) => <label key={outcome} className="mr-3 inline-block"><input type="checkbox" checked={draft.evidenceRequiredOutcomes.includes(outcome)} onChange={() => toggleOutcome(outcome)} /> {OUTCOME_LABELS[outcome]}</label>)}
         </fieldset>
         <label className="block text-sm">Effective from
-          <input aria-label="Rule effective from" type="datetime-local" min={effectiveDefault()} value={draft.effectiveFrom} onChange={(event) => setDraft({ ...draft, effectiveFrom: event.target.value })} className="ml-2 rounded border px-2 py-1" />
+          <input aria-label="Rule effective from" type="datetime-local" lang="en-ZA" min={effectiveDefault()} value={draft.effectiveFrom} onChange={(event) => setDraft({ ...draft, effectiveFrom: event.target.value })} className="ml-2 rounded border px-2 py-1" />
         </label>
         <label className="block text-sm">Change reason
           <textarea aria-label="Rule change reason" value={draft.changeReason} onChange={(event) => setDraft({ ...draft, changeReason: event.target.value })} className="block w-full rounded border px-2 py-1" />
         </label>
-        <button type="button" disabled={!draftValid(draft) || saving} onClick={() => void create()} className="rounded bg-[var(--ff-primary)] px-3 py-2 text-sm text-white disabled:opacity-50">
+        {/* text-black, not text-white: `--ff-primary` (#f59e0b) with white text measures ~2.15:1,
+            well under the 4.5:1 floor, and reads as disabled. Black on this amber is ~9.8:1 in
+            both themes (the token is identical light/dark) — fixed locally rather than touching
+            `--ff-primary` itself, which is used app-wide and out of this page's scope. */}
+        <button type="button" disabled={!draftValid(draft) || saving} onClick={() => void create()} className="rounded bg-[var(--ff-primary)] px-3 py-2 text-sm text-black disabled:opacity-50">
           {saving ? 'Creating version…' : 'Create rule version'}
         </button>
       </div>}
