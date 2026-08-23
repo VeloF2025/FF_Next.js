@@ -160,7 +160,7 @@ export function SignatureCapture({
         <label className="mb-1 block text-sm font-medium text-muted-foreground">
           Signature
         </label>
-        <div className="relative rounded-lg border-2 border-dashed border-border bg-white dark:border-gray-600">
+        <div className="relative rounded-lg border-2 border-dashed border-border bg-white text-gray-900 dark:border-gray-600">
           <canvas
             ref={canvasRef}
             className="touch-none cursor-crosshair rounded-lg"

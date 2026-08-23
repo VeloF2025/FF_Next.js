@@ -125,13 +125,13 @@ export function ContractorImport({
   return (
     <div role="dialog" aria-modal="true" aria-label="Import Contractors" className="fixed inset-0 z-50 overflow-y-auto">
       <div className="min-h-full flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+        <div className="bg-card text-card-foreground rounded-lg shadow-xl max-w-2xl w-full">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b">
             <h2 className="text-xl font-semibold">Import Contractors</h2>
             <button
               onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-muted-foreground hover:text-foreground"
               aria-label="Close dialog"
             >
               <X className="w-5 h-5" />
@@ -162,7 +162,7 @@ export function ContractorImport({
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-                  <p className="text-gray-600">Processing import...</p>
+                  <p className="text-muted-foreground">Processing import...</p>
                 </div>
               </div>
             )}
@@ -178,11 +178,11 @@ export function ContractorImport({
 
           {/* Footer */}
           {step === 'upload' && (
-            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-between items-center text-sm text-gray-600">
+            <div className="px-6 py-4 bg-secondary text-secondary-foreground rounded-b-lg flex justify-between items-center text-sm">
               <ContractorImportInstructions />
               <button
                 onClick={handleClose}
-                className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                className="px-4 py-2 text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>

@@ -146,7 +146,7 @@ const MyOnboardPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
       </div>
 
       <div className="flex flex-col items-center mb-6">
-        <div className="w-16 h-16 rounded-2xl bg-white border border-neutral-800 flex items-center justify-center shadow-lg p-2">
+        <div className="w-16 h-16 rounded-2xl bg-white text-neutral-900 border border-neutral-800 flex items-center justify-center shadow-lg p-2">
           <img
             src="/assets/vf/vf-logo.svg"
             alt="Velocity Fibre"

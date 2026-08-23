@@ -78,8 +78,8 @@ export function WhatsAppConversationPanel({
         <div className="p-4 text-sm text-muted-foreground">No WhatsApp messages for this ticket.</div>
       ) : (
         items.map((m) => (
-          <div key={m.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.direction === 'outbound' ? 'self-end bg-green-100' : 'self-start bg-gray-100'}`}>
-            <div className="mb-0.5 text-xs text-gray-500">
+          <div key={m.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.direction === 'outbound' ? 'self-end bg-green-100 dark:bg-green-900/40' : 'self-start bg-secondary text-secondary-foreground'}`}>
+            <div className="mb-0.5 text-xs text-muted-foreground">
               {m.from ?? (m.direction === 'outbound' ? 'You' : 'Unknown')} · {m.channel} · {new Date(m.at).toLocaleString()}
             </div>
             <div className="whitespace-pre-wrap">{m.text}</div>

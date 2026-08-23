@@ -76,7 +76,7 @@ export function MyLoginScreen() {
   return (
     <MyPortalShell title="Sign in" showFooterNav={false} showHeader={false}>
       <div className="flex flex-col items-center pt-8 pb-6">
-        <div className="w-20 h-20 rounded-2xl bg-white border border-neutral-800 flex items-center justify-center shadow-lg p-2">
+        <div className="w-20 h-20 rounded-2xl bg-white text-neutral-900 border border-neutral-800 flex items-center justify-center shadow-lg p-2">
           <img
             src="/assets/vf/vf-logo.svg"
             alt="Velocity Fibre"
