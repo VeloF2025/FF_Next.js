@@ -157,7 +157,52 @@ ruleTester.run('no-unthemed-light-surface', rule, {
     // --- A replaced element is exempt, but a plain wrapper around one is NOT
     //     (it can still leak a theme-following colour onto text children).
     { code: '<div className="bg-white"><img src={s} alt="" /></div>;', errors: E },
+
+    // --- Object KEYS carry the class in the clsx/cn conditional idiom.
+    //     Reading only Property VALUES missed this entirely, and it is the most
+    //     common way a conditional surface class is written.
+    { code: '<div className={cn({ "bg-white": active })}>x</div>;', errors: E },
+    { code: '<div className={clsx({ "bg-gray-100": on, "p-2": true })}>x</div>;', errors: E },
+
+    // --- Arbitrary values bypass the token list. Without these, a developer
+    //     told to stop writing `bg-white` satisfies the rule with `bg-[#fff]`
+    //     — the identical pixel, unguarded.
+    { code: '<div className="bg-[#fff] p-2">x</div>;', errors: E },
+    { code: '<div className="bg-[#FFFFFF] p-2">x</div>;', errors: E },
+    { code: '<div className="bg-[white] p-2">x</div>;', errors: E },
+
+    // --- The neutral ramp under its other names. Covering gray/slate but not
+    //     neutral/zinc/stone was an arbitrary hole, not a decision.
+    { code: '<div className="bg-neutral-50 p-2">x</div>;', errors: E },
+    { code: '<div className="bg-zinc-100 p-2">x</div>;', errors: E },
+    { code: '<div className="bg-stone-50 p-2">x</div>;', errors: E },
+
+    // --- dangerouslySetInnerHTML has no JSX children but renders text, so the
+    //     "no children" exemption must not apply to it.
+    { code: '<div className="bg-white" dangerouslySetInnerHTML={{ __html: h }} />;', errors: E },
   ],
+});
+
+// ---------------------------------------------------------------------------
+// Known, deliberate limits — asserted so they are a recorded decision rather
+// than an unnoticed hole. Each of these DOES render light-on-light; the rule
+// lets them through for a stated reason, and these cases fail loudly if that
+// ever changes silently.
+// ---------------------------------------------------------------------------
+ruleTester.run('no-unthemed-light-surface (documented non-coverage)', rule, {
+  valid: [
+    // Coloured -50 status tints: same failure, but 400+ files use them here, so
+    // they belong to a separate cleanup with its own baseline rather than
+    // turning this gate into a 400-finding ratchet on day one.
+    '<div className="bg-red-50 p-2">x</div>;',
+    '<div className="bg-blue-50 p-2">x</div>;',
+    '<div className="bg-amber-50 p-2">x</div>;',
+    // Inline styles are out of scope: the rule reads class strings only.
+    '<div style={{ background: "#fff" }}>x</div>;',
+    // A class assembled by concatenation is not statically resolvable.
+    '<div className={"bg-" + "white"}>x</div>;',
+  ],
+  invalid: [],
 });
 
 // ---------------------------------------------------------------------------

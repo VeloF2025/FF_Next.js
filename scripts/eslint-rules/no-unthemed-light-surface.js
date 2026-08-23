@@ -74,11 +74,30 @@
 'use strict';
 
 // Hard-coded light surfaces. Matched as whole class tokens.
+// The neutral greys. `gray` and `slate` were the original list; `neutral`,
+// `zinc` and `stone` are the same lightness ramp under different names, so
+// covering one and not the others was an arbitrary hole rather than a decision.
+//
+// NOT covered, deliberately: the `-50` tints of the COLOURED palettes
+// (bg-red-50, bg-blue-50, bg-green-50, bg-amber-50 ...). They are just as light
+// and do fail the same way, but they are used in 400+ files here as status
+// tints, so folding them in would turn a clean gate into a 400-finding ratchet.
+// That is a separate cleanup with its own baseline, not something to smuggle in
+// behind this rule. See the PR description.
 const LIGHT_SURFACE_BASES = [
   'bg-white',
   'bg-gray-50', 'bg-gray-100', 'bg-gray-200',
-  'bg-slate-50', 'bg-slate-100',
+  'bg-slate-50', 'bg-slate-100', 'bg-slate-200',
+  'bg-neutral-50', 'bg-neutral-100', 'bg-neutral-200',
+  'bg-zinc-50', 'bg-zinc-100', 'bg-zinc-200',
+  'bg-stone-50', 'bg-stone-100', 'bg-stone-200',
 ];
+
+// Arbitrary-value light backgrounds: bg-[#fff], bg-[#FFFFFF], bg-[white].
+// The bracket syntax bypasses the token list entirely, so without this a
+// developer told to stop using `bg-white` could satisfy the rule by writing
+// `bg-[#fff]` — the identical pixel, silently unguarded.
+const ARBITRARY_LIGHT_RE = /^(?!.*(?:^|:)dark:)(?:[a-z0-9-]+:)*bg-\[(#(?:f{3}|f{6}|fff[0-9a-f]{0,5})|white|snow|ivory|azure)\]$/i;
 
 // A whole-token match, allowing a `/NN` opacity suffix and any variant prefixes
 // (`hover:`, `md:`, `group-hover:` ...). The `dark:` prefix is excluded here —
@@ -150,8 +169,17 @@ function collectStrings(node, out) {
       for (const el of node.elements) collectStrings(el, out);
       return;
     case 'ObjectExpression':
+      // BOTH keys and values. The clsx/cn conditional idiom puts the class name
+      // in the KEY — `cn({ 'bg-white': isActive })` — so reading values alone
+      // misses it entirely, which is the single most common way a conditional
+      // surface class is written.
       for (const p of node.properties) {
-        if (p.type === 'Property') collectStrings(p.value, out);
+        if (p.type !== 'Property') continue;
+        if (p.key) {
+          if (p.key.type === 'Literal' && typeof p.key.value === 'string') out.push(p.key.value);
+          else if (p.key.type === 'Identifier' && !p.computed) out.push(p.key.name);
+        }
+        collectStrings(p.value, out);
       }
       return;
     default:
@@ -194,6 +222,7 @@ module.exports = {
 
     /** Is this token a light SURFACE (not a low-opacity tint)? */
     function lightSurfaceIn(tok) {
+      if (ARBITRARY_LIGHT_RE.test(tok)) return tok;
       const m = LIGHT_SURFACE_RE.exec(tok);
       if (!m) return null;
       if (m[2] !== undefined && Number(m[2]) < opaqueFrom) return null;
@@ -237,15 +266,24 @@ module.exports = {
 
           // Exemption (b): an element with no children renders no text.
           // Self-closing, or a JSXElement whose children are only whitespace.
-          const parent = opening.parent;
-          const children =
-            parent && parent.type === 'JSXElement' ? parent.children : [];
-          const hasChildren = children.some(
-            (c) =>
-              !(c.type === 'JSXText' && c.value.trim() === '') &&
-              !(c.type === 'JSXExpressionContainer' && c.expression.type === 'JSXEmptyExpression')
+          //
+          // `dangerouslySetInnerHTML` defeats this: the element has no JSX
+          // children yet renders arbitrary text, so it is exactly the
+          // light-on-light case the rule exists for. Never exempt it.
+          const injectsHtml = opening.attributes.some(
+            (a) => a.type === 'JSXAttribute' && a.name && a.name.name === 'dangerouslySetInnerHTML'
           );
-          if (opening.selfClosing || !hasChildren) return;
+          if (!injectsHtml) {
+            const parent = opening.parent;
+            const children =
+              parent && parent.type === 'JSXElement' ? parent.children : [];
+            const hasChildren = children.some(
+              (c) =>
+                !(c.type === 'JSXText' && c.value.trim() === '') &&
+                !(c.type === 'JSXExpressionContainer' && c.expression.type === 'JSXEmptyExpression')
+            );
+            if (opening.selfClosing || !hasChildren) return;
+          }
         }
 
         check(node, node.value);
