@@ -16,6 +16,7 @@ import {
   PoleInstallStep,
 } from './poleInstallClassifier';
 import { linkSessionToQaReview } from './poleInstallCompletionService';
+import { waBridgeJsonHeaders } from '@/lib/waBridgeAuth';
 
 const logger = createLogger('poleInstallAckService');
 const WA_BRIDGE_URL = process.env.WHATSAPP_BRIDGE_URL || 'http://72.61.197.178:8083';
@@ -285,7 +286,7 @@ async function sendAckToGroup(
   try {
     const response = await fetch(`${WA_BRIDGE_URL}/send-message`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: waBridgeJsonHeaders(),
       body: JSON.stringify({ group_jid: groupJid, mention_jid: senderJid, message }),
       signal: AbortSignal.timeout(15_000),
     });

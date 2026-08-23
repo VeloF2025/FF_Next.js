@@ -76,6 +76,9 @@ export default defineConfig({
       // logger exists. Needed by any test that drives real service SQL rather
       // than applying a migration file (483_fleet_parking_queries).
       { find: '@/lib/dbCircuitBreaker', replacement: path.resolve(__dirname, './src/lib/dbCircuitBreaker') },
+      // dbCircuitBreaker imports this; it lives under src/lib, so without an entry
+      // the generic @/lib fallback below sends it to ./lib and the import fails.
+      { find: '@/lib/waBridgeAuth', replacement: path.resolve(__dirname, './src/lib/waBridgeAuth') },
       { find: '@/lib/logger', replacement: path.resolve(__dirname, './src/lib/logger') },
       // approvalQueries measures how far a driver moved their address, so the
       // parking approval test's closure reaches haversineDistanceM.

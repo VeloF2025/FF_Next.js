@@ -82,6 +82,9 @@ export default defineConfig({
       { find: '@/lib/arcjet', replacement: path.resolve(__dirname, './src/lib/arcjet') },
       { find: '@/lib/email', replacement: path.resolve(__dirname, './src/lib/email') },
       { find: '@/lib/dbCircuitBreaker', replacement: path.resolve(__dirname, './src/lib/dbCircuitBreaker') },
+      // dbCircuitBreaker imports this; it lives under src/lib, so without an entry
+      // the generic @/lib fallback below sends it to ./lib and the import fails.
+      { find: '@/lib/waBridgeAuth', replacement: path.resolve(__dirname, './src/lib/waBridgeAuth') },
       { find: '@/lib/geo', replacement: path.resolve(__dirname, './src/lib/geo') },
       { find: '@/lib/apiResponse', replacement: path.resolve(__dirname, './src/lib/apiResponse') },
       { find: '@/lib/serial-events', replacement: path.resolve(__dirname, './src/lib/serial-events') },

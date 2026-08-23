@@ -1288,8 +1288,35 @@ func extractDirectPathFromURL(url string) string {
 
 // Start a REST API server to expose the WhatsApp client functionality
 func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port int) {
+	// Mutating endpoints run through the inbound secret check in the configured
+	// mode; handleStrict rejects unconditionally.
+	//
+	// What stays open, and why each one is a deliberate choice rather than a
+	// blanket "read-only is safe" claim:
+	//
+	//	/health         - the local healthcheck cron polls it and holds no secret.
+	//	                  Discloses link state and the bridge's own phone number.
+	//	/groups         - group names and JIDs. Read by the FibreFlow admin UI.
+	//	/all-groups     - as above, for groups not yet registered in the DB.
+	//	/api/download   - media by ID. Callers in field-ops and NOC photo services.
+	//	/api/lid-lookup - a phone-number to LID oracle.
+	//
+	// The last three disclose real data to an unauthenticated caller and should
+	// be closed once their callers send the secret; they are left open here only
+	// because migrating them is a wider change than this one. /list-recent is
+	// NOT in that list: it returns message text for everything sent in the last
+	// hour, has no caller anywhere in the repo, on the VPS, or in cron, so it is
+	// closed outright below.
+	handleGuarded := func(path string, h http.HandlerFunc) {
+		http.HandleFunc(path, guard(path, h))
+	}
+	handleStrict := func(path string, h http.HandlerFunc) {
+		http.HandleFunc(path, guardStrict(h))
+	}
+	registerPairingRoutes(client)
+
 	// Handler for sending messages
-	http.HandleFunc("/api/send", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/api/send", func(w http.ResponseWriter, r *http.Request) {
 		// Only allow POST requests
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -1429,7 +1456,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 
 	// Handler: /send-document - send an xlsx/document to a group (restored 2026-05-27)
-	http.HandleFunc("/send-document", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/send-document", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if r.Method != http.MethodPost {
@@ -1521,7 +1548,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 
 	// Handler: /send-message - Sender-compatible endpoint
-	http.HandleFunc("/send-message", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/send-message", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	
 		if r.Method != http.MethodPost {
@@ -1609,7 +1636,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 	
 	// Handler: /delete-message - Delete a sent message
-	http.HandleFunc("/delete-message", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/delete-message", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	
 		if r.Method != http.MethodPost {
@@ -1670,7 +1697,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 	
 	// Handler: /list-recent - List recently sent messages
-	http.HandleFunc("/list-recent", func(w http.ResponseWriter, r *http.Request) {
+	handleStrict("/list-recent", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	
 		sentMessagesMu.RLock()
@@ -1718,7 +1745,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	})
 	
 	// Handler: /react - Send emoji reaction to a message
-	http.HandleFunc("/react", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/react", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	
 		if r.Method != http.MethodPost {
@@ -1789,7 +1816,7 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	
 
 	// Handler: /reload-groups - Reload groups from database
-	http.HandleFunc("/reload-groups", func(w http.ResponseWriter, r *http.Request) {
+	handleGuarded("/reload-groups", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Println("📥 /reload-groups endpoint called")
 		

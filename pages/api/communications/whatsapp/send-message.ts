@@ -10,6 +10,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import type { WaAdminApiResponse, WaTestMessageResult } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { waBridgeJsonHeaders } from '@/lib/waBridgeAuth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -155,9 +156,7 @@ async function sendMessage(
   try {
     const response = await fetch(`${WA_BRIDGE_URL}/send-message`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: waBridgeJsonHeaders(),
       body: JSON.stringify({
         group_jid: groupJid,
         mention_jid: recipientJid,

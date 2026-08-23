@@ -11,6 +11,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import type { WaAdminApiResponse, WaTestMessageResult } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { waBridgeJsonHeaders } from '@/lib/waBridgeAuth';
 
 // Unified bridge URL (port 8083)
 const WA_BRIDGE_URL = process.env.WHATSAPP_BRIDGE_URL || 'http://72.61.197.178:8083';
@@ -123,9 +124,7 @@ async function sendTestMessage(
   try {
     const response = await fetch(`${WA_BRIDGE_URL}/send-message`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: waBridgeJsonHeaders(),
       body: JSON.stringify({
         group_jid: groupJid,
         recipient_jid: '0@s.whatsapp.net', // Dummy JID for no @mention

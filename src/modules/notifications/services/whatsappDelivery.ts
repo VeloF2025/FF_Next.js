@@ -10,6 +10,7 @@ import { log } from '@/lib/logger';
 import { sendWhatsAppText } from '@/modules/communications/whatsapp/send/waSendClient';
 import { sendWahaDm } from '@/modules/communications/whatsapp/send/wahaDmClient';
 import type { NotifyPayload } from '../types';
+import { waBridgeJsonHeaders } from '@/lib/waBridgeAuth';
 
 
 // WA Bridge on VPS (direct — legacy 8092 proxy is deprecated)
@@ -103,7 +104,7 @@ export async function sendWhatsAppGroup(
 
   const response = await fetch(`${WA_FEEDBACK_URL}/send-message`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: waBridgeJsonHeaders(),
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(30_000),
   });
@@ -132,7 +133,7 @@ export async function sendWhatsAppGroupImage(
 
   const response = await fetch(`${WA_FEEDBACK_URL}/api/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: waBridgeJsonHeaders(),
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(60_000), // longer timeout for image download
   });
@@ -162,7 +163,7 @@ export async function sendWhatsAppGroupDocument(
 
   const response = await fetch(`${WA_FEEDBACK_URL}/send-document`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: waBridgeJsonHeaders(),
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(60_000),
   });

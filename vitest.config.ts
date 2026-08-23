@@ -187,6 +187,9 @@ export default defineConfig({
       { find: /^@\/lib\/vlm-health/, replacement: path.resolve(__dirname, 'src/lib/vlm-health') },
       // @/lib/cronAuth lives at src/lib/ — without this it falls through to the generic
       // @/lib -> ./lib fallback below and fails to resolve under Vitest.
+      // Lives in src/lib, so without an explicit entry it falls through to the
+      // generic @/lib -> ./lib fallback and fails to resolve under Vitest.
+      { find: '@/lib/waBridgeAuth', replacement: path.resolve(__dirname, './src/lib/waBridgeAuth') },
       { find: '@/lib/cronAuth', replacement: path.resolve(__dirname, './src/lib/cronAuth') },
       { find: '@/lib/rateLimiter', replacement: path.resolve(__dirname, './src/lib/rateLimiter') },
       { find: '@/lib/featureFlags', replacement: path.resolve(__dirname, './src/lib/featureFlags') },
