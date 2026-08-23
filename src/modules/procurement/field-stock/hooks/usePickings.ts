@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import { extractApiErrorMessage, parseJsonResponse } from '@/lib/handleApiResponse';
 import type {
   StockPicking,
   CreatePickingInput,
@@ -90,8 +91,8 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
       const response = await fetch(url);
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to fetch pickings');
+        const data = await parseJsonResponse(response);
+        throw new Error(extractApiErrorMessage(data, 'Failed to fetch pickings'));
       }
 
       const data = await response.json();
@@ -116,8 +117,8 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to create picking');
+      const data = await parseJsonResponse(response);
+      throw new Error(extractApiErrorMessage(data, 'Failed to create picking'));
     }
 
     const data = await response.json();
@@ -135,8 +136,8 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to confirm picking');
+      const data = await parseJsonResponse(response);
+      throw new Error(extractApiErrorMessage(data, 'Failed to confirm picking'));
     }
 
     const data = await response.json();
@@ -154,8 +155,8 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to process picking');
+      const data = await parseJsonResponse(response);
+      throw new Error(extractApiErrorMessage(data, 'Failed to process picking'));
     }
 
     const data = await response.json();
@@ -175,8 +176,8 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to sign picking');
+      const data = await parseJsonResponse(response);
+      throw new Error(extractApiErrorMessage(data, 'Failed to sign picking'));
     }
 
     const data = await response.json();
@@ -194,8 +195,8 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to cancel picking');
+      const data = await parseJsonResponse(response);
+      throw new Error(extractApiErrorMessage(data, 'Failed to cancel picking'));
     }
 
     setPickings(prev => prev.filter(p => p.id !== pickingId));
@@ -209,8 +210,8 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
 
     if (!response.ok) {
       if (response.status === 404) return null;
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to fetch picking');
+      const data = await parseJsonResponse(response);
+      throw new Error(extractApiErrorMessage(data, 'Failed to fetch picking'));
     }
 
     const data = await response.json();
