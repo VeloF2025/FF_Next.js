@@ -3,6 +3,7 @@ import * as path from 'path';
 import { categorizationCandidates } from './categorizationSource';
 import { civilCandidates } from './civilSource';
 import { civilHoldoutCandidates } from './civilHoldoutSource';
+import { civilPairCandidates, civilPairHoldoutCandidates } from './civilPairSource';
 import { serialsCandidates } from './serialsSource';
 import { closeHarvestPool } from './db';
 import { stratifiedSample, type Candidate } from './sample';
@@ -14,6 +15,8 @@ const SOURCES: Record<string, { dir: string; idPrefix: string; load: () => Promi
   categorization: { dir: 'categorization', idPrefix: 'cat', load: categorizationCandidates },
   'civil-qa': { dir: 'civil-qa', idPrefix: 'civil', load: civilCandidates },
   'civil-qa-holdout': { dir: 'civil-qa-holdout', idPrefix: 'civilho', load: civilHoldoutCandidates },
+  'civil-pair': { dir: 'civil-pair', idPrefix: 'civilpair', load: civilPairCandidates },
+  'civil-pair-holdout': { dir: 'civil-pair-holdout', idPrefix: 'civilpairho', load: civilPairHoldoutCandidates },
   serials: { dir: 'serials', idPrefix: 'serial', load: serialsCandidates },
 };
 

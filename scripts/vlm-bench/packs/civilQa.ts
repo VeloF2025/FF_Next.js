@@ -67,3 +67,17 @@ function makeCivilQaPack(id: string): VlmTestPack {
 export const civilQaPack = makeCivilQaPack('civil-qa');
 /** Disjoint second draw — see harvest/civilHoldoutSource.ts. */
 export const civilQaHoldoutPack = makeCivilQaPack('civil-qa-holdout');
+
+/**
+ * Pair-focused draws restricted to During(2) and Compaction(5).
+ *
+ * Same prompt and same scorer as the general packs — only the population
+ * differs — so a score gap between these and civil-qa is a property of the
+ * photos, not of the measurement. See harvest/civilPairSource.ts for why the
+ * general set cannot resolve this pair.
+ *
+ * These score ONLY the 2/5 pair. A gain here says nothing about steps
+ * 0/1/3/4/6/7; confirm any change on civil-qa-holdout before believing it.
+ */
+export const civilPairPack = makeCivilQaPack('civil-pair');
+export const civilPairHoldoutPack = makeCivilQaPack('civil-pair-holdout');

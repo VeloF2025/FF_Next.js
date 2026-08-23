@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { serialsPack } from './packs/serials';
 import { categorizationPack } from './packs/categorization';
-import { civilQaPack, civilQaHoldoutPack } from './packs/civilQa';
+import { civilQaPack, civilQaHoldoutPack, civilPairPack, civilPairHoldoutPack } from './packs/civilQa';
 import { stepMetrics, strataBreakdown } from './scoring/steps';
 import { harvest, closeHarvestPool } from './harvest';
 import { runPack } from './engine/runner';
@@ -23,6 +23,8 @@ const PACKS: Record<string, VlmTestPack> = {
   categorization: categorizationPack,
   'civil-qa': civilQaPack,
   'civil-qa-holdout': civilQaHoldoutPack,
+  'civil-pair': civilPairPack,
+  'civil-pair-holdout': civilPairHoldoutPack,
 };
 const MIN_GOLDEN = 100;
 
