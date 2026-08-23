@@ -80,7 +80,7 @@ describe('POST /api/communications/whatsapp/services/[service]/pair — authoris
     });
   }
 
-  for (const role of ['admin', 'super_admin']) {
+  for (const role of ['admin', 'system', 'super_admin']) {
     it(`lets an '${role}' through the role gate`, async () => {
       currentUser.role = role;
       const { res, run } = callPair();
