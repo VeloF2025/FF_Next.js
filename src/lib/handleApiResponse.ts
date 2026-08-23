@@ -246,3 +246,32 @@ export function getErrorDisplayMessage(
 }
 
 export default handleApiResponse;
+
+/**
+ * Extract a displayable message from a raw API error body.
+ *
+ * `apiResponse.error()` sends `{ success:false, error:{ code, message, details } }`
+ * — an OBJECT. Callers that did `new Error(body.error || fallback)` therefore
+ * rendered the literal string "[object Object]" to the user, hiding the real
+ * reason (Lizelle, 2026-08-23: a transfer refused for insufficient stock showed
+ * only "[object Object]"). Validation details are field-keyed messages that name
+ * the item and warehouse, so they are folded into the message — they are the
+ * actionable part.
+ */
+export function extractApiErrorMessage(body: unknown, fallback: string): string {
+  if (typeof body !== 'object' || body === null) return fallback;
+  const raw = (body as { error?: unknown }).error;
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  if (typeof raw !== 'object' || raw === null) return fallback;
+
+  const { message, details } = raw as { message?: unknown; details?: unknown };
+  const base = typeof message === 'string' && message.trim() ? message : fallback;
+
+  if (typeof details === 'object' && details !== null) {
+    const lines = Object.values(details as Record<string, unknown>)
+      .flatMap((v) => (Array.isArray(v) ? v : [v]))
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+    if (lines.length > 0) return `${base}: ${lines.join('; ')}`;
+  }
+  return base;
+}

@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { extractApiErrorMessage } from '@/lib/handleApiResponse';
 import {
   ArrowLeft,
   ArrowRight,
@@ -114,7 +115,7 @@ export function PickingDetail({ pickingId }: PickingDetailProps) {
             return;
           }
           const data = await res.json();
-          throw new Error(data.error || 'Failed to fetch transfer');
+          throw new Error(extractApiErrorMessage(data, 'Failed to fetch transfer'));
         }
         const data = await res.json();
         setPicking(data.data);
