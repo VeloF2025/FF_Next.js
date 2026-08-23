@@ -20,6 +20,7 @@
  */
 import { useState } from 'react';
 import { incidentApi, IncidentApiError, type IncidentActionBody } from './incidentApi';
+import { OUTCOME_LABELS } from './incidentLabels';
 import type { IncidentDetail, IncidentOutcome } from '../types';
 
 function sast(value: string | null): string {
@@ -71,10 +72,6 @@ function RequestDriverInputSection({ incidentId }: { incidentId: string }) {
 
 const RESOLVED_OUTCOMES: readonly IncidentOutcome[] = ['confirmed', 'valid_reason', 'assignment_error', 'geofence_error', 'no_action_required'];
 const DISMISSED_OUTCOMES: readonly IncidentOutcome[] = ['false_positive', 'data_gap', 'duplicate'];
-const OUTCOME_LABELS: Record<IncidentOutcome, string> = {
-  confirmed: 'Confirmed', valid_reason: 'Valid reason', false_positive: 'False positive', data_gap: 'Data gap',
-  assignment_error: 'Assignment error', geofence_error: 'Geofence error', duplicate: 'Duplicate', no_action_required: 'No action required',
-};
 
 type AvailableAction = 'acknowledged' | 'review_started' | 'commented' | 'resolved' | 'dismissed';
 

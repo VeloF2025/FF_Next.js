@@ -16,6 +16,10 @@ import {
   hasActiveIncidentFilters, incidentApi, IncidentApiError, parseIncidentQueueFilters,
   serializeIncidentQueueFilters, useIncidentQueue, type IncidentQueueFilters,
 } from './incidentApi';
+import {
+  CONDITION_STATE_LABELS, EVIDENCE_STATE_LABELS, INCIDENT_TYPE_LABELS, LIFECYCLE_STATUS_LABELS, SEVERITY_LABELS,
+} from './incidentLabels';
+import { IncidentIdFilter } from './IncidentIdFilter';
 import { IncidentReviewDrawer } from './IncidentReviewDrawer';
 import { IncidentSettingsDialog } from './IncidentSettingsDialog';
 import { IncidentTable } from './IncidentTable';
@@ -23,18 +27,28 @@ import { IncidentTable } from './IncidentTable';
 const LIFECYCLE_STATUSES: readonly IncidentLifecycleStatus[] = ['open', 'acknowledged', 'under_review', 'resolved', 'dismissed'];
 const PAGE_LIMIT = 25;
 
-const SELECT_FILTERS: ReadonlyArray<{ key: keyof IncidentQueueFilters; label: string; options: readonly string[] }> = [
-  { key: 'lifecycleStatus', label: 'Status', options: LIFECYCLE_STATUSES },
-  { key: 'incidentType', label: 'Type', options: INCIDENT_TYPES },
-  { key: 'severity', label: 'Severity', options: SEVERITIES },
-  { key: 'conditionState', label: 'Condition', options: ['active', 'cleared'] },
-  { key: 'evidenceState', label: 'Evidence', options: ['required', 'present'] },
+/** `labels` maps each raw enum value to the same manager-facing wording `IncidentTable`/
+ * `IncidentActionPanel` already use elsewhere on this page — the filter that produced a row
+ * and the row's own cells must never disagree on what to call a status. */
+const SELECT_FILTERS: ReadonlyArray<{ key: keyof IncidentQueueFilters; label: string; options: readonly string[]; labels: Record<string, string> }> = [
+  { key: 'lifecycleStatus', label: 'Status', options: LIFECYCLE_STATUSES, labels: LIFECYCLE_STATUS_LABELS },
+  { key: 'incidentType', label: 'Type', options: INCIDENT_TYPES, labels: INCIDENT_TYPE_LABELS },
+  { key: 'severity', label: 'Severity', options: SEVERITIES, labels: SEVERITY_LABELS },
+  { key: 'conditionState', label: 'Condition', options: ['active', 'cleared'], labels: CONDITION_STATE_LABELS },
+  { key: 'evidenceState', label: 'Evidence', options: ['required', 'present'], labels: EVIDENCE_STATE_LABELS },
 ];
-const TEXT_FILTERS: ReadonlyArray<{ key: keyof IncidentQueueFilters; label: string; type: 'text' | 'date' }> = [
-  { key: 'projectId', label: 'Project ID', type: 'text' }, { key: 'managerUserId', label: 'Manager user ID', type: 'text' },
-  { key: 'staffId', label: 'Staff ID', type: 'text' }, { key: 'fromDate', label: 'From date', type: 'date' },
-  { key: 'toDate', label: 'To date', type: 'date' },
+/** SA date format, not the browser/OS default `mm/dd/yyyy` — Chromium ignores `lang` on
+ * `<input type="date">` and follows the OS locale regardless, so this only takes effect in
+ * browsers (Firefox, Safari) that honour it; see the fix-notes for the Chromium gap. */
+const DATE_FILTERS: ReadonlyArray<{ key: keyof IncidentQueueFilters; label: string }> = [
+  { key: 'fromDate', label: 'From date' }, { key: 'toDate', label: 'To date' },
 ];
+
+/** `resolveOversightUserNames` is a batch id->name resolver (built for oversight-membership
+ * rows); wrapped to the single-id shape `IncidentIdFilter` expects. */
+function resolveManagerUser(id: string, signal?: AbortSignal) {
+  return incidentApi.resolveOversightUserNames([id], signal).then((results) => results[0] ?? null);
+}
 
 function locationFilters(): IncidentQueueFilters {
   return typeof window === 'undefined' ? {} : parseIncidentQueueFilters(window.location.search);
@@ -45,7 +59,10 @@ function replaceLocation(filters: IncidentQueueFilters): void {
   window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
 }
 
-function FilterBar({ filters, onChange }: { filters: IncidentQueueFilters; onChange: (next: IncidentQueueFilters) => void }) {
+function FilterBar({ filters, onChange, canManageSettings }: {
+  filters: IncidentQueueFilters; onChange: (next: IncidentQueueFilters) => void; canManageSettings: boolean;
+}) {
+  const setId = (key: 'projectId' | 'managerUserId' | 'staffId') => (id: string | undefined) => onChange({ ...filters, [key]: id });
   return (
     <div role="group" aria-label="Incident filters" className="flex flex-wrap items-end gap-3">
       {SELECT_FILTERS.map((field) => (
@@ -53,13 +70,24 @@ function FilterBar({ filters, onChange }: { filters: IncidentQueueFilters; onCha
           <select aria-label={field.label} value={(filters[field.key] as string | undefined) ?? ''}
             onChange={(event) => onChange({ ...filters, [field.key]: event.target.value || undefined })} className="ml-2 rounded border px-2 py-2">
             <option value="">Any</option>
-            {field.options.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}
+            {field.options.map((option) => <option key={option} value={option}>{field.labels[option] ?? option.replaceAll('_', ' ')}</option>)}
           </select>
         </label>
       ))}
-      {TEXT_FILTERS.map((field) => (
+      <IncidentIdFilter label="Project" value={filters.projectId} onChange={setId('projectId')} search={incidentApi.searchProjects} resolveById={incidentApi.resolveProject} />
+      <IncidentIdFilter label="Staff" value={filters.staffId} onChange={setId('staffId')} search={incidentApi.searchStaff} resolveById={incidentApi.resolveStaffMember} />
+      {/* `searchActiveUsers` is scoped to `fleet.incidents-settings:edit` (see incidentApi.ts) —
+          a plain incidents viewer without that permission keeps the raw-UUID fallback, which
+          still supports the map panel's `?managerUserId=` deep link either way. */}
+      {canManageSettings
+        ? <IncidentIdFilter label="Manager" value={filters.managerUserId} onChange={setId('managerUserId')} search={incidentApi.searchActiveUsers} resolveById={resolveManagerUser} />
+        : <label className="text-sm text-[var(--ff-text-secondary)]">Manager user ID
+            <input aria-label="Manager user ID" type="text" value={filters.managerUserId ?? ''}
+              onChange={(event) => onChange({ ...filters, managerUserId: event.target.value || undefined })} className="ml-2 rounded border px-2 py-2" />
+          </label>}
+      {DATE_FILTERS.map((field) => (
         <label key={field.key} className="text-sm text-[var(--ff-text-secondary)]">{field.label}
-          <input aria-label={field.label} type={field.type} value={(filters[field.key] as string | undefined) ?? ''}
+          <input aria-label={field.label} type="date" lang="en-ZA" value={(filters[field.key] as string | undefined) ?? ''}
             onChange={(event) => onChange({ ...filters, [field.key]: event.target.value || undefined })} className="ml-2 rounded border px-2 py-2" />
         </label>
       ))}
@@ -118,10 +146,16 @@ export function IncidentQueue({ canEdit, canManageSettings }: IncidentQueueProps
         <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Fleet incidents</h2>
         {canManageSettings && <button type="button" onClick={() => setSettingsOpen(true)} className="rounded border px-3 py-2 text-sm">Settings</button>}
       </header>
-      <FilterBar filters={filters} onChange={change} />
+      <FilterBar filters={filters} onChange={change} canManageSettings={canManageSettings} />
       {error && <p role="alert" className="text-sm text-red-700">Fleet incidents could not be refreshed{data ? ' — showing the last successful data.' : '.'}</p>}
       {loading && !data && <p>Loading Fleet incidents…</p>}
-      {data && data.total === 0 && !hasActiveIncidentFilters(filters) && <p>No Fleet incidents right now.</p>}
+      {data && data.total === 0 && !hasActiveIncidentFilters(filters) && (
+        <p className="text-sm text-[var(--ff-text-secondary)]">
+          No Fleet incidents right now — none have been raised by the operational status monitor
+          (late arrivals, wrong-site check-ins, missing evidence, early departures) or reported directly.
+          This list fills in automatically once one is detected.
+        </p>
+      )}
       {data && data.total === 0 && hasActiveIncidentFilters(filters) && <p>No incidents match the current filters.</p>}
       {data && data.total > 0 && <>
         {canEdit && <div className="flex items-center gap-3">

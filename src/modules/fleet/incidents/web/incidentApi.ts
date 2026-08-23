@@ -231,6 +231,41 @@ export const incidentApi = {
     const params = new URLSearchParams({ ids: userIds.join(',') });
     return request<UserSearchResponse>(`/api/fleet/incidents/settings/user-search?${params.toString()}`, { signal }).then((data) => data.users);
   },
+  /**
+   * Backs the queue's "Project" filter picker. Deliberately `/api/projects` (gated by plain
+   * `withAuth`, the app-wide project list every signed-in user can search — the same source
+   * `SOWProjectSelector`/`ProcurementProjectSelector` read from) rather than
+   * `/api/fleet/operations/project-options`, which is scoped to `fleet.operations-status:view`
+   * — a different permission from `fleet.incidents:view`, and one an incidents-only viewer
+   * would not hold. Reusing it here would 403 exactly the audience this filter is for.
+   */
+  searchProjects(searchTerm: string, signal?: AbortSignal): Promise<ActiveUserOption[]> {
+    const params = new URLSearchParams({ search: searchTerm, limit: '20' });
+    return request<Array<{ id: string; name: string }>>(`/api/projects?${params.toString()}`, { signal })
+      .then((data) => data.map((project) => ({ id: project.id, name: project.name })));
+  },
+  /** Backs the queue's "Staff" filter picker. `/api/staff` is likewise gated by plain
+   * `withAuth`, not a `fleet.*` permission — safe for the same incidents-only audience. */
+  searchStaff(searchTerm: string, signal?: AbortSignal): Promise<ActiveUserOption[]> {
+    const params = new URLSearchParams({ search: searchTerm });
+    return request<Array<{ id: string; name: string }>>(`/api/staff?${params.toString()}`, { signal })
+      .then((data) => data.map((staff) => ({ id: staff.id, name: staff.name })));
+  },
+  /**
+   * Resolves one project id to its display name for `IncidentIdFilter`'s deep-link case
+   * (`?projectId=…` from `MapAttentionPanel`). Deliberately `?id=` — `searchProjects`'s
+   * `?search=` matches against `project_name`/`project_code` text, so passing a raw UUID
+   * into it never matches anything and the filter would silently render the id forever.
+   */
+  resolveProject(id: string, signal?: AbortSignal): Promise<ActiveUserOption | null> {
+    return request<{ id: string; name: string }>(`/api/projects?id=${encodeURIComponent(id)}`, { signal })
+      .then((project) => ({ id: project.id, name: project.name })).catch(() => null);
+  },
+  /** Resolves one staff id to its display name — same reasoning as `resolveProject`. */
+  resolveStaffMember(id: string, signal?: AbortSignal): Promise<ActiveUserOption | null> {
+    return request<{ id: string; name: string }>(`/api/staff?id=${encodeURIComponent(id)}`, { signal })
+      .then((staff) => ({ id: staff.id, name: staff.name })).catch(() => null);
+  },
 };
 
 const POLL_INTERVAL_MS = 30_000;

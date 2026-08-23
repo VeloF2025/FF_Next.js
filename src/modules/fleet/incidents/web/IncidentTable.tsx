@@ -14,8 +14,9 @@
  * visible indicator only, per the review's explicit instruction not to
  * reintroduce a filter without server-side enforcement in the same commit.
  */
-import type { IncidentListItem, IncidentLifecycleStatus, IncidentSeverity, IncidentType } from '../types';
+import type { IncidentListItem, IncidentLifecycleStatus } from '../types';
 import type { DriverInputState } from '../driver/types';
+import { INCIDENT_TYPE_LABELS as TYPE_LABELS, LIFECYCLE_STATUS_LABELS as LIFECYCLE_LABELS, SEVERITY_LABELS } from './incidentLabels';
 
 /** No cell text for `not_requested` — nothing to flag a manager's attention with yet, mirrors the drawer's own badge suppression for this state. */
 const DRIVER_INPUT_LABELS: Partial<Record<DriverInputState, string>> = {
@@ -24,19 +25,6 @@ const DRIVER_INPUT_LABELS: Partial<Record<DriverInputState, string>> = {
 };
 
 const TERMINAL: readonly IncidentLifecycleStatus[] = ['resolved', 'dismissed'];
-
-const TYPE_LABELS: Record<IncidentType, string> = {
-  late: 'Late', wrong_site: 'Wrong site', evidence_mismatch: 'Evidence mismatch', left_early: 'Left early',
-  unassigned: 'Unassigned', unverifiable: 'Unverifiable', evidence_gap: 'Evidence gap',
-  vehicle_on_site_driver_unconfirmed: 'Vehicle on site — driver unconfirmed',
-  accident_sos: 'Accident / SOS', dangerous_area_entry: 'Dangerous area entry',
-  theft_after_hours_movement: 'Theft — after-hours movement', severe_driving: 'Severe driving',
-  prolonged_unauthorized_stop: 'Prolonged unauthorized stop', lost_contact_moving: 'Lost contact while moving',
-};
-const LIFECYCLE_LABELS: Record<IncidentLifecycleStatus, string> = {
-  open: 'Open', acknowledged: 'Acknowledged', under_review: 'Under review', resolved: 'Resolved', dismissed: 'Dismissed',
-};
-const SEVERITY_LABELS: Record<IncidentSeverity, string> = { normal: 'Normal', high: 'High', critical: 'Critical' };
 
 function sast(value: string | null): string {
   return value ? new Date(value).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }) : '—';

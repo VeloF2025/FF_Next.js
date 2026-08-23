@@ -79,7 +79,14 @@ describe('IncidentQueue', () => {
     fetchMock.mockResolvedValue(ok(listResult([])));
     render(<IncidentQueue canEdit canManageSettings={false} />);
     await flush();
-    expect(screen.getByText('No Fleet incidents right now.')).toBeInTheDocument();
+    // Regex rather than an exact string because the copy now carries an
+    // explanation, but the explanation itself is asserted too — a loosened
+    // matcher that only checks the headline would pass on an empty state that
+    // silently lost the "why is this empty?" text that makes it useful.
+    const empty = screen.getByText(/No Fleet incidents right now/);
+    expect(empty).toBeInTheDocument();
+    expect(empty.textContent).toMatch(/operational status monitor/);
+    expect(empty.textContent).toMatch(/fills in automatically/);
   });
 
   it('shows a distinct no-filter-results state when a filter excludes everything', async () => {
@@ -96,7 +103,10 @@ describe('IncidentQueue', () => {
     fetchMock.mockResolvedValue(ok(listResult([])));
     render(<IncidentQueue canEdit canManageSettings={false} />);
     await flush();
-    const firstCall = String(fetchMock.mock.calls[0]![0]);
+    // The Project/Staff id-filter pickers also call `fetch` on mount (resolving the
+    // deep-linked id to a display name), so the incidents-list call is no longer
+    // reliably `calls[0]` — find it by its own endpoint instead.
+    const firstCall = String(fetchMock.mock.calls.map((call) => String(call[0])).find((url) => url.includes('/api/fleet/incidents?')));
     expect(firstCall).toContain('incidentType=wrong_site');
     expect(firstCall).toContain('projectId=project-9');
     expect(firstCall).toContain('staffId=staff-9');
