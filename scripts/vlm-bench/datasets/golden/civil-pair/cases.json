@@ -1,0 +1,2162 @@
+[
+  {
+    "id": "civilpair-0001",
+    "imageRef": "civilpair-0001.jpg",
+    "sha256": "b39b1442585f9e959100fe9cf57a73245fc7bec52064da25e18434ddb64e4068",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "46b39d63-68fe-51cd-835d-698b924283bf",
+      "photoId": "590c9858-23f4-5759-bc94-f487a4eb9526",
+      "storageKey": "thembisa-pop-1/TEM.P.C683/aa1af8c5-064a-4588-b876-2b4d6cbe3b68.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "590c9858-23f4-5759-bc94-f487a4eb9526"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0002",
+    "imageRef": "civilpair-0002.jpg",
+    "sha256": "9b250d5cbb029ae6af120e53eb9260babc8b4769278c4ace6ce5a718f06c4a63",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "db17af4b-947e-5d1c-bebc-f11e07661295",
+      "photoId": "c3637dce-fdf2-5e59-9790-4b94f7ddbe12",
+      "storageKey": "thembisa-pop-1/TEM.P.C692/23e6c484-a47d-43c3-a2f4-42798b82cba1.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "c3637dce-fdf2-5e59-9790-4b94f7ddbe12"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0003",
+    "imageRef": "civilpair-0003.jpg",
+    "sha256": "0b206e2766e095ae0a056d0083fd5913a20b0d85a2f942e42957f3a22a7938db",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "e33a9cf8-7954-4a87-8145-f3fbe0efcf72",
+      "photoId": "37a029de-dec6-4c2a-bf36-3b576eacd188",
+      "storageKey": "etwatwa/ETW.P.H890/5eab4779-3f9e-45ab-af01-b3e5b4860224.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "37a029de-dec6-4c2a-bf36-3b576eacd188"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0004",
+    "imageRef": "civilpair-0004.jpg",
+    "sha256": "9ca8d6e6f3604aa950ceb290f4cb0ef1599225036c8e26c71d2e8783e77dc4b5",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_wrong",
+      "reviewId": "03d3571f-0de6-5a95-9376-dff00bf5d612",
+      "photoId": "e3f7c3db-e329-5c67-bb26-ad3003b99dca",
+      "storageKey": "thembisa-pop-1/TEM.P.C087/eaaa4289-e083-4a84-8950-cec65ac89fa7.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "e3f7c3db-e329-5c67-bb26-ad3003b99dca"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0005",
+    "imageRef": "civilpair-0005.jpg",
+    "sha256": "f64369becea3614d847cb9be5a64b24f460ca809004688d5cf177765f8bc47d8",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "670badeb-9982-5dba-bfb1-38dcc8ee89d1",
+      "photoId": "47d09c0f-2c5f-542e-bc47-49a70d160a93",
+      "storageKey": "thembisa-pop-1/TEM.P.C070/11ed3137-8aee-4b51-9e74-4a59381be2f2.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "47d09c0f-2c5f-542e-bc47-49a70d160a93"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0006",
+    "imageRef": "civilpair-0006.jpg",
+    "sha256": "be72fd9800d56c220bbbb7194fa5611504e6d2b1abc5ccea53b91ff46ee6e12c",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "f81bf8f7-e758-501d-9e16-45a3df01660a",
+      "photoId": "cd5ffcb8-c557-51c5-834c-2c46f37ae762",
+      "storageKey": "thembisa-pop-1/TEM.P.C709/66dcac6d-5b5d-487e-9705-34e9e0c5726e.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "cd5ffcb8-c557-51c5-834c-2c46f37ae762"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0007",
+    "imageRef": "civilpair-0007.jpg",
+    "sha256": "a15f1a040f981720d6e739a2f9515d4f9cfc76880d63eeb236252f856a3f7204",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "2e93829b-d3e5-5d63-8a45-17a38ab258bc",
+      "photoId": "735aedcc-f907-5681-b3e3-3f0b8a9d3dc5",
+      "storageKey": "thembisa-pop-1/TEM.P.C659/7cad6124-d4a3-4048-b700-335d1afc4851.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "735aedcc-f907-5681-b3e3-3f0b8a9d3dc5"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0008",
+    "imageRef": "civilpair-0008.jpg",
+    "sha256": "c0964d93001524e1860fe00f9800daa02c0400f1ba0e8dc6c555220c5b17f989",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "966e928f-5015-5306-b319-d3ba5a653a66",
+      "photoId": "f1c0ba12-cd70-5320-bd9c-a5dc318a1cea",
+      "storageKey": "thembisa-pop-1/TEM.P.C465/07677b38-f195-45b0-9f53-1a283aa34bac.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "f1c0ba12-cd70-5320-bd9c-a5dc318a1cea"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0009",
+    "imageRef": "civilpair-0009.jpeg",
+    "sha256": "6890dd778c66285167e190329c6bab5a48cb20ecba3b29972d887ab98834266d",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_wrong",
+      "reviewId": "90bf7d7c-f423-549f-97cb-ba572112ee65",
+      "photoId": "c2d210a7-ea09-51cb-b997-41ac172a1252",
+      "storageKey": "thembisa-pop-3/TEM.P.I409/WhatsApp Image 2026-02-17 at 10.10.52 (1).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "c2d210a7-ea09-51cb-b997-41ac172a1252"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0010",
+    "imageRef": "civilpair-0010.jpeg",
+    "sha256": "c29066b119376b53c8919904c010c212341e24a9e328ec405c6f72707102c67f",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_wrong",
+      "reviewId": "6186a28a-fac2-484a-bd97-5bed6e0bbfd8",
+      "photoId": "327d60a8-51f5-4067-8b93-ce3d91fd551f",
+      "storageKey": "etwatwa/ETW.P.H768/WhatsApp Image 2026-03-16 at 09.49.51 (1).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "327d60a8-51f5-4067-8b93-ce3d91fd551f"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0011",
+    "imageRef": "civilpair-0011.jpg",
+    "sha256": "02e34cc9e2fc535a59231947e4fd15223cfacc4983f22bd6f7a25916c6553c90",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_wrong",
+      "reviewId": "2432f489-43ae-5c14-9fa8-3e02c7a62e4a",
+      "photoId": "56fb5b3e-1a7d-45a3-954c-ca931bfc8a68",
+      "storageKey": "thembisa pop 1/TEM.P.C584/v20260216122422-c3371efa",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "56fb5b3e-1a7d-45a3-954c-ca931bfc8a68"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0012",
+    "imageRef": "civilpair-0012.jpg",
+    "sha256": "6b5aee2ce30c2fbbf2c1cee9b53384e705ab14ca9b217b5dd157c13def16dbf1",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "8ae06b5c-bb4b-52b1-9853-94074989a8c3",
+      "photoId": "35778f95-6909-5030-9aeb-148a406be513",
+      "storageKey": "thembisa-pop-1/TEM.P.C256/6a5b310c-deda-4016-a757-6da03e59133e.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "35778f95-6909-5030-9aeb-148a406be513"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0013",
+    "imageRef": "civilpair-0013.jpg",
+    "sha256": "a32dc847d30084bdf4a2decd2a4bc267707d14f24e427cdd3faef805f3fc5e6e",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "ebe0a5af-b38c-53e4-88ce-63b8b36cdb9d",
+      "photoId": "47c808bc-54b4-5bed-be70-2cc20528dec1",
+      "storageKey": "thembisa-pop-1/TEM.P.C334/203e319f-9c5a-4e26-b5da-a0d500a88803.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "47c808bc-54b4-5bed-be70-2cc20528dec1"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0014",
+    "imageRef": "civilpair-0014.jpg",
+    "sha256": "a2072e90d12054a2e94ad570025890440dcbcd8e0c5424cc5925e51feb6dfa9d",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "4c7b3662-733b-48f3-b432-3d6276d7f6d9",
+      "photoId": "b368f0d7-9117-5d23-a184-98813e30c4ae",
+      "storageKey": "thembisa-pop-1/TEM.P.C328/dbf28547-0b50-41d9-acf6-abcc08a2b9ea.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "b368f0d7-9117-5d23-a184-98813e30c4ae"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0015",
+    "imageRef": "civilpair-0015.jpg",
+    "sha256": "d2381907e3cb9b88a96c691c3362bb3a7466a29d946d2894ee01e670f28cd47c",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "c1695359-0d33-5cec-a986-6c72bbdfb3b5",
+      "photoId": "71d8c084-11a9-5822-8ead-8a01901e9b48",
+      "storageKey": "thembisa-pop-1/TEM.P.C454/4bc41dca-7021-4353-80b2-a2dace43f0cb.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "71d8c084-11a9-5822-8ead-8a01901e9b48"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0016",
+    "imageRef": "civilpair-0016.jpg",
+    "sha256": "4b50eb6f9940641b4249ae8310f24a64155d9e8946333d20b0d2bc70b983c510",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": null,
+      "stratum": "vlm_wrong",
+      "reviewId": "00af9aff-cb62-586e-9533-d78b65b58d86",
+      "photoId": "e15af8fa-bdf6-5555-a39d-007b540315cf",
+      "storageKey": "thembisa-pop-1/TEM.P.C039/f1b7a414-8185-4f9d-a8c9-328d630126cf.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "e15af8fa-bdf6-5555-a39d-007b540315cf"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0017",
+    "imageRef": "civilpair-0017.jpeg",
+    "sha256": "80787bb9ebe9818fbcf0900e8c9f3efc1d97e541c7b31a6db41aff057f71013f",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "df4f2e5f-18e5-5e1d-bfe3-ab272c234421",
+      "photoId": "a3198965-3857-530d-adf6-37dc7ae39b8a",
+      "storageKey": "thembisa-pop-1/TEM.P.C575/WhatsApp Image 2026-02-10 at 18.55.44.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "a3198965-3857-530d-adf6-37dc7ae39b8a"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0018",
+    "imageRef": "civilpair-0018.jpeg",
+    "sha256": "8b3b4224eeea3140ea89b00c58e72f69d624b2a5c7eb14d46fd62fb518f5b865",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "34814ea1-ce30-520a-9d78-7beaf511b0a8",
+      "photoId": "e67d8bad-a644-53b1-ad6f-7760b6413ed9",
+      "storageKey": "thembisa-pop-1/TEM.P.C162/WhatsApp Image 2026-02-05 at 12.56.17.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "e67d8bad-a644-53b1-ad6f-7760b6413ed9"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0019",
+    "imageRef": "civilpair-0019.jpeg",
+    "sha256": "6782d24e4f8451d0eabd2a854771be1184be3de45bbe7a6d6de50f461a507698",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_wrong",
+      "reviewId": "13d163b8-8c25-50df-b1e6-5bd8f1f21fa5",
+      "photoId": "03ec917e-cffd-5e7b-8a3c-e1f6bb06e5d2",
+      "storageKey": "thembisa-pop-1/TEM.P.C598/WhatsApp Image 2026-02-12 at 13.31.11.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "03ec917e-cffd-5e7b-8a3c-e1f6bb06e5d2"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0020",
+    "imageRef": "civilpair-0020.jpeg",
+    "sha256": "17c984cd8cd24847dfaf3d3904f79158ea02047cf3f180321184eb1728e0f9b4",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_wrong",
+      "reviewId": "d0922b38-da38-5a48-b073-78f7c3e5f335",
+      "photoId": "c65ad404-96a2-568f-a812-5a5a2f6b368e",
+      "storageKey": "thembisa-pop-1/TEM.P.C174/WhatsApp Image 2026-02-06 at 13.26.52.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "c65ad404-96a2-568f-a812-5a5a2f6b368e"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0021",
+    "imageRef": "civilpair-0021.jpeg",
+    "sha256": "43771fe78193c7a5183929e051f7a5418d818b57f90b1103c572923bc45c388f",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_wrong",
+      "reviewId": "559816ab-9cd4-4f7d-a586-da85ed14ca3e",
+      "photoId": "3f78165b-5dfd-5263-9e79-4dae795b39c2",
+      "storageKey": "thembisa-pop-1/TEM.P.C278/WhatsApp Image 2026-03-11 at 2.07.50 PM (1).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "3f78165b-5dfd-5263-9e79-4dae795b39c2"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0022",
+    "imageRef": "civilpair-0022.jpeg",
+    "sha256": "63a5aed0c794ff9d43c7d51a15636748d4be3b8487d1f42fe89fd1f5748717de",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_wrong",
+      "reviewId": "28de019c-d5d5-5940-bd70-fef6d2dfe22e",
+      "photoId": "6045898d-301c-567f-8589-6f3df18ff78a",
+      "storageKey": "etwatwa/ETW.P.H499/attachment_5198_308509_2884340.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "6045898d-301c-567f-8589-6f3df18ff78a"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0023",
+    "imageRef": "civilpair-0023.jpg",
+    "sha256": "54517d782672e4feeb3c53a3aa0e03da8836c7318991250c3ce4f6223cddbdbf",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "2fb2924d-a02a-4fd8-a130-f95a1ebeb939",
+      "photoId": "4c34a331-a41a-4145-b263-3ad4b98bb6eb",
+      "storageKey": "etwatwa/ETW.P.F790/b4acd669-b98e-47a1-88ac-0b2b978a011b.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "4c34a331-a41a-4145-b263-3ad4b98bb6eb"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0024",
+    "imageRef": "civilpair-0024.jpeg",
+    "sha256": "ca699d5eefcdd874ec3626bd77730b2ba3573c3b67f9b39c6b53018f991cca93",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_wrong",
+      "reviewId": "9b386b5a-b18f-5cdc-930b-59a4b9f8fd59",
+      "photoId": "5221312c-f4e1-5330-9e38-68a3a3576fc1",
+      "storageKey": "thembisa-pop-1/TEM.P.C163/WhatsApp Image 2026-02-03 at 21.12.04.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "5221312c-f4e1-5330-9e38-68a3a3576fc1"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0025",
+    "imageRef": "civilpair-0025.jpg",
+    "sha256": "5f14410e6ba24c6ac093a34c2c9a573568716d058dad49f1c2f4eb14e9b8da59",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "cb6ee842-43c2-5d60-9edf-da3e2de13907",
+      "photoId": "19f85af2-f362-583b-9081-f9417e886d5d",
+      "storageKey": "thembisa-pop-1/TEM.P.C012/159feff0-c2ec-43c4-bfc7-03599433626f.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "19f85af2-f362-583b-9081-f9417e886d5d"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0026",
+    "imageRef": "civilpair-0026.jpg",
+    "sha256": "97c564ec33e3742c6447a6061c157d3da0fa817fb68b383da17510bcdfc4224f",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "571fa7c1-113f-5d05-ab00-b7853160c179",
+      "photoId": "59af634c-7907-5ad0-9963-a82665d83d8f",
+      "storageKey": "thembisa-pop-1/TEM.P.C456/1c377f0d-7dc3-4189-975d-564796ecdc14.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "59af634c-7907-5ad0-9963-a82665d83d8f"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0027",
+    "imageRef": "civilpair-0027.jpg",
+    "sha256": "3bcb25b37d446518e57217a0e337e6e5ab4ca9f97a8d4e497fe0f23f2ab41c82",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "f3b809da-c4ff-4c01-b74a-56e0c540a394",
+      "photoId": "80fa2b5c-8178-5e27-9f89-e3deef487c2a",
+      "storageKey": "thembisa-pop-1/TEM.P.C327/e703cff9-87cc-4ceb-9643-20cd2384ce21.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "80fa2b5c-8178-5e27-9f89-e3deef487c2a"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0028",
+    "imageRef": "civilpair-0028.jpeg",
+    "sha256": "3a33fca2f1427ce5d9d9acec62cc2a0ba1cafd7c6bec2c8118c00be854b24aba",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "1032e95b-beb0-4b68-9972-0bf660820114",
+      "photoId": "74806d69-ce99-4334-a944-09edcc1839ee",
+      "storageKey": "etwatwa/ETW.P.H812/WhatsApp Image 2026-02-23 at 10.16.42.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "74806d69-ce99-4334-a944-09edcc1839ee"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0029",
+    "imageRef": "civilpair-0029.jpg",
+    "sha256": "c878b5ebdc7454ea06ad49cd6d2049ccfeafbd2cbad663d64f631f5e98715849",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "c18da903-28cc-5e59-8135-dd60ce54f0c2",
+      "photoId": "de720270-7abb-57d1-a022-593cddb5a253",
+      "storageKey": "thembisa-pop-1/TEM.P.C017/c2d50f9b-538f-4426-bc57-5ae8dc399542.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "de720270-7abb-57d1-a022-593cddb5a253"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0030",
+    "imageRef": "civilpair-0030.jpg",
+    "sha256": "077fcc970b54612666f6a2cfced6f92802891a77468b60f6e97542d0538b5eba",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_wrong",
+      "reviewId": "e8494815-6f1c-529f-aa9e-d5f5db09d02a",
+      "photoId": "978aec70-478d-5476-a66a-8543f67fe1a2",
+      "storageKey": "thembisa-pop-1/TEM.P.C399/cb68b0b9-a14c-43e9-93dc-c53cd0871e0a.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "978aec70-478d-5476-a66a-8543f67fe1a2"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0031",
+    "imageRef": "civilpair-0031.jpeg",
+    "sha256": "db3d7840c5a7e562f6eef156123b54eee66bc43c183b13b05e8b63bef5bec5f1",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "45745ed2-491d-5e1c-9642-194f4e1946b4",
+      "photoId": "26f7753f-6f38-5646-b863-70c8683f7d9f",
+      "storageKey": "thembisa-pop-1/TEM.P.C171/WhatsApp Image 2026-02-05 at 12.34.09 (1).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "26f7753f-6f38-5646-b863-70c8683f7d9f"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0032",
+    "imageRef": "civilpair-0032.jpg",
+    "sha256": "60cf6964e775a0b42c563606bc5134fabb9ca16c31f95d7718d1b2bcd3af586e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "5d91d13f-ff55-56b1-8a1d-04cec4059c27",
+      "photoId": "bf661a1d-c128-525b-8a89-69449c49b22a",
+      "storageKey": "thembisa-pop-1/TEM.P.C771/371e5c94-31c4-47da-aa93-0dd9a9c8c3a3.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "bf661a1d-c128-525b-8a89-69449c49b22a"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0033",
+    "imageRef": "civilpair-0033.jpeg",
+    "sha256": "31f386ec3361a4e98fedccd3550f3aad93bd46835799de6dbb0a3819c5aae97a",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "85b9b914-d0d6-5d33-bd40-f7ab33053b4a",
+      "photoId": "e79391a7-fbec-51b4-90ae-e7c63c2cf41d",
+      "storageKey": "thembisa-pop-3/TEM.P.H223/WhatsApp Image 2026-02-11 at 14.40.00.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "e79391a7-fbec-51b4-90ae-e7c63c2cf41d"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0034",
+    "imageRef": "civilpair-0034.jpg",
+    "sha256": "a7daa0669987bf7cadc8ab931995d7a5f254cb3029a20cfd9cd1a3143e65dc6a",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "a79813eb-1e88-5191-8367-80b35454d57c",
+      "photoId": "20f3cb28-174b-5593-9562-20ec3f0d087a",
+      "storageKey": "thembisa-pop-1/TEM.P.C634/5e5d1406-69e1-4771-86cd-5dc7dcc372dd.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "20f3cb28-174b-5593-9562-20ec3f0d087a"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0035",
+    "imageRef": "civilpair-0035.jpg",
+    "sha256": "55af402abb5989198cb0a343f4921e9f912fc3fe347fca5cf8b20ba0ad69cb30",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "0f30368c-c6d2-5640-a5cb-fd0a176afaee",
+      "photoId": "16234ba7-1fff-5714-a6c7-e4461befc4de",
+      "storageKey": "thembisa-pop-1/TEM.P.C722/36dc0e8d-603f-44c2-b5d7-3d9baa611ce3.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "16234ba7-1fff-5714-a6c7-e4461befc4de"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0036",
+    "imageRef": "civilpair-0036.jpeg",
+    "sha256": "7e8f1e1ab402ff2acc7563f68f4bddfbb2ca4a796a1fa266941d9a3fce0cce95",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "621476b6-da1d-560c-87ce-577a691f1344",
+      "photoId": "f7fa7588-2bb4-4cca-9b96-928157517fed",
+      "storageKey": "etwatwa/ETW.P.H449/WhatsApp Image 2026-02-26 at 20.12.11.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "f7fa7588-2bb4-4cca-9b96-928157517fed"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0037",
+    "imageRef": "civilpair-0037.jpeg",
+    "sha256": "6b160ab0d7085eb5fac676a47d8b2a1f5a519b0bd1f2a080d9042e904886d709",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_wrong",
+      "reviewId": "742f0fbc-29ac-56d6-8cec-6bef8a8b964e",
+      "photoId": "cec113ae-8649-5eef-9306-cdede77125c6",
+      "storageKey": "thembisa-pop-1/TEM.P.C319/WhatsApp Image 2026-07-16 at 16.46.11 (2).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "cec113ae-8649-5eef-9306-cdede77125c6"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0038",
+    "imageRef": "civilpair-0038.jpg",
+    "sha256": "34493deed759fe43df43eb7a1984bfc6daa6d4a0b49c05112c87536bcb23b337",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "670badeb-9982-5dba-bfb1-38dcc8ee89d1",
+      "photoId": "3db33dd9-76c3-54fc-ba63-3eb96d88066c",
+      "storageKey": "thembisa-pop-1/TEM.P.C070/10f76fd1-fb46-4159-9555-0a2c4d73d2b6.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "3db33dd9-76c3-54fc-ba63-3eb96d88066c"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0039",
+    "imageRef": "civilpair-0039.jpg",
+    "sha256": "fe243c9fef62804fdda61de0031f6888aeb59396cb5ac64c1eb15cf98905b49f",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "8fe15416-6a61-5e02-8451-03e48687ceed",
+      "photoId": "40d2ca7b-f1c6-541d-b692-69e8f18ba94b",
+      "storageKey": "thembisa-pop-1/TEM.P.C650/11433b67-ac6a-4a62-98cc-b2c0987bed2a.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "40d2ca7b-f1c6-541d-b692-69e8f18ba94b"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0040",
+    "imageRef": "civilpair-0040.jpg",
+    "sha256": "56465c647f761f7f5915212d3e7c84eb3f488b128ac230597e8ee8b896cef4fa",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": null,
+      "stratum": "vlm_wrong",
+      "reviewId": "d61e6c97-c74f-5631-8874-0759bfb2c2ce",
+      "photoId": "f8d4971d-be7e-5b72-b7dd-596683e92055",
+      "storageKey": "thembisa-pop-1/TEM.P.C150/6370785d-400b-490e-a96f-744e2c708c58.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "f8d4971d-be7e-5b72-b7dd-596683e92055"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0041",
+    "imageRef": "civilpair-0041.jpg",
+    "sha256": "6d22ec5cfd8dee9eb41bad85558742044f7174102758a3f56eb3626f19907039",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "6f729743-882c-50ce-96b1-a497d2293a29",
+      "photoId": "4b7a8070-df4c-56ef-be90-6954853ebfad",
+      "storageKey": "thembisa-pop-1/TEM.P.C027/af8eb073-852d-42a9-9c85-f905dfdbfd0a.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "4b7a8070-df4c-56ef-be90-6954853ebfad"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0042",
+    "imageRef": "civilpair-0042.jpeg",
+    "sha256": "cad14bceea244b7da5799ba8bc5072e158a91e2ecf5450e88b6eb784198a89ea",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "7ac2b16f-1a25-4624-8d14-722d42e69aaf",
+      "photoId": "be1024d0-fce9-57d8-828c-e017d5db9c41",
+      "storageKey": "thembisa-pop-1/TEM.P.C672/WhatsApp Image 2026-04-22 at 10.58.56 AM.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "be1024d0-fce9-57d8-828c-e017d5db9c41"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0043",
+    "imageRef": "civilpair-0043.jpg",
+    "sha256": "d329b165eeb7145e72be98e9f8ac5edd4c3b0077cbaaaab06ba7f3360815cdc2",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "2b7356ba-e574-5161-a49c-857bc301a84c",
+      "photoId": "9899a643-0d04-5ce1-bb5e-5f3ebcbe7b6b",
+      "storageKey": "thembisa-pop-1/TEM.P.C249/5d9039e2-8c98-4c65-b855-5770c55f852a.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "9899a643-0d04-5ce1-bb5e-5f3ebcbe7b6b"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0044",
+    "imageRef": "civilpair-0044.jpg",
+    "sha256": "418978a35c4136644071ab4762e801edb94afe91d728ff82f143ed30d8513459",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_wrong",
+      "reviewId": "50f6a4e8-37d3-5b0b-9bc5-647d49083b83",
+      "photoId": "fbdfcb1a-f6ea-5e7a-9a0a-3c91d3d4f2d1",
+      "storageKey": "thembisa-pop-1/TEM.P.C725/27ca044e-b403-41bb-9ced-84edd2d7ca3e.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "fbdfcb1a-f6ea-5e7a-9a0a-3c91d3d4f2d1"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0045",
+    "imageRef": "civilpair-0045.jpg",
+    "sha256": "4132f5f2313be69d622d50f63a00a4dcac5bcb3a456316e1b89373809d5cf6c1",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "50f6a4e8-37d3-5b0b-9bc5-647d49083b83",
+      "photoId": "60e8b4c4-13a1-51cc-a2a4-61d28d4708a9",
+      "storageKey": "thembisa-pop-1/TEM.P.C725/3ba0c30e-267d-486b-8a09-102185cbc0ac.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "60e8b4c4-13a1-51cc-a2a4-61d28d4708a9"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0046",
+    "imageRef": "civilpair-0046.jpg",
+    "sha256": "559d2b14aa38be269330ee09ee2fe209b8aea532d90688fb6eabca47f78c25c4",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "56c16a78-977d-5227-b69f-d716ee2e43d8",
+      "photoId": "152a0284-4f21-53a2-ad26-44ab5e507b2c",
+      "storageKey": "thembisa-pop-1/TEM.P.C767/77adc044-2f52-4759-8fa6-e8ad8946e759.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "152a0284-4f21-53a2-ad26-44ab5e507b2c"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0047",
+    "imageRef": "civilpair-0047.jpeg",
+    "sha256": "c24f518dff5e62930d01791e33e4d965b267496fa63c817bcd5bfeb2b7d12524",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "9f00dab8-302c-5fd7-abf0-10e1879fd861",
+      "photoId": "6d8dde69-082e-5e40-b1c8-126a6ca8b92d",
+      "storageKey": "thembisa-pop-1/TEM.P.C164/WhatsApp Image 2026-02-03 at 20.56.19 (1).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "6d8dde69-082e-5e40-b1c8-126a6ca8b92d"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0048",
+    "imageRef": "civilpair-0048.jpeg",
+    "sha256": "8171f2e3ec866c8589d90cd32fe38ec9348391fb644d2edefb463ac58bb36f2f",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "519d419f-56d9-5688-82b7-37a37545a7ce",
+      "photoId": "04f389cf-8be3-587a-bad8-45d8cee70f00",
+      "storageKey": "thembisa-pop-1/TEM.P.C238/WhatsApp Image 2026-02-25 at 3.03.30 PM (1).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "04f389cf-8be3-587a-bad8-45d8cee70f00"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0049",
+    "imageRef": "civilpair-0049.jpg",
+    "sha256": "aa3d76ad011228f36fe1e55945dc8890c2e815d0e8b0ec5bf614e61537fb3795",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "17fdb788-d513-5b1a-84bd-1855308f966e",
+      "photoId": "1215e51e-724a-521c-9c04-07ef654faf4b",
+      "storageKey": "thembisa-pop-3/TEM.P.I398/c95a16d7-480d-4785-884a-b1597b8f04a8.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "1215e51e-724a-521c-9c04-07ef654faf4b"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0050",
+    "imageRef": "civilpair-0050.jpg",
+    "sha256": "aa92df6a28bb897920efe4583fd531cbff4e37e22c818a1a0a32875f9d67cbb2",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "96fd8b16-10ae-5cf4-96f7-381a2d29caa1",
+      "photoId": "fb1e7f34-2476-59d8-99de-092b6b10460d",
+      "storageKey": "thembisa-pop-1/TEM.P.C462/97d3fbf9-bcd0-432d-a6b3-75d1e3b1ecaf.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "fb1e7f34-2476-59d8-99de-092b6b10460d"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0051",
+    "imageRef": "civilpair-0051.jpeg",
+    "sha256": "20c823a1c36ff9ca208457b4cabed061074dcb4d5a34e53f287aa7fdb46e05dc",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "07144f19-4a12-5c30-bba6-c1bb0549e37d",
+      "photoId": "96497c70-6f65-5261-9eb2-efdb939dd543",
+      "storageKey": "thembisa-pop-3/TEM.P.H238/WhatsApp Image 2026-02-11 at 19.56.37.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "96497c70-6f65-5261-9eb2-efdb939dd543"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0052",
+    "imageRef": "civilpair-0052.jpg",
+    "sha256": "56a82778a4e26dbabefa25f833e2ff2ca972a1b34e158c72998b64d24badfec6",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "c9f7b741-8e8e-5833-a0ba-8873a2877359",
+      "photoId": "317e1b58-29fc-5c8c-9c7f-760ba237cc46",
+      "storageKey": "thembisa-pop-1/TEM.P.C078/1ac3d9a3-d5df-488f-aeb8-7c00cae8576c.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "317e1b58-29fc-5c8c-9c7f-760ba237cc46"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0053",
+    "imageRef": "civilpair-0053.jpeg",
+    "sha256": "5098e35df8685ecfaf7dcabfa8ebb786f801d241e318385a787db4936068c3e4",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "54211908-5bee-56c5-a423-72121e8ff656",
+      "photoId": "994a95e3-33ef-52ba-bc79-4f4054edce79",
+      "storageKey": "thembisa-pop-1/TEM.P.C516/WhatsApp Image 2026-02-11 at 15.05.51.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "994a95e3-33ef-52ba-bc79-4f4054edce79"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0054",
+    "imageRef": "civilpair-0054.jpeg",
+    "sha256": "8987cfbe0bdf1471cdd5ff020698cb5e5b6812ac72fba5f0c0cd8ac26b3a572e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "12752cf5-17c2-5005-9fab-16fac93f9ba9",
+      "photoId": "839927b2-b490-5945-aac6-ac83fb40d7f4",
+      "storageKey": "thembisa-pop-3/TEM.P.J733/WhatsApp Image 2026-02-17 at 10.12.10 (1).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "839927b2-b490-5945-aac6-ac83fb40d7f4"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0055",
+    "imageRef": "civilpair-0055.jpeg",
+    "sha256": "82be870f0064c34637d0e7a0c5347bf01dae3a9a0feddf94749ca5ae7897aa4f",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "ff98024b-1fbb-58f4-a299-2634fae73add",
+      "photoId": "8945ca76-2571-5b5f-bba7-125dc15608fa",
+      "storageKey": "thembisa-pop-1/TEM.P.C172/WhatsApp Image 2026-02-06 at 13.17.32 (1).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "8945ca76-2571-5b5f-bba7-125dc15608fa"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0056",
+    "imageRef": "civilpair-0056.jpeg",
+    "sha256": "1c9332af196903e5e7bb57a88f484c963a1822804460ebeebd57e7665c730280",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "e1025673-6813-50a0-944b-55bf6df39a15",
+      "photoId": "29a371c5-9130-59e3-9d8b-fb5fdc5700fe",
+      "storageKey": "thembisa-pop-1/TEM.P.C774/WhatsApp Image 2026-02-21 at 09.34.04.jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "29a371c5-9130-59e3-9d8b-fb5fdc5700fe"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0057",
+    "imageRef": "civilpair-0057.jpg",
+    "sha256": "cff2f54c64014339d466885103e999a37b56f2e5275b16641963ec06bc3ad2b0",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "bcfcd4bc-a734-5afa-937b-0455310c0a9f",
+      "photoId": "7a14476f-f9d1-52a9-88a2-7ba117d43213",
+      "storageKey": "thembisa-pop-1/TEM.P.C732/9bdcbb4b-2dad-4b8c-8ed9-1e9466255e4d.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "7a14476f-f9d1-52a9-88a2-7ba117d43213"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0058",
+    "imageRef": "civilpair-0058.jpg",
+    "sha256": "1c30404215e62609fd82c893a49c87111b321ef411f74baa020c8f0b340ff6c9",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "a3faa85c-fafe-5ae1-bbb9-9e8816f25f9a",
+      "photoId": "386f4618-2395-57d7-b519-2eecaf0d1fd2",
+      "storageKey": "thembisa-pop-1/TEM.P.C648/99bd2af5-1fdd-4219-89f7-cb18c5589995.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "386f4618-2395-57d7-b519-2eecaf0d1fd2"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0059",
+    "imageRef": "civilpair-0059.jpeg",
+    "sha256": "a2b95e87e12ceb62bf7e35d8ccf175081f3b191a55aa46b8c067e80bf9c3247e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "reviewId": "2b4d1c0d-7393-468c-8c88-193756291514",
+      "photoId": "6a279971-ef3d-58db-88bc-984c3b849b23",
+      "storageKey": "thembisa-pop-1/TEM.P.C559/WhatsApp Image 2026-04-29 at 11.29.46 AM (2).jpeg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "6a279971-ef3d-58db-88bc-984c3b849b23"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0060",
+    "imageRef": "civilpair-0060.jpg",
+    "sha256": "72317192cc661cf675fe7efe59bdada25de38bb852cadcbcc2415e7a83e5fd3c",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 0,
+      "stratum": "vlm_wrong",
+      "reviewId": "9ded85a3-be73-5340-a112-bc2d55db896a",
+      "photoId": "fb4fa237-8f5b-5522-9e97-03e8ae84fa2b",
+      "storageKey": "thembisa-pop-1/TEM.P.C660/ec969f2d-9ff4-4936-a7b4-e0be2a9fde28.jpg",
+      "confirmation": "human_correction",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "fb4fa237-8f5b-5522-9e97-03e8ae84fa2b"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0061",
+    "imageRef": "civilpair-0061.jpeg",
+    "sha256": "de8547ac9134bb1f71e1240571e93d15f72620e77c2ba5a3ce865533f6618e9b",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "0f93eeed-cd26-5c91-98c5-e1ec31660281",
+      "photoId": "71659e8c-7672-5640-afa1-ff51193617fb",
+      "storageKey": "thembisa-pop-1/TEM.P.C242/WhatsApp Image 2026-02-25 at 3.10.38 PM (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "71659e8c-7672-5640-afa1-ff51193617fb"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0062",
+    "imageRef": "civilpair-0062.jpeg",
+    "sha256": "e0afffeb2c5dd88e58fa217dc44ccddc46c13daa3f405bc4415b484e3da0388e",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "0e6db44f-0d67-4911-9c04-33f56c3f0ac3",
+      "photoId": "1398d46b-f18e-49a4-9d66-125501d61ea1",
+      "storageKey": "etwatwa/ETW.P.H553/WhatsApp Image 2026-03-09 at 11.35.07 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "1398d46b-f18e-49a4-9d66-125501d61ea1"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0063",
+    "imageRef": "civilpair-0063.jpg",
+    "sha256": "d9c7bb769e0da0a71ca4d52e10508f400f03709b153a863c3253d9b017740bd1",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "ced067e9-1890-5d85-926c-ac0f0b45d3e6",
+      "photoId": "8b0b57b1-5683-5763-8c12-48562e16c7d7",
+      "storageKey": "thembisa-pop-1/TEM.P.C622/9d867941-de13-46d7-b691-fb1171c1e79e.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "8b0b57b1-5683-5763-8c12-48562e16c7d7"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0064",
+    "imageRef": "civilpair-0064.jpg",
+    "sha256": "54c05b83582ce880cdf8bd25dbde8f1b75a59d17c0fe68d4ff7f449d0e723691",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "15447a3a-478f-5fb5-876a-a803d59d1f54",
+      "photoId": "a82f9df7-9da8-4344-a071-e0fe4c12ee42",
+      "storageKey": "etwatwa/ETW.P.H689/civil-audit_20260422150847456.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "a82f9df7-9da8-4344-a071-e0fe4c12ee42"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0065",
+    "imageRef": "civilpair-0065.jpeg",
+    "sha256": "852f93342dd0916ddb27eea2b09bdc26564aee09b6eebd83e5a14f014893d14c",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "700303de-dae5-48a2-9068-3b6caae9af91",
+      "photoId": "d896ee06-52dc-4991-b141-a45a8175b0d2",
+      "storageKey": "etwatwa/ETW.P.H552/WhatsApp Image 2026-03-09 at 11.47.05 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "d896ee06-52dc-4991-b141-a45a8175b0d2"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0066",
+    "imageRef": "civilpair-0066.jpeg",
+    "sha256": "79c32c42eb3a0c318b7ab3e7de53cc7172f3b07e21fa1b866f8ed115995666a6",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "45745ed2-491d-5e1c-9642-194f4e1946b4",
+      "photoId": "ea76959a-75e0-50a3-981d-5e8c1da31b24",
+      "storageKey": "thembisa-pop-1/TEM.P.C171/WhatsApp Image 2026-02-05 at 12.34.09.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "ea76959a-75e0-50a3-981d-5e8c1da31b24"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0067",
+    "imageRef": "civilpair-0067.jpeg",
+    "sha256": "720f8da2720521709f3feb3614d6e99611be3c6f1719061d8159fa013159e842",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "2b78485f-d82b-4a47-8d78-c357a248e707",
+      "photoId": "0962db6d-67ba-49b9-96ae-2a21ffb02812",
+      "storageKey": "etwatwa/ETW.P.H717/WhatsApp Image 2026-03-15 at 16.48.27 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "0962db6d-67ba-49b9-96ae-2a21ffb02812"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0068",
+    "imageRef": "civilpair-0068.jpg",
+    "sha256": "21bd5445e171053e77734635f61e3322ddc9f38e4a2bd84a7223ce2a6445d136",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "16e388ed-8880-55b8-a346-837637829149",
+      "photoId": "32aa3501-8209-5265-8fdc-640a7228dac9",
+      "storageKey": "thembisa-pop-1/TEM.P.C100/P-TEM.P.C100_07_after_photo.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "32aa3501-8209-5265-8fdc-640a7228dac9"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0069",
+    "imageRef": "civilpair-0069.jpeg",
+    "sha256": "45ccbca903d74d9ab9663c0805579417d8095f7d8eb1edead9d4bc502e998613",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "50ec94fa-4201-4977-ad89-b3b5ae3e7993",
+      "photoId": "f43baf20-6485-4a46-8094-2768ae9f72e1",
+      "storageKey": "etwatwa/ETW.P.H296/WhatsApp Image 2026-03-09 at 17.54.13.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "f43baf20-6485-4a46-8094-2768ae9f72e1"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0070",
+    "imageRef": "civilpair-0070.jpeg",
+    "sha256": "2f5a79fe3ed3aa910797935cc42143fbbf2bd5dd3e2cf0cf657399718875d468",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "4f30edcf-b769-4dc7-889e-9e64b04ed01f",
+      "photoId": "8313e252-0d6f-52c1-b5f1-5230bece0cf2",
+      "storageKey": "thembisa-pop-1/TEM.P.B413/WhatsApp Image 2026-04-22 at 10.44.38 AM (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "8313e252-0d6f-52c1-b5f1-5230bece0cf2"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0071",
+    "imageRef": "civilpair-0071.jpg",
+    "sha256": "2e6f7bfd55ec3577297f51a520b25de14f107cadda4233c1cc61fa293a9b6cfb",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "db0b9c3e-6386-45ad-92ed-f2a1ebc70e4d",
+      "photoId": "69b0b477-67d3-49df-a7d9-d34d04ecca30",
+      "storageKey": "etwatwa/ETW.P.H325/civil-audit_20260518134442134.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "69b0b477-67d3-49df-a7d9-d34d04ecca30"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0072",
+    "imageRef": "civilpair-0072.jpg",
+    "sha256": "48c094409c4dfc1e2e1c080782bf9f92ee0bf43ff9335ad2564cda85b7208309",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "2d5d66f3-b321-5611-8b14-1ac7d66a02ab",
+      "photoId": "fb189a3b-dea8-55f8-b47f-feca82e449a4",
+      "storageKey": "thembisa-pop-1/TEM.P.C481/P-TEM.P.C481_07_after_photo.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "fb189a3b-dea8-55f8-b47f-feca82e449a4"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0073",
+    "imageRef": "civilpair-0073.jpg",
+    "sha256": "481a3da64ba8e4fc15dfdf6897915ed35f3df64513edb9c10ca1085456feec5b",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "fe3412fe-0f86-56f8-968a-364e4339a391",
+      "photoId": "74dd522b-940c-5fae-b525-b9f3e6f44b15",
+      "storageKey": "thembisa-pop-1/TEM.P.C346/c625c99a-2c06-4329-a502-de0648df21b0.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "74dd522b-940c-5fae-b525-b9f3e6f44b15"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0074",
+    "imageRef": "civilpair-0074.jpeg",
+    "sha256": "2a56c888765bf9d73d3772db3da91752d3672ddb47724b8efc24af28159f671e",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "df1f20a5-6071-5ad4-932b-c220a4d09de2",
+      "photoId": "dc07e78b-0b24-54e7-9a4e-4f52f24f9435",
+      "storageKey": "thembisa-pop-1/TEM.P.C313/WhatsApp Image 2026-07-16 at 14.17.32 (2).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "dc07e78b-0b24-54e7-9a4e-4f52f24f9435"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0075",
+    "imageRef": "civilpair-0075.jpg",
+    "sha256": "2c4853634fa1f73679de341f4cb6a584ab8336a78c74fabc06b7070139ab4760",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "1c3b5e36-fdd2-5714-bd35-34ca926d31b2",
+      "photoId": "4890729f-f602-5dc8-bcfe-069a1e7fd3a5",
+      "storageKey": "thembisa-pop-1/TEM.P.C083/2514d073-4fe5-4543-b5d9-0a702194bace.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "4890729f-f602-5dc8-bcfe-069a1e7fd3a5"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0076",
+    "imageRef": "civilpair-0076.jpeg",
+    "sha256": "9aca57656b5f592ce946c1c96e735fa5070a54f367243a63c5a2eea4d77bd9f1",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "2b78485f-d82b-4a47-8d78-c357a248e707",
+      "photoId": "904afdcc-587c-45c6-a4a8-72e9a1cffff0",
+      "storageKey": "etwatwa/ETW.P.H717/WhatsApp Image 2026-03-15 at 16.48.27.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "904afdcc-587c-45c6-a4a8-72e9a1cffff0"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0077",
+    "imageRef": "civilpair-0077.jpeg",
+    "sha256": "45314bb080821d4483ee0ba26f886c88d54002d18813ec6874848844e25cbac8",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "34814ea1-ce30-520a-9d78-7beaf511b0a8",
+      "photoId": "42722c72-3ef0-5f53-8f1e-96c5ac458828",
+      "storageKey": "thembisa-pop-1/TEM.P.C162/P-TEM.P.C162_07_after_photo.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "42722c72-3ef0-5f53-8f1e-96c5ac458828"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0078",
+    "imageRef": "civilpair-0078.jpeg",
+    "sha256": "82aa568c806f9670f3941ce3e46a3a310b4c3a6d276d2117c4c35fafe2cc3dce",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "68380425-8723-5c1e-ac1c-61722aca8f93",
+      "photoId": "34d54889-b477-5334-9694-95aa3f2280c5",
+      "storageKey": "thembisa-pop-3/TEM.P.I869/WhatsApp Image 2026-02-18 at 13.38.35 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "34d54889-b477-5334-9694-95aa3f2280c5"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0079",
+    "imageRef": "civilpair-0079.jpeg",
+    "sha256": "8049cc1a715aadb8adcbcb8ea1f21f88a377aacb3a9749e959d0b1340bc9237d",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "6be05c14-4c99-4ff2-acf2-51d12561e76e",
+      "photoId": "9fd8be42-fc3d-5fd4-8ef9-07bcb02e83aa",
+      "storageKey": "thembisa-pop-1/TEM.P.B410/WhatsApp Image 2026-04-23 at 9.07.26 AM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "9fd8be42-fc3d-5fd4-8ef9-07bcb02e83aa"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0080",
+    "imageRef": "civilpair-0080.jpg",
+    "sha256": "cb3da398fc2b7561f27d3eb2e22fe95449b18b10b05fb8c64f61e24b6890d231",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "8f9087dc-5866-57ac-95e9-194f29db617b",
+      "photoId": "8893f211-8e7a-554f-8faa-0b4dcf749671",
+      "storageKey": "thembisa-pop-1/TEM.P.C042/P-TEM.P.C042_02_during_photo.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "8893f211-8e7a-554f-8faa-0b4dcf749671"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0081",
+    "imageRef": "civilpair-0081.jpg",
+    "sha256": "7e4d2fbddf82a2d3aedeb076d934d33172e6fd5cc2f58cba525f8c37fadc2910",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "b297938c-4059-5c7b-a3c0-e40c173d5410",
+      "photoId": "83ef2b54-2d05-5ddb-b54c-e5872f2d8cac",
+      "storageKey": "thembisa-pop-1/TEM.P.C394/567bf8d9-0b3e-4681-ad0e-e04c75879c6d.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "83ef2b54-2d05-5ddb-b54c-e5872f2d8cac"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0082",
+    "imageRef": "civilpair-0082.jpg",
+    "sha256": "4e5b0bb7ee8921f6c6f4909242d769703c147bdf4974943033853a58bd5d6995",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "04b3bfc2-dbf6-534b-8c2e-697fce23df93",
+      "photoId": "def7596e-3c9b-5d3f-85c0-c2a407eaf30b",
+      "storageKey": "thembisa-pop-1/TEM.P.C122/P-TEM.P.C122_07_after_photo.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "def7596e-3c9b-5d3f-85c0-c2a407eaf30b"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0083",
+    "imageRef": "civilpair-0083.jpg",
+    "sha256": "f0bc50a08ff57a9a74990619792da0896d5beefcc7a1c2faf53205f24eb9d8bc",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "9024369d-9a42-4966-89b7-19bffe8f3f5b",
+      "photoId": "81a2743d-b08a-46a9-bb3b-1b33e82e811a",
+      "storageKey": "etwatwa/ETW.P.H334/civil-audit_20260518155704250.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "81a2743d-b08a-46a9-bb3b-1b33e82e811a"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0084",
+    "imageRef": "civilpair-0084.jpg",
+    "sha256": "49a417f9bb78ccb9ae0a2b494ce33e287b2e6a92ea37ba68468c7098f90daba1",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "4af8be6c-a3c7-52a1-a958-a78bbe40815e",
+      "photoId": "948e076e-9225-4fe6-9e1f-52ebcea8b3a7",
+      "storageKey": "thembisa-pop-3/TEM.P.H241/thm-3-poles_20260505144626981.56.30 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "948e076e-9225-4fe6-9e1f-52ebcea8b3a7"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0085",
+    "imageRef": "civilpair-0085.jpg",
+    "sha256": "c299992a56e0074d7bf7057cc396858086febf116e9de2e6aebe4135588a3230",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "64ad2830-e22c-5b99-9665-071629d7b16d",
+      "photoId": "1a996c49-fa17-5e2d-84fd-0dd72a71e78f",
+      "storageKey": "thembisa-pop-1/TEM.P.C186/a6a2e470-9cd2-489a-9806-7f392ffd8580.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "1a996c49-fa17-5e2d-84fd-0dd72a71e78f"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0086",
+    "imageRef": "civilpair-0086.jpg",
+    "sha256": "2a05d0c3c77b9cb7e8b2d2066462db556135aca363521ee80d437e6537c122f8",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "f0bef5bd-7acb-41bb-9467-8296bcd9f442",
+      "photoId": "6592f82a-546d-46a8-a013-fa12546a47eb",
+      "storageKey": "etwatwa/ETW.P.H315/1aec13db-f5ea-447e-95a1-4b1c5b632f96.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "6592f82a-546d-46a8-a013-fa12546a47eb"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0087",
+    "imageRef": "civilpair-0087.jpeg",
+    "sha256": "c16323c97ad272388d8a487cfa4f0b0bc52518cba83aff71aa534d99b54abb48",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "c440a30f-4a88-53c0-b396-fc9e46d1eff6",
+      "photoId": "1f74dc0c-5fc7-57a8-9a76-00b1cbf1d362",
+      "storageKey": "etwatwa/ETW.P.H420/attachment_5198_308430_2884797.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "1f74dc0c-5fc7-57a8-9a76-00b1cbf1d362"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0088",
+    "imageRef": "civilpair-0088.jpg",
+    "sha256": "5649457125c6f879c5549cbc28de4a8eae10603755ef4a8caeb552eb9934f052",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "2b2b94bd-0f2a-558f-9f9a-e1cbb7048cc3",
+      "photoId": "8c5c6d50-a3ff-53fe-b0a1-8482bba269d5",
+      "storageKey": "thembisa-pop-1/TEM.P.C088/b15d98e6-b514-4ccf-84b7-37275c1c4d2c.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "8c5c6d50-a3ff-53fe-b0a1-8482bba269d5"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0089",
+    "imageRef": "civilpair-0089.jpeg",
+    "sha256": "52d558b4d39cf7a45ef9f3eb071a594da1db8f2b3ac7d9348e32cd702a153544",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "12752cf5-17c2-5005-9fab-16fac93f9ba9",
+      "photoId": "bd9b526c-f4ca-5751-ab3b-1a3f579d2cb3",
+      "storageKey": "thembisa-pop-3/TEM.P.J733/WhatsApp Image 2026-02-17 at 10.12.09 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "bd9b526c-f4ca-5751-ab3b-1a3f579d2cb3"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0090",
+    "imageRef": "civilpair-0090.jpeg",
+    "sha256": "5d6d8b9cb29d3a3416c8930adc43a50d6fa90af0a5c89272ec7d359ace55c94d",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "reviewId": "304ef520-32ae-4df1-ba66-dde1ec9b829c",
+      "photoId": "98aba775-564a-49df-abe8-409b7655338e",
+      "storageKey": "etwatwa/ETW.P.H242/WhatsApp Image 2026-03-15 at 17.24.44.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "98aba775-564a-49df-abe8-409b7655338e"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0091",
+    "imageRef": "civilpair-0091.jpeg",
+    "sha256": "ee663f06052b9d38b1eda4df9b3ffff9941b371ed1986bbccb351bf1cf968385",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "b76902fd-10d0-42d4-bb59-33b43c804306",
+      "photoId": "d5e91073-72d0-5713-94a8-2ffa713bc5c0",
+      "storageKey": "thembisa-pop-1/TEM.P.C662/WhatsApp Image 2026-04-22 at 2.55.14 PM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "d5e91073-72d0-5713-94a8-2ffa713bc5c0"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0092",
+    "imageRef": "civilpair-0092.jpg",
+    "sha256": "bcd836f26397f2b83fc2da55dfac1f0b43446b73c41f7fee76b61b0696287a8e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "1ffe0e5a-e747-588f-a0ba-516d49738dd4",
+      "photoId": "26998f4d-a03a-5a94-be8b-7a7e23425e58",
+      "storageKey": "thembisa-pop-1/TEM.P.C471/P-TEM.P.C471_02_during_photo.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "26998f4d-a03a-5a94-be8b-7a7e23425e58"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0093",
+    "imageRef": "civilpair-0093.jpg",
+    "sha256": "9fc3a7b6c5585d35961c686bed5ae334cf4ea1be44dc26c16810e9f2c7907370",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "b4d76885-d8ac-5712-8267-f65a268c77f1",
+      "photoId": "6da12214-e166-5139-8426-da593de861ec",
+      "storageKey": "thembisa-pop-1/TEM.P.C149/3357869f-9374-430a-b3a4-6fc45feca956.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "6da12214-e166-5139-8426-da593de861ec"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0094",
+    "imageRef": "civilpair-0094.jpeg",
+    "sha256": "cd1e338989d0d367218b8d496c9b6f672cc2b289ed5c1fb0e7bf3bd4572d10d7",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "5c84ed34-1946-5f13-8c5e-b9c6387bca42",
+      "photoId": "3772abe1-b1a4-526f-95f5-390f346e3e76",
+      "storageKey": "thembisa-pop-1/TEM.P.C286/WhatsApp Image 2026-03-19 at 10.45.09 AM (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "3772abe1-b1a4-526f-95f5-390f346e3e76"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0095",
+    "imageRef": "civilpair-0095.jpg",
+    "sha256": "6a7bba749563df72085ee9a7574909748c7da67720da68959c73f64a853415e5",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "46b39d63-68fe-51cd-835d-698b924283bf",
+      "photoId": "dde0fded-0d0a-535f-b1a8-3219a45f3cfd",
+      "storageKey": "thembisa-pop-1/TEM.P.C683/13c13085-9d34-440b-b842-30543be669cd.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "dde0fded-0d0a-535f-b1a8-3219a45f3cfd"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0096",
+    "imageRef": "civilpair-0096.jpeg",
+    "sha256": "629c4a14d6e56da3fb45b9f41817838bac837878a2a1897b852ba89eb2bdef00",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "e1d6ff9f-e03e-5d3c-becd-b37591add1c5",
+      "photoId": "98323178-d7d9-5248-8c0e-4d33db3aa594",
+      "storageKey": "thembisa-pop-1/TEM.P.C102/WhatsApp Image 2026-03-23 at 9.47.36 AM (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "98323178-d7d9-5248-8c0e-4d33db3aa594"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0097",
+    "imageRef": "civilpair-0097.jpeg",
+    "sha256": "b7ec99096721bdc9bd2823645d3f381a56a06ca939c4a51f0d899ee9686cec98",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "f14ec6fd-ff43-5e72-b074-72f14e07302b",
+      "photoId": "18401b37-9fbe-5f12-99ba-69dabbf4d144",
+      "storageKey": "thembisa-pop-1/TEM.P.C427/P-TEM.P.C427_02_during_photo.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "18401b37-9fbe-5f12-99ba-69dabbf4d144"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0098",
+    "imageRef": "civilpair-0098.jpeg",
+    "sha256": "c87e8c62b2a6bac6e1354b9bf3f66e47252cc254baeab2817a5fd12aeb6a316e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "f1f6a8cd-442f-5bd2-bf14-d6a4367c653c",
+      "photoId": "63de902a-15f9-55ad-b8c7-45821c66d636",
+      "storageKey": "thembisa-pop-1/TEM.P.C740/P-TEM.P.C740_02_during_photo.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "63de902a-15f9-55ad-b8c7-45821c66d636"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0099",
+    "imageRef": "civilpair-0099.jpg",
+    "sha256": "4c515db29147a70d1b4c8f5bc8fc894f43754eed37cef7a4bf966f0fe254479a",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "16758fa2-422e-5dd2-85cb-db037da1c8e1",
+      "photoId": "303b1705-a9cf-57ec-8204-bcb36de469bd",
+      "storageKey": "thembisa-pop-1/TEM.P.C635/4035d209-4557-4a58-ae72-dc14971567b5.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "303b1705-a9cf-57ec-8204-bcb36de469bd"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0100",
+    "imageRef": "civilpair-0100.jpeg",
+    "sha256": "0eee3aeeb58f4b9a01b65b4ce55faac8a81e176313fafe15e9600c662cf74b75",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "e05b3807-9f61-4e0f-b75d-501974f056b1",
+      "photoId": "8c9013b7-028d-5b2c-9218-7b3d1316ac99",
+      "storageKey": "thembisa-pop-1/TEM.P.C259/WhatsApp Image 2026-03-19 at 6.44.15 PM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "8c9013b7-028d-5b2c-9218-7b3d1316ac99"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0101",
+    "imageRef": "civilpair-0101.jpeg",
+    "sha256": "64cdf34dd926a0509b506d72d25fe886efac110d6d869efddeb87eece37d2bd0",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "559816ab-9cd4-4f7d-a586-da85ed14ca3e",
+      "photoId": "f96e01fb-c828-569b-a161-f7c14543c5c4",
+      "storageKey": "thembisa-pop-1/TEM.P.C278/WhatsApp Image 2026-03-11 at 2.07.50 PM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "f96e01fb-c828-569b-a161-f7c14543c5c4"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0102",
+    "imageRef": "civilpair-0102.jpeg",
+    "sha256": "cf28472c880948506b721634cf1a091db2aff8948f1baa3c44b560a00034f99e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "a1659d4d-e513-4d64-934d-0bc23899ee3b",
+      "photoId": "7949909e-ed14-51bb-ad12-307d2dc10251",
+      "storageKey": "thembisa-pop-1/TEM.P.C664/WhatsApp Image 2026-04-22 at 2.17.41 PM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "7949909e-ed14-51bb-ad12-307d2dc10251"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0103",
+    "imageRef": "civilpair-0103.jpeg",
+    "sha256": "0f9bb1858dc2ac095da62a5024657bae2abdf334f26f9890bf0bfa9729454c68",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "7f5da805-eba3-58fa-8815-62df7d30c59b",
+      "photoId": "aea35035-f726-5eb9-bda5-045dc2b09adf",
+      "storageKey": "thembisa-pop-1/TEM.P.C292/WhatsApp Image 2026-03-19 at 4.11.24 PM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "aea35035-f726-5eb9-bda5-045dc2b09adf"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0104",
+    "imageRef": "civilpair-0104.jpeg",
+    "sha256": "00bd7dadd19b4ce891262003f094c34de4634b9f1db62878e1498577a848c3f1",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "a83b8818-f940-56d9-b301-b19a67266d7e",
+      "photoId": "bc757ac7-c886-51ee-a2e0-fdd9195a1ce1",
+      "storageKey": "etwatwa/ETW.P.F553/ETW.P.F553_compaction_1.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "bc757ac7-c886-51ee-a2e0-fdd9195a1ce1"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0105",
+    "imageRef": "civilpair-0105.jpeg",
+    "sha256": "909b2a820f5af9f5b732989444c609f96e1150ad072b60998f7bcdf1d70adacf",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "872432c5-b8cf-52cf-9dd1-ece85e03d7de",
+      "photoId": "9f28cc83-0a1f-5f91-ad7d-75a510fff1a4",
+      "storageKey": "thembisa-pop-1/TEM.P.C173/WhatsApp Image 2026-04-02 at 10.03.19 AM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "9f28cc83-0a1f-5f91-ad7d-75a510fff1a4"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0106",
+    "imageRef": "civilpair-0106.jpeg",
+    "sha256": "269270dfc96b434cea45e6fe9c9f0629a44dc4817ee1c622b0599068a8b63136",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "61a50346-1763-484f-9fcc-878c07d26ec3",
+      "photoId": "ab92488b-38fd-4227-80be-cdac47b10d5f",
+      "storageKey": "etwatwa/ETW.P.H322/WhatsApp Image 2026-03-11 at 13.05.31.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "ab92488b-38fd-4227-80be-cdac47b10d5f"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0107",
+    "imageRef": "civilpair-0107.jpeg",
+    "sha256": "a01d068b44fed42cc871fdddabaec08525ada0a3a3f1633cd277ac830c1023d7",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "21fde81a-90b1-4f3d-8488-6c049c4ea2a2",
+      "photoId": "8fd0b90d-9792-51cf-9150-959b4662d9e5",
+      "storageKey": "thembisa-pop-1/TEM.P.B408/WhatsApp Image 2026-04-23 at 9.07.31 AM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "8fd0b90d-9792-51cf-9150-959b4662d9e5"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0108",
+    "imageRef": "civilpair-0108.jpeg",
+    "sha256": "f429b3b6c6a20788e611fe2f94d52589e0c501406ed73316e0e3a27be976599e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "3ba85f6c-172e-5cdb-95b8-7f69bc139cef",
+      "photoId": "cae070c4-a7d0-56fd-a53b-9c93c8908965",
+      "storageKey": "thembisa-pop-1/TEM.P.C287/WhatsApp Image 2026-03-19 at 11.36.58 AM (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "cae070c4-a7d0-56fd-a53b-9c93c8908965"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0109",
+    "imageRef": "civilpair-0109.jpg",
+    "sha256": "b2a1823e88764a1dc0788e866c808e00121ff2e1dab2b7fb064ecd5c9cc6414b",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "85b9b914-d0d6-5d33-bd40-f7ab33053b4a",
+      "photoId": "12047c2d-330a-485f-9b85-b898f3877609",
+      "storageKey": "thembisa-pop-3/TEM.P.H223/thm-3-poles_20260505114435923.39.59 (2).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "12047c2d-330a-485f-9b85-b898f3877609"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0110",
+    "imageRef": "civilpair-0110.jpeg",
+    "sha256": "bf3a6fb43f0d95d94b3b18e96798ffdfb50cf855f2d34da8466cbbed691a3f12",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "00cbb457-c9e0-420d-941e-054c8d504a1f",
+      "photoId": "ddf3ee21-588b-5c07-bde1-612480e65f84",
+      "storageKey": "thembisa-pop-3/TEM.P.I492/WhatsApp Image 2026-02-23 at 5.35.33 PM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "ddf3ee21-588b-5c07-bde1-612480e65f84"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0111",
+    "imageRef": "civilpair-0111.jpeg",
+    "sha256": "ec500c4856699a6ac7dd3adce84babe85e45bdde0c691ad0a90e00678b559a68",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "54ca795f-6571-5a2d-bb62-c8d8e33b7fae",
+      "photoId": "0f8408aa-0d6e-5d2c-ac0b-0da695a1bfbb",
+      "storageKey": "thembisa-pop-3/TEM.P.H222/WhatsApp Image 2026-04-20 at 15.32.21 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "0f8408aa-0d6e-5d2c-ac0b-0da695a1bfbb"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0112",
+    "imageRef": "civilpair-0112.jpeg",
+    "sha256": "e24f3812fac79cd1c5a12f2c2fb5e5fafb30a49a94a215e1f2f3caffd92e63d3",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "97143920-a013-496a-990d-01143c217a6a",
+      "photoId": "0a6570aa-f4e8-435a-bce6-11494154b48d",
+      "storageKey": "etwatwa/ETW.P.H730/WhatsApp Image 2026-02-25 at 10.06.45.STAMPER.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "0a6570aa-f4e8-435a-bce6-11494154b48d"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0113",
+    "imageRef": "civilpair-0113.jpg",
+    "sha256": "0ef2dfc6a9b5b859b197edb740ee2e33c1707c1f78fe02af92feb1ab3482b659",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "571fa7c1-113f-5d05-ab00-b7853160c179",
+      "photoId": "94752f10-af7d-5ec3-af64-f947584d41cd",
+      "storageKey": "thembisa-pop-1/TEM.P.C456/53e54733-faa5-4b27-87b4-5bcbf785e296.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "94752f10-af7d-5ec3-af64-f947584d41cd"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0114",
+    "imageRef": "civilpair-0114.jpeg",
+    "sha256": "2ebf2a22fed88f2ae88434a4c73d916bcdf6937d068f2ec15f5ed7bd8c5f5451",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "7ac2b16f-1a25-4624-8d14-722d42e69aaf",
+      "photoId": "1e59283d-da3c-5d5e-8599-c33ffd4c6b0b",
+      "storageKey": "thembisa-pop-1/TEM.P.C672/WhatsApp Image 2026-04-22 at 10.58.57 AM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "1e59283d-da3c-5d5e-8599-c33ffd4c6b0b"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0115",
+    "imageRef": "civilpair-0115.jpeg",
+    "sha256": "cae54dcc0f43b1038409b2bed02779d26266b91b13b4b12284c224f068afc079",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "2b6e0f56-169d-5db0-9654-4e28cc510d38",
+      "photoId": "a3d83b39-a535-45e6-ad66-5c857b93b585",
+      "storageKey": "etwatwa/ETW.P.G684/WhatsApp Image 2026-03-04 at 13.22.56 (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "a3d83b39-a535-45e6-ad66-5c857b93b585"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0116",
+    "imageRef": "civilpair-0116.jpeg",
+    "sha256": "9e6464868c41928a0b444cce1a637c338e10672f578c35be2eb4e75ce34d593e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "f6933cc2-7c76-55b8-99ef-5660015bf737",
+      "photoId": "b867a46a-b5bb-583a-a278-912ba3ea02a5",
+      "storageKey": "thembisa-pop-1/TEM.P.C160/WhatsApp Image 2026-02-05 at 11.34.28.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "b867a46a-b5bb-583a-a278-912ba3ea02a5"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0117",
+    "imageRef": "civilpair-0117.jpeg",
+    "sha256": "b49bcbf848c83201d84994583437608ce264b8941f34b9e60358624d8b2dc72c",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "15a4043b-fefc-552c-9d26-2f95277da532",
+      "photoId": "4d2a8eca-6ccc-535a-9ea6-e517ba1e0b65",
+      "storageKey": "thembisa-pop-1/TEM.P.C285/WhatsApp Image 2026-03-19 at 1.03.07 PM.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "4d2a8eca-6ccc-535a-9ea6-e517ba1e0b65"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0118",
+    "imageRef": "civilpair-0118.jpeg",
+    "sha256": "e27be9046531acd2b898a805acd442abe16c7071b7f3b16ee48bea26d4d038db",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "9eff51b4-7040-5302-ac47-a491505b95ce",
+      "photoId": "398a441a-3b1f-5869-9afb-c0d6e36efa01",
+      "storageKey": "thembisa-pop-1/TEM.P.C288/WhatsApp Image 2026-03-19 at 12.27.45 PM (1).jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "398a441a-3b1f-5869-9afb-c0d6e36efa01"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0119",
+    "imageRef": "civilpair-0119.jpg",
+    "sha256": "47185dc51dc8ac0387757f9dafeb3d469838783ac4949af1aeee30ca50a6ecff",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "24ebd582-2d76-5968-949e-701df27a2f13",
+      "photoId": "40535fcc-45cd-475a-8085-aeea02b47ce7",
+      "storageKey": "thembisa-pop-3/TEM.P.H236/thm-3-poles_20260505123628424.50.05.jpeg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "40535fcc-45cd-475a-8085-aeea02b47ce7"
+      }
+    }
+  },
+  {
+    "id": "civilpair-0120",
+    "imageRef": "civilpair-0120.jpg",
+    "sha256": "251f45d9d3cc45100493c5c166f86bed755b309b470d4e60ea54d15f53d7c57e",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "reviewId": "15447a3a-478f-5fb5-876a-a803d59d1f54",
+      "photoId": "a25e203e-eb97-4cac-860e-7a68213792b8",
+      "storageKey": "etwatwa/ETW.P.H689/civil-audit_20260422150859598.jpg",
+      "confirmation": "named_reviewer_left_unchanged",
+      "provenance": {
+        "table": "construction_qa_photos",
+        "rowId": "a25e203e-eb97-4cac-860e-7a68213792b8"
+      }
+    }
+  }
+]

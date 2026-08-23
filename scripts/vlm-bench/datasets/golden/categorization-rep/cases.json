@@ -1,0 +1,2552 @@
+[
+  {
+    "id": "catrep-0001",
+    "imageRef": "catrep-0001.jpg",
+    "sha256": "7ad8aafef31d6d7524bbaf1ad8f96060baeb9b9de07eceacd0bf7160404e28ed",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "drNumber": "DR1861138",
+      "photoFilename": "DR1861138_ph_hm_ln_5257918.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "f908ae50-c9cd-430c-a9ff-94cdf102c9e1",
+        "photoFilename": "DR1861138_ph_hm_ln_5257918.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0002",
+    "imageRef": "catrep-0002.jpg",
+    "sha256": "2f8ae9581cdc87503181af27c6b10e6e8c7c65d723a2d1f2407877b3b142b65a",
+    "expected": {
+      "step": 0,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_wrong",
+      "drNumber": "DR1861102",
+      "photoFilename": "DR1861102_ph_bl_5255685.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "e1873f11-b999-409a-a252-3c41827b6891",
+        "photoFilename": "DR1861102_ph_bl_5255685.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0003",
+    "imageRef": "catrep-0003.jpg",
+    "sha256": "d92478f2924db31457740b8b93da150bf11ea183c6e0937141e2e195415e3827",
+    "expected": {
+      "step": 0,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_wrong",
+      "drNumber": "DR1745252",
+      "photoFilename": "DR1745252_ph_hm_ln_5541977.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "82b45990-a596-4e70-a116-e26b67949ffa",
+        "photoFilename": "DR1745252_ph_hm_ln_5541977.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0004",
+    "imageRef": "catrep-0004.jpg",
+    "sha256": "d9efb001de420da8c9a54e1dc659a99c2d50aca48eee056fe36626097df81ad3",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_wrong",
+      "drNumber": "DR475559",
+      "photoFilename": "DR475559_ph_outs_5263876.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "de91b9fd-c96d-4453-9da6-bf8b123feb28",
+        "photoFilename": "DR475559_ph_outs_5263876.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0005",
+    "imageRef": "catrep-0005.jpg",
+    "sha256": "57f1c1ac5e0247549ea3cb9d5a6610ce4ce5be2f1e09b84c9c262590a1b013de",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1735292",
+      "photoFilename": "DR1735292_ph_sign2_4607911.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "75ca9493-618b-449d-9209-ae5364b59009",
+        "photoFilename": "DR1735292_ph_sign2_4607911.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0006",
+    "imageRef": "catrep-0006.jpg",
+    "sha256": "4a53ea809b5cf2a4eed43a6b4e553efe182978bb116554c40391d79696bd6f5d",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732094",
+      "photoFilename": "DR1732094_ph_hh1_3288104.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "58fc78a2-d549-4eac-9d54-37d73bfbb9a0",
+        "photoFilename": "DR1732094_ph_hh1_3288104.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0007",
+    "imageRef": "catrep-0007.jpg",
+    "sha256": "ee776aae80d47810d3fbd72faef98b32fc923edbefeff356825402694235f570",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1730534",
+      "photoFilename": "DR1730534_ph_after_3961946.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "31c2e0f7-cf83-4b0e-b5b8-af92f0bba1de",
+        "photoFilename": "DR1730534_ph_after_3961946.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0008",
+    "imageRef": "catrep-0008.jpg",
+    "sha256": "a64f36c7c4c1f5fa483e3b6008d7112cf86a08829c06b0563fdbcf650ab77a4d",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1748587",
+      "photoFilename": "DR1748587_ph_cbl_r_2579164.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "04850b55-8146-49ca-b6d9-ad6722a6b168",
+        "photoFilename": "DR1748587_ph_cbl_r_2579164.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0009",
+    "imageRef": "catrep-0009.jpg",
+    "sha256": "4b7d983ff55011a598a4e64079670cf863af2d786c5afbab6786a523c9e3437d",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1861244",
+      "photoFilename": "DR1861244_ph_sign1_1643754.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "2b247116-00e8-494a-a12b-ee48d4f3a883",
+        "photoFilename": "DR1861244_ph_sign1_1643754.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0010",
+    "imageRef": "catrep-0010.jpg",
+    "sha256": "0b3cce497d6bf183b4e1ecb518f6f5703c2c2eb07570dff2798cb1d7b9130082",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "drNumber": "DR1854639",
+      "photoFilename": "DR1854639_ph_hm_en_2791273.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "747f83b4-75c2-41ae-95d4-1214f5c7d957",
+        "photoFilename": "DR1854639_ph_hm_en_2791273.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0011",
+    "imageRef": "catrep-0011.jpg",
+    "sha256": "0e6a9c85a05e2b1570cc599ca994191f2c6d3512bc22fcfb655643f1c62a37e8",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751528",
+      "photoFilename": "DR1751528_ph_outs_1727174.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "cd31a399-377a-4d6a-89c1-86baa76e75ea",
+        "photoFilename": "DR1751528_ph_outs_1727174.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0012",
+    "imageRef": "catrep-0012.jpg",
+    "sha256": "38455afde668565d5c817a0db66591d604624c1485e9c8dcef7e6405832150da",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750331",
+      "photoFilename": "DR1750331_ph_cbl_r_1861694.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "6c980108-bab3-4a38-9f6d-4d56f07ec408",
+        "photoFilename": "DR1750331_ph_cbl_r_1861694.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0013",
+    "imageRef": "catrep-0013.jpg",
+    "sha256": "60bccaee2c98c9c21c1ad3d56b9d68a6a0dc79b8e99dfb8a7a5650cacb3b0c49",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1856936",
+      "photoFilename": "DR1856936_ph_outs_3266020.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "b249e8fc-9d20-4de2-a5e2-ea2e0c530329",
+        "photoFilename": "DR1856936_ph_outs_3266020.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0014",
+    "imageRef": "catrep-0014.jpg",
+    "sha256": "050380df3aede11c55d96ab3abf357276545ef5cc57d4149c3f64d958abc7bf9",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR476498",
+      "photoFilename": "DR476498_ph_sign2_4593280.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "c339da9b-0228-405d-b77e-a75ab816c253",
+        "photoFilename": "DR476498_ph_sign2_4593280.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0015",
+    "imageRef": "catrep-0015.jpg",
+    "sha256": "a3ee1a4e9bb3f0960243ba0794b3accba61d29c6f62e050bbc8894f231ea8cc9",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1738262",
+      "photoFilename": "DR1738262_ph_prop_1640144.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "d3dfa74a-a336-4af6-b413-78ee529cb575",
+        "photoFilename": "DR1738262_ph_prop_1640144.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0016",
+    "imageRef": "catrep-0016.jpg",
+    "sha256": "ec0bc45e8db259002c7e023f836464b7c8b1c1fed22e2c3152b716f4f85f1b63",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1854889",
+      "photoFilename": "DR1854889_ph_powm2_3910651.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "d6111b15-4902-456e-aaea-d2b1ce0f4288",
+        "photoFilename": "DR1854889_ph_powm2_3910651.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0017",
+    "imageRef": "catrep-0017.jpg",
+    "sha256": "45a4a0f83a8af69449fc964918f6d1e0d0b0b770d29884b4801483fd639182cb",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734191",
+      "photoFilename": "DR1734191_ph_prop_2603834.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "abd2b282-67b0-4e3f-8e4f-4457b959d0a4",
+        "photoFilename": "DR1734191_ph_prop_2603834.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0018",
+    "imageRef": "catrep-0018.jpg",
+    "sha256": "a558c49221dd3d1c5fc0208e8a5d47db477b3f2cba4c98bab8ef4d8e3e2985b6",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733579",
+      "photoFilename": "DR1733579_ph_powm2_3550364.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "05aca71d-34c1-4dec-bedb-a494412380ec",
+        "photoFilename": "DR1733579_ph_powm2_3550364.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0019",
+    "imageRef": "catrep-0019.jpg",
+    "sha256": "670293e8d9e8a84b31c04e8cc564c6cd8eeee9e0789b392cd5f7786b1c72f964",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1863404",
+      "photoFilename": "DR1863404_ph_cbl_r_4625116.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "a256743b-2518-4064-9f93-8dc88540560e",
+        "photoFilename": "DR1863404_ph_cbl_r_4625116.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0020",
+    "imageRef": "catrep-0020.jpg",
+    "sha256": "d5f339fc5523c6193f864eaeac1c7e61505def22b5b68ff4989bc8c7ad9415e1",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR469310",
+      "photoFilename": "DR469310_ph_sign2_4761499.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "c7e20836-6d77-41e4-887f-4058ffd77400",
+        "photoFilename": "DR469310_ph_sign2_4761499.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0021",
+    "imageRef": "catrep-0021.jpg",
+    "sha256": "82f891160a6d0798f91cfc0b6d047361f26354f0ab6e7b28c2ef6bd166828bf5",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734357",
+      "photoFilename": "DR1734357_ph_hh1_3401688.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "9ecfa68f-2e46-4c1e-8909-340c6b01bdb1",
+        "photoFilename": "DR1734357_ph_hh1_3401688.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0022",
+    "imageRef": "catrep-0022.jpg",
+    "sha256": "8a0c11c1a91cfd2526972d7af8980b0931a708331fe569bd0420cdb50058bb95",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1857463",
+      "photoFilename": "DR1857463_ph_hh1_3722250.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "68e4b558-e877-4a1c-b6e8-f01c4bd7ba1f",
+        "photoFilename": "DR1857463_ph_hh1_3722250.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0023",
+    "imageRef": "catrep-0023.jpg",
+    "sha256": "c4085cd654d3a9502946e9792bfafd01711e12bb8ba46a10bace5a42ebdd58a8",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1748812",
+      "photoFilename": "DR1748812_ph_cbl_r_2894211.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "9cfecf59-cfe7-4774-9574-1012f8c8d43a",
+        "photoFilename": "DR1748812_ph_cbl_r_2894211.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0024",
+    "imageRef": "catrep-0024.jpg",
+    "sha256": "2ffda44845d4d2f94236b6029de303d118ad19fbd07e6aa481ca1443eac663ea",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1857093",
+      "photoFilename": "DR1857093_ph_powm2_3635962.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "49447def-dc18-45a4-a689-1e68c55b5668",
+        "photoFilename": "DR1857093_ph_powm2_3635962.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0025",
+    "imageRef": "catrep-0025.jpg",
+    "sha256": "7d77acfbe0b03f9fad6e4beb4f9dc1993aa89a4368bbb70d1bd0620dac14c5a2",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1861287",
+      "photoFilename": "DR1861287_ph_sign1_2024425.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "9b74fbee-8868-4d52-85e0-2cd1d8e022cc",
+        "photoFilename": "DR1861287_ph_sign1_2024425.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0026",
+    "imageRef": "catrep-0026.jpg",
+    "sha256": "9fa61f4c0630e32c8263b58eac339d1f321b10cbc2b2af999ff89a818cc378f8",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732222",
+      "photoFilename": "DR1732222_ph_bl_3384017.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "8c5f960a-ab82-473d-9e5c-b5334ee0dbb4",
+        "photoFilename": "DR1732222_ph_bl_3384017.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0027",
+    "imageRef": "catrep-0027.jpg",
+    "sha256": "c32c00fdacfcbd261486d17824d68a39d8df3e91beb527defda6c5358696899c",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732152",
+      "photoFilename": "DR1732152_ph_powm2_3288002.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "207ff0f0-74e7-4b0c-b4b2-9b5bd4ee25c9",
+        "photoFilename": "DR1732152_ph_powm2_3288002.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0028",
+    "imageRef": "catrep-0028.jpg",
+    "sha256": "305c384575a48187a58fce81c8b80701ac947f804a1b66a3432600e86d9e1069",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734190",
+      "photoFilename": "DR1734190_ph_bl_3398718.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "8688cf6c-8e3b-4e16-9752-70bdb2f3234e",
+        "photoFilename": "DR1734190_ph_bl_3398718.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0029",
+    "imageRef": "catrep-0029.jpg",
+    "sha256": "a1f89a6a75462bb759390742f90b5bc136575667ee0c118ca6d4e74f9dd4f82f",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR473319",
+      "photoFilename": "DR473319_ph_hm_ln_4555612.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "cd850dae-9304-40d2-9a15-d4bc15df28bf",
+        "photoFilename": "DR473319_ph_hm_ln_4555612.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0030",
+    "imageRef": "catrep-0030.jpg",
+    "sha256": "c9779333bac9da5d1d433a39252802bb7a44c9d4865636f49ee72c7c9af6141c",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751908",
+      "photoFilename": "DR1751908_ph_powm1_3345640.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "215c3dd1-e7aa-4ea0-84e1-3e67b5af8b7a",
+        "photoFilename": "DR1751908_ph_powm1_3345640.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0031",
+    "imageRef": "catrep-0031.jpg",
+    "sha256": "216b26ce47217e13f7345640131c7b17da57ecfddbf0512e9efc858aeba8e7c3",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750331",
+      "photoFilename": "DR1750331_ph_powm2_1973090.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "6c980108-bab3-4a38-9f6d-4d56f07ec408",
+        "photoFilename": "DR1750331_ph_powm2_1973090.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0032",
+    "imageRef": "catrep-0032.jpg",
+    "sha256": "a879118c96a72c7e522d4f814ccc21a4a00ab0432cfe725c7df2f0c437e03a26",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1748579",
+      "photoFilename": "DR1748579_ph_bl_2554080.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "0b183678-333b-48e2-89ad-5a6d111d7b5c",
+        "photoFilename": "DR1748579_ph_bl_2554080.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0033",
+    "imageRef": "catrep-0033.jpg",
+    "sha256": "14d30934a0b1c1aca542e72ef14e83fc11c51113382b6246765db9adaf8dcc16",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1854224",
+      "photoFilename": "DR1854224_ph_prop_2284391.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "18deefef-9856-4147-85be-9f9573a2ddbb",
+        "photoFilename": "DR1854224_ph_prop_2284391.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0034",
+    "imageRef": "catrep-0034.jpg",
+    "sha256": "1b762766784648072ecaf3f621934bd287cf2bb55b36c7937de96e3e5afa0d08",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "drNumber": "DR1857301",
+      "photoFilename": "DR1857301_ph_outs_3390800.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "cfbc456f-f827-49a9-a934-71ba347db9aa",
+        "photoFilename": "DR1857301_ph_outs_3390800.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0035",
+    "imageRef": "catrep-0035.jpg",
+    "sha256": "f07e33035c3384fdd7783dc12f6528713558643dfdd842022e23877c80c8e7ca",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734542",
+      "photoFilename": "DR1734542_ph_cbl_r_3422337.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "45eba6e4-ffec-496c-b76e-e3f81e5c4d46",
+        "photoFilename": "DR1734542_ph_cbl_r_3422337.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0036",
+    "imageRef": "catrep-0036.jpg",
+    "sha256": "704ff38031ded10d4851369c12d405d0f646aac3eb6c830bfb186de768336ec0",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750482",
+      "photoFilename": "DR1750482_ph_outs_2050259.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "7b8da517-93ba-408f-9c95-3d72d1f70654",
+        "photoFilename": "DR1750482_ph_outs_2050259.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0037",
+    "imageRef": "catrep-0037.jpg",
+    "sha256": "c64383a9720e1a8d381ae3580c7d728bdc0a024fffdef23c86d1c73cad2ddac0",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751163",
+      "photoFilename": "DR1751163_ph_hh1_2759420.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "a0106136-a489-4638-8a01-2d18f56a8689",
+        "photoFilename": "DR1751163_ph_hh1_2759420.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0038",
+    "imageRef": "catrep-0038.jpg",
+    "sha256": "7f855160d38bf97769a44034fcd48c3ffad99c85234b7974d25897a83a97e9b9",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734550",
+      "photoFilename": "DR1734550_ph_cbl_r_3418827.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "e08bd5cf-6f5c-40dd-8add-abbf0af353a4",
+        "photoFilename": "DR1734550_ph_cbl_r_3418827.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0039",
+    "imageRef": "catrep-0039.jpg",
+    "sha256": "603ee589a83490ad40814b07565da468185258fab62a1ea9f15b391a1149e481",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733968",
+      "photoFilename": "DR1733968_ph_conn1_3872152.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "33591475-d84a-421b-b1ef-6c4b80cee0b0",
+        "photoFilename": "DR1733968_ph_conn1_3872152.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0040",
+    "imageRef": "catrep-0040.jpg",
+    "sha256": "20dc4d9302447d08dbf61e4498eb11c642e765badcf5f0ea6bc0e75d6cac3139",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR469241",
+      "photoFilename": "DR469241_ph_sign2_3678910.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "34482701-4ad4-4a17-b0ea-2b4cf96db2b1",
+        "photoFilename": "DR469241_ph_sign2_3678910.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0041",
+    "imageRef": "catrep-0041.jpg",
+    "sha256": "488784186890519b4198b8f59fb23c620a3a89d8d5c67093c1c3fd19133b1856",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752148",
+      "photoFilename": "DR1752148_ph_wall_4191540.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "832a02c4-06b6-4abe-ab08-77e3ae44be97",
+        "photoFilename": "DR1752148_ph_wall_4191540.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0042",
+    "imageRef": "catrep-0042.jpg",
+    "sha256": "cc1c05ef8fe466c6affde2e6367c71717b756b3935294d1231f0179a38fb5088",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1862934",
+      "photoFilename": "DR1862934_ph_sign2_4347427.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "5b44d1b4-4670-4af8-9495-67acd419d577",
+        "photoFilename": "DR1862934_ph_sign2_4347427.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0043",
+    "imageRef": "catrep-0043.jpg",
+    "sha256": "05867abce97a32097cb915bf54e531b45771ad2bce80fc886ffda54815fb4a9b",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732206",
+      "photoFilename": "DR1732206_ph_wall_3216944.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "718e7f27-ff02-4e9b-865e-6e824f81ba4d",
+        "photoFilename": "DR1732206_ph_wall_3216944.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0044",
+    "imageRef": "catrep-0044.jpg",
+    "sha256": "886bb4b008cf1fe095aa36d9fc0097a300de27574a60892a171dfa69b4957a1a",
+    "expected": {
+      "step": 8,
+      "vlmStepAtReview": 8,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750940",
+      "photoFilename": "DR1750940_ph_after_4591897.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "2b698d7d-0f76-46c6-859f-fe32286ee743",
+        "photoFilename": "DR1750940_ph_after_4591897.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0045",
+    "imageRef": "catrep-0045.jpg",
+    "sha256": "1fc754fa2cc196477c5ad4f1f5c94028e05d8ca3c11fb607c7ae5a8734ece8ea",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734491",
+      "photoFilename": "DR1734491_ph_bl_3410337.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "8856088a-c8d3-4031-9f81-a014964f6b88",
+        "photoFilename": "DR1734491_ph_bl_3410337.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0046",
+    "imageRef": "catrep-0046.jpg",
+    "sha256": "5c4defbaf68cb79d5c1032495398c4ba258c8e2ebc9e829b660ba6a238ec8670",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751919",
+      "photoFilename": "DR1751919_ph_prop_3352566.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "2d274c8e-018e-481d-98c2-9c01f4d0eb32",
+        "photoFilename": "DR1751919_ph_prop_3352566.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0047",
+    "imageRef": "catrep-0047.jpg",
+    "sha256": "dde6bf60b6480e95b3f584e22a2edab0da1c8c1076163c0391e6f5e9f668a2b7",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1730422",
+      "photoFilename": "DR1730422_ph_powm2_3856692.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "4bc09f87-96fd-4d64-8254-1f38c197e7dc",
+        "photoFilename": "DR1730422_ph_powm2_3856692.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0048",
+    "imageRef": "catrep-0048.jpg",
+    "sha256": "00cbadbc0a8e2dba944dc01a85064d498ca81c50eeb4a57e0aba7aeb12d7311c",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733136",
+      "photoFilename": "DR1733136_ph_hm_en_3293027.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "4fe30bae-36ec-407b-bfcf-a5b96c8ec15a",
+        "photoFilename": "DR1733136_ph_hm_en_3293027.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0049",
+    "imageRef": "catrep-0049.jpg",
+    "sha256": "58bd35bb9e7da52b53b3cf0f47fa998da87dbfa361b8ae0d0d830c9ab337a923",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733241",
+      "photoFilename": "DR1733241_ph_outs_3968744.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "33fa199d-dd78-4d34-b609-0fa0902f0ba9",
+        "photoFilename": "DR1733241_ph_outs_3968744.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0050",
+    "imageRef": "catrep-0050.jpg",
+    "sha256": "ebe17d639e6bae005121e2abf7c9a939ed1e255383ce73d14fa053bba56096c9",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733934",
+      "photoFilename": "DR1733934_ph_sign2_3852875.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "814eb06a-cfa3-492e-8af5-382a13643c9e",
+        "photoFilename": "DR1733934_ph_sign2_3852875.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0051",
+    "imageRef": "catrep-0051.jpg",
+    "sha256": "1e07fef193455256ecf57ab6f5044d2dd49e8db8c1ceb8401f316a2fb0c3979a",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732113",
+      "photoFilename": "DR1732113_ph_drop_3227753.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "07112c49-5053-4309-848c-78ec7e0c31ee",
+        "photoFilename": "DR1732113_ph_drop_3227753.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0052",
+    "imageRef": "catrep-0052.jpg",
+    "sha256": "b87341a483dfd4ca58d2750ca43885396d0cdf912a4f2408791cedeb016cbd25",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR476688",
+      "photoFilename": "DR476688_ph_powm2_4602303.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "b9722eef-8d8c-4a4b-8b91-34319b2f8cbe",
+        "photoFilename": "DR476688_ph_powm2_4602303.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0053",
+    "imageRef": "catrep-0053.jpg",
+    "sha256": "c027f82cf6986a145baa9ddd08f34ffee76ea5fcbd659664b07f6da63272354f",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733425",
+      "photoFilename": "DR1733425_ph_powm1_3531762.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "dc6868f9-bc1e-4160-8647-dcd50216e939",
+        "photoFilename": "DR1733425_ph_powm1_3531762.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0054",
+    "imageRef": "catrep-0054.jpg",
+    "sha256": "2eba8064177665cf61c96b3b4bb23757a348b4ddaf259666809d49cc64a6801e",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR476736",
+      "photoFilename": "DR476736_ph_sign1_4608340.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "670c750e-9e8f-4ddd-9c90-2fc42b55009f",
+        "photoFilename": "DR476736_ph_sign1_4608340.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0055",
+    "imageRef": "catrep-0055.jpg",
+    "sha256": "30d528dbe3210cf4ae251c69b43ff2d03b95ccebc1e86bece2bb3fdcfe3b7766",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734620",
+      "photoFilename": "DR1734620_ph_drop_1693065.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "f8ce76f4-d123-43dd-9b27-36a34582bac6",
+        "photoFilename": "DR1734620_ph_drop_1693065.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0056",
+    "imageRef": "catrep-0056.jpg",
+    "sha256": "324d37c8d5643937e9b336266fde4bea7412a9a1e319e4e537e5af7d77599cfe",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1862632",
+      "photoFilename": "DR1862632_ph_sign2_4372598.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "c4b1ba63-6e83-4e17-89d2-02e9373a72fa",
+        "photoFilename": "DR1862632_ph_sign2_4372598.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0057",
+    "imageRef": "catrep-0057.jpg",
+    "sha256": "0d3dd3061c6ef50a91556569341fa7b6d82b44f406c9f1b979aae3b67cee4226",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752598",
+      "photoFilename": "DR1752598_ph_hm_ln_3479086.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "962fe353-a268-48c3-8c2a-a8e919f16702",
+        "photoFilename": "DR1752598_ph_hm_ln_3479086.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0058",
+    "imageRef": "catrep-0058.jpg",
+    "sha256": "d6480df8e639263bae1d99a89cf0344cd5690ce780733bd366379645db735c09",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR476356",
+      "photoFilename": "DR476356_ph_bl_4653351.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "83e44f98-ad37-41c2-b296-671156328a86",
+        "photoFilename": "DR476356_ph_bl_4653351.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0059",
+    "imageRef": "catrep-0059.jpg",
+    "sha256": "b27706aab0a42ac129d5e00bdcd7683d09ca6c49ede3886889f4a057344925cf",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751163",
+      "photoFilename": "DR1751163_ph_cbl_r_2759390.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "a0106136-a489-4638-8a01-2d18f56a8689",
+        "photoFilename": "DR1751163_ph_cbl_r_2759390.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0060",
+    "imageRef": "catrep-0060.jpg",
+    "sha256": "9414dc6f664c20b0c9eb1b39af37555e8ea9087ebbf0e40df565f763277113cc",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR476312",
+      "photoFilename": "DR476312_ph_bl_4785277.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "153bb9e9-5981-4251-ad50-792ac6e25c66",
+        "photoFilename": "DR476312_ph_bl_4785277.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0061",
+    "imageRef": "catrep-0061.jpg",
+    "sha256": "44954b50f5be3a064f90a8e0024a06835c1c39ac599592f6610b486dce88be49",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1863719",
+      "photoFilename": "DR1863719_ph_sign2_4643011.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "67f4564a-ed29-4b17-923c-dd5e836d58ea",
+        "photoFilename": "DR1863719_ph_sign2_4643011.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0062",
+    "imageRef": "catrep-0062.jpg",
+    "sha256": "20b1490e947e12bf904ee051dbe331bb6b9c26dd343e02946a2628162203f4fe",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732222",
+      "photoFilename": "DR1732222_ph_sign1_3242508.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "8c5f960a-ab82-473d-9e5c-b5334ee0dbb4",
+        "photoFilename": "DR1732222_ph_sign1_3242508.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0063",
+    "imageRef": "catrep-0063.jpg",
+    "sha256": "d7e4e873d5218bb381cc898638680f2342259ea6fbf5e27539f2d3360b28f1a8",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1861105",
+      "photoFilename": "DR1861105_ph_outs_4757879.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "b7764090-f0b6-401e-80af-dee24cf49e98",
+        "photoFilename": "DR1861105_ph_outs_4757879.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0064",
+    "imageRef": "catrep-0064.jpg",
+    "sha256": "ecb81e499e4ecaad38f4ad675807dc2358bf52f27f7c3943693cda43a19c640d",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752743",
+      "photoFilename": "DR1752743_ph_prop_2072231.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "b6beb964-20d8-4552-9e43-e4906ecd4633",
+        "photoFilename": "DR1752743_ph_prop_2072231.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0065",
+    "imageRef": "catrep-0065.jpg",
+    "sha256": "3001fb4b76a599d6a30dd1e66e33078feff2a10316f219ccaa8c34a9cdf43796",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR471337",
+      "photoFilename": "DR471337_ph_cbl_r_3371063.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "6cce2eed-f631-440e-9c71-e3700b6456bb",
+        "photoFilename": "DR471337_ph_cbl_r_3371063.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0066",
+    "imageRef": "catrep-0066.jpg",
+    "sha256": "88272de66e3684537b3337a214960d7ffe05f571bf9550fc9f12e0d712e54782",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734658",
+      "photoFilename": "DR1734658_ph_bl_3426645.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "17328b08-a7d4-4894-b364-088b2b80b2ce",
+        "photoFilename": "DR1734658_ph_bl_3426645.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0067",
+    "imageRef": "catrep-0067.jpg",
+    "sha256": "467ccf7a111d78cda72193aa999faf1b0319a04a873986969cb564c68446d2b6",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1749947",
+      "photoFilename": "DR1749947_ph_hm_ln_1876852.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "9d3e652c-1815-42fa-bda2-651b717903f7",
+        "photoFilename": "DR1749947_ph_hm_ln_1876852.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0068",
+    "imageRef": "catrep-0068.jpg",
+    "sha256": "1a7b647bcb90ec9af28230e4db40adcb79617ad865d29af4ca7a4941a1cef5cd",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752825",
+      "photoFilename": "DR1752825_ph_prop_1556726.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "65b507b0-7aff-4111-8550-8eed252a32a0",
+        "photoFilename": "DR1752825_ph_prop_1556726.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0069",
+    "imageRef": "catrep-0069.jpg",
+    "sha256": "b6d26a65419df558c6a5ff64c7ce9893ccebcb8c81a4fa97f7d2abe94927f9fe",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732233",
+      "photoFilename": "DR1732233_ph_conn1_3248564.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "5360d20b-d81b-4d02-bc14-b19f22c910d6",
+        "photoFilename": "DR1732233_ph_conn1_3248564.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0070",
+    "imageRef": "catrep-0070.jpg",
+    "sha256": "feba9ef1e4b8393d838525b218e78f4add0842be2c1267ab942b2df9f5a6f8e6",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "drNumber": "DR1856029",
+      "photoFilename": "DR1856029_ph_hm_en_4127331.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "7aa860d0-7b7c-4912-a771-a0ea40993f44",
+        "photoFilename": "DR1856029_ph_hm_en_4127331.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0071",
+    "imageRef": "catrep-0071.jpg",
+    "sha256": "31ece6d53e5f87c0b1b797ad548bbc6586cc83030e7910db21c3ed7a5515828c",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1730674",
+      "photoFilename": "DR1730674_ph_prop_3379409.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "ecbf4aff-ad42-4fdf-a7f0-9d61a6dafac3",
+        "photoFilename": "DR1730674_ph_prop_3379409.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0072",
+    "imageRef": "catrep-0072.jpg",
+    "sha256": "9319fb28029931bbae241e08be8a8d20ea7f5c9bef54c160eaf71c6e06ca76c3",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751096",
+      "photoFilename": "DR1751096_ph_powm1_2723964.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "a61f00ff-321a-4dc6-93d0-1a5a5b450ef2",
+        "photoFilename": "DR1751096_ph_powm1_2723964.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0073",
+    "imageRef": "catrep-0073.jpg",
+    "sha256": "50f1e3b2e5b8f30c9a8efe5f2bf83d3a812547dee439d9bde89b68527c334158",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752606",
+      "photoFilename": "DR1752606_ph_wall_1876417.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "25f25f89-83b0-47c1-8651-fe975918a26a",
+        "photoFilename": "DR1752606_ph_wall_1876417.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0074",
+    "imageRef": "catrep-0074.jpg",
+    "sha256": "b566421514cf42c5ef2e3418c850b598e9c0e4e8d1312544490270c9b049009f",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "drNumber": "DR470218",
+      "photoFilename": "DR470218_ph_wall_3610861.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "d2916bc7-1b12-4316-9603-7e3b2bf10ea6",
+        "photoFilename": "DR470218_ph_wall_3610861.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0075",
+    "imageRef": "catrep-0075.jpg",
+    "sha256": "37b358276139390c7aebd23fa26c3ef9ed7d5562db3dd2a6b8ba710186d381b6",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752518",
+      "photoFilename": "DR1752518_ph_hm_en_1660083.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "51281b8f-a602-4e88-b441-cb7483062665",
+        "photoFilename": "DR1752518_ph_hm_en_1660083.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0076",
+    "imageRef": "catrep-0076.jpg",
+    "sha256": "90fac08805d05699305e8919d7058f5320f3c10af872d0bc4e1c288999cc59b6",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734159",
+      "photoFilename": "DR1734159_ph_hm_ln_3487254.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "fa58a510-0543-4947-a7d3-4e45a2a9fa54",
+        "photoFilename": "DR1734159_ph_hm_ln_3487254.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0077",
+    "imageRef": "catrep-0077.jpg",
+    "sha256": "412862de2a4eba2402cca4ec826b1399b4efb37dc676886639fa4e08e4e54897",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734914",
+      "photoFilename": "DR1734914_ph_drop_3483475.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "92b6a01b-713a-4c80-9eb4-41016a612442",
+        "photoFilename": "DR1734914_ph_drop_3483475.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0078",
+    "imageRef": "catrep-0078.jpg",
+    "sha256": "b7d6625f95aa513891bb56d02af213c0c4575b536a7d3249ba7bd238736f42c1",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1857657",
+      "photoFilename": "DR1857657_ph_hm_ln_3267420.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "0beb5731-3661-4f4d-a7b7-629961625f7f",
+        "photoFilename": "DR1857657_ph_hm_ln_3267420.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0079",
+    "imageRef": "catrep-0079.jpg",
+    "sha256": "09e2d727662b9979c6a7b92af03f9484b486bcc51bd8a08691c55156083eccff",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1735758",
+      "photoFilename": "DR1735758_ph_sign2_4768275.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "f30503b3-cfa7-4f60-9731-b4850ea89183",
+        "photoFilename": "DR1735758_ph_sign2_4768275.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0080",
+    "imageRef": "catrep-0080.jpg",
+    "sha256": "2365c47569e953530ab3e06dce8fbf6c5c31681861a62688ce9e5a249f8a7f35",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733546",
+      "photoFilename": "DR1733546_ph_drop_3586511.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "85f78c48-b48c-4f25-9b9b-d7a9ec1d2cb9",
+        "photoFilename": "DR1733546_ph_drop_3586511.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0081",
+    "imageRef": "catrep-0081.jpg",
+    "sha256": "fe9c11216207545641905d8216fa58126fba18b60f0c3068115f8e27d196e45b",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR476510",
+      "photoFilename": "DR476510_ph_wall_4592074.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "8acb7691-7bd1-4a1b-9ac7-4e03a8dc50cd",
+        "photoFilename": "DR476510_ph_wall_4592074.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0082",
+    "imageRef": "catrep-0082.jpg",
+    "sha256": "1439524ea080f4a25aac4d048caaa6a5817bba17ffcf52cd3357d674430ab688",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733770",
+      "photoFilename": "DR1733770_ph_hm_en_3843753.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "6c400c2d-3721-4820-821c-8350c2235d0e",
+        "photoFilename": "DR1733770_ph_hm_en_3843753.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0083",
+    "imageRef": "catrep-0083.jpg",
+    "sha256": "179bc50d17951f2ea11f9d4a32152e7cb46dbb6a448ad1d6ba9aa4ba180d7296",
+    "expected": {
+      "step": 8,
+      "vlmStepAtReview": 8,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751142",
+      "photoFilename": "DR1751142_ph_wall_2303785.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "e21e75ca-6d0d-45c0-91c7-241464cae37f",
+        "photoFilename": "DR1751142_ph_wall_2303785.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0084",
+    "imageRef": "catrep-0084.jpg",
+    "sha256": "59a7c8b3621667bc6bdf241c73bc1ecfba25683b7009d449d8a267b07d3604df",
+    "expected": {
+      "step": 8,
+      "vlmStepAtReview": 8,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733931",
+      "photoFilename": "DR1733931_ph_after_3764141.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "470f056f-8c1e-442d-8384-bf9be39dfa1b",
+        "photoFilename": "DR1733931_ph_after_3764141.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0085",
+    "imageRef": "catrep-0085.jpg",
+    "sha256": "11fa94547483ac335fd93cf0d756be424798512fc16ad385f6840cd88acc0440",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752736",
+      "photoFilename": "DR1752736_ph_wall_3188475.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "a6a018bd-67b8-47ed-940b-6457a3b8598e",
+        "photoFilename": "DR1752736_ph_wall_3188475.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0086",
+    "imageRef": "catrep-0086.jpg",
+    "sha256": "f93f8530aa87924d15c690e7ec3dcb95c309039b5bb8511d6bfd6720f06273bd",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750308",
+      "photoFilename": "DR1750308_ph_sign1_1538400.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "60f97885-634b-4749-bb5a-72c26022e31e",
+        "photoFilename": "DR1750308_ph_sign1_1538400.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0087",
+    "imageRef": "catrep-0087.jpg",
+    "sha256": "098ff59cc8487568dd1b6edcbac7dc693362af25f18c70fbd781cb25fe854ce9",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752421",
+      "photoFilename": "DR1752421_ph_cbl_r_2711147.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "d345a706-4645-493f-be42-d2cd09288c88",
+        "photoFilename": "DR1752421_ph_cbl_r_2711147.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0088",
+    "imageRef": "catrep-0088.jpg",
+    "sha256": "6bee1a0cffbacdbd9ac1d7f8a308e3d17c7e59d95485dfd92aa0a3fd4d98ee4c",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR476362",
+      "photoFilename": "DR476362_ph_cbl_r_4652736.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "11fe0add-06c9-4419-a84c-10ed1b580ec8",
+        "photoFilename": "DR476362_ph_cbl_r_4652736.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0089",
+    "imageRef": "catrep-0089.jpg",
+    "sha256": "391e176969035c323ea354cd6c8adbf26f993eda63c4b8532d12dcc7b918f7a5",
+    "expected": {
+      "step": 8,
+      "vlmStepAtReview": 8,
+      "stratum": "vlm_right",
+      "drNumber": "DR1861232",
+      "photoFilename": "DR1861232_ph_after_4835394.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "4f2a7867-ef0c-4a3b-aec5-be86a42d71c4",
+        "photoFilename": "DR1861232_ph_after_4835394.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0090",
+    "imageRef": "catrep-0090.jpg",
+    "sha256": "17dd8a3a15708b55a777ea2463c583d8450e11fbeb5df81dbd182f6443df8661",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751853",
+      "photoFilename": "DR1751853_ph_powm1_3131915.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "dcd897a9-c020-4b82-a5c0-ee5e20aacc40",
+        "photoFilename": "DR1751853_ph_powm1_3131915.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0091",
+    "imageRef": "catrep-0091.jpg",
+    "sha256": "0910a5742ea0a073839e57f74b2a04880d2bb4100cfee28fe628411c29fbc03c",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750338",
+      "photoFilename": "DR1750338_ph_sign1_1555016.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "59bc49dc-ee3c-4b33-beb5-4adf54106aee",
+        "photoFilename": "DR1750338_ph_sign1_1555016.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0092",
+    "imageRef": "catrep-0092.jpg",
+    "sha256": "a47ee071b3709169745741e550909346c056dd2148766bb5cc16b9ade0725eeb",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1854906",
+      "photoFilename": "DR1854906_ph_prop_1935649.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "1d2c813b-7d67-41db-9aa1-a1b4bf103778",
+        "photoFilename": "DR1854906_ph_prop_1935649.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0093",
+    "imageRef": "catrep-0093.jpg",
+    "sha256": "8e5ba9129bea8e25e717a72f43a394dd2ade983a53d4be4d99866b985308f887",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "drNumber": "DR469950",
+      "photoFilename": "DR469950_ph_hm_en_4257018.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "1826e509-b9d5-4137-a726-237760b698b0",
+        "photoFilename": "DR469950_ph_hm_en_4257018.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0094",
+    "imageRef": "catrep-0094.jpg",
+    "sha256": "53d359d6f183f7edad7a14177291414e3b7c60fe1d41613c218388486ea54225",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1854061",
+      "photoFilename": "DR1854061_ph_outs_2436157.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "4a10988a-9179-4b0a-b238-d66dc0beebcf",
+        "photoFilename": "DR1854061_ph_outs_2436157.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0095",
+    "imageRef": "catrep-0095.jpg",
+    "sha256": "8dcf9af30bbda327bed59757eaf80723e88ad2c486f7ce2ebe1d0408e0bc5599",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR476427",
+      "photoFilename": "DR476427_ph_sign1_1969684.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "e83ddb1b-a47f-4ee1-a400-274208719be8",
+        "photoFilename": "DR476427_ph_sign1_1969684.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0096",
+    "imageRef": "catrep-0096.jpg",
+    "sha256": "161f5f65b5510b3de3b8d39b9ed43d81c393db2fb4260d3ba4dd7bc2e234b7dc",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR474163",
+      "photoFilename": "DR474163_ph_sign2_4689555.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "b4c99e89-8eb8-4a4a-8013-56c6dd201368",
+        "photoFilename": "DR474163_ph_sign2_4689555.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0097",
+    "imageRef": "catrep-0097.jpg",
+    "sha256": "fd61933b67ad101b1ee3b9678411d5d99089b029ecee4c01104839cd38ae0365",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751802",
+      "photoFilename": "DR1751802_ph_powm2_3147846.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "44e3510f-fd79-454d-aebc-da80b139e357",
+        "photoFilename": "DR1751802_ph_powm2_3147846.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0098",
+    "imageRef": "catrep-0098.jpg",
+    "sha256": "d77586515b2dd444f577198ca83044c60986389bea4185bd80427cf47a6f4024",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750496",
+      "photoFilename": "DR1750496_ph_hm_en_1882569.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "2e40c929-0e88-4df6-970e-be00ee9b317e",
+        "photoFilename": "DR1750496_ph_hm_en_1882569.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0099",
+    "imageRef": "catrep-0099.jpg",
+    "sha256": "5fb2e99387dc6b5a7980490fe1e19ff11cdfea2bb498326cc70b96e027afd218",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1856294",
+      "photoFilename": "DR1856294_ph_powm2_4453124.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "93e164d4-819c-49c7-ae33-022d496d4a3b",
+        "photoFilename": "DR1856294_ph_powm2_4453124.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0100",
+    "imageRef": "catrep-0100.jpg",
+    "sha256": "c5a26bf37869658b4a257a1477bc1866ae2eae989f206a3ba8657b953efa9da0",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751200",
+      "photoFilename": "DR1751200_ph_outs_2103057.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "57216e7b-5980-40a2-babb-b5252374eb01",
+        "photoFilename": "DR1751200_ph_outs_2103057.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0101",
+    "imageRef": "catrep-0101.jpg",
+    "sha256": "4b728ce796d38ea2c9e00c6871577ffc1b5f9f992b0539ec02ce7dbdbc3d1d67",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751738",
+      "photoFilename": "DR1751738_ph_drop_3142116.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "8d456961-f7b3-4318-9e0b-35dad8405330",
+        "photoFilename": "DR1751738_ph_drop_3142116.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0102",
+    "imageRef": "catrep-0102.jpg",
+    "sha256": "c40496dee2775e05165aee89f4318c061a8dfba155c6a2076f5030a3f8018b9c",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "drNumber": "DR1730860",
+      "photoFilename": "DR1730860_ph_hm_en_4323711.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "ec3cba19-7c32-441c-bae7-7756c45c110f",
+        "photoFilename": "DR1730860_ph_hm_en_4323711.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0103",
+    "imageRef": "catrep-0103.jpg",
+    "sha256": "d8cd60bada86b8962312910dd02e20d7670fbcc41d400ae411d1e5e58e8a9556",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750214",
+      "photoFilename": "DR1750214_ph_hm_ln_1663149.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "a7ae8777-d418-451b-aa4a-e7362a950db3",
+        "photoFilename": "DR1750214_ph_hm_ln_1663149.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0104",
+    "imageRef": "catrep-0104.jpg",
+    "sha256": "0969aa3a5598121ac217141f93bc0291a61bda843c5056cae68046a1f169577d",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR470391",
+      "photoFilename": "DR470391_ph_sign1_3489478.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "c769e4eb-09fa-40ee-ab9c-8f0f0e3d0f93",
+        "photoFilename": "DR470391_ph_sign1_3489478.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0105",
+    "imageRef": "catrep-0105.jpg",
+    "sha256": "a60f48abc7927b771d5ca2eb115dc6115e5ec9e09ac013ff465f7a40202b36c8",
+    "expected": {
+      "step": 8,
+      "vlmStepAtReview": 8,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750845",
+      "photoFilename": "DR1750845_ph_bl_2713348.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "71460b31-8431-453c-8926-ddd73f1a2afe",
+        "photoFilename": "DR1750845_ph_bl_2713348.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0106",
+    "imageRef": "catrep-0106.jpg",
+    "sha256": "f016f3e6e8ee5bda6be8d9363dbc2864959a472dbeef92230a38107be8432c07",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734000",
+      "photoFilename": "DR1734000_ph_hh1_3994556.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "068bba0b-7560-44bc-9dcb-6e7175dc172b",
+        "photoFilename": "DR1734000_ph_hh1_3994556.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0107",
+    "imageRef": "catrep-0107.jpg",
+    "sha256": "f37b7fb4b71e22a5e37ba1b9d4e40845f5fd2d2f26198a5c5ceabf9c00f9f89e",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1748335",
+      "photoFilename": "DR1748335_ph_wall_2370486.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "7c4c66f1-af9a-46a2-bc0c-46f4f7b1c85c",
+        "photoFilename": "DR1748335_ph_wall_2370486.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0108",
+    "imageRef": "catrep-0108.jpg",
+    "sha256": "11d23b58cee498b1fa23fee2d08bcb948b39d832f1bb36804c4449fa3601fe81",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "drNumber": "DR469032",
+      "photoFilename": "DR469032_ph_wall_4731654.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "557b6237-e528-4371-8fac-a5dced107aef",
+        "photoFilename": "DR469032_ph_wall_4731654.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0109",
+    "imageRef": "catrep-0109.jpg",
+    "sha256": "0adaa9011604710775d9d617aa2b8ee5b3feca6ff6ad7936db82818bed46b898",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732143",
+      "photoFilename": "DR1732143_ph_powm2_4054253.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "2db5b191-f3a7-4f4a-b4ea-ad0493e582cb",
+        "photoFilename": "DR1732143_ph_powm2_4054253.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0110",
+    "imageRef": "catrep-0110.jpg",
+    "sha256": "878be06e76dcae83ff426ecb943a68e0a7d9abfd92965f293b96188732c2ac31",
+    "expected": {
+      "step": 8,
+      "vlmStepAtReview": 8,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750156",
+      "photoFilename": "DR1750156_ph_after_2054163.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "6655cfdb-334d-4221-ab12-2d2b07b24108",
+        "photoFilename": "DR1750156_ph_after_2054163.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0111",
+    "imageRef": "catrep-0111.jpg",
+    "sha256": "cff2e2b6a677f85acea1528f515af4969126240237971c1cd0e9b7022c9a551a",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR476432",
+      "photoFilename": "DR476432_ph_outs_4750561.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "16bd1e46-3592-4981-a359-d6d6de3e0188",
+        "photoFilename": "DR476432_ph_outs_4750561.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0112",
+    "imageRef": "catrep-0112.jpg",
+    "sha256": "9570cb1fe874607cbb561e5883f9be81102442e8427979038e87aa1093efceaa",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733814",
+      "photoFilename": "DR1733814_ph_wall_3752757.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "b0f8f901-a44f-4c45-9f8f-5c77aedf1696",
+        "photoFilename": "DR1733814_ph_wall_3752757.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0113",
+    "imageRef": "catrep-0113.jpg",
+    "sha256": "3eecb87fdc70a1660ec10f4aa86872f733911ccfd3d94000465cbc03dce02b50",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752300",
+      "photoFilename": "DR1752300_ph_hm_ln_3669400.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "6f8cc375-4e12-4ba4-9f60-b31a26d308bd",
+        "photoFilename": "DR1752300_ph_hm_ln_3669400.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0114",
+    "imageRef": "catrep-0114.jpg",
+    "sha256": "4bb16e84746de2ac055cde97b43a2a7cacdcc5c9f0d373fa7a0f8fd6aecd67a2",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733150",
+      "photoFilename": "DR1733150_ph_cbl_r_2810944.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "03f4dad1-34f1-4c2d-9163-410249eabc69",
+        "photoFilename": "DR1733150_ph_cbl_r_2810944.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0115",
+    "imageRef": "catrep-0115.jpg",
+    "sha256": "645df2d861cf4e34d8ac3e70477e63f6b4eab9aeae600a46b1eb2c0d3ec03692",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732156",
+      "photoFilename": "DR1732156_ph_sign1_1728627.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "733102da-eb1f-468d-813d-72a900c7d254",
+        "photoFilename": "DR1732156_ph_sign1_1728627.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0116",
+    "imageRef": "catrep-0116.jpg",
+    "sha256": "40120bd7fcda217037deb3a435487da54542201546b4b2741b2ad22174527749",
+    "expected": {
+      "step": 6,
+      "vlmStepAtReview": 6,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752295",
+      "photoFilename": "DR1752295_ph_cbl_r_4083565.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "4c53634c-2c56-492e-a3bf-0f4db378ab64",
+        "photoFilename": "DR1752295_ph_cbl_r_4083565.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0117",
+    "imageRef": "catrep-0117.jpg",
+    "sha256": "94b7e3b9cf6ef35e79e277eb30e31eb98a021e4c26b454bc391833f95c6a1709",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733402",
+      "photoFilename": "DR1733402_ph_prop_3480964.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "44fae327-6166-423f-8c60-ad5bbefb8eb4",
+        "photoFilename": "DR1733402_ph_prop_3480964.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0118",
+    "imageRef": "catrep-0118.jpg",
+    "sha256": "cb012d007e779e934cd53601d73210162a957f1cfae38be2ebde17ca83c2cbbe",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732176",
+      "photoFilename": "DR1732176_ph_prop_3253990.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "5f41a2c2-6a64-42fc-8cde-75620c092858",
+        "photoFilename": "DR1732176_ph_prop_3253990.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0119",
+    "imageRef": "catrep-0119.jpg",
+    "sha256": "bda1faca578e4b2bd69e30622a3888aae53bf99b85c4fb79477dcc2302f72045",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR474520",
+      "photoFilename": "DR474520_ph_prop_4634040.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "b360a7eb-f502-4bef-9f91-cbd0f81ebfcf",
+        "photoFilename": "DR474520_ph_prop_4634040.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0120",
+    "imageRef": "catrep-0120.jpg",
+    "sha256": "e06d1c629d06605d04e9a8bd5523cfe84aa67dc72ad449c37c115385d48dbd5c",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734534",
+      "photoFilename": "DR1734534_ph_outs_1692828.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "05b6648b-f934-4a84-ab25-5d5e37599636",
+        "photoFilename": "DR1734534_ph_outs_1692828.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0121",
+    "imageRef": "catrep-0121.jpg",
+    "sha256": "4ed3920825aa19a4bbad5082a79f0ebb91a322a43283218d12ab50f4761683b7",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "drNumber": "DR1736067",
+      "photoFilename": "DR1736067_ph_wall_4296297.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "e0899c7c-442b-42e5-bd73-99ca741d95f8",
+        "photoFilename": "DR1736067_ph_wall_4296297.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0122",
+    "imageRef": "catrep-0122.jpg",
+    "sha256": "b13cd2d2e99d4ea542a40e023be997daa9898b70e2b9cd5302769625565b4c91",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751923",
+      "photoFilename": "DR1751923_ph_bl_3295279.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "44645127-c308-4030-8ee5-07dee6aedb0b",
+        "photoFilename": "DR1751923_ph_bl_3295279.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0123",
+    "imageRef": "catrep-0123.jpg",
+    "sha256": "d209797ff8b463e8d15e4961df97feb71d6afa2dc8dbb6a6e10ee0175abd613b",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733485",
+      "photoFilename": "DR1733485_ph_hh1_4861671.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "526180a9-93be-47e5-80ce-bee8523d8030",
+        "photoFilename": "DR1733485_ph_hh1_4861671.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0124",
+    "imageRef": "catrep-0124.jpg",
+    "sha256": "48449060067874e726d2fd1e235e488310bf05614593d903466ec8ae0f3d1a7f",
+    "expected": {
+      "step": 5,
+      "vlmStepAtReview": 5,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734036",
+      "photoFilename": "DR1734036_ph_wall_3855392.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "5f9cb57b-f12c-4eb0-a455-0de40daa5e3a",
+        "photoFilename": "DR1734036_ph_wall_3855392.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0125",
+    "imageRef": "catrep-0125.jpg",
+    "sha256": "d54cff4bda327da1a16775c8f80b0e4301c0b93d1fdca759af8577d2925d9696",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1732261",
+      "photoFilename": "DR1732261_ph_sign1_1658174.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "90517bcd-4a26-4359-a7e1-202ef2ce0996",
+        "photoFilename": "DR1732261_ph_sign1_1658174.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0126",
+    "imageRef": "catrep-0126.jpg",
+    "sha256": "ac50666ede923152b24d6492d27121384ef6479b1751282cfd1a00fd6ed32bb6",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734561",
+      "photoFilename": "DR1734561_ph_conn1_3428521.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "dc3c4630-b493-4bf4-9e34-ec89b159340d",
+        "photoFilename": "DR1734561_ph_conn1_3428521.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0127",
+    "imageRef": "catrep-0127.jpg",
+    "sha256": "57584a2c1b7ce904c58ea871f874155e16c3ea7a356de36e29021f4c331f19c8",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1861082",
+      "photoFilename": "DR1861082_ph_powm1_4724314.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "21a30780-85f2-404d-bcf4-695b024efd5b",
+        "photoFilename": "DR1861082_ph_powm1_4724314.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0128",
+    "imageRef": "catrep-0128.jpg",
+    "sha256": "84d8c5c810ed9f22b7f3b36914fbb423e760c096c786080d0afca709b2dc0bee",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1854370",
+      "photoFilename": "DR1854370_ph_powm1_2708464.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "3d0f49f2-6ed4-458f-9732-ff6e452c70a0",
+        "photoFilename": "DR1854370_ph_powm1_2708464.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0129",
+    "imageRef": "catrep-0129.jpg",
+    "sha256": "2f2a1458283631b471382769d03e5bb1db39b42dccedc49271ce3cb153ee83ee",
+    "expected": {
+      "step": 8,
+      "vlmStepAtReview": 8,
+      "stratum": "vlm_right",
+      "drNumber": "DR1862984",
+      "photoFilename": "DR1862984_ph_bl_4350045.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "17190cce-e505-48b7-b9f5-2007e5b246d6",
+        "photoFilename": "DR1862984_ph_bl_4350045.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0130",
+    "imageRef": "catrep-0130.jpg",
+    "sha256": "6a66d2eece396d19f5e17f2eaab0b8909936df7dfb52564f10dad6713c37e28b",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733157",
+      "photoFilename": "DR1733157_ph_outs_2761531.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "6c103eed-1e5f-4f53-b5d8-48f874fdf57e",
+        "photoFilename": "DR1733157_ph_outs_2761531.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0131",
+    "imageRef": "catrep-0131.jpg",
+    "sha256": "7e3c732d35195fd51a4226cedbad932e160b4d530399bc3d5e37e898a0ab673d",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1735850",
+      "photoFilename": "DR1735850_ph_sign2_4952579.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "a534b780-f6d0-4c0b-8a72-09b7fb997b41",
+        "photoFilename": "DR1735850_ph_sign2_4952579.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0132",
+    "imageRef": "catrep-0132.jpg",
+    "sha256": "d4af56ad05fcba30e6378314ab1512d95f7564d276e20442b682e18cf2b816ad",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR1734616",
+      "photoFilename": "DR1734616_ph_outs_3419556.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "5c6c3b32-9b7a-4a6f-86bc-dda3f2e5c90b",
+        "photoFilename": "DR1734616_ph_outs_3419556.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0133",
+    "imageRef": "catrep-0133.jpg",
+    "sha256": "f432c38efa2d378652d69fad8b95ff26ecc40a8498fabb49b38f4807d34aca22",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1862937",
+      "photoFilename": "DR1862937_ph_drop_4358465.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "0b20478e-5245-4f54-b7fa-b2f061db97d7",
+        "photoFilename": "DR1862937_ph_drop_4358465.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0134",
+    "imageRef": "catrep-0134.jpg",
+    "sha256": "4d8217061ba89099f994a4a61ff7c84d80d7cba28c9c9fd0b6a985dc5f6c74c6",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1730573",
+      "photoFilename": "DR1730573_ph_sign2_3950294.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "fa637aa2-c818-406c-8f98-25f95386fa90",
+        "photoFilename": "DR1730573_ph_sign2_3950294.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0135",
+    "imageRef": "catrep-0135.jpg",
+    "sha256": "cced9fec383e69735a19fb4d7730340f6813afd63cc11f5bcef6e15d1a31a91d",
+    "expected": {
+      "step": 8,
+      "vlmStepAtReview": 8,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733800",
+      "photoFilename": "DR1733800_ph_after_3762069.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "c0c72dc9-9ffe-4667-8dbe-980fdffc8471",
+        "photoFilename": "DR1733800_ph_after_3762069.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0136",
+    "imageRef": "catrep-0136.jpg",
+    "sha256": "cf37988b79c3745be7bd86175aad1825554a79965f834324c355575865aa3e00",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1733926",
+      "photoFilename": "DR1733926_ph_prop_3755061.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "6e5958b9-dd49-4246-976f-f98c1fd7ae7f",
+        "photoFilename": "DR1733926_ph_prop_3755061.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0137",
+    "imageRef": "catrep-0137.jpg",
+    "sha256": "db7e81f6e5d702ce01cf32e6b4990de26d5047eb62256019766f7e2640cb979b",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1751446",
+      "photoFilename": "DR1751446_ph_sign1_1643382.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "38dc1259-eea2-43f5-8aa7-01568ea32888",
+        "photoFilename": "DR1751446_ph_sign1_1643382.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0138",
+    "imageRef": "catrep-0138.jpg",
+    "sha256": "526a4f7a6acc9511cef6b671e242a2a56ba52ebd5ea1cb9e3255974fafbee739",
+    "expected": {
+      "step": 4,
+      "vlmStepAtReview": 4,
+      "stratum": "vlm_right",
+      "drNumber": "DR476512",
+      "photoFilename": "DR476512_ph_hm_en_4678111.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "87eec08d-5c3f-4bd9-9dc2-dcdce2aaedd6",
+        "photoFilename": "DR476512_ph_hm_en_4678111.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0139",
+    "imageRef": "catrep-0139.jpg",
+    "sha256": "3f439da892a9a896cc3cd5556f868374e731fcc697776bc036a48aeec14690bc",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR470303",
+      "photoFilename": "DR470303_ph_hm_ln_3558815.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "4f6ba627-9ff4-446f-beff-6a48b8e66589",
+        "photoFilename": "DR470303_ph_hm_ln_3558815.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0140",
+    "imageRef": "catrep-0140.jpg",
+    "sha256": "687bbe21fe7fde87983d91e7d4614f23b8ca8eea1aaddd7c7d914d9556ab5790",
+    "expected": {
+      "step": 9,
+      "vlmStepAtReview": 9,
+      "stratum": "vlm_right",
+      "drNumber": "DR1753056",
+      "photoFilename": "DR1753056_ph_drop_2227225.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "4b631bf3-7b17-4637-aaad-ab9cbdade299",
+        "photoFilename": "DR1753056_ph_drop_2227225.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0141",
+    "imageRef": "catrep-0141.jpg",
+    "sha256": "8ef45096b883e53374938360c61643d49a034615b97960c7d6c91221ea85c2e9",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR474118",
+      "photoFilename": "DR474118_ph_sign2_5032444.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "ee1d9a7a-c74e-46d3-81c4-1cd3939d635a",
+        "photoFilename": "DR474118_ph_sign2_5032444.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0142",
+    "imageRef": "catrep-0142.jpg",
+    "sha256": "06d97459b6369d4a58bbac3d3ba97ed9cea300ab850370b832a3c1ec0b55e96c",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752028",
+      "photoFilename": "DR1752028_ph_powm2_3342961.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "a9e33b6d-a913-4e8d-b58b-912c782c1d36",
+        "photoFilename": "DR1752028_ph_powm2_3342961.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0143",
+    "imageRef": "catrep-0143.jpg",
+    "sha256": "387b2b4a5c97636a03889c0aa5e340b4e997a3a7b188ab77edbf806c73588c34",
+    "expected": {
+      "step": 2,
+      "vlmStepAtReview": 2,
+      "stratum": "vlm_right",
+      "drNumber": "DR470091",
+      "photoFilename": "DR470091_ph_hm_ln_3726506.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "f04b7be8-7e49-461a-8d15-8bf2260bd44e",
+        "photoFilename": "DR470091_ph_hm_ln_3726506.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0144",
+    "imageRef": "catrep-0144.jpg",
+    "sha256": "4e73dbc6f42a08c416dd28906405eddbeab898b6ff937d85143d322ad4ac8112",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1730550",
+      "photoFilename": "DR1730550_ph_sign1_3876456.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "ebb5c7d6-e640-4081-85d5-48a1e35ca259",
+        "photoFilename": "DR1730550_ph_sign1_3876456.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0145",
+    "imageRef": "catrep-0145.jpg",
+    "sha256": "fe9d02f72bdaa939d858472d259b716d198644b8ca6daf0a63b9b7c2ba514d46",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR474549",
+      "photoFilename": "DR474549_ph_prop_4547810.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "97887bcb-0a14-45cd-9ed3-95d98b31559b",
+        "photoFilename": "DR474549_ph_prop_4547810.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0146",
+    "imageRef": "catrep-0146.jpg",
+    "sha256": "017b10df3ac33023f1352a0d8a34c668a72dc3a5e43b233494dd047568ccf815",
+    "expected": {
+      "step": 10,
+      "vlmStepAtReview": 10,
+      "stratum": "vlm_right",
+      "drNumber": "DR1752252",
+      "photoFilename": "DR1752252_ph_sign2_3656661.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "393a73eb-ba80-4fcc-852c-0b42633d7643",
+        "photoFilename": "DR1752252_ph_sign2_3656661.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0147",
+    "imageRef": "catrep-0147.jpg",
+    "sha256": "2df0856ed8c7869d076d9f41545677d858d8bdbb35961f4a844ea169840012ad",
+    "expected": {
+      "step": 7,
+      "vlmStepAtReview": 7,
+      "stratum": "vlm_right",
+      "drNumber": "DR1748832",
+      "photoFilename": "DR1748832_ph_powm2_2716132.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "d7b4cff0-90fb-48f5-a2e5-5631146990ae",
+        "photoFilename": "DR1748832_ph_powm2_2716132.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0148",
+    "imageRef": "catrep-0148.jpg",
+    "sha256": "711f632ce5b57a55db96594608530e173902a189817ce8030a081b6e9d9d3910",
+    "expected": {
+      "step": 8,
+      "vlmStepAtReview": 8,
+      "stratum": "vlm_right",
+      "drNumber": "DR477157",
+      "photoFilename": "DR477157_ph_after_4766780.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "def06c9c-7ef6-4712-8219-9bcea508a7a1",
+        "photoFilename": "DR477157_ph_after_4766780.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0149",
+    "imageRef": "catrep-0149.jpg",
+    "sha256": "f5e9d658fdd09159bfeae6d069b1cc5e31a432312be4f6fc7f1ad0b349077b37",
+    "expected": {
+      "step": 3,
+      "vlmStepAtReview": 3,
+      "stratum": "vlm_right",
+      "drNumber": "DR1750159",
+      "photoFilename": "DR1750159_ph_hm_en_1955501.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "5065554a-9165-4a8f-abf8-da2f796e4640",
+        "photoFilename": "DR1750159_ph_hm_en_1955501.jpg"
+      }
+    }
+  },
+  {
+    "id": "catrep-0150",
+    "imageRef": "catrep-0150.jpg",
+    "sha256": "619d968730643794f68703992c592bd432674b02d8fd064d1d8281f7ad78e6ea",
+    "expected": {
+      "step": 1,
+      "vlmStepAtReview": 1,
+      "stratum": "vlm_right",
+      "drNumber": "DR1853395",
+      "photoFilename": "DR1853395_ph_drop_2737693.jpg",
+      "provenance": {
+        "table": "dr_photo_unified_reviews",
+        "rowId": "36dae31d-b777-466a-aa66-4c79ef5c61ac",
+        "photoFilename": "DR1853395_ph_drop_2737693.jpg"
+      }
+    }
+  }
+]

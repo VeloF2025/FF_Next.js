@@ -1,5 +1,6 @@
 // scripts/vlm-bench/packs/civilQa.ts
 // Construction QA — civil (pole planting) photo step classification, steps 0..7.
+import * as fs from 'fs';
 import * as path from 'path';
 import { VLM_QA_MODEL, VLM_MAX_TOKENS_OCR } from '@/lib/vlm';
 import { buildPhotoPrompt } from '@/modules/construction-qa/services/constructionQaPrompt';
@@ -20,15 +21,41 @@ export interface CivilQaExpected extends StepExpectation {
  * scorer — so a score difference between them is a difference in the photos,
  * not in the measurement.
  */
-function makeCivilQaPack(id: string): VlmTestPack {
+function makeCivilQaPack(id: string, opts: { fewShotFile?: string; goldenDir?: string } = {}): VlmTestPack {
+  const dir = opts.goldenDir ?? id;
+
+  // Pinned to a file rather than read live: production loads few-shot from
+  // vlm_corrections, which changes daily, and an irreproducible prompt makes
+  // every before/after number meaningless. Snapshot with snapFewshot.ts.
+  //
+  // Read LAZILY, not at module load: this module exports six other packs that
+  // have nothing to do with few-shot, and a missing file read at import time
+  // would take all of them — and anything importing them — down with it.
+  //
+  // An EMPTY file is the more dangerous case. It does not throw; it would make
+  // this pack byte-identical to the base pack, so the A/B would quietly measure
+  // nothing and report a delta of ~0 as if that were a finding. Fail loudly.
+  const readFewShot = (): string => {
+    if (!opts.fewShotFile) return '';
+    const file = path.join(__dirname, '..', opts.fewShotFile);
+    const text = fs.readFileSync(file, 'utf8');
+    if (text.trim().length === 0) {
+      throw new Error(
+        `few-shot snapshot ${file} is empty — pack '${id}' would be identical to its ` +
+          `base pack and the A/B would measure nothing. Re-run snapFewshot.ts.`,
+      );
+    }
+    return text;
+  };
   return {
     id,
+    goldenDir: dir,
 
     async loadCases(mode, opts: LoadOpts): Promise<BenchCase[]> {
       if (mode !== 'golden') {
         throw new Error(`${id} live mode is not implemented (Phase 1)`);
       }
-      return loadGolden(path.join(opts.goldenRoot, id));
+      return loadGolden(path.join(opts.goldenRoot, dir));
     },
 
     buildPrompt(c: BenchCase): VlmRequest {
@@ -40,7 +67,7 @@ function makeCivilQaPack(id: string): VlmTestPack {
       // known step passed. fewShotSection is pinned to '' because production
       // loads it from a table that changes daily, which would make scores
       // irreproducible; this pack measures the BASE prompt only.
-      const prompt = buildPhotoPrompt('civil', null, null, '');
+      const prompt = buildPhotoPrompt('civil', null, null, readFewShot());
       return {
         model: VLM_QA_MODEL,
         max_tokens: VLM_MAX_TOKENS_OCR,
@@ -67,3 +94,38 @@ function makeCivilQaPack(id: string): VlmTestPack {
 export const civilQaPack = makeCivilQaPack('civil-qa');
 /** Disjoint second draw — see harvest/civilHoldoutSource.ts. */
 export const civilQaHoldoutPack = makeCivilQaPack('civil-qa-holdout');
+
+/**
+ * Pair-focused draws restricted to During(2) and Compaction(5).
+ *
+ * Same prompt and same scorer as the general packs — only the population
+ * differs — so a score gap between these and civil-qa is a property of the
+ * photos, not of the measurement. See harvest/civilPairSource.ts for why the
+ * general set cannot resolve this pair.
+ *
+ * These score ONLY the 2/5 pair. A gain here says nothing about steps
+ * 0/1/3/4/6/7; confirm any change on civil-qa-holdout before believing it.
+ */
+export const civilPairPack = makeCivilQaPack('civil-pair');
+export const civilPairHoldoutPack = makeCivilQaPack('civil-pair-holdout');
+
+/**
+ * Representative draw — the population's natural wrong/right ratio.
+ *
+ * Scores are NOT comparable to civil-qa or the pair packs: this measures
+ * accuracy on the labelled workload, they measure a deliberately hard slice.
+ */
+export const civilRepPack = makeCivilQaPack('civil-rep');
+
+/**
+ * civil-rep, but WITH production's pinned few-shot block.
+ *
+ * Same photos, same prompt, same scorer as civilRepPack — the only difference
+ * is the few-shot section, so the gap between the two runs IS the few-shot
+ * layer's contribution. Production sends this section on every civil call;
+ * every other pack here measures the base prompt without it.
+ */
+export const civilRepFewshotPack = makeCivilQaPack('civil-rep-fewshot', {
+  fewShotFile: 'datasets/fewshot/civil.txt',
+  goldenDir: 'civil-rep',
+});

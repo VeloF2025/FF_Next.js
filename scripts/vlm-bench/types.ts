@@ -70,6 +70,12 @@ export interface VlmRequest {
 /** A pluggable use-case pack. */
 export interface VlmTestPack {
   id: string;
+  /**
+   * Directory under datasets/golden holding this pack's cases and images.
+   * Defaults to `id`. Set it when two packs deliberately score the SAME photos
+   * under different prompts — an A/B needs one dataset and two pack ids.
+   */
+  goldenDir?: string;
   loadCases(mode: 'golden' | 'live', opts: LoadOpts): Promise<BenchCase[]>;
   buildPrompt(c: BenchCase, variant?: string): VlmRequest;
   score(expected: unknown, actual: string): ScoreOutcome;

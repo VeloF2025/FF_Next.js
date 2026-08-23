@@ -78,3 +78,24 @@ function parseStepFromCategorizations(actual: string): number | null {
   }
   return parseStep(actual, ['predicted_step', 'step']);
 }
+
+/**
+ * Representative draw — the population's natural wrong/right ratio.
+ *
+ * Shares categorizationPack's prompt and scorer so a score gap between them is
+ * a property of the photos, not the measurement. loadCases is overridden
+ * because the base pack hardcodes its golden directory.
+ *
+ * NOT comparable to `categorization`: that pack is a forced 50/50 comparison
+ * instrument, this one estimates accuracy on the labelled workload.
+ */
+export const categorizationRepPack: VlmTestPack = {
+  ...categorizationPack,
+  id: 'categorization-rep',
+  async loadCases(mode, opts: LoadOpts): Promise<BenchCase[]> {
+    if (mode !== 'golden') {
+      throw new Error('categorization-rep live mode is not implemented (Phase 1)');
+    }
+    return loadGolden(path.join(opts.goldenRoot, 'categorization-rep'));
+  },
+};
