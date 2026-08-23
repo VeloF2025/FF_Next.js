@@ -41,9 +41,17 @@ ruleTester.run('no-unthemed-light-surface', rule, {
     { code: '<div className="p-4 bg-secondary rounded-lg">x</div>;' },
     { code: '<div className="bg-card text-card-foreground">x</div>;' },
 
-    // --- A dark: variant that restates the BACKGROUND.
+    // --- A dark: variant that restates the BACKGROUND with an actually dark
+    //     value. The shade floor is 600; every dark:bg-* in this repo today is
+    //     a 700/800/900, so the floor does not reject honest existing code.
     { code: '<div className="bg-white dark:bg-neutral-900">x</div>;' },
     { code: '<div className="bg-gray-50 dark:bg-gray-800">x</div>;' },
+    { code: '<div className="bg-white dark:bg-gray-600">x</div>;' },
+    { code: '<div className="bg-white dark:bg-black">x</div>;' },
+    // --- A theme token flips with the theme, so it is dark in dark mode.
+    { code: '<div className="bg-white dark:bg-card">x</div>;' },
+    // --- Opacity suffixes on a dark value are still a fix.
+    { code: '<div className="bg-white dark:bg-gray-900/80">x</div>;' },
     // --- ...or the TEXT.
     { code: '<div className="bg-white dark:text-gray-900">x</div>;' },
     // --- dark: behind another variant prefix still counts.
@@ -180,6 +188,20 @@ ruleTester.run('no-unthemed-light-surface', rule, {
     // --- dangerouslySetInnerHTML has no JSX children but renders text, so the
     //     "no children" exemption must not apply to it.
     { code: '<div className="bg-white" dangerouslySetInnerHTML={{ __html: h }} />;', errors: E },
+
+    // --- The dark: escape hatch must check the VALUE, not just that a dark:
+    //     token exists. Accepting mere presence meant the natural way to
+    //     silence this rule — "add a dark: variant" — could reship the exact
+    //     same bug. All three of these were previously clean.
+    { code: '<div className="bg-white dark:bg-white">x</div>;', errors: E },
+    { code: '<div className="bg-white dark:bg-gray-100">x</div>;', errors: E },
+    { code: '<div className="bg-white dark:bg-slate-50">x</div>;', errors: E },
+    { code: '<div className="bg-white dark:text-white">x</div>;', errors: E },
+    { code: '<div className="bg-white dark:text-gray-100">x</div>;', errors: E },
+
+    // --- An input's placeholder and value ARE rendered text, so `input` is not
+    //     a textless element. Closing this cost zero findings repo-wide.
+    { code: '<input className="bg-white" placeholder="Search" />;', errors: E },
   ],
 });
 

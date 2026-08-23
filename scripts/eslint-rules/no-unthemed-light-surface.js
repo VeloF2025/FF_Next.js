@@ -108,9 +108,43 @@ const LIGHT_SURFACE_RE = new RegExp(
   ')(?:\\/(\\d{1,3}))?$'
 );
 
-// A `dark:` variant that actually addresses the light-on-light failure: it must
-// restate the background or the text. `dark:border-*` alone does not.
-const DARK_FIX_RE = /(?:^|:)dark:(?:[a-z0-9-]+:)*(?:bg|text)-/;
+const PALETTES =
+  'gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|' +
+  'cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
+
+// Theme tokens whose value FLIPS with the theme, so they are genuinely dark in
+// dark mode. `dark:bg-card` is a real fix; `dark:bg-white` is not.
+const THEME_SURFACE_TOKENS = 'card|background|secondary|muted|popover|accent|primary';
+
+// A `dark:` variant that actually addresses the light-on-light failure.
+//
+// It is NOT enough for a `dark:bg-*`/`dark:text-*` token to merely EXIST. The
+// original rule accepted any of them, which meant the natural way to silence a
+// lint error — add a dark: variant — could reship the identical bug:
+//
+//   "bg-white dark:bg-white"      still white in dark mode
+//   "bg-white dark:bg-gray-100"   still light in dark mode
+//   "bg-white dark:text-white"    white text on a white surface
+//
+// All three passed. So the dark-mode VALUE has to be checked, not just its
+// presence. Two independent ways to be correct:
+//
+//   1. the dark-mode BACKGROUND is actually dark  (shade >= 600, black, or a
+//      theme token that flips), or
+//   2. the surface stays light but the dark-mode TEXT is actually dark
+//      (shade >= 400 or black), which is readable on it.
+//
+// Anything unrecognised counts as NOT a fix, keeping the bias toward false
+// positives. Every `dark:bg-*` in this repo today is a 700/800/900 shade, so
+// the floor does not reject existing honest code.
+const DARK_BG_FIX_RE = new RegExp(
+  '^(?:[a-z0-9-]+:)*dark:(?:[a-z0-9-]+:)*bg-(?:black|(?:' + THEME_SURFACE_TOKENS + ')|(?:' +
+  PALETTES + ')-(?:[6-9]\\d{2}))(?:\\/\\d{1,3})?$'
+);
+const DARK_TEXT_FIX_RE = new RegExp(
+  '^(?:[a-z0-9-]+:)*dark:(?:[a-z0-9-]+:)*text-(?:black|(?:' +
+  PALETTES + ')-(?:[4-9]\\d{2}))(?:\\/\\d{1,3})?$'
+);
 
 // A literal, dark-enough text colour. Explicitly EXCLUDES:
 //   - text-white and the 50/100/200/300 tints (not dark-safe on a white surface)
@@ -120,14 +154,22 @@ const DARK_SAFE_TEXT_RE =
   /^(?:[a-z0-9-]+:)*text-(?:black|(?:gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:[4-9]\d{2}))(?:\/\d{1,3})?$/;
 
 // Elements that cannot render text children, so can never be light-on-light.
-// `input` is included: its value text is painted by the UA/`color`, and a
-// bg-white input is the normal light-only control, but its `text-*` is set on
-// the same element when it matters — it is not a container that leaks a
-// theme-following colour onto descendants.
+//
+// `input` was originally on this list and has been REMOVED. Its placeholder and
+// value are real rendered text subject to the same theme-following colour, so
+// exempting it was a genuine hole rather than an AST-provable exemption like
+// the others here. Removing it costs nothing measurable: re-scanned across all
+// 2112 .tsx files, it produces zero new findings — there was no false-positive
+// price to pay for closing it.
 const TEXTLESS_ELEMENTS = new Set([
   'img', 'canvas', 'video', 'audio', 'iframe', 'embed', 'object',
-  'hr', 'br', 'input', 'source', 'track', 'picture', 'progress', 'meter',
+  'hr', 'br', 'source', 'track', 'picture', 'progress', 'meter',
 ]);
+
+// Elements that render text WITHOUT any JSX children, so the "no children"
+// exemption must not apply to them: an <input>'s placeholder and value are
+// painted onto its own background.
+const SELF_TEXT_ELEMENTS = new Set(['input', 'textarea']);
 
 /** Split a class string into tokens. */
 function tokens(value) {
@@ -240,7 +282,7 @@ module.exports = {
       if (!offender) return;
 
       // Either escape hatch, evaluated across the WHOLE className expression.
-      const hasDarkFix = all.some((t) => DARK_FIX_RE.test(t));
+      const hasDarkFix = all.some((t) => DARK_BG_FIX_RE.test(t) || DARK_TEXT_FIX_RE.test(t));
       const hasDarkSafeText = all.some((t) => DARK_SAFE_TEXT_RE.test(t));
       if (hasDarkFix || hasDarkSafeText) return;
 
@@ -273,7 +315,9 @@ module.exports = {
           const injectsHtml = opening.attributes.some(
             (a) => a.type === 'JSXAttribute' && a.name && a.name.name === 'dangerouslySetInnerHTML'
           );
-          if (!injectsHtml) {
+          const rendersOwnText =
+            el && el.type === 'JSXIdentifier' && SELF_TEXT_ELEMENTS.has(el.name);
+          if (!injectsHtml && !rendersOwnText) {
             const parent = opening.parent;
             const children =
               parent && parent.type === 'JSXElement' ? parent.children : [];

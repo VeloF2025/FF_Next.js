@@ -190,11 +190,21 @@ echo -e "\n${CYAN}── Gate 2f: Unthemed light surfaces ──${NC}\n"
 # A count alone cannot tell a clean scan from a scan that linted nothing: both
 # report 0. So this reads ESLint's JSON output and asserts the number of files
 # actually linted, the same fail-loud shape as scripts/silent-catch-ratchet.mjs.
+# Floor for the scan frame. Measured 2026-08-23: 2112 .tsx files across src/ and
+# pages/. Set to 1500 — roughly 70% of that — so ordinary churn (or deleting a
+# large module) does not trip it, while a collapse to a handful of files does.
+# It guards the FRAME, not the findings: a wrong --ext, a moved directory, or a
+# --rulesdir that fails to load all report zero findings, which is
+# indistinguishable from a clean repo. Re-measure and raise it if src/ grows
+# substantially; it is a tripwire, not a target.
 SURFACE_MIN_FILES=1500
 
+# .jsx as well as .tsx: there are no .jsx files today, but nothing else would
+# stop one being added and silently never scanned.
+SURFACE_ERR=$(mktemp)
 SURFACE_RC=0
-SURFACE_JSON=$(npx eslint src pages --ext .tsx --rulesdir scripts/eslint-rules \
-  --rule '{"no-unthemed-light-surface": "error"}' -f json 2>/dev/null) || SURFACE_RC=$?
+SURFACE_JSON=$(npx eslint src pages --ext .tsx,.jsx --rulesdir scripts/eslint-rules \
+  --rule '{"no-unthemed-light-surface": "error"}' -f json 2>"$SURFACE_ERR") || SURFACE_RC=$?
 
 SURFACE_STATS=$(printf '%s' "$SURFACE_JSON" | node -e '
   let raw = "";
@@ -215,7 +225,9 @@ SURFACE_COUNT=$(echo "$SURFACE_STATS" | awk '{print $3}')
 
 if [ "$SURFACE_RC" -ge 2 ] || [ "$SURFACE_STATUS" != "OK" ]; then
   fail "Unthemed light surfaces: eslint failed to run (exit ${SURFACE_RC}) — gate scanned nothing"
-  printf '%s' "$SURFACE_JSON" | tail -c 400 | sed 's/^/    /'
+  # eslint writes crash output to STDERR. Printing stdout here showed nothing:
+  # on a crash stdout is empty and stderr is where the reason is.
+  tail -c 600 "$SURFACE_ERR" | sed 's/^/    /'
 elif [ "$SURFACE_FILES" -lt "$SURFACE_MIN_FILES" ]; then
   # Guards the sampling frame, not the findings: a moved directory or a bad
   # --ext would shrink the frame to nothing and still report a clean zero.
@@ -239,6 +251,7 @@ else
     });
   ' 2>/dev/null | head -20
 fi
+rm -f "$SURFACE_ERR"
 
 # ─── Gate 2d: QField step-detection (pure-logic regression) ──────────────────
 # Guards the GPKG photo-column → checklist-step mapping (qfield_step_detection.py)
