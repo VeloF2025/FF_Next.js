@@ -160,4 +160,43 @@ describe('IncidentQueue', () => {
     rerender(<IncidentQueue canEdit canManageSettings />);
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();
   });
+
+  // The Manager filter is the one field whose SEARCH SOURCE is permission-gated:
+  // incidentApi.searchActiveUsers is scoped to `fleet.incidents-settings:edit`.
+  // A viewer without it keeps the raw-id input rather than a picker that would
+  // 403 on every keystroke. The server route enforces this independently, so
+  // these assert the UI branch, not the security boundary.
+  it('gives a settings-authorized viewer the Manager name picker', async () => {
+    fetchMock.mockResolvedValue(ok(listResult([])));
+    render(<IncidentQueue canEdit canManageSettings />);
+    await flush();
+    expect(screen.getByLabelText('Manager search')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Manager user ID')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the raw-id input when the viewer is not settings-authorized', async () => {
+    fetchMock.mockResolvedValue(ok(listResult([])));
+    render(<IncidentQueue canEdit canManageSettings={false} />);
+    await flush();
+    expect(screen.getByLabelText('Manager user ID')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Manager search')).not.toBeInTheDocument();
+
+    // Project and Staff are NOT permission-gated: their sources are plain
+    // withAuth, so both viewers get the picker for those.
+    expect(screen.getByLabelText('Project search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Staff search')).toBeInTheDocument();
+  });
+
+  it('keeps the ?managerUserId= deep link working for an unauthorized viewer', async () => {
+    // The fallback must remain a functioning filter, not a dead control: the
+    // map panel links here with managerUserId already set.
+    window.history.replaceState({}, '', '/fleet/incidents?managerUserId=mgr-7');
+    fetchMock.mockResolvedValue(ok(listResult([])));
+    render(<IncidentQueue canEdit canManageSettings={false} />);
+    await flush();
+    expect(screen.getByLabelText<HTMLInputElement>('Manager user ID').value).toBe('mgr-7');
+    const listCall = fetchMock.mock.calls.map((call) => String(call[0])).find((url) => url.includes('/api/fleet/incidents?'));
+    expect(listCall).toContain('managerUserId=mgr-7');
+    window.history.replaceState({}, '', '/fleet/incidents');
+  });
 });
