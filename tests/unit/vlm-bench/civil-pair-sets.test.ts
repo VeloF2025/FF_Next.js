@@ -7,7 +7,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const GOLDEN = path.join(__dirname, '../../../scripts/vlm-bench/datasets/golden');
-const SETS = ['civil-qa', 'civil-qa-holdout', 'civil-pair', 'civil-pair-holdout'] as const;
+// civil-rep belongs here too: civilRepSource excludes the other four at draw
+// time, but that exclusion is one-directional — nothing stops a future
+// re-harvest of civil-pair from colliding with it. civil-rep-fewshot is
+// deliberately absent: it is a second pack over the SAME directory as
+// civil-rep, not a separate dataset, so it must overlap it completely.
+const SETS = [
+  'civil-qa',
+  'civil-qa-holdout',
+  'civil-pair',
+  'civil-pair-holdout',
+  'civil-rep',
+] as const;
 
 interface Case {
   expected: { photoId?: string; reviewId?: string; step?: number; stratum?: string };

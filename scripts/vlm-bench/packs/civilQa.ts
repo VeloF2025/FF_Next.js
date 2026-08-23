@@ -22,13 +22,31 @@ export interface CivilQaExpected extends StepExpectation {
  * not in the measurement.
  */
 function makeCivilQaPack(id: string, opts: { fewShotFile?: string; goldenDir?: string } = {}): VlmTestPack {
+  const dir = opts.goldenDir ?? id;
+
   // Pinned to a file rather than read live: production loads few-shot from
   // vlm_corrections, which changes daily, and an irreproducible prompt makes
   // every before/after number meaningless. Snapshot with snapFewshot.ts.
-  const fewShot = opts.fewShotFile
-    ? fs.readFileSync(path.join(__dirname, '..', opts.fewShotFile), 'utf8')
-    : '';
-  const dir = opts.goldenDir ?? id;
+  //
+  // Read LAZILY, not at module load: this module exports six other packs that
+  // have nothing to do with few-shot, and a missing file read at import time
+  // would take all of them — and anything importing them — down with it.
+  //
+  // An EMPTY file is the more dangerous case. It does not throw; it would make
+  // this pack byte-identical to the base pack, so the A/B would quietly measure
+  // nothing and report a delta of ~0 as if that were a finding. Fail loudly.
+  const readFewShot = (): string => {
+    if (!opts.fewShotFile) return '';
+    const file = path.join(__dirname, '..', opts.fewShotFile);
+    const text = fs.readFileSync(file, 'utf8');
+    if (text.trim().length === 0) {
+      throw new Error(
+        `few-shot snapshot ${file} is empty — pack '${id}' would be identical to its ` +
+          `base pack and the A/B would measure nothing. Re-run snapFewshot.ts.`,
+      );
+    }
+    return text;
+  };
   return {
     id,
     goldenDir: dir,
@@ -49,7 +67,7 @@ function makeCivilQaPack(id: string, opts: { fewShotFile?: string; goldenDir?: s
       // known step passed. fewShotSection is pinned to '' because production
       // loads it from a table that changes daily, which would make scores
       // irreproducible; this pack measures the BASE prompt only.
-      const prompt = buildPhotoPrompt('civil', null, null, fewShot);
+      const prompt = buildPhotoPrompt('civil', null, null, readFewShot());
       return {
         model: VLM_QA_MODEL,
         max_tokens: VLM_MAX_TOKENS_OCR,

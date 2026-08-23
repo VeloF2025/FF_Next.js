@@ -56,12 +56,18 @@ describe('civil few-shot A/B', () => {
   });
 });
 
-// A pack's directory is decided in TWO places: `goldenDir ?? id` (used by
-// cli.ts to resolve images) and whatever loadCases passes to loadGolden (used
-// for the manifest). They agree today only by convention. If they ever
-// diverge, a run scores the right labels against the wrong photos and still
-// reports a plausible number — silent, and fatal to any A/B.
-describe('pack directory invariant', () => {
+// A pack's directory is resolved in two places: `goldenDir ?? id`, which cli.ts
+// uses to locate IMAGES, and whatever loadCases passes to loadGolden, which
+// supplies the MANIFEST. For packs built by makeCivilQaPack both come from one
+// closure variable and cannot diverge; categorization/serials hardcode theirs
+// independently and can.
+//
+// Rather than compare the two derivations (tautological wherever they share a
+// variable), this asserts the property that actually matters and can fail for
+// every pack: every image the manifest names must EXIST in the directory cli.ts
+// will read. A stale manifest, a half-finished harvest, or a genuinely
+// mismatched directory all fail here.
+describe('pack manifest and images agree', () => {
   const GOLDEN_ROOT = path.join(__dirname, '../../../scripts/vlm-bench/datasets/golden');
 
   it.each([
@@ -74,14 +80,21 @@ describe('pack directory invariant', () => {
     ['civil-pair-holdout', civilPairHoldoutPack],
     ['civil-rep', civilRepPack],
     ['civil-rep-fewshot', civilRepFewshotPack],
-  ])('%s loads its manifest from the same dir cli.ts resolves images from', async (_name, pack) => {
-    const resolved = pack.goldenDir ?? pack.id;
+  ])('%s: every case image exists where cli.ts resolves it', async (_name, pack) => {
+    const resolved = path.join(GOLDEN_ROOT, pack.goldenDir ?? pack.id);
     const cases = await pack.loadCases('golden', { goldenRoot: GOLDEN_ROOT });
-    const manifest = JSON.parse(
-      fs.readFileSync(path.join(GOLDEN_ROOT, resolved, 'cases.json'), 'utf8'),
-    ) as unknown[];
-    // Same count AND same first image ref — a different directory would change both.
-    expect(cases).toHaveLength(manifest.length);
-    expect(cases[0]?.imageRef).toBe((manifest[0] as { imageRef: string }).imageRef);
+    expect(cases.length).toBeGreaterThan(0);
+    const missing = cases
+      .map((c) => c.imageRef)
+      .filter((ref) => !fs.existsSync(path.join(resolved, ref)));
+    expect(missing).toEqual([]);
+  });
+
+  it('civil-rep-fewshot scores exactly the civil-rep images', async () => {
+    // The A/B is only an A/B if both arms see the same photos.
+    const opts = { goldenRoot: GOLDEN_ROOT };
+    const base = (await civilRepPack.loadCases('golden', opts)).map((c) => c.imageRef);
+    const fs_ = (await civilRepFewshotPack.loadCases('golden', opts)).map((c) => c.imageRef);
+    expect(fs_).toEqual(base);
   });
 });

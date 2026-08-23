@@ -62,10 +62,23 @@ export async function harvest(opts: HarvestOpts): Promise<void> {
   const mix = opts.mix ?? 'balanced';
   let wantWrong: number;
   if (mix === 'natural') {
-    // Round the population ratio, then clamp so neither stratum is empty —
-    // a set with zero wrong cases cannot show an error and a set with zero
-    // right cases cannot show a false positive.
-    const ratio = candidates.length === 0 ? 0 : wrong / candidates.length;
+    // Round the population ratio, then clamp so neither stratum is empty — a
+    // set with zero wrong cases cannot show an error and a set with zero right
+    // cases cannot show a false positive.
+    //
+    // The clamp must not demand a case from a stratum that HAS none: forcing 1
+    // out of an empty pool makes stratifiedSample throw "only 0 candidates,
+    // need 1", which reads as data scarcity when it is really the clamp. Refuse
+    // up front with a message that says what is actually wrong.
+    const right = candidates.length - wrong;
+    if (wrong === 0 || right === 0) {
+      throw new Error(
+        `${opts.packId}: mix=natural needs both strata, but the population has ` +
+          `${wrong} vlm_wrong and ${right} vlm_right. A single-stratum set cannot ` +
+          `measure accuracy — widen the source query or use mix=balanced.`,
+      );
+    }
+    const ratio = wrong / candidates.length;
     wantWrong = Math.min(opts.size - 1, Math.max(1, Math.round(opts.size * ratio)));
   } else {
     wantWrong = Math.floor(opts.size / 2);
