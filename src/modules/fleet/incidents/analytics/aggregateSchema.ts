@@ -113,7 +113,7 @@ export const DURATION_BUCKET_COLUMNS = [
 export type DurationBucketColumn = (typeof DURATION_BUCKET_COLUMNS)[number];
 
 // ---------------------------------------------------------------------------
-// The public aggregate surface
+// The aggregate surface (INTERNAL - see the disclosure note before exposing it)
 // ---------------------------------------------------------------------------
 
 /**
@@ -124,6 +124,10 @@ export type DurationBucketColumn = (typeof DURATION_BUCKET_COLUMNS)[number];
  * table without being added here fails the build — which is the point: an
  * aggregate is retained indefinitely, so a column that can hold identity must
  * never reach it in the first place.
+ *
+ * NOTE that this constrains the SHAPE of a row, not what can be inferred from a
+ * SET of rows. No column here can hold a name; that does not make the table
+ * safe to publish. See `.claude/modules/fleet-analytics-disclosure.md`.
  */
 export const PUBLIC_AGGREGATE_COLUMNS = [
   'id', 'metric_version', 'month_start', 'dimension_level', 'dimension_project_id',

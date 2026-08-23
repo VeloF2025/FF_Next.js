@@ -7,7 +7,8 @@
  * group clears the anonymity threshold, and `suppression.ts` drops them before
  * anything is persisted — no contributor key ever reaches
  * `fleet_operational_monthly_aggregates`, which has no column that could hold
- * one.
+ * one. That is a statement about a ROW; it is not a claim that the resulting
+ * table is safe to publish. See `.claude/modules/fleet-analytics-disclosure.md`.
  *
  * Facts are loaded by Task 3's `aggregateRepository`; nothing here touches SQL.
  */

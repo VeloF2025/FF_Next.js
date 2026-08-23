@@ -145,13 +145,20 @@ export async function replaceMonth(
 /**
  * Whether retention may treat this month as aggregated.
  *
- * KNOWN LIMITATION, and deliberately left failing closed: a month whose data
- * was entirely suppressed - every group under the anonymity threshold, or every
- * incident missing an operational site - stores no rows, so this reports false
- * and its incidents are never purged. Blocking a deletion is the safe direction
- * to be wrong in, but it does mean such a month needs a manual decision. Fixing
- * it properly needs a per-month run record, which is a migration and therefore
- * its own approval.
+ * KNOWN LIMITATION, and deliberately left failing closed: this infers "the
+ * month was aggregated" from "the month stored rows", and those are not the
+ * same thing. A month whose data was entirely suppressed - every group under
+ * the anonymity threshold, every metric with no support, or every incident
+ * missing an operational site - stores no rows, so this reports false and its
+ * incidents are never purged.
+ *
+ * That case became MORE likely once zero-support metrics stopped publishing
+ * (see `anonymitySetFor`), and it is the current blocker on retention actually
+ * running: with no operational data at all, no month ever reports coverage.
+ * Blocking a deletion is the safe direction to be wrong in, but it is not a
+ * working retention path. Coverage should be recorded explicitly per month on
+ * the aggregation run rather than inferred here - which needs a migration, and
+ * so its own approval. See `.claude/modules/fleet-analytics-disclosure.md`.
  */
 export async function hasCompleteAggregateCoverage(
   monthStart: string,

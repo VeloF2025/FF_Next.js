@@ -50,13 +50,6 @@ interface Tally {
    * that person's exact duration.
    */
   contributorsByMetric: Map<string, Set<string>>;
-  /**
-   * Everyone seen at this site-month, used ONLY as the anonymity set for a
-   * metric whose support is zero. A true zero describes nobody in particular,
-   * so it is safe to publish, and publishing it keeps every group's metric set
-   * complete for coverage checking.
-   */
-  roster: Set<string>;
 }
 
 /** `YYYY-MM-DD` to the first of its month. The date is already SAST. */
@@ -72,7 +65,6 @@ function emptyTally(monthStart: string, projectId: string, operationalSiteId: st
     counts: new Map(),
     histograms: new Map(),
     contributorsByMetric: new Map(),
-    roster: new Set(),
   };
 }
 
@@ -157,23 +149,19 @@ function applyFact(tally: Tally, fact: OperationsFact): void {
   switch (fact.kind) {
     case 'presence': {
       const who = [fact.contributorKey];
-      tally.roster.add(fact.contributorKey);
       bump(tally, 'presence.scheduled_days', who);
       bump(tally, `presence.${fact.confirmation}_days`, who);
       return;
     }
     case 'incident':
-      tally.roster.add(fact.contributorKey);
       applyIncident(tally, fact);
       return;
     case 'monitor_run':
-      for (const key of fact.contributorKeys) tally.roster.add(key);
       bump(tally, 'reliability.monitor_runs_expected', fact.contributorKeys);
       if (fact.completed) bump(tally, 'reliability.monitor_runs_completed', fact.contributorKeys);
       return;
     case 'notification': {
       const who = [fact.contributorKey];
-      tally.roster.add(fact.contributorKey);
       bump(tally, 'reliability.notifications_sent', who);
       if (fact.delivered) bump(tally, 'reliability.notifications_delivered', who);
       return;
@@ -212,18 +200,24 @@ function denominatorKeyFor(metricKey: OperationsMetricKey): string | null {
 }
 
 /**
- * The group a metric's row describes, and therefore the set the anonymity
- * threshold is applied to downstream.
+ * The people a metric is actually about - and nobody else.
  *
- * A metric with real support is described by exactly the people who contributed
- * to it - never by the wider roster, which would overstate the protection. A
- * metric with NO support is a true zero: it describes nobody in particular, so
- * the roster is the honest anonymity set and the row is safe to publish.
+ * An earlier version handed a zero-support metric the site ROSTER so that true
+ * zeros stayed publishable. That was wrong in a way worth recording, because it
+ * re-opened the exact leak it was written alongside: parent rows union their
+ * children's sets, so a real support of ONE at one site merged with the rosters
+ * of people who contributed nothing at the others - inflating 1 to 9 and
+ * defeating the organisation-level guard. A single incident's exact
+ * `sum_seconds` was then published at project and organisation level, by the
+ * fix that was meant to prevent exactly that.
+ *
+ * So the set is the support, always, and an empty support stays empty. A metric
+ * nobody contributed to is withheld rather than published as a roster-sized
+ * zero. `contributor_count` now means one thing on every row at every level:
+ * how many distinct people this number is about.
  */
 function anonymitySetFor(tally: Tally, metricKey: string): Set<string> {
-  const measured = tally.contributorsByMetric.get(metricKey);
-  if (measured && measured.size > 0) return new Set(measured);
-  return new Set(tally.roster);
+  return new Set(tally.contributorsByMetric.get(metricKey) ?? []);
 }
 
 function toGroups(tally: Tally, metricVersion: number): CalculatedMetricGroup[] {

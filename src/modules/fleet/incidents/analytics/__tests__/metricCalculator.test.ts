@@ -306,14 +306,50 @@ describe('calculateMonthlyMetrics', () => {
       expect(find(groups, 'incident.late')?.contributors).toEqual(new Set(['a', 'b']));
     });
 
-    it('gives a true zero the roster, since it singles nobody out', () => {
+    it('leaves a zero-support metric with an EMPTY set, never the roster', () => {
+      // Handing a zero its roster looks harmless at leaf level and is not:
+      // parents union their children's sets, so a roster of people who
+      // contributed nothing inflates a sibling site's real support of one into
+      // a number that clears the threshold, and the exact value withheld below
+      // gets published above. An empty support stays empty and the row is
+      // withheld instead.
       const groups = calculateMonthlyMetrics(
         [presence('a', 'confirmed'), presence('b', 'confirmed')],
         VERSION,
       );
       const never = find(groups, 'incident.severe_driving');
       expect(never?.numerator).toBe(0);
-      expect(never?.contributors).toEqual(new Set(['a', 'b']));
+      expect(never?.contributors.size).toBe(0);
+    });
+
+    it('does not let a zero-support sibling inflate a parent above the threshold', () => {
+      // Two sites, eight rostered each, ONE incident in the whole project.
+      // The project row must NOT publish that one person's exact duration.
+      const facts: OperationsFact[] = [];
+      for (const site of ['s1', 's2']) {
+        for (let i = 0; i < 8; i += 1) {
+          facts.push({
+            kind: 'presence', workDate: '2026-07-14',
+            dimension: { projectId: 'p1', operationalSiteId: site },
+            contributorKey: `${site}-${i}`, confirmation: 'confirmed',
+          });
+        }
+      }
+      facts.push(incident({
+        contributorKey: 's1-0', incidentType: 'accident_sos',
+        resolutionSeconds: 4271, dimension: { projectId: 'p1', operationalSiteId: 's1' },
+      }));
+
+      const groups = calculateMonthlyMetrics(facts, VERSION);
+      const s2Timing = groups.find(
+        (g) => g.operationalSiteId === 's2' && g.metricKey === 'timing.resolution',
+      );
+      expect(s2Timing?.contributors.size).toBe(0);
+      const s1Timing = groups.find(
+        (g) => g.operationalSiteId === 's1' && g.metricKey === 'timing.resolution',
+      );
+      // The union a parent would compute is 1, not 1 + 8.
+      expect(s1Timing?.contributors).toEqual(new Set(['s1-0']));
     });
 
     it('does not let monitor-run facts inflate a presence group', () => {

@@ -1,12 +1,27 @@
 /**
  * Turns per-site calculated groups into the rows that may actually be stored.
  *
- * `contributor_count >= 5` on `fleet_operational_monthly_aggregates` is a
- * per-row guard, and a per-row guard cannot see DIFFERENCING: if a project
- * publishes its total and all but one of its sites, subtracting recovers the
- * withheld site exactly. So this module withholds in pairs - see
- * `applyComplementarySuppression`. That rule, not the threshold, is the reason
- * this file exists.
+ * ## What this does and does NOT guarantee
+ *
+ * These rows are INTERNAL. They are not a published anonymous dataset and this
+ * module is not a statistical disclosure control. Read
+ * `.claude/modules/fleet-analytics-disclosure.md` before exposing any of this
+ * through an API, an export, or a UI - the surface is not safe to release as-is
+ * and the reasons are specific and written down.
+ *
+ * What it DOES close: cross-level differencing. `contributor_count >= 5` is a
+ * per-row guard, and a per-row guard cannot see that subtracting a parent's
+ * published children from the parent recovers the withheld ones. So siblings
+ * are withheld until that residual itself describes enough people - see
+ * `applyComplementarySuppression`.
+ *
+ * What it does NOT close: the metric keys are not independent of one another.
+ * They partition into sums whose totals are published as the denominators of
+ * the surviving rows, so withholding one key while publishing its siblings and
+ * their shared denominator recovers it by subtraction. Suppression here only
+ * ever compares siblings WITHIN one metric key. Closing that needs
+ * partition-aware suppression, which is the design work the disclosure note
+ * describes.
  *
  * It is also the last place a contributor identity exists. Groups arrive with a
  * `Set<string>` of contributor keys and leave with a count; `ReleasedAggregate`
