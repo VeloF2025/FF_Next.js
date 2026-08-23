@@ -52,6 +52,21 @@ ruleTester.run('no-unthemed-light-surface', rule, {
     { code: '<div className="bg-white dark:bg-card">x</div>;' },
     // --- Opacity suffixes on a dark value are still a fix.
     { code: '<div className="bg-white dark:bg-gray-900/80">x</div>;' },
+    // --- A DARK arbitrary value is a legitimate fix. Rejecting it (the rule
+    //     did, before the lightness parser) is the false positive most likely
+    //     to make someone reach for eslint-disable, since an exact brand colour
+    //     is normally written this way.
+    { code: '<div className="bg-white dark:bg-[#111]">x</div>;' },
+    { code: '<div className="bg-white dark:bg-[rgb(17,17,17)]">x</div>;' },
+    // --- A dark arbitrary background needs no dark: prefix to be fine.
+    { code: '<div className="bg-[#111]">x</div>;' },
+    { code: '<div className="bg-[rgb(20,20,20)]">x</div>;' },
+    // --- A CSS custom property IS the theming mechanism this rule pushes
+    //     toward: it flips with the theme, so it is never an unthemed surface.
+    //     There are 5,611 such usages in this repo; treating an unparseable
+    //     value as light must not sweep them all up.
+    { code: '<div className="bg-[var(--ff-surface-elevated)]">x</div>;' },
+    { code: '<div className="bg-white dark:bg-[var(--ff-surface-dark)]">x</div>;' },
     // --- ...or the TEXT.
     { code: '<div className="bg-white dark:text-gray-900">x</div>;' },
     // --- dark: behind another variant prefix still counts.
@@ -202,6 +217,18 @@ ruleTester.run('no-unthemed-light-surface', rule, {
     // --- An input's placeholder and value ARE rendered text, so `input` is not
     //     a textless element. Closing this cost zero findings repo-wide.
     { code: '<input className="bg-white" placeholder="Search" />;', errors: E },
+
+    // --- Arbitrary LIGHT values in every notation. A hex-only regex let
+    //     rgb()/hsl() white through untouched, so the value is parsed instead.
+    { code: '<div className="bg-[rgb(255,255,255)]">x</div>;', errors: E },
+    { code: '<div className="bg-[hsl(0,0%,100%)]">x</div>;', errors: E },
+    // Tailwind writes spaces as underscores inside arbitrary values.
+    { code: '<div className="bg-[rgb(255_255_255)]">x</div>;', errors: E },
+    { code: '<div className="bg-[#FFF]">x</div>;', errors: E },
+    { code: '<div className="bg-[#fffffe]">x</div>;', errors: E },
+
+    // --- A dark: arbitrary value that is still LIGHT is not a fix.
+    { code: '<div className="bg-white dark:bg-[#eee]">x</div>;', errors: E },
   ],
 });
 

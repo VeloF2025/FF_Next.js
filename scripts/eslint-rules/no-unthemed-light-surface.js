@@ -80,10 +80,12 @@
 //
 // NOT covered, deliberately: the `-50` tints of the COLOURED palettes
 // (bg-red-50, bg-blue-50, bg-green-50, bg-amber-50 ...). They are just as light
-// and do fail the same way, but they are used in 400+ files here as status
-// tints, so folding them in would turn a clean gate into a 400-finding ratchet.
-// That is a separate cleanup with its own baseline, not something to smuggle in
-// behind this rule. See the PR description.
+// and do fail the same way, but measured on 2026-08-23 they appear 706 times
+// across 268 files here as status tints, so folding them in would turn a clean
+// gate into a several-hundred-finding ratchet. That is a separate cleanup with
+// its own baseline, not something to smuggle in behind this rule.
+//   grep -rlE 'bg-(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|
+//     blue|indigo|violet|purple|fuchsia|pink|rose)-50\b' --include=*.tsx src pages
 const LIGHT_SURFACE_BASES = [
   'bg-white',
   'bg-gray-50', 'bg-gray-100', 'bg-gray-200',
@@ -93,11 +95,76 @@ const LIGHT_SURFACE_BASES = [
   'bg-stone-50', 'bg-stone-100', 'bg-stone-200',
 ];
 
-// Arbitrary-value light backgrounds: bg-[#fff], bg-[#FFFFFF], bg-[white].
+// Arbitrary-value backgrounds: bg-[#fff], bg-[rgb(255,255,255)], bg-[hsl(0,0%,100%)].
 // The bracket syntax bypasses the token list entirely, so without this a
 // developer told to stop using `bg-white` could satisfy the rule by writing
 // `bg-[#fff]` — the identical pixel, silently unguarded.
-const ARBITRARY_LIGHT_RE = /^(?!.*(?:^|:)dark:)(?:[a-z0-9-]+:)*bg-\[(#(?:f{3}|f{6}|fff[0-9a-f]{0,5})|white|snow|ivory|azure)\]$/i;
+//
+// A regex over hex alone was not enough: `bg-[rgb(255,255,255)]` and
+// `bg-[hsl(0,0%,100%)]` are plain white and slipped straight through. Rather
+// than grow the pattern again, the value is PARSED and its lightness measured,
+// which also lets the dark: escape hatch recognise a genuinely dark arbitrary
+// value such as `dark:bg-[#111]` instead of rejecting a correct fix.
+const ARBITRARY_BG_RE = /^(?:[a-z0-9-]+:)*bg-\[([^\]]+)\]$/i;
+const DARK_ARBITRARY_BG_RE = /^(?:[a-z0-9-]+:)*dark:(?:[a-z0-9-]+:)*bg-\[([^\]]+)\]$/i;
+
+// Named CSS colours light enough to be a light surface. Not exhaustive — an
+// unrecognised name returns null (unknown), which counts as light for a plain
+// `bg-[...]` and as NOT-dark for a `dark:bg-[...]`, keeping both directions
+// biased toward reporting.
+const LIGHT_NAMED = new Set([
+  'white', 'snow', 'ivory', 'azure', 'floralwhite', 'ghostwhite', 'seashell',
+  'whitesmoke', 'aliceblue', 'mintcream', 'honeydew', 'lavenderblush',
+  'oldlace', 'linen', 'cornsilk', 'beige', 'lightyellow', 'lightgoldenrodyellow',
+]);
+
+/**
+ * Relative lightness of an arbitrary Tailwind colour value, 0 (black) to 1
+ * (white), or null when the value cannot be parsed.
+ *
+ * Tailwind writes arbitrary values with underscores standing in for spaces
+ * (`bg-[rgb(255_255_255)]`), so those are normalised first.
+ */
+function arbitraryLightness(raw) {
+  const value = String(raw).trim().replace(/_/g, ' ').toLowerCase();
+
+  // A CSS custom property IS the theming mechanism this rule pushes people
+  // toward — `bg-[var(--ff-surface-elevated)]` flips with the theme, so it is
+  // never an unthemed light surface. It must be treated as safe rather than as
+  // an unparseable unknown, or the rule would flag the correct pattern.
+  if (value.includes('var(')) return THEMED;
+
+  const hex = /^#([0-9a-f]{3,8})$/.exec(value);
+  if (hex) {
+    let d = hex[1];
+    if (d.length === 3 || d.length === 4) d = d.slice(0, 3).split('').map((c) => c + c).join('');
+    if (d.length < 6) return null;
+    const r = parseInt(d.slice(0, 2), 16) / 255;
+    const g = parseInt(d.slice(2, 4), 16) / 255;
+    const b = parseInt(d.slice(4, 6), 16) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(value);
+  if (rgb) {
+    const [r, g, b] = [rgb[1], rgb[2], rgb[3]].map((n) => Number(n) / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  const hsl = /^hsla?\(\s*[\d.]+(?:deg)?[\s,]+[\d.]+%[\s,]+([\d.]+)%/.exec(value);
+  if (hsl) return Number(hsl[1]) / 100;
+
+  if (LIGHT_NAMED.has(value)) return 1;
+  if (value === 'black' || value === 'transparent' || value === 'currentcolor') return 0;
+  return null;
+}
+
+/** Sentinel: value follows the theme, so it is safe in both directions. */
+const THEMED = -1;
+/** A light surface: bright enough that theme-following text disappears on it. */
+const LIGHT_THRESHOLD = 0.75;
+/** A genuinely dark dark-mode surface, matching the >= 600 palette-shade floor. */
+const DARK_THRESHOLD = 0.35;
 
 // A whole-token match, allowing a `/NN` opacity suffix and any variant prefixes
 // (`hover:`, `md:`, `group-hover:` ...). The `dark:` prefix is excluded here —
@@ -264,7 +331,14 @@ module.exports = {
 
     /** Is this token a light SURFACE (not a low-opacity tint)? */
     function lightSurfaceIn(tok) {
-      if (ARBITRARY_LIGHT_RE.test(tok)) return tok;
+      if (/(?:^|:)dark:/.test(tok)) return null;
+      const arbitrary = ARBITRARY_BG_RE.exec(tok);
+      if (arbitrary) {
+        const lightness = arbitraryLightness(arbitrary[1]);
+        // Unparseable counts as light: an unknown value must not buy silence.
+        if (lightness === THEMED) return null;
+        return lightness === null || lightness >= LIGHT_THRESHOLD ? tok : null;
+      }
       const m = LIGHT_SURFACE_RE.exec(tok);
       if (!m) return null;
       if (m[2] !== undefined && Number(m[2]) < opaqueFrom) return null;
@@ -282,7 +356,16 @@ module.exports = {
       if (!offender) return;
 
       // Either escape hatch, evaluated across the WHOLE className expression.
-      const hasDarkFix = all.some((t) => DARK_BG_FIX_RE.test(t) || DARK_TEXT_FIX_RE.test(t));
+      const hasDarkFix = all.some((t) => {
+        if (DARK_BG_FIX_RE.test(t) || DARK_TEXT_FIX_RE.test(t)) return true;
+        // A dark arbitrary value (`dark:bg-[#111]`) is a legitimate fix. Without
+        // this, hitting an exact brand colour that way is rejected, which is the
+        // shape most likely to make someone reach for eslint-disable.
+        const darkArbitrary = DARK_ARBITRARY_BG_RE.exec(t);
+        if (!darkArbitrary) return false;
+        const lightness = arbitraryLightness(darkArbitrary[1]);
+        return lightness === THEMED || (lightness !== null && lightness >= 0 && lightness <= DARK_THRESHOLD);
+      });
       const hasDarkSafeText = all.some((t) => DARK_SAFE_TEXT_RE.test(t));
       if (hasDarkFix || hasDarkSafeText) return;
 
