@@ -29,17 +29,28 @@ const BASE_TABLE = 'fleet_operational_monthly_aggregates';
  * INSERT or UPDATE a generation, and a view is not what you write through.
  * Every other file must go through the view.
  */
-const WRITER_FILES = ['src/modules/fleet/incidents/analytics/aggregateRepository.ts'];
+const WRITER_FILES = [
+  'src/modules/fleet/incidents/analytics/aggregateRepository.ts',
+  // The migrations that CREATE the table and the view over it. A migration is
+  // the one place the base table has to be named, and naming it there is not a
+  // read path.
+  'scripts/migrations/sql/518_fleet_operational_analytics_retention.sql',
+  'scripts/migrations/sql/rollback_518_fleet_operational_analytics_retention.sql',
+  'scripts/migrations/sql/527_fleet_aggregates_published_view.sql',
+  'scripts/migrations/sql/rollback_527_fleet_aggregates_published_view.sql',
+];
 
 /**
- * Where a query can be written. The old frame was `src/modules/fleet` alone,
- * which the blind review of PR #2604 pointed out excludes the 118 `.ts` files
- * under `pages/api/**` that write raw SQL, all of `src/services` and `src/lib`,
- * every script, and every `.js` and `.mjs` file anywhere. A guard that cannot
- * see the directory the next reader will put their query in is not a guard.
+ * Where a query can be written. The frame started as `src/modules/fleet` alone,
+ * which excluded the `pages/api/**` handlers that write raw SQL, all of
+ * `src/services` and `src/lib`, every script, and every `.js` and `.mjs` file
+ * anywhere. The App Router tree — 233 more `.ts`/`.tsx` files — and raw `.sql`
+ * were still missing after the first widening. A guard that cannot see the
+ * directory the next reader will put their query in is not a guard, and the way
+ * that keeps being discovered is by someone naming a directory it forgot.
  */
-const SCANNED_ROOTS = ['pages', 'src', 'scripts', 'lib'];
-const SCANNED_EXTENSIONS = /\.(ts|tsx|js|mjs)$/;
+const SCANNED_ROOTS = ['app', 'pages', 'src', 'scripts', 'lib'];
+const SCANNED_EXTENSIONS = /\.(ts|tsx|js|mjs|sql)$/;
 const SKIPPED_DIRECTORIES = new Set(['node_modules', '.next', 'dist', 'build', 'coverage']);
 
 const forward = readFileSync(MIGRATION, 'utf8');
@@ -50,17 +61,20 @@ const forward = readFileSync(MIGRATION, 'utf8');
  * next person to delete the explanation rather than the query.
  *
  * Between the keyword and the name: any run of whitespace, brackets or quotes,
- * then an optional schema qualification, then an optional opening quote. The
- * trailing `(?!\\w)` keeps the view (…_published) out — `_` is a word character,
- * so no `\\b` falls between the name and its suffix — while still allowing the
- * closing double quote of a quoted identifier.
+ * then an optional schema qualification — quoted or not — then an optional
+ * opening quote. The trailing `(?!\\w)` keeps the view (…_published) out — `_` is
+ * a word character, so no `\\b` falls between the name and its suffix — while
+ * still allowing the closing double quote of a quoted identifier.
+ *
+ * The keyword list is every way SQL names a relation it is about to read or
+ * write, not just the four a first draft thought of.
  *
  * Built fresh on each call: the `g`-less form has no lastIndex to carry, but a
  * shared literal is the kind of thing a later edit makes stateful by accident.
  */
 function basePattern(): RegExp {
   return new RegExp(
-    `(FROM|JOIN|INTO|UPDATE)[\\s("]+(?:public\\.)?"?${BASE_TABLE}(?!\\w)`,
+    `(FROM|JOIN|INTO|UPDATE|TRUNCATE|COPY|MERGE)[\\s("]+(?:"?public"?\\.)?"?${BASE_TABLE}(?!\\w)`,
     'i',
   );
 }
@@ -76,6 +90,18 @@ function sourceFiles(directory: string): string[] {
   return found;
 }
 
+/**
+ * Tests may name the base table: they are what proves the writer still reaches
+ * it. The exemption is narrow on purpose — `__tests__` anywhere in the path used
+ * to be enough, which would have excused a `__tests__` directory in any module
+ * in the repository. It now has to be this module's own test directory, or a
+ * file that is a test by name.
+ */
+function exemptFromScan(relativePath: string): boolean {
+  if (relativePath.startsWith('src/modules/fleet/') && relativePath.includes('/__tests__/')) return true;
+  return /(^|\/)[^/]*\.test\.[^/]+$/.test(relativePath);
+}
+
 function scannedFiles(): string[] {
   const found: string[] = [];
   for (const root of SCANNED_ROOTS) {
@@ -86,7 +112,7 @@ function scannedFiles(): string[] {
   return found;
 }
 
-describe('migration 527 publishes exactly the allow-listed surface', () => {
+describe('migration 527 publishes exactly the columns the allow-list names', () => {
   it('selects every column the allow-list names, and no other', () => {
     const body = /AS\s*\nSELECT([\s\S]*?)FROM fleet_operational_monthly_aggregates/.exec(forward);
     expect(body).not.toBeNull();
@@ -122,7 +148,7 @@ describe('nothing reads the base table behind the view', () => {
     for (const file of scannedFiles()) {
       const relativePath = relative(REPO_ROOT, file).split('\\').join('/');
       if (WRITER_FILES.includes(relativePath)) continue;
-      if (relativePath.includes('__tests__')) continue;
+      if (exemptFromScan(relativePath)) continue;
       if (basePattern().test(readFileSync(file, 'utf8'))) offenders.push(relativePath);
     }
     expect(offenders).toEqual([]);
@@ -132,10 +158,12 @@ describe('nothing reads the base table behind the view', () => {
     // The frame is the guard. If this ever shrinks back to one module, the
     // assertion above passes for the wrong reason.
     const scanned = scannedFiles().map((file) => relative(REPO_ROOT, file).split('\\').join('/'));
+    expect(scanned.some((path) => path.startsWith('app/'))).toBe(true);
     expect(scanned.some((path) => path.startsWith('pages/api/'))).toBe(true);
     expect(scanned.some((path) => path.startsWith('src/services/'))).toBe(true);
     expect(scanned.some((path) => path.startsWith('scripts/'))).toBe(true);
     expect(scanned.some((path) => path.endsWith('.js') || path.endsWith('.mjs'))).toBe(true);
+    expect(scanned.some((path) => path.endsWith('.sql'))).toBe(true);
     expect(scanned.length).toBeGreaterThan(1000);
   });
 
@@ -145,6 +173,10 @@ describe('nothing reads the base table behind the view', () => {
     // of double quotes walked past it.
     for (const bypass of [
       'SELECT * FROM public.fleet_operational_monthly_aggregates',
+      'SELECT * FROM "public".fleet_operational_monthly_aggregates',
+      'TRUNCATE fleet_operational_monthly_aggregates',
+      'COPY fleet_operational_monthly_aggregates TO STDOUT',
+      'MERGE INTO fleet_operational_monthly_aggregates AS target',
       'SELECT * FROM "fleet_operational_monthly_aggregates"',
       'SELECT * FROM public."fleet_operational_monthly_aggregates"',
       'SELECT * FROM\n  fleet_operational_monthly_aggregates',
