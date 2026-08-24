@@ -1,7 +1,20 @@
 # Fleet operational aggregates — disclosure status
 
-**Status: INTERNAL. Not a published anonymous dataset. Do not expose through an API, an export,
-a report, or a UI without doing the design work in "What is still open" below.**
+**Status: INTERNAL, with the two blocking items now closed. Still not a published anonymous
+dataset — read "What is still open" before exposing it, and treat section 3 as live.**
+
+The two items that blocked a read path were closed on 2026-08-24, before stage 8 task 7 was
+written:
+
+- **Cross-key differencing (was open item 1)** — closed by `metricPartitions.ts`, applied at every
+  cell by `suppression.ts#applyPartitionRule`. See "The metric keys are not independent" below for
+  what it now does.
+- **Retired rows (was open item 2)** — closed by migration 525's
+  `fleet_operational_monthly_aggregates_published` view, which hard-codes `is_active = true`, plus
+  a CI guard that fails the build if any file outside the writer queries the base table.
+
+What has NOT changed: everything in section 3, and the fact that `contributor_count >= 5` bounds
+how many people are in a bucket and never how much of it belongs to one of them.
 
 `fleet_operational_monthly_aggregates` (migration 518) was designed as a publishable anonymous
 aggregate. Adversarial review on 2026-08-23 (PR #2594) demonstrated that it is not one. The table,
@@ -56,7 +69,7 @@ Nothing reads the table for analytics, because the read path (stage 8 tasks 6–
 
 ## What is still open — read before exposing anything
 
-### 1. The metric keys are not independent (the blocking one)
+### 1. The metric keys are not independent — CLOSED 2026-08-24
 
 They partition into sums whose totals are published as the denominators of the surviving rows:
 
@@ -78,19 +91,45 @@ incident:  incident.total(10) - published(8) = 2 accident_sos, support = 1 perso
 And `contributor_count` arithmetic across keys attributes it:
 `k(incident.total) - k(incident.late) = 1` — one named person, at a named site, in a named month.
 
-**Closing it needs partition-aware suppression:** treat a partition as one unit, and apply the same
-residual rule across its keys — withhold members until the withheld members' combined support
-clears the threshold — and never publish a denominator whose partition has a sub-threshold
-residual.
+**How it was closed.** `metricPartitions.ts` declares the three partitions and, for each cell,
+returns the members that must additionally be withheld: once the total is knowable, the withheld
+members' combined support must either be empty — they are all zero, so the subtraction yields zero
+and describes nobody — or cover at least `k` people. Members are sacrificed smallest-support first,
+ties broken on the key name, so a re-run stays byte-identical.
 
-### 2. Retired rows are unprotected
+Two parts of it were found by testing rather than by design, and are worth knowing:
+
+- **Withholding every member is not always enough.** Where a partition's members do not between
+  them cover everyone the total counts, the total is still published with nothing left to hide the
+  residual behind. So the total goes too — `presence.scheduled_days` for presence, and
+  `reliability.evidence_available` / `reliability.recurrence` for incidents, both of which are
+  ratios over `incident.total`. This is the "never publish a denominator whose partition has a
+  sub-threshold residual" half, and a 20,000-case randomised property test is what surfaced it.
+- **The two axes interact.** A sacrifice made across keys can withhold a parent whose children the
+  cross-level rule had already published, so the "a withheld parent publishes nothing beneath it"
+  invariant has to be re-established afterwards (`cascadeWithholding`).
+
+With today's two rules the pass converges immediately: both only ever withhold cells that already
+cleared the threshold, so a cascade adds at least `k` people to any residual it touches and cannot
+open a new violation. The loop around them is a backstop for a future rule without that property.
+
+### 2. Retired rows — CLOSED 2026-08-24
 
 `is_active = false` rows are never deleted and nothing but a `WHERE` predicate protects them. There
-is no view and no RLS; the grant that exists makes it worse rather than better — migration 518
-grants `SELECT, INSERT, UPDATE, DELETE` on this table to `fibreflow_user`, the application role, so
-the "only writer" property below is a property of the codebase and not one the database enforces.
-The first reader that forgets `AND is_active = true` reads withheld groups. If a read path ships,
-it must go through a view that hard-codes the predicate — not through a convention.
+was no view and no RLS, and the first reader that forgot `AND is_active = true` would have read
+withheld groups — silently, because the omission returns more rows rather than an error.
+
+Migration 525 adds `fleet_operational_monthly_aggregates_published`, a `security_barrier` view over
+the allow-listed columns with `is_active = true` hard-coded, and `retentionRepository.ts`'s coverage
+gate — the only reader that existed — now goes through it.
+
+**The grant is unchanged, and that is the residual risk.** `fibreflow_user` keeps `SELECT` on the
+base table because Postgres requires it for any column named in an `UPDATE`'s `WHERE` or
+`RETURNING`, so revoking it would break `replaceMonth` and the purge with it. Splitting the writer
+onto its own role is what would let the grant be withdrawn; that is an architectural change, not a
+migration, and remains open. Until then the database would still permit a direct read, and the
+thing that actually stops one is `aggregateViewContract.test.ts`, which fails the build if any file
+outside the writer names the base table in a `FROM`/`JOIN`/`INTO`/`UPDATE` position.
 
 Note also that raising `k` is exactly the case that recomputes a month to nothing (see
 `replaceMonth`), which leaves the PRE-TIGHTENING, more disclosive generation sitting in the table

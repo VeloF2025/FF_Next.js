@@ -3,25 +3,28 @@
  *
  * ## What this does and does NOT guarantee
  *
- * These rows are INTERNAL. They are not a published anonymous dataset and this
- * module is not a statistical disclosure control. Read
- * `.claude/modules/fleet-analytics-disclosure.md` before exposing any of this
- * through an API, an export, or a UI - the surface is not safe to release as-is
- * and the reasons are specific and written down.
+ * Read `.claude/modules/fleet-analytics-disclosure.md` before exposing any of
+ * this through an API, an export, or a UI. Two of the blockers it listed are
+ * now closed - see below - but the weaker items in its section 3 are not, and
+ * this module is still not a general statistical disclosure control.
  *
- * What it DOES close: cross-level differencing. `contributor_count >= 5` is a
- * per-row guard, and a per-row guard cannot see that subtracting a parent's
- * published children from the parent recovers the withheld ones. So siblings
- * are withheld until that residual itself describes enough people - see
- * `applyComplementarySuppression`.
+ * What it closes, on two axes:
  *
- * What it does NOT close: the metric keys are not independent of one another.
- * They partition into sums whose totals are published as the denominators of
- * the surviving rows, so withholding one key while publishing its siblings and
- * their shared denominator recovers it by subtraction. Suppression here only
- * ever compares siblings WITHIN one metric key. Closing that needs
- * partition-aware suppression, which is the design work the disclosure note
- * describes.
+ * 1. Cross-level differencing. `contributor_count >= 5` is a per-row guard, and
+ *    a per-row guard cannot see that subtracting a parent's published children
+ *    from the parent recovers the withheld ones. So siblings are withheld until
+ *    that residual itself describes enough people - `applyComplementarySuppression`.
+ *
+ * 2. Cross-KEY differencing. The metric keys are not independent: three
+ *    families of them sum to a total that is published in its own right, as a
+ *    row for presence and as the shared denominator everywhere else. Withholding
+ *    one member while publishing its siblings and their total gave the member
+ *    back by subtraction, and rule 1 never looked across keys. `metricPartitions.ts`
+ *    is that second axis, applied at every cell by `applyPartitionRule`.
+ *
+ * The two interact: a sacrifice made by rule 2 can withhold a parent whose
+ * children rule 1 had already published, so `cascadeWithholding` re-establishes
+ * "a withheld parent publishes nothing beneath it" afterwards.
  *
  * It is also the last place a contributor identity exists. Groups arrive with a
  * `Set<string>` of contributor keys and leave with a count; `ReleasedAggregate`
@@ -33,6 +36,7 @@
 import type { AggregateDimensionLevel, AggregateMetricKind, OperationsMetricKey } from './aggregateSchema';
 import { metricKindFor } from './aggregateSchema';
 import type { CalculatedMetricGroup } from './facts';
+import { partitionSacrifices } from './metricPartitions';
 import type { DurationHistogram } from './types';
 
 export interface ReleasedAggregate {
@@ -178,14 +182,36 @@ function toRow(
   };
 }
 
-/** One (month, metric) slice: sites -> projects -> organisation. */
-function releaseSlice(
+/**
+ * One cell of the cube: one metric key at one level of one month. Carries the
+ * per-key decision AND the contributor set behind it, because the partition rule
+ * runs after this and needs the support, not the count.
+ */
+interface ReleaseCell {
+  monthStart: string;
+  metricVersion: number;
+  metricKey: OperationsMetricKey;
+  level: AggregateDimensionLevel;
+  projectId: string | null;
+  siteId: string | null;
+  accumulator: Accumulator;
+  published: boolean;
+}
+
+/**
+ * One (month, metric) slice: sites -> projects -> organisation.
+ *
+ * Returns cells rather than rows. Every cell the slice knows about is returned,
+ * withheld ones included — `applyPartitionRule` has to see what was withheld to
+ * work out whether the withholding gave anything away.
+ */
+function releaseSliceCells(
   monthStart: string,
   metricVersion: number,
   metricKey: OperationsMetricKey,
   groups: readonly CalculatedMetricGroup[],
   minimumContributors: number,
-): ReleasedAggregate[] {
+): ReleaseCell[] {
   const byProject = new Map<string, Candidate[]>();
   for (const group of groups) {
     const sites = byProject.get(group.projectId) ?? [];
@@ -194,41 +220,48 @@ function releaseSlice(
   }
 
   const projects: Candidate[] = [];
-  const siteDecisions = new Map<string, { published: Candidate[]; withheldCount: number }>();
+  const publishedSites = new Map<string, Set<string>>();
   for (const [projectId, sites] of byProject) {
     const accumulator = emptyAccumulator();
     for (const site of sites) accumulate(accumulator, site.accumulator);
     projects.push({ id: projectId, accumulator });
-    siteDecisions.set(projectId, applyComplementarySuppression(sites, minimumContributors));
+    const decision = applyComplementarySuppression(sites, minimumContributors);
+    publishedSites.set(projectId, new Set(decision.published.map((candidate) => candidate.id)));
   }
 
   const organisation = emptyAccumulator();
   for (const project of projects) accumulate(organisation, project.accumulator);
   // The organisation is a superset of every project, so if it cannot clear the
   // threshold nothing beneath it can either: the whole slice is withheld.
-  if (organisation.contributors.size < minimumContributors) return [];
+  const organisationPublished = organisation.contributors.size >= minimumContributors;
+  const publishedProjects = new Set(
+    organisationPublished
+      ? applyComplementarySuppression(projects, minimumContributors).published.map((candidate) => candidate.id)
+      : [],
+  );
 
-  const projectDecision = applyComplementarySuppression(projects, minimumContributors);
-
-  const rows: ReleasedAggregate[] = [];
-  for (const project of projectDecision.published) {
-    const decision = siteDecisions.get(project.id);
-    for (const site of decision?.published ?? []) {
-      rows.push(toRow(monthStart, metricVersion, metricKey, 'site', project.id, site.id, null, site.accumulator));
+  const base = { monthStart, metricVersion, metricKey };
+  const cells: ReleaseCell[] = [];
+  for (const [projectId, sites] of byProject) {
+    const sitesHere = publishedSites.get(projectId) ?? new Set<string>();
+    for (const site of sites) {
+      cells.push({
+        ...base, level: 'site', projectId, siteId: site.id, accumulator: site.accumulator,
+        published: organisationPublished && publishedProjects.has(projectId) && sitesHere.has(site.id),
+      });
     }
-    rows.push(toRow(
-      monthStart, metricVersion, metricKey, 'project', project.id, null,
-      (decision?.withheldCount ?? 0) > 0 ? 'site' : null,
-      project.accumulator,
-    ));
   }
-  // A withheld project publishes no site rows either: its sites would rebuild it.
-  rows.push(toRow(
-    monthStart, metricVersion, metricKey, 'organisation', null, null,
-    projectDecision.withheldCount > 0 ? 'project' : null,
-    organisation,
-  ));
-  return rows;
+  for (const project of projects) {
+    cells.push({
+      ...base, level: 'project', projectId: project.id, siteId: null, accumulator: project.accumulator,
+      published: organisationPublished && publishedProjects.has(project.id),
+    });
+  }
+  cells.push({
+    ...base, level: 'organisation', projectId: null, siteId: null, accumulator: organisation,
+    published: organisationPublished,
+  });
+  return cells;
 }
 
 const LEVEL_ORDER: Record<AggregateDimensionLevel, number> = { site: 0, project: 1, organisation: 2 };
@@ -237,6 +270,85 @@ const LEVEL_ORDER: Record<AggregateDimensionLevel, number> = { site: 0, project:
  * Releases every group that may be published, generalizing or withholding the
  * rest. Returns rows in a stable order so a re-run is byte-identical.
  */
+/** Identifies one cell across metric keys — the axis the partition rule works on. */
+function cellId(cell: ReleaseCell): string {
+  return `${cell.monthStart}|${cell.metricVersion}|${cell.level}|${cell.projectId ?? ''}|${cell.siteId ?? ''}`;
+}
+
+/**
+ * Withholds the members the partition rule demands, at every cell independently.
+ * Returns whether anything changed, because withholding more can create a new
+ * violation elsewhere — see the fixed point in `releaseAnonymousGroups`.
+ */
+function applyPartitionRule(cells: readonly ReleaseCell[], minimumContributors: number): boolean {
+  const byCell = new Map<string, ReleaseCell[]>();
+  for (const cell of cells) {
+    const bucket = byCell.get(cellId(cell)) ?? [];
+    bucket.push(cell);
+    byCell.set(cellId(cell), bucket);
+  }
+
+  let changed = false;
+  for (const bucket of byCell.values()) {
+    const sacrifices = new Set(partitionSacrifices(
+      bucket.map((cell) => ({
+        metricKey: cell.metricKey, contributors: cell.accumulator.contributors, published: cell.published,
+      })),
+      minimumContributors,
+    ));
+    if (sacrifices.size === 0) continue;
+    for (const cell of bucket) {
+      if (cell.published && sacrifices.has(cell.metricKey)) { cell.published = false; changed = true; }
+    }
+  }
+  return changed;
+}
+
+/**
+ * A withheld parent publishes nothing beneath it: its children would rebuild it.
+ * The per-key pass already honours this, but the partition rule can withhold a
+ * parent afterwards, so it has to be re-established.
+ */
+function cascadeWithholding(cells: readonly ReleaseCell[]): boolean {
+  const withheldOrganisation = new Set<string>();
+  const withheldProject = new Set<string>();
+  for (const cell of cells) {
+    if (cell.published) continue;
+    if (cell.level === 'organisation') withheldOrganisation.add(`${cell.monthStart}|${cell.metricVersion}|${cell.metricKey}`);
+    if (cell.level === 'project') withheldProject.add(`${cell.monthStart}|${cell.metricVersion}|${cell.metricKey}|${cell.projectId}`);
+  }
+
+  let changed = false;
+  for (const cell of cells) {
+    if (!cell.published) continue;
+    const orphanedByOrganisation = cell.level !== 'organisation'
+      && withheldOrganisation.has(`${cell.monthStart}|${cell.metricVersion}|${cell.metricKey}`);
+    const orphanedByProject = cell.level === 'site'
+      && withheldProject.has(`${cell.monthStart}|${cell.metricVersion}|${cell.metricKey}|${cell.projectId}`);
+    if (orphanedByOrganisation || orphanedByProject) { cell.published = false; changed = true; }
+  }
+  return changed;
+}
+
+/**
+ * A published parent whose children were not all published says so on the row.
+ * Computed from the final decision rather than from the per-key pass, so a
+ * sacrifice made by the partition rule is disclosed the same way.
+ */
+function generalizedFrom(cell: ReleaseCell, cells: readonly ReleaseCell[]): AggregateDimensionLevel | null {
+  if (cell.level === 'site') return null;
+  const childLevel = cell.level === 'project' ? 'site' : 'project';
+  const withheldChild = cells.some((candidate) => (
+    candidate.level === childLevel
+    && candidate.metricKey === cell.metricKey
+    && candidate.monthStart === cell.monthStart
+    && candidate.metricVersion === cell.metricVersion
+    && (cell.level === 'organisation' || candidate.projectId === cell.projectId)
+    && !candidate.published
+  ));
+  return withheldChild ? childLevel : null;
+}
+
 export function releaseAnonymousGroups(
   groups: readonly CalculatedMetricGroup[],
   minimumContributors: number,
@@ -249,10 +361,32 @@ export function releaseAnonymousGroups(
     slices.set(key, slice);
   }
 
-  const rows: ReleasedAggregate[] = [];
+  const cells: ReleaseCell[] = [];
   for (const [key, slice] of slices) {
     const [monthStart, metricVersion, metricKey] = key.split(' ') as [string, string, OperationsMetricKey];
-    rows.push(...releaseSlice(monthStart, Number(metricVersion), metricKey, slice, minimumContributors));
+    cells.push(...releaseSliceCells(monthStart, Number(metricVersion), metricKey, slice, minimumContributors));
+  }
+
+  // With today's two rules this settles on the first pass, and a test does not
+  // reach a second one: both only ever withhold cells that had already cleared
+  // the threshold, so anything the cascade withholds adds at least
+  // `minimumContributors` people to whatever residual it touches and cannot
+  // open a new violation. The loop is the backstop for a future rule without
+  // that property; it terminates because withholding is monotonic over finitely
+  // many cells.
+  for (let pass = 0; pass <= cells.length; pass += 1) {
+    const partitioned = applyPartitionRule(cells, minimumContributors);
+    const cascaded = cascadeWithholding(cells);
+    if (!partitioned && !cascaded) break;
+  }
+
+  const rows: ReleasedAggregate[] = [];
+  for (const cell of cells) {
+    if (!cell.published) continue;
+    rows.push(toRow(
+      cell.monthStart, cell.metricVersion, cell.metricKey, cell.level,
+      cell.projectId, cell.siteId, generalizedFrom(cell, cells), cell.accumulator,
+    ));
   }
 
   return rows.sort(
