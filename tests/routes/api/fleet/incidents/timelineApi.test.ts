@@ -116,13 +116,16 @@ describe('GET /api/fleet/incidents/{incidentId}/timeline', () => {
     expect(mocks.timeline).not.toHaveBeenCalled();
   });
 
-  it('answers 404 for an incident the viewer may not see', async () => {
+  it('answers 404 for an incident that does not exist', async () => {
     mocks.timeline.mockRejectedValue(new IncidentNotFoundError('No incident found'));
     const result = await call('GET');
     expect(result.status).toBe(404);
   });
 
-  it('answers 403 for a viewer with no incident scope at all', async () => {
+  // Both the no-scope refusal and the out-of-scope refusal reach the route as
+  // this one error, and both answer 403 — the same pair GET /api/fleet/incidents/[incidentId]
+  // answers for the same two conditions.
+  it('answers 403 for a viewer who may not see this incident', async () => {
     mocks.timeline.mockRejectedValue(new IncidentTimelineAccessDeniedError('You cannot view Fleet incidents'));
     const result = await call('GET');
     expect(result.status).toBe(403);

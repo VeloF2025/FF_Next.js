@@ -20,7 +20,7 @@ vi.mock('../../reviewQueries', () => coreMock);
 const namesMock = vi.hoisted(() => ({ resolveActiveUserNames: vi.fn() }));
 vi.mock('../../settingsRepository', () => namesMock);
 
-import { getIncidentTimeline } from '../timelineService';
+import { getIncidentTimeline, IncidentTimelineAccessDeniedError } from '../timelineService';
 import { IncidentNotFoundError } from '../../incidentRepository';
 
 const INCIDENT = '11111111-1111-4111-8111-111111111111';
@@ -52,6 +52,13 @@ const actionRow = {
   is_system_actor: false, occurred_at: '2026-08-13T08:10:00.000Z', visibility: 'internal',
 };
 
+/** Five manager actions a minute apart — enough to page through more than once. */
+const many = Array.from({ length: 5 }, (_, index) => ({
+  ...actionRow,
+  id: `aaaaaaa1-0000-4000-8000-00000000000${index}`,
+  occurred_at: `2026-08-13T08:0${index}:00.000Z`,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   scopeMock.resolveIncidentScope.mockResolvedValue({ unrestricted: false, pmUserId: USER, pmStaffId: STAFF });
@@ -62,9 +69,13 @@ beforeEach(() => {
 });
 
 describe('getIncidentTimeline scope', () => {
-  it('refuses an incident outside the viewer project scope as not-found, not forbidden', async () => {
+  it('refuses an incident outside the viewer project scope the way the detail read does', async () => {
+    // 403, not 404: `reviewService.ts#getIncidentDetailForViewer` answers 403
+    // for exactly this condition, and two endpoints on the same incident must
+    // not disagree about whether it exists.
     scopeMock.isProjectOwnedByScope.mockResolvedValue(false);
-    await expect(getIncidentTimeline(OTHER_INCIDENT, viewer)).rejects.toThrow(IncidentNotFoundError);
+    await expect(getIncidentTimeline(OTHER_INCIDENT, viewer))
+      .rejects.toThrow(IncidentTimelineAccessDeniedError);
   });
 
   it('refuses an incident that does not exist', async () => {
@@ -74,7 +85,8 @@ describe('getIncidentTimeline scope', () => {
 
   it('reads no source table when the scope check fails', async () => {
     scopeMock.isProjectOwnedByScope.mockResolvedValue(false);
-    await expect(getIncidentTimeline(INCIDENT, viewer)).rejects.toThrow(IncidentNotFoundError);
+    await expect(getIncidentTimeline(INCIDENT, viewer))
+      .rejects.toThrow(IncidentTimelineAccessDeniedError);
     expect(db.query).not.toHaveBeenCalled();
   });
 
@@ -207,12 +219,6 @@ describe('getIncidentTimeline ordering', () => {
 });
 
 describe('getIncidentTimeline pagination', () => {
-  const many = Array.from({ length: 5 }, (_, index) => ({
-    ...actionRow,
-    id: `aaaaaaa1-0000-4000-8000-00000000000${index}`,
-    occurred_at: `2026-08-13T08:0${index}:00.000Z`,
-  }));
-
   it('returns a cursor when more entries remain, and resumes after it', async () => {
     respondWith({ actions: many });
     const first = await getIncidentTimeline(INCIDENT, viewer, { limit: 2 });
@@ -278,6 +284,13 @@ describe('getIncidentTimeline disclosure', () => {
   });
 
   it('selects no free-text, storage, or recipient column in any source query', async () => {
+    // `recipient` is matched on a word boundary, so it does NOT catch the
+    // notification query's `recipient_count` — `_` is a word character, so
+    // `\brecipient\b` cannot match inside `recipient_count`. That is deliberate:
+    // an aggregate count is a fact about the fan-out, while a `recipient`,
+    // `recipient_id`, or `recipient_email` column would name a person. Any
+    // column that identifies who was messaged must be added to this list
+    // explicitly; the word boundary will not do it for you.
     await getIncidentTimeline(INCIDENT, viewer);
     const sql = capturedSql();
     for (const column of [
@@ -292,8 +305,9 @@ describe('getIncidentTimeline disclosure', () => {
   it('collapses a notification fan-out by truncating to the minute', async () => {
     // notificationBus writes one row per recipient in a loop, microseconds
     // apart. Grouping on the raw timestamp would turn one notification into one
-    // entry per person, so the size of the audience could be counted off the
-    // chronology even though no recipient is ever named.
+    // entry per person; the minute bucket collapses it into one entry, or two
+    // when the loop happens to straddle a minute boundary — either way far
+    // fewer entries than recipients, and no recipient is ever named.
     await getIncidentTimeline(INCIDENT, viewer);
     const notifications = db.query.mock.calls
       .map((call) => String(call[0]))
@@ -317,6 +331,73 @@ describe('getIncidentTimeline disclosure', () => {
     expect(db.query).toHaveBeenCalledTimes(5);
     for (const call of db.query.mock.calls) {
       expect(call[1]).toContain(INCIDENT);
+    }
+  });
+});
+
+/**
+ * The merge happens in memory, so a source that returned its whole history
+ * would cost the same however small the page was. These hold the reads bounded:
+ * every source orders ascending and stops at `limit + 1` rows, which is exactly
+ * the number that can decide a page of `limit`.
+ */
+describe('getIncidentTimeline source bounding', () => {
+  it('orders and limits every source query rather than reading a whole history', async () => {
+    await getIncidentTimeline(INCIDENT, viewer, { limit: 25 });
+    expect(db.query).toHaveBeenCalledTimes(5);
+    for (const call of db.query.mock.calls) {
+      const sql = String(call[0]);
+      expect(sql).toMatch(/ORDER BY /);
+      expect(sql).toMatch(/LIMIT \$3/);
+      // limit + 1: the extra row is what answers "is there another page".
+      expect(call[1]).toEqual([INCIDENT, null, 26]);
+    }
+  });
+
+  it('bounds every source on the default limit when the caller asks for none', async () => {
+    await getIncidentTimeline(INCIDENT, viewer);
+    for (const call of db.query.mock.calls) {
+      expect((call[1] as unknown[])[2]).toBe(101);
+    }
+  });
+
+  it('passes the cursor instant to every source so no source rereads the earlier page', async () => {
+    respondWith({ actions: many });
+    const first = await getIncidentTimeline(INCIDENT, viewer, { limit: 2 });
+    db.query.mockClear();
+    respondWith({ actions: many });
+    await getIncidentTimeline(INCIDENT, viewer, { limit: 2, cursor: first.nextCursor });
+    expect(db.query).toHaveBeenCalledTimes(5);
+    for (const call of db.query.mock.calls) {
+      expect((call[1] as unknown[])[1]).toBe('2026-08-13T08:01:00.000Z');
+    }
+  });
+
+  it('bounds inclusively, so an entry sharing the cursor instant is not skipped', async () => {
+    // The cursor's tie-break is (occurredAt, recordedAt, stableId) and only the
+    // first of those reaches SQL, so an exclusive bound would drop a row
+    // recorded in the same second that sorts after the cursor.
+    const at = '2026-08-13T08:00:00.000Z';
+    const tied = [0, 1, 2].map((index) => ({
+      ...actionRow, id: `bbbbbbb1-0000-4000-8000-00000000000${index}`, occurred_at: at,
+    }));
+    respondWith({ actions: tied });
+    const first = await getIncidentTimeline(INCIDENT, viewer, { limit: 1 });
+    expect(first.entries).toHaveLength(1);
+    respondWith({ actions: tied });
+    const second = await getIncidentTimeline(INCIDENT, viewer, { limit: 5, cursor: first.nextCursor });
+    expect(second.entries.map((entry) => entry.stableId)).toEqual([
+      'manager:bbbbbbb1-0000-4000-8000-000000000001',
+      'manager:bbbbbbb1-0000-4000-8000-000000000002',
+    ]);
+  });
+
+  it('falls back to the default rather than clamping a limit the route would have refused', async () => {
+    // The route answers 400 for a limit above the maximum. Clamping here would
+    // let a direct caller be answered a page size the endpoint rejects.
+    await getIncidentTimeline(INCIDENT, viewer, { limit: 5000 });
+    for (const call of db.query.mock.calls) {
+      expect((call[1] as unknown[])[2]).toBe(101);
     }
   });
 });

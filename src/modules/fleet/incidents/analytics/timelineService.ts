@@ -4,11 +4,12 @@
  *
  * Three rules the tests hold this file to:
  *
- * 1. **No free text ever reaches an entry.** Every `summary` comes from a label
- *    map keyed on a CHECK-constrained enum, so a manager's comment, a driver's
- *    explanation, and an evidence filename cannot be carried out of the drawer
- *    by a timeline read. The bodies are already rendered by the drawer's own
- *    sections to viewers permitted to read them.
+ * 1. **No free text ever reaches an entry.** Every `summary` is either a label
+ *    from a map keyed on a CHECK-constrained enum or a label with a count
+ *    interpolated into it — never a value a person typed. A manager's comment, a
+ *    driver's explanation, and an evidence filename therefore cannot be carried
+ *    out of the drawer by a timeline read. The bodies are already rendered by
+ *    the drawer's own sections to viewers permitted to read them.
  * 2. **Nothing is rewritten after the fact.** An entry reports the event as it
  *    was recorded. Where a source later changes state — an Attendance
  *    correction being approved, say — the chronology does not go back and
@@ -25,7 +26,7 @@ import type { IncidentActionType } from '../types';
 import type { RetentionHoldActionType } from './aggregateSchema';
 import {
   listActionSource, listAttendanceSource, listNotificationSource,
-  listObservationSource, listRetentionHoldSource,
+  listObservationSource, listRetentionHoldSource, type TimelineBound,
 } from './timelineQueries';
 import type { IncidentTimelineEntry, IncidentTimelinePage, TimelineSource } from './types';
 
@@ -126,10 +127,18 @@ function decodeCursor(cursor: string): { occurredAt: string; recordedAt: string;
   return { occurredAt, recordedAt, stableId };
 }
 
+/**
+ * Validation lives on the route, which answers 400 rather than silently
+ * clamping (`parseLimit` in `pages/api/fleet/incidents/[incidentId]/timeline.ts`).
+ * This is the defence for a direct caller only, and it deliberately does not
+ * clamp either: a limit this function cannot honour falls back to the default
+ * rather than being quietly reshaped into a different number of rows, so no
+ * caller can be answered a page size the route would have rejected.
+ */
 function resolveLimit(limit: number | undefined): number {
   if (limit === undefined) return TIMELINE_DEFAULT_LIMIT;
-  if (!Number.isInteger(limit) || limit < 1) return TIMELINE_DEFAULT_LIMIT;
-  return Math.min(limit, TIMELINE_MAX_LIMIT);
+  if (!Number.isInteger(limit) || limit < 1 || limit > TIMELINE_MAX_LIMIT) return TIMELINE_DEFAULT_LIMIT;
+  return limit;
 }
 
 /**
@@ -153,17 +162,27 @@ export async function getIncidentTimeline(
   const scope = await resolveIncidentScope(viewer.userId, viewer.staffId, viewer.role, 'view');
   if (!scope) throw new IncidentTimelineAccessDeniedError('You cannot view Fleet incidents');
   const core = await getIncidentCore(incidentId);
-  // Out-of-scope answers 404, not 403 (plan, task 6 step 1): an incident id is
-  // guessable, and a 403 would confirm that the one guessed exists. This is a
-  // deliberate difference from the detail endpoint, which answers 403.
+  // Missing answers 404 and out-of-scope answers 403 — the same pair, in the
+  // same order, as the detail read this chronology is rendered beside
+  // (`reviewService.ts#getIncidentDetailForViewer`). Answering 404 here instead
+  // would not hide anything: a manager who can see the incident's detail can
+  // already tell the two apart from that endpoint, so the only thing a
+  // divergence buys is two endpoints disagreeing about the same incident.
   if (!core) throw new IncidentNotFoundError(`No incident found for id ${incidentId}`);
   if (!scope.unrestricted && !await isProjectOwnedByScope(scope, core.projectId)) {
-    throw new IncidentNotFoundError(`No incident found for id ${incidentId}`);
+    throw new IncidentTimelineAccessDeniedError('You cannot view this Fleet incident');
   }
 
+  const after = options.cursor ? decodeCursor(options.cursor) : null;
+  const limit = resolveLimit(options.limit);
+  // One row past the page is what tells `nextCursor` there is another page. Read
+  // from every source, because any of them could own that row.
+  const bound: TimelineBound = { after: after?.occurredAt ?? null, limit: limit + 1 };
+
   const [actions, observations, attendance, notifications, holds] = await Promise.all([
-    listActionSource(incidentId), listObservationSource(incidentId), listAttendanceSource(incidentId),
-    listNotificationSource(incidentId), listRetentionHoldSource(incidentId),
+    listActionSource(incidentId, bound), listObservationSource(incidentId, bound),
+    listAttendanceSource(incidentId, bound), listNotificationSource(incidentId, bound),
+    listRetentionHoldSource(incidentId, bound),
   ]);
 
   const labels = await resolveActorLabels([
@@ -185,6 +204,11 @@ export async function getIncidentTimeline(
       const at = iso(row.linked_at);
       return entry('attendance', row.id, 'correction_linked', at, at, 'Attendance correction linked', null);
     }),
+    // The count is a number the database computed, not text anyone typed, and it
+    // is the point of the entry: a manager reading the chronology needs to know
+    // that a notification went out and how far it reached. What the minute
+    // grouping protects is *who* was notified — `user_notifications.user_id` is
+    // never read, so the audience can be sized but not named.
     ...notifications.map((row) => {
       const at = iso(row.occurred_at);
       return entry('notification', at, 'notification_delivered', at, at,
@@ -197,14 +221,12 @@ export async function getIncidentTimeline(
     }),
   ].sort(compareEntries);
 
-  const after = options.cursor ? decodeCursor(options.cursor) : null;
   const remaining = after
     ? merged.filter((candidate) => compareEntries(candidate, {
       ...candidate, occurredAt: after.occurredAt, recordedAt: after.recordedAt, stableId: after.stableId,
     }) > 0)
     : merged;
 
-  const limit = resolveLimit(options.limit);
   const entries = remaining.slice(0, limit);
   const nextCursor = remaining.length > limit && entries.length > 0
     ? encodeCursor(entries[entries.length - 1]!)
