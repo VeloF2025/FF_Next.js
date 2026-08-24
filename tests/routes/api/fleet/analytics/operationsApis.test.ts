@@ -56,7 +56,10 @@ async function call(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.gates.length = 0;
+  // Deliberately NOT cleared: both routes build their permission gate once, at
+  // import, rather than rebuilding it on every request. Resetting the record
+  // here would make the gate assertions below pass only for a route that
+  // rebuilds it — which is the thing they must not require.
   mocks.staff.mockResolvedValue(STAFF);
   mocks.analytics.mockResolvedValue(report);
   mocks.drillDown.mockResolvedValue({ mode: 'retained_detail', values: [], incidentIds: [], nextCursor: null });

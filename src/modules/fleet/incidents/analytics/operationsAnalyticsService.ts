@@ -28,101 +28,30 @@
  * presence in the nightly job: a month-end aggregate that disagrees with what a
  * supervisor saw on the day is worse than either answer being wrong alone.
  */
-import { getEffectiveAnalyticsRetentionSettings } from './settingsRepository';
-import { isProjectOwnedByScope, resolveIncidentScope } from '../reviewScope';
-import type { IncidentScopeFilter } from '../reviewScope';
-import { shiftMonth } from './aggregationService';
 import type { IncidentFact, OperationsFact } from './facts';
-import { loadIncidentFacts, loadNotificationFacts } from './incidentFactQueries';
 import { calculateMonthlyMetrics } from './metricCalculator';
+import type { PublishedAggregate } from './operationsAggregateQueries';
 import { readPublishedAggregates } from './operationsAggregateQueries';
-import { hasRetainedOnlyFilter } from './operationsFilters';
+import { loadRetainedFacts } from './operationsFactSelection';
 import { foldToCards, upsertValue } from './operationsMetricValues';
-import { latestAggregationRun, listScopedProjectIds } from './operationsRunQueries';
+import { latestAggregationRun } from './operationsRunQueries';
+import type { OperationsViewer, ResolvedRange } from './operationsScope';
+import {
+  DRILL_DOWN_PAGE_SIZE, OperationsFilterConflictError,
+  aggregateRequestFor, assertRetainedOnlyFiltersFit, monthsBetween, resolveRange,
+} from './operationsScope';
 import type {
   OperationsAnalyticsResponse, OperationsDrillDownResponse,
   OperationsFilters, OperationsMetricValue,
 } from './types';
 
-export class OperationsAccessDeniedError extends Error {
-  constructor(message: string) { super(message); this.name = 'OperationsAccessDeniedError'; }
-}
-
-export class OperationsFilterConflictError extends Error {
-  constructor(message: string) { super(message); this.name = 'OperationsFilterConflictError'; }
-}
-
-export interface OperationsViewer {
-  userId: string;
-  staffId: string | null;
-  role: string;
-}
-
-export const DRILL_DOWN_PAGE_SIZE = 100;
-
-/** First day of the month a `YYYY-MM-DD` calendar date falls in. */
-function monthStartOf(date: string): string {
-  return `${date.slice(0, 7)}-01`;
-}
-
-/** Every month start from `start`'s month through `end`'s month, inclusive. */
-function monthsBetween(start: string, end: string): string[] {
-  const months: string[] = [];
-  let cursor = monthStartOf(start);
-  const last = monthStartOf(end);
-  while (cursor <= last) {
-    months.push(cursor);
-    cursor = shiftMonth(cursor, 1);
-  }
-  return months;
-}
-
-/** The op_ filters that apply to a live fact. Group filters only — see below. */
-function factMatchesFilters(fact: OperationsFact, filters: OperationsFilters): boolean {
-  if (filters.projectId !== undefined && fact.dimension.projectId !== filters.projectId) return false;
-  if (filters.operationalSiteId !== undefined && fact.dimension.operationalSiteId !== filters.operationalSiteId) return false;
-  if (fact.kind !== 'incident') {
-    // A non-incident fact carries none of the incident attributes, so an
-    // incident-shaped filter excludes it rather than passing it through: a
-    // presence figure that ignored `op_type` would silently answer a wider
-    // question than the cards beside it.
-    return filters.incidentType === undefined && filters.severity === undefined
-      && filters.outcome === undefined && filters.staffId === undefined
-      && filters.vehicleId === undefined && filters.evidenceAvailable === undefined;
-  }
-  return incidentMatchesFilters(fact, filters);
-}
-
-function incidentMatchesFilters(fact: IncidentFact, filters: OperationsFilters): boolean {
-  if (filters.incidentType !== undefined && fact.incidentType !== filters.incidentType) return false;
-  if (filters.severity !== undefined && fact.severity !== filters.severity) return false;
-  if (filters.outcome !== undefined && fact.outcome !== filters.outcome) return false;
-  if (filters.staffId !== undefined && fact.contributorKey !== filters.staffId) return false;
-  if (filters.vehicleId !== undefined && fact.vehicleId !== filters.vehicleId) return false;
-  if (filters.evidenceAvailable !== undefined && fact.evidenceAvailable !== filters.evidenceAvailable) return false;
-  return true;
-}
-
-async function loadRetainedFacts(
-  months: readonly string[], filters: OperationsFilters, scopedProjectIds: ReadonlySet<string>,
-  scope: IncidentScopeFilter,
-): Promise<OperationsFact[]> {
-  const perMonth = await Promise.all(months.map(async (monthStart) => {
-    const nextMonthStart = shiftMonth(monthStart, 1);
-    const [incidents, notifications] = await Promise.all([
-      loadIncidentFacts(monthStart, nextMonthStart),
-      loadNotificationFacts(monthStart, nextMonthStart),
-    ]);
-    return [...incidents, ...notifications];
-  }));
-
-  return perMonth.flat().filter((fact) => {
-    // Scope first, filters second: a filter can only ever narrow what scope
-    // already allows, never reach past it.
-    if (!scope.unrestricted && !scopedProjectIds.has(fact.dimension.projectId)) return false;
-    return factMatchesFilters(fact, filters);
-  });
-}
+// The routes and the export (task 8) import these from the service, which is
+// the module they already depend on; scope resolution is an implementation
+// detail of it rather than a second public entry point.
+export {
+  DRILL_DOWN_PAGE_SIZE, OperationsAccessDeniedError, OperationsFilterConflictError,
+} from './operationsScope';
+export type { OperationsViewer } from './operationsScope';
 
 function valuesFromFacts(facts: readonly OperationsFact[], metricVersion: number): Map<string, OperationsMetricValue[]> {
   const byMonth = new Map<string, OperationsMetricValue[]>();
@@ -140,40 +69,31 @@ function valuesFromFacts(facts: readonly OperationsFact[], metricVersion: number
   return byMonth;
 }
 
-interface ResolvedRange {
-  scope: IncidentScopeFilter;
-  metricVersion: number;
-  retainedDetailFrom: string;
-  retainedMonths: string[];
-  historicMonths: string[];
-  scopedProjectIds: Set<string>;
-}
-
 /**
- * The scope check, the retention boundary, and the month split — everything both
- * entry points need before they diverge.
+ * A restricted viewer reading their own projects gets one row per project that
+ * published, and a project withheld by suppression is simply absent — nothing
+ * in the response distinguishes it from a project where nothing happened. The
+ * total is then presented as complete when it is not, so it says so instead.
+ *
+ * Deliberately not phrased as "withheld": a project with no incidents at all in
+ * those months is equally absent, and claiming suppression that did not happen
+ * is its own kind of wrong answer.
  */
-async function resolveRange(
-  filters: OperationsFilters, viewer: OperationsViewer, now: string,
-): Promise<ResolvedRange> {
-  const scope = await resolveIncidentScope(viewer.userId, viewer.staffId, viewer.role, 'view');
-  if (!scope) throw new OperationsAccessDeniedError('You cannot view Fleet operations analytics');
-  if (filters.projectId !== undefined && !await isProjectOwnedByScope(scope, filters.projectId)) {
-    throw new OperationsAccessDeniedError('You cannot view analytics for that project');
-  }
-
-  const policy = await getEffectiveAnalyticsRetentionSettings(now);
-  const retainedDetailFrom = shiftMonth(monthStartOf(now.slice(0, 10)), -policy.retentionMonths);
-  const months = monthsBetween(filters.start, filters.end);
-
-  return {
-    scope,
-    metricVersion: policy.metricVersion,
-    retainedDetailFrom,
-    retainedMonths: months.filter((month) => month >= retainedDetailFrom),
-    historicMonths: months.filter((month) => month < retainedDetailFrom),
-    scopedProjectIds: new Set(scope.unrestricted ? [] : await listScopedProjectIds(scope)),
-  };
+function missingProjectNotice(
+  filters: OperationsFilters, range: ResolvedRange, published: readonly PublishedAggregate[],
+): string | null {
+  const readsManagedProjects = !range.scope.unrestricted
+    && filters.projectId === undefined && filters.operationalSiteId === undefined
+    && filters.managerUserId === undefined;
+  if (!readsManagedProjects || range.historicMonths.length === 0) return null;
+  const expected = range.scopedProjectIds.size;
+  const covered = new Set(published
+    .map((row) => row.dimensionProjectId)
+    .filter((id): id is string => id !== null)).size;
+  if (expected === 0 || covered >= expected) return null;
+  return `Figures for the months before the retention boundary cover ${covered} of the ${expected} projects you manage; `
+    + 'the rest published nothing for those months, either because nothing happened there or because the group '
+    + 'described too few people to publish.';
 }
 
 export async function getOperationsAnalytics(
@@ -184,23 +104,15 @@ export async function getOperationsAnalytics(
   // A per-person or per-vehicle filter cannot be honoured against aggregates,
   // and answering the retained half alone would silently drop the older months
   // from a range the caller asked about.
-  if (hasRetainedOnlyFilter(filters) && range.historicMonths.length > 0) {
-    throw new OperationsFilterConflictError(
-      `op_driver and op_vehicle only apply to months at or after ${range.retainedDetailFrom}, when the detail behind them still exists`,
-    );
-  }
+  assertRetainedOnlyFiltersFit(filters, range);
 
-  const facts = await loadRetainedFacts(range.retainedMonths, filters, range.scopedProjectIds, range.scope);
+  const facts = await loadRetainedFacts(range.retainedMonths, filters, range.allowedProjectIds);
   const retainedByMonth = valuesFromFacts(facts, range.metricVersion);
 
-  const aggregateRequest = { monthStarts: range.historicMonths, metricVersion: range.metricVersion };
-  const published = await readPublishedAggregates(
-    filters.projectId === undefined && filters.operationalSiteId === undefined
-      ? aggregateRequest
-      : { ...aggregateRequest, ...(filters.projectId !== undefined ? { projectId: filters.projectId } : {}),
-        ...(filters.operationalSiteId !== undefined ? { operationalSiteId: filters.operationalSiteId } : {}) },
-    range.scope,
-  );
+  const aggregateRequest = aggregateRequestFor(filters, range);
+  const published = aggregateRequest === null
+    ? []
+    : await readPublishedAggregates(aggregateRequest, range.scope);
 
   const historicByMonth = new Map<string, OperationsMetricValue[]>();
   for (const row of published) {
@@ -227,6 +139,8 @@ export async function getOperationsAnalytics(
       'No published figures exist for the months before the retention boundary in this selection.',
     );
   }
+  const missing = missingProjectNotice(filters, range, published);
+  if (missing !== null) suppressionNotices.push(missing);
 
   const run = await latestAggregationRun();
   return {
@@ -256,23 +170,32 @@ export async function getOperationsDrillDown(
 ): Promise<OperationsDrillDownResponse> {
   const range = await resolveRange(filters, viewer, now);
 
-  if (range.retainedMonths.length === 0) {
-    if (hasRetainedOnlyFilter(filters)) {
-      throw new OperationsFilterConflictError(
-        'op_driver and op_vehicle cannot be applied to months whose detail has been purged',
-      );
-    }
-    const published = await readPublishedAggregates(
-      { monthStarts: range.historicMonths, metricVersion: range.metricVersion,
-        ...(filters.projectId !== undefined ? { projectId: filters.projectId } : {}),
-        ...(filters.operationalSiteId !== undefined ? { operationalSiteId: filters.operationalSiteId } : {}) },
-      range.scope,
+  // The same rule the analytics endpoint applies, in the same words: a
+  // drill-down that refused the identical request differently would read as a
+  // different rule rather than the same one.
+  assertRetainedOnlyFiltersFit(filters, range);
+
+  // A range with detail on one side of the boundary and none on the other has
+  // no single honest answer here. Analytics can merge the two sources because
+  // it answers in totals; a drill-down answers in incident ids, and the purged
+  // months have none — so the ids would silently describe part of the range
+  // while the values beside them described all of it.
+  if (range.retainedMonths.length > 0 && range.historicMonths.length > 0) {
+    throw new OperationsFilterConflictError(
+      `a drill-down covers one side of the retention boundary at a time, and ${range.retainedDetailFrom} splits this range; ask for months at or after it, or months before it`,
     );
+  }
+
+  if (range.retainedMonths.length === 0) {
+    const aggregateRequest = aggregateRequestFor(filters, range);
+    const published = aggregateRequest === null
+      ? []
+      : await readPublishedAggregates(aggregateRequest, range.scope);
     const values = foldToCards([{ values: published.map((row) => ({ ...row })) }]);
     return { mode: 'aggregate_only', values, incidentIds: [], nextCursor: null };
   }
 
-  const facts = await loadRetainedFacts(range.retainedMonths, filters, range.scopedProjectIds, range.scope);
+  const facts = await loadRetainedFacts(range.retainedMonths, filters, range.allowedProjectIds);
   const values = foldToCards([...valuesFromFacts(facts, range.metricVersion).values()].map((v) => ({ values: v })));
 
   // Sorted so a cursor means the same thing on every request; the cursor is the

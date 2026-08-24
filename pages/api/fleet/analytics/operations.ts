@@ -37,8 +37,11 @@ async function handler(req: Request, res: NextApiResponse): Promise<void> {
   }
 }
 
+/** Built once. Rebuilding the gate per request wraps the handler afresh on every call. */
+const guardedHandler = withPermission('fleet.incidents', 'view')(handler);
+
 async function route(req: Request, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
-  return withPermission('fleet.incidents', 'view')(handler)(req, res);
+  return guardedHandler(req, res);
 }
 export default withAuth(route);

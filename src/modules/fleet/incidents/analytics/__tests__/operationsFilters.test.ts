@@ -7,6 +7,7 @@ const PROJECT = '11111111-1111-4111-8111-111111111111';
 const SITE = '22222222-2222-4222-8222-222222222222';
 const DRIVER = '33333333-3333-4333-8333-333333333333';
 const VEHICLE = '44444444-4444-4444-8444-444444444444';
+const MANAGER = '55555555-5555-4555-8555-555555555555';
 
 const range = { op_start: '2026-01-01', op_end: '2026-03-31' };
 
@@ -33,7 +34,21 @@ describe('the range', () => {
   });
 
   it('allows a range exactly at the limit', () => {
-    expect(parseOperationsFilters({ op_start: '2026-01-15', op_end: '2026-12-15' }).start).toBe('2026-01-15');
+    expect(parseOperationsFilters({ op_start: '2026-01-15', op_end: '2026-12-15' }).start).toBe('2026-01-01');
+  });
+
+  it('answers in whole months, and says so by widening the range it echoes', () => {
+    // Every figure behind this range is a monthly aggregate or a month derived
+    // from facts, so a mid-month bound is not honoured and must not be echoed
+    // back as though it were: a reader comparing `start` to the numbers would
+    // otherwise believe the first half of January was excluded.
+    const filters = parseOperationsFilters({ op_start: '2026-01-15', op_end: '2026-03-04' });
+    expect(filters).toMatchObject({ start: '2026-01-01', end: '2026-03-31' });
+  });
+
+  it('lands on the real last day of a short month, leap years included', () => {
+    expect(parseOperationsFilters({ op_start: '2024-02-10', op_end: '2024-02-10' }).end).toBe('2024-02-29');
+    expect(parseOperationsFilters({ op_start: '2026-02-10', op_end: '2026-02-10' }).end).toBe('2026-02-28');
   });
 });
 
@@ -82,6 +97,20 @@ describe('the optional filters', () => {
 
   it('keeps the op_ prefix, so a queue deep link cannot pre-filter analytics', () => {
     expect(parseOperationsFilters({ ...range, projectId: PROJECT })).not.toHaveProperty('projectId');
+  });
+});
+
+describe('op_manager', () => {
+  it('parses as a manager user id', () => {
+    expect(parseOperationsFilters({ ...range, op_manager: MANAGER })).toMatchObject({ managerUserId: MANAGER });
+  });
+
+  it('refuses to be combined with op_site, which already names one project', () => {
+    // op_manager narrows to the projects one person manages; a site sits inside
+    // exactly one project, so the pair is either redundant or contradictory, and
+    // answering it would mean guessing which the caller meant.
+    expect(() => parseOperationsFilters({ ...range, op_manager: MANAGER, op_site: SITE }))
+      .toThrow(/op_manager cannot be combined with op_site/);
   });
 });
 

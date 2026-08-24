@@ -11,6 +11,7 @@
 import { query, queryOne } from '@/lib/db-pool';
 import type { IncidentScopeFilter } from '../reviewScope';
 import type { RunStatus } from './aggregateSchema';
+import { toWorkDate } from './sastDates';
 
 interface ProjectIdRow extends Record<string, unknown> { id: string }
 
@@ -65,8 +66,10 @@ export async function latestAggregationRun(): Promise<AggregationFreshness | nul
   const through = row.aggregates_through;
   return {
     status: row.status,
-    aggregatesThrough: through === null
-      ? null
-      : (through instanceof Date ? through.toISOString() : String(through)).slice(0, 10),
+    // `MAX(month_start)` is a DATE, and node-postgres parses a DATE to LOCAL
+    // midnight. Formatting that through UTC reports the 1st as the previous
+    // month's last day, so a freshness line would understate coverage by a day
+    // — and by a whole month at every month boundary.
+    aggregatesThrough: through === null ? null : toWorkDate(through),
   };
 }

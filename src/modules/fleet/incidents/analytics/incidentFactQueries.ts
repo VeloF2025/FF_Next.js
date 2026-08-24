@@ -13,8 +13,22 @@
  * when the transition never happened. A null is not a zero: an incident nobody
  * acknowledged has no acknowledgement time, and averaging it in as instant
  * would make the slowest incidents look like the fastest.
+ *
+ * ## The optional scope
+ *
+ * The nightly job wants every incident in a month and passes no scope, which is
+ * why the parameter is optional and absent by default — its behaviour is
+ * unchanged. An interactive reader wants one manager's projects and one
+ * incident type, and pushing those into the WHERE clause is the difference
+ * between scanning a company-wide month and reading the rows that will survive.
+ *
+ * The narrowing is assembled from a fixed list of predicates that carry only
+ * `$n` placeholders; no caller value is ever put into the SQL text, and this is
+ * not a conditional tagged-template fragment (CLAUDE.md) — it is one
+ * parameterized statement whose optional predicates are appended verbatim.
  */
 import { query } from '@/lib/db-pool';
+import type { IncidentSeverity } from '../types';
 import type { IncidentFact, NotificationFact } from './facts';
 import { toWorkDate } from './sastDates';
 
@@ -27,7 +41,7 @@ interface IncidentRow extends Record<string, unknown> {
   project_id: string;
   operational_site_id: string;
   staff_id: string;
-  severity: string;
+  severity: IncidentSeverity;
   vehicle_id: string | null;
   incident_type: string;
   outcome: string | null;
@@ -49,7 +63,45 @@ function toSeconds(value: string | number | null): number | null {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
 }
 
-const INCIDENT_FACT_SQL = `/* fleet-analytics-facts:incidents */
+
+/**
+ * What a caller already knows it will keep. Every field narrows; none widens,
+ * and an absent field means "no restriction" rather than "restrict to null".
+ */
+export interface FactQueryScope {
+  /** The projects the answer may draw on. An empty list means none of them. */
+  projectIds?: readonly string[];
+  operationalSiteId?: string;
+  incidentType?: string;
+  severity?: string;
+  outcome?: string;
+  staffId?: string;
+  vehicleId?: string;
+}
+
+/**
+ * The optional predicates, appended to a WHERE clause whose fixed parameters
+ * are already bound. `params` is extended in place so a predicate's `$n` and
+ * its value can never drift apart.
+ */
+function narrowingFor(scope: FactQueryScope | undefined, params: unknown[]): string {
+  if (!scope) return '';
+  const clauses: string[] = [];
+  const add = (predicate: (position: number) => string, value: unknown): void => {
+    params.push(value);
+    clauses.push(predicate(params.length));
+  };
+  if (scope.projectIds !== undefined) add((n) => `i.project_id = ANY($${n}::uuid[])`, [...scope.projectIds]);
+  if (scope.operationalSiteId !== undefined) add((n) => `i.operational_site_id = $${n}::uuid`, scope.operationalSiteId);
+  if (scope.incidentType !== undefined) add((n) => `i.incident_type = $${n}`, scope.incidentType);
+  if (scope.severity !== undefined) add((n) => `i.severity = $${n}`, scope.severity);
+  if (scope.outcome !== undefined) add((n) => `i.outcome = $${n}`, scope.outcome);
+  if (scope.staffId !== undefined) add((n) => `i.staff_id = $${n}::uuid`, scope.staffId);
+  if (scope.vehicleId !== undefined) add((n) => `i.vehicle_id = $${n}::uuid`, scope.vehicleId);
+  return clauses.map((clause) => `\n    AND ${clause}`).join('');
+}
+
+const INCIDENT_FACT_SELECT = `/* fleet-analytics-facts:incidents */
   SELECT
     i.id,
     i.work_date,
@@ -110,17 +162,25 @@ const INCIDENT_FACT_SQL = `/* fleet-analytics-facts:incidents */
     AND i.work_date < $2::date
     -- Site-less incidents have no dimension to belong to; see the file header.
     AND i.operational_site_id IS NOT NULL
-    AND i.project_id IS NOT NULL
+    AND i.project_id IS NOT NULL`;
+
+const INCIDENT_FACT_ORDER = `
   ORDER BY i.work_date, i.id`;
 
-/** Every incident fact for the month starting at `monthStart` (`YYYY-MM-01`). */
+/**
+ * Every incident fact for the month starting at `monthStart` (`YYYY-MM-01`),
+ * optionally narrowed to what the caller will keep.
+ */
 export async function loadIncidentFacts(
   monthStart: string,
   nextMonthStart: string,
+  scope?: FactQueryScope,
 ): Promise<IncidentFact[]> {
-  const rows = await query<IncidentRow>(INCIDENT_FACT_SQL, [
-    monthStart, nextMonthStart, RECURRENCE_WINDOW_DAYS,
-  ]);
+  const params: unknown[] = [monthStart, nextMonthStart, RECURRENCE_WINDOW_DAYS];
+  const rows = await query<IncidentRow>(
+    `${INCIDENT_FACT_SELECT}${narrowingFor(scope, params)}${INCIDENT_FACT_ORDER}`,
+    params,
+  );
 
   return rows.map((row) => ({
     kind: 'incident' as const,
@@ -161,7 +221,7 @@ interface NotificationRow extends Record<string, unknown> {
  * that. `user_notifications.source_id` carries the incident id, which is the
  * only link between the notification bus and this module.
  */
-const NOTIFICATION_FACT_SQL = `/* fleet-analytics-facts:notifications */
+const NOTIFICATION_FACT_SELECT = `/* fleet-analytics-facts:notifications */
   SELECT
     i.work_date,
     i.project_id,
@@ -179,15 +239,22 @@ const NOTIFICATION_FACT_SQL = `/* fleet-analytics-facts:notifications */
     AND i.work_date >= $1::date
     AND i.work_date < $2::date
     AND i.operational_site_id IS NOT NULL
-    AND i.project_id IS NOT NULL
+    AND i.project_id IS NOT NULL`;
+
+const NOTIFICATION_FACT_ORDER = `
   ORDER BY i.work_date, n.id`;
 
 /** Every notification fact for the month, one row per recipient notification. */
 export async function loadNotificationFacts(
   monthStart: string,
   nextMonthStart: string,
+  scope?: FactQueryScope,
 ): Promise<NotificationFact[]> {
-  const rows = await query<NotificationRow>(NOTIFICATION_FACT_SQL, [monthStart, nextMonthStart]);
+  const params: unknown[] = [monthStart, nextMonthStart];
+  const rows = await query<NotificationRow>(
+    `${NOTIFICATION_FACT_SELECT}${narrowingFor(scope, params)}${NOTIFICATION_FACT_ORDER}`,
+    params,
+  );
   return rows.map((row) => ({
     kind: 'notification' as const,
     workDate: toWorkDate(row.work_date),

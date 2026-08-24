@@ -19,6 +19,7 @@
  * to notice.
  */
 import { OUTCOMES, INCIDENT_TYPES, SEVERITIES } from '../reviewValidation';
+import { datesInMonth } from './sastDates';
 import type { OperationsFilters } from './types';
 
 export class OperationsFilterError extends Error {
@@ -87,14 +88,32 @@ function monthSpan(start: string, end: string): number {
   return (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
 }
 
+/**
+ * The range widened to the whole months it touches.
+ *
+ * Every figure this module can produce is monthly — a released aggregate is one
+ * row per month, and the retained half derives a month at a time from facts. A
+ * mid-month bound is therefore not honoured, and echoing it back unchanged
+ * would tell a reader the first half of the month was excluded when it was
+ * counted in full. `MAX_RANGE_MONTHS` is already counted on the month span, so
+ * widening here cannot let a wider range through than the check above allowed.
+ */
+function wholeMonths(start: string, end: string): { start: string; end: string } {
+  const endMonth = `${end.slice(0, 7)}-01`;
+  const lastDay = datesInMonth(endMonth).at(-1);
+  if (lastDay === undefined) throw new OperationsFilterError(`op_end is not a usable month: ${end}`);
+  return { start: `${start.slice(0, 7)}-01`, end: lastDay };
+}
+
 export function parseOperationsFilters(query: RawOperationsQuery): OperationsFilters {
-  const start = requiredDate(query, 'op_start');
-  const end = requiredDate(query, 'op_end');
-  if (end < start) throw new OperationsFilterError('op_end cannot be before op_start');
-  const span = monthSpan(start, end);
+  const rawStart = requiredDate(query, 'op_start');
+  const rawEnd = requiredDate(query, 'op_end');
+  if (rawEnd < rawStart) throw new OperationsFilterError('op_end cannot be before op_start');
+  const span = monthSpan(rawStart, rawEnd);
   if (span > MAX_RANGE_MONTHS) {
     throw new OperationsFilterError(`the range may cover at most ${MAX_RANGE_MONTHS} months, and this one covers ${span}`);
   }
+  const { start, end } = wholeMonths(rawStart, rawEnd);
 
   const filters: OperationsFilters = { start, end };
   const projectId = optionalUuid(query, 'op_project');
@@ -106,6 +125,14 @@ export function parseOperationsFilters(query: RawOperationsQuery): OperationsFil
   const severity = optionalEnum(query, 'op_severity', SEVERITIES);
   const outcome = optionalEnum(query, 'op_outcome', OUTCOMES);
   const evidenceAvailable = optionalBoolean(query, 'op_evidence');
+
+  // op_manager narrows to the projects one person manages; a site sits inside
+  // exactly one project. The pair is therefore either redundant or
+  // contradictory, and honouring it would mean guessing which of the two the
+  // caller meant — which is the silent widening this parser exists to refuse.
+  if (managerUserId !== undefined && operationalSiteId !== undefined) {
+    throw new OperationsFilterError('op_manager cannot be combined with op_site; a site already names one project');
+  }
 
   // Assigned rather than spread so an absent filter is absent, not present-and-
   // undefined: the filters travel back out on the response, and `"op_site": null`

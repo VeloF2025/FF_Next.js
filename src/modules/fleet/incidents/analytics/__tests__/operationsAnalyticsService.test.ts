@@ -28,6 +28,7 @@ const PROJECT = '33333333-3333-4333-8333-333333333333';
 const OTHER_PROJECT = '44444444-4444-4444-8444-444444444444';
 const SITE = '55555555-5555-4555-8555-555555555555';
 const DRIVER = '66666666-6666-4666-8666-666666666666';
+const MANAGER = '77777777-7777-4777-8777-777777777777';
 
 const viewer = { userId: USER, staffId: STAFF, role: 'project_manager' };
 /** 2026-08-24, with a 12-month retention: months from 2025-08-01 keep detail. */
@@ -99,7 +100,7 @@ describe('the retained / historic split', () => {
   it('derives a recent month from facts and never asks the aggregates for it', async () => {
     factsMock.loadIncidentFacts.mockResolvedValue([incident()]);
     await getOperationsAnalytics(filters(), viewer, NOW);
-    expect(factsMock.loadIncidentFacts).toHaveBeenCalledWith('2026-08-01', '2026-09-01');
+    expect(factsMock.loadIncidentFacts).toHaveBeenCalledWith('2026-08-01', '2026-09-01', expect.anything());
     expect(aggregateMock.readPublishedAggregates).toHaveBeenCalledWith(
       expect.objectContaining({ monthStarts: [] }), expect.anything(),
     );
@@ -300,5 +301,119 @@ describe('what never reaches the response', () => {
     const report = await getOperationsAnalytics(filters(), viewer, NOW);
     expect(report.cards.every((card) => card.metricKey.includes('.'))).toBe(true);
     expect(JSON.stringify(report)).not.toContain('driver-a');
+  });
+});
+
+describe('the SAST retention boundary', () => {
+  it('reads the boundary in Johannesburg, not in UTC', async () => {
+    // 22:30 UTC on the last of August is already the 1st of September in SAST,
+    // so the twelve retained months run back to September, not to August. A UTC
+    // reading leaves a month whose detail was already purged classed as
+    // retained, and it then reports zero from facts that no longer exist.
+    const report = await getOperationsAnalytics(
+      filters({ start: '2026-09-01', end: '2026-09-30' }), viewer, '2026-08-31T22:30:00.000Z',
+    );
+    expect(report.retainedDetailFrom).toBe('2025-09-01');
+  });
+
+  it('still reads a mid-month instant as that month', async () => {
+    const report = await getOperationsAnalytics(filters(), viewer, '2026-08-24T09:00:00.000Z');
+    expect(report.retainedDetailFrom).toBe('2025-08-01');
+  });
+});
+
+describe('op_manager', () => {
+  beforeEach(() => {
+    runMock.listScopedProjectIds.mockImplementation(async (scope: { pmUserId: string }) => (
+      scope.pmUserId === MANAGER ? [PROJECT] : [PROJECT, OTHER_PROJECT]
+    ));
+    scopeMock.resolveIncidentScope.mockResolvedValue({ unrestricted: true, pmUserId: USER, pmStaffId: STAFF });
+  });
+
+  it('drops a live fact from a project the named manager does not own', async () => {
+    factsMock.loadIncidentFacts.mockResolvedValue([
+      incident(),
+      incident({ incidentId: 'theirs', dimension: { projectId: OTHER_PROJECT, operationalSiteId: SITE } }),
+    ]);
+    const report = await getOperationsAnalytics(filters({ managerUserId: MANAGER }), viewer, NOW);
+    expect(report.cards.find((card) => card.metricKey === 'incident.late')?.numerator).toBe(1);
+  });
+
+  it('narrows the aggregate half to the same projects', async () => {
+    await getOperationsAnalytics(
+      filters({ start: '2024-01-01', end: '2024-01-31', managerUserId: MANAGER }), viewer, NOW,
+    );
+    expect(aggregateMock.readPublishedAggregates).toHaveBeenCalledWith(
+      expect.objectContaining({ projectIds: [PROJECT] }), expect.anything(),
+    );
+  });
+
+  it('drops every live fact when the asked-for project is not one of theirs', async () => {
+    factsMock.loadIncidentFacts.mockResolvedValue([incident()]);
+    const report = await getOperationsAnalytics(
+      filters({ projectId: OTHER_PROJECT, managerUserId: MANAGER }), viewer, NOW,
+    );
+    expect(report.cards).toEqual([]);
+  });
+
+  it('does not ask the aggregates about a project that manager does not own', async () => {
+    await getOperationsAnalytics(
+      filters({ start: '2024-01-01', end: '2024-01-31', projectId: OTHER_PROJECT, managerUserId: MANAGER }),
+      viewer, NOW,
+    );
+    expect(aggregateMock.readPublishedAggregates).not.toHaveBeenCalled();
+  });
+
+  it('applies to the drill-down by the same rule', async () => {
+    factsMock.loadIncidentFacts.mockResolvedValue([
+      incident({ incidentId: 'mine' }),
+      incident({ incidentId: 'theirs', dimension: { projectId: OTHER_PROJECT, operationalSiteId: SITE } }),
+    ]);
+    const page = await getOperationsDrillDown(filters({ managerUserId: MANAGER }), viewer, {}, NOW);
+    expect(page.incidentIds).toEqual(['mine']);
+  });
+});
+
+describe('a drill-down over a range that straddles the boundary', () => {
+  it('refuses it rather than answering only the half that still exists', async () => {
+    await expect(getOperationsDrillDown(filters({ start: '2025-07-01', end: '2026-08-31' }), viewer, {}, NOW))
+      .rejects.toThrow(OperationsFilterConflictError);
+  });
+
+  it('names the boundary that splits the range', async () => {
+    await expect(getOperationsDrillDown(filters({ start: '2025-07-01', end: '2026-08-31' }), viewer, {}, NOW))
+      .rejects.toThrow(/2025-08-01/);
+  });
+
+  it('refuses a driver filter over that range with the message analytics uses', async () => {
+    const straddling = filters({ start: '2025-07-01', end: '2026-08-31', staffId: DRIVER });
+    const fromAnalytics = await getOperationsAnalytics(straddling, viewer, NOW).catch((e: Error) => e.message);
+    const fromDrillDown = await getOperationsDrillDown(straddling, viewer, {}, NOW).catch((e: Error) => e.message);
+    expect(fromDrillDown).toBe(fromAnalytics);
+  });
+
+  it('still answers a range wholly inside the retained window', async () => {
+    const page = await getOperationsDrillDown(filters({ start: '2026-07-01', end: '2026-08-31' }), viewer, {}, NOW);
+    expect(page.mode).toBe('retained_detail');
+  });
+});
+
+describe('a restricted viewer whose projects did not all publish', () => {
+  it('says so rather than presenting the total as complete', async () => {
+    runMock.listScopedProjectIds.mockResolvedValue([PROJECT, OTHER_PROJECT]);
+    aggregateMock.readPublishedAggregates.mockResolvedValue([
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null, histogram: null, generalized: false },
+    ]);
+    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
+    expect(report.suppressionNotices.join(' ')).toMatch(/1 of the 2 projects/);
+  });
+
+  it('adds no such notice when every project published', async () => {
+    runMock.listScopedProjectIds.mockResolvedValue([PROJECT]);
+    aggregateMock.readPublishedAggregates.mockResolvedValue([
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null, histogram: null, generalized: false },
+    ]);
+    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
+    expect(report.suppressionNotices.join(' ')).not.toMatch(/projects/);
   });
 });

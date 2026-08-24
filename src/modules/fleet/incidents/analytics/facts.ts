@@ -12,6 +12,7 @@
  *
  * Facts are loaded by Task 3's `aggregateRepository`; nothing here touches SQL.
  */
+import type { IncidentSeverity } from '../types';
 import type { OperationsMetricKey } from './aggregateSchema';
 
 /** Every fact is site-scoped. Site-less operational data has no dimension to roll up. */
@@ -51,7 +52,8 @@ export interface IncidentFact extends FactBase {
    * They must never become a dimension or a metric key.
    */
   incidentId: string;
-  severity: string;
+  /** The closed set `SEVERITIES` validates against, not free text. */
+  severity: IncidentSeverity;
   vehicleId: string | null;
   /** The bare type, e.g. `late`; prefixed to `incident.late` by the calculator. */
   incidentType: string;

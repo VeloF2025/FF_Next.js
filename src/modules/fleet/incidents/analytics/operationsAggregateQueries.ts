@@ -3,7 +3,7 @@
  * purged.
  *
  * Everything here goes through `fleet_operational_monthly_aggregates_published`
- * (migration 525), never the base table: the view hard-codes `is_active = true`,
+ * (migration 527), never the base table: the view hard-codes `is_active = true`,
  * and a superseded generation is the disclosive one — a month is recomputed to
  * fewer rows exactly when the anonymity threshold is raised, so the retired
  * generation published groups now judged too small. `aggregateViewContract.test.ts`
@@ -16,16 +16,22 @@
  * gets this far.
  *
  * WHERE clauses are explicit, parameterized branches — never conditional
- * tagged-template fragments (CLAUDE.md).
+ * tagged-template fragments (CLAUDE.md). The parameter numbering the branches
+ * share is defined once, in `EXTRA_PARAM` and `extraParams` below, because a
+ * branch whose SQL says `$3` while its caller binds the value fourth fails only
+ * at run time and only for the viewer that branch belongs to.
  */
 import { query } from '@/lib/db-pool';
 import type { IncidentScopeFilter } from '../reviewScope';
 import type { AggregateDimensionLevel, OperationsMetricKey } from './aggregateSchema';
 import { DURATION_BUCKET_COLUMNS } from './aggregateSchema';
+import { toWorkDate } from './sastDates';
 import type { DurationHistogram } from './types';
 
 export interface PublishedAggregate {
   monthStart: string;
+  /** The project this row is about; null on the organisation row. */
+  dimensionProjectId: string | null;
   metricKey: OperationsMetricKey;
   numerator: number;
   denominator: number | null;
@@ -36,6 +42,7 @@ export interface PublishedAggregate {
 
 interface AggregateRow extends Record<string, unknown> {
   month_start: string | Date;
+  dimension_project_id: string | null;
   metric_key: OperationsMetricKey;
   numerator: number;
   denominator: number | null;
@@ -50,8 +57,11 @@ interface AggregateRow extends Record<string, unknown> {
   bucket_over_14400: number | null;
 }
 
-const AGGREGATE_COLUMNS = `month_start, metric_key, numerator, denominator, sample_count, sum_seconds,
-  generalized_from_level, ${DURATION_BUCKET_COLUMNS.join(', ')}`;
+const AGGREGATE_COLUMNS = `month_start, dimension_project_id, metric_key, numerator, denominator,
+  sample_count, sum_seconds, generalized_from_level, ${DURATION_BUCKET_COLUMNS.join(', ')}`;
+
+const PUBLISHED_VIEW = 'fleet_operational_monthly_aggregates_published a';
+const MONTH_AND_VERSION = 'a.month_start = ANY($1::date[]) AND a.metric_version = $2::int';
 
 /**
  * The scope predicate the incident queue uses, applied to the aggregate's own
@@ -63,8 +73,43 @@ const SCOPE_PREDICATE = `EXISTS (
      AND (p.project_manager = $3::uuid OR ($4::uuid IS NOT NULL AND p.project_manager = $4::uuid))
 )`;
 
-function monthOf(value: string | Date): string {
-  return (value instanceof Date ? value.toISOString() : String(value)).slice(0, 10);
+/**
+ * Where a branch's own parameter lands. An unrestricted branch binds nothing
+ * for scope, so its parameter is third; a scoped branch has spent $3 and $4 on
+ * the scope predicate, so its parameter is fifth. Postgres refuses a bind whose
+ * count does not match the statement, which is why the scope parameters cannot
+ * simply always be supplied.
+ */
+const EXTRA_PARAM = { unrestricted: '$3', scoped: '$5' } as const;
+
+function statement(tag: string, where: string): string {
+  return `/* fleet-operations-analytics:${tag} */
+     SELECT ${AGGREGATE_COLUMNS} FROM ${PUBLISHED_VIEW}
+      WHERE ${MONTH_AND_VERSION} AND ${where}`;
+}
+
+const SQL = {
+  site: statement('aggregates-site',
+    `a.dimension_level = 'site' AND a.dimension_site_id = ${EXTRA_PARAM.unrestricted}::uuid`),
+  siteScoped: statement('aggregates-site-scoped',
+    `a.dimension_level = 'site' AND a.dimension_site_id = ${EXTRA_PARAM.scoped}::uuid AND ${SCOPE_PREDICATE}`),
+  project: statement('aggregates-project',
+    `a.dimension_level = 'project' AND a.dimension_project_id = ${EXTRA_PARAM.unrestricted}::uuid`),
+  projectScoped: statement('aggregates-project-scoped',
+    `a.dimension_level = 'project' AND a.dimension_project_id = ${EXTRA_PARAM.scoped}::uuid AND ${SCOPE_PREDICATE}`),
+  projectList: statement('aggregates-project-list',
+    `a.dimension_level = 'project' AND a.dimension_project_id = ANY(${EXTRA_PARAM.unrestricted}::uuid[])`),
+  projectListScoped: statement('aggregates-project-list-scoped',
+    `a.dimension_level = 'project' AND a.dimension_project_id = ANY(${EXTRA_PARAM.scoped}::uuid[])
+      AND ${SCOPE_PREDICATE}`),
+  organisation: statement('aggregates-organisation', `a.dimension_level = 'organisation'`),
+  managedProjects: statement('aggregates-managed-projects',
+    `a.dimension_level = 'project' AND ${SCOPE_PREDICATE}`),
+} as const;
+
+/** The bind list for a branch that carries one parameter of its own. */
+function extraParams(base: readonly unknown[], scope: IncidentScopeFilter, extra: unknown): unknown[] {
+  return scope.unrestricted ? [...base, extra] : [...base, scope.pmUserId, scope.pmStaffId, extra];
 }
 
 function histogramOf(row: AggregateRow): DurationHistogram | null {
@@ -78,7 +123,11 @@ function histogramOf(row: AggregateRow): DurationHistogram | null {
 
 function mapRow(row: AggregateRow): PublishedAggregate {
   return {
-    monthStart: monthOf(row.month_start),
+    // `month_start` is a DATE, which node-postgres parses to LOCAL midnight;
+    // formatting that through UTC reports the 1st as the previous month's last
+    // day and files the row under a month the caller never asked for.
+    monthStart: toWorkDate(row.month_start),
+    dimensionProjectId: row.dimension_project_id,
     metricKey: row.metric_key,
     numerator: Number(row.numerator),
     denominator: row.denominator === null ? null : Number(row.denominator),
@@ -91,7 +140,34 @@ export interface AggregateDimensionRequest {
   monthStarts: readonly string[];
   metricVersion: number;
   projectId?: string;
+  /** The project set an `op_manager` filter resolved to. Never a single person. */
+  projectIds?: readonly string[];
   operationalSiteId?: string;
+}
+
+function selectFor(
+  request: AggregateDimensionRequest, scope: IncidentScopeFilter, base: readonly unknown[],
+): { text: string; params: unknown[] } {
+  if (request.operationalSiteId !== undefined) {
+    return {
+      text: scope.unrestricted ? SQL.site : SQL.siteScoped,
+      params: extraParams(base, scope, request.operationalSiteId),
+    };
+  }
+  if (request.projectId !== undefined) {
+    return {
+      text: scope.unrestricted ? SQL.project : SQL.projectScoped,
+      params: extraParams(base, scope, request.projectId),
+    };
+  }
+  if (request.projectIds !== undefined) {
+    return {
+      text: scope.unrestricted ? SQL.projectList : SQL.projectListScoped,
+      params: extraParams(base, scope, [...request.projectIds]),
+    };
+  }
+  if (scope.unrestricted) return { text: SQL.organisation, params: [...base] };
+  return { text: SQL.managedProjects, params: [...base, scope.pmUserId, scope.pmStaffId] };
 }
 
 /**
@@ -110,70 +186,7 @@ export async function readPublishedAggregates(
 ): Promise<PublishedAggregate[]> {
   const months = [...request.monthStarts];
   if (months.length === 0) return [];
-  const base = [months, request.metricVersion];
-  const scoped = [...base, scope.pmUserId, scope.pmStaffId];
-
-  // Five whole statements rather than one with conditional fragments. Beyond
-  // CLAUDE.md's rule against those, splicing the scope predicate in or out
-  // would leave $3/$4 bound but unreferenced in the unrestricted branches,
-  // which Postgres reports at bind time rather than in review.
-  if (request.operationalSiteId !== undefined) {
-    const rows = scope.unrestricted
-      ? await query<AggregateRow>(
-        `/* fleet-operations-analytics:aggregates-site */
-         SELECT ${AGGREGATE_COLUMNS} FROM fleet_operational_monthly_aggregates_published a
-          WHERE a.month_start = ANY($1::date[]) AND a.metric_version = $2::int
-            AND a.dimension_level = 'site' AND a.dimension_site_id = $3::uuid`,
-        [...base, request.operationalSiteId],
-      )
-      : await query<AggregateRow>(
-        `/* fleet-operations-analytics:aggregates-site-scoped */
-         SELECT ${AGGREGATE_COLUMNS} FROM fleet_operational_monthly_aggregates_published a
-          WHERE a.month_start = ANY($1::date[]) AND a.metric_version = $2::int
-            AND a.dimension_level = 'site' AND a.dimension_site_id = $5::uuid
-            AND ${SCOPE_PREDICATE}`,
-        [...scoped, request.operationalSiteId],
-      );
-    return rows.map(mapRow);
-  }
-
-  if (request.projectId !== undefined) {
-    const rows = scope.unrestricted
-      ? await query<AggregateRow>(
-        `/* fleet-operations-analytics:aggregates-project */
-         SELECT ${AGGREGATE_COLUMNS} FROM fleet_operational_monthly_aggregates_published a
-          WHERE a.month_start = ANY($1::date[]) AND a.metric_version = $2::int
-            AND a.dimension_level = 'project' AND a.dimension_project_id = $3::uuid`,
-        [...base, request.projectId],
-      )
-      : await query<AggregateRow>(
-        `/* fleet-operations-analytics:aggregates-project-scoped */
-         SELECT ${AGGREGATE_COLUMNS} FROM fleet_operational_monthly_aggregates_published a
-          WHERE a.month_start = ANY($1::date[]) AND a.metric_version = $2::int
-            AND a.dimension_level = 'project' AND a.dimension_project_id = $5::uuid
-            AND ${SCOPE_PREDICATE}`,
-        [...scoped, request.projectId],
-      );
-    return rows.map(mapRow);
-  }
-
-  if (scope.unrestricted) {
-    const rows = await query<AggregateRow>(
-      `/* fleet-operations-analytics:aggregates-organisation */
-       SELECT ${AGGREGATE_COLUMNS} FROM fleet_operational_monthly_aggregates_published a
-        WHERE a.month_start = ANY($1::date[]) AND a.metric_version = $2::int
-          AND a.dimension_level = 'organisation'`,
-      base,
-    );
-    return rows.map(mapRow);
-  }
-
-  const rows = await query<AggregateRow>(
-    `/* fleet-operations-analytics:aggregates-managed-projects */
-     SELECT ${AGGREGATE_COLUMNS} FROM fleet_operational_monthly_aggregates_published a
-      WHERE a.month_start = ANY($1::date[]) AND a.metric_version = $2::int
-        AND a.dimension_level = 'project' AND ${SCOPE_PREDICATE}`,
-    scoped,
-  );
+  const { text, params } = selectFor(request, scope, [months, request.metricVersion]);
+  const rows = await query<AggregateRow>(text, params);
   return rows.map(mapRow);
 }
