@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"go.mau.fi/whatsmeow/types"
 )
@@ -219,4 +220,50 @@ func membershipHealth() map[string]interface{} {
 		out["unreachable_with_ack"] = lastMembership.UnreachableAckCount()
 	}
 	return out
+}
+
+// GetJoinedGroups is an info query, and WhatsApp rate-limits info queries. The
+// first version of this ran it on the five-minute group reload, which is 288
+// calls a day and produced a steady drip of "429 rate-overlimit" within hours
+// of deploying. This account has already been blocked twice, so provoking the
+// rate limiter to keep a diagnostic fresh is a bad trade.
+//
+// Group membership changes when a person adds or removes the number — days
+// apart, not minutes. Six hours is far more often than the thing being watched
+// actually moves, and the check still runs once at startup so a restart gives
+// an immediate answer.
+const defaultReconcileInterval = 6 * time.Hour
+
+// minReconcileInterval stops a careless override from recreating the problem.
+const minReconcileInterval = 30 * time.Minute
+
+func reconcileInterval() time.Duration {
+	raw := getEnvOrDefault("WA_RECONCILE_INTERVAL", "")
+	if raw == "" {
+		return defaultReconcileInterval
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		fmt.Printf("⚠️  WA_RECONCILE_INTERVAL=%q is not a duration, using %s\n", raw, defaultReconcileInterval)
+		return defaultReconcileInterval
+	}
+	if d < minReconcileInterval {
+		fmt.Printf("⚠️  WA_RECONCILE_INTERVAL=%s is below the %s floor, using the floor\n", d, minReconcileInterval)
+		return minReconcileInterval
+	}
+	return d
+}
+
+// startMembershipReconciler runs the membership check on its own slow schedule,
+// deliberately decoupled from the five-minute DB reload.
+func startMembershipReconciler() {
+	interval := reconcileInterval()
+	fmt.Printf("🕒 Group membership will be re-checked every %s\n", interval)
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for range ticker.C {
+			runGroupReconciliation(context.Background(), getReconcileClient())
+		}
+	}()
 }

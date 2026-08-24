@@ -212,11 +212,7 @@ func startGroupsReloader() {
 			fmt.Println("🔄 Reloading groups from database...")
 			if err := loadGroupsFromDB(); err != nil {
 				fmt.Printf("❌ Failed to reload groups: %v\n", err)
-				continue
 			}
-			// Membership can change without the DB changing, so re-check on
-			// every reload rather than only at startup.
-			runGroupReconciliation(context.Background(), getReconcileClient())
 		}
 	}()
 }
@@ -2073,6 +2069,7 @@ func main() {
 	// removed from groups looks completely healthy until something tries to send.
 	setReconcileClient(client)
 	runGroupReconciliation(context.Background(), getReconcileClient())
+	startMembershipReconciler()
 
 	// Start REST API server
 	startRESTServer(client, messageStore, 8083)
