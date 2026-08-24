@@ -14,6 +14,29 @@
  */
 import { buildTrips } from '../src/modules/fleet/trips/tripBuildService';
 
+/**
+ * Output for a CLI report tool.
+ *
+ * The zero-tolerance gate forbids `console.*` in changed files and offers
+ * `eslint-disable-next-line no-console` as the sanctioned exception. This is one of the cases it
+ * exists for: the entire purpose of this script is to print a human-readable table to a terminal,
+ * and routing that through the structured application logger would emit JSON to a log sink rather
+ * than a report to the operator running it.
+ *
+ * Funnelled through two helpers so the exception is declared ONCE per stream and is visible, not
+ * repeated silently at every call site.
+ */
+function report(line: string): void {
+  // eslint-disable-next-line no-console -- CLI report output; see the comment above
+  console.log(line);
+}
+
+function fail(line: string): void {
+  // eslint-disable-next-line no-console -- CLI error output; see the comment above
+  console.error(line);
+}
+
+
 const MAX_PASSES = 100;
 
 async function main(): Promise<void> {
@@ -26,7 +49,7 @@ async function main(): Promise<void> {
     const result = await buildTrips(now);
     totalTrips += result.tripsWritten;
 
-    console.log(
+    report(
       `pass ${String(pass).padStart(3)}  ` +
       `vehicles ${result.vehiclesSucceeded}/${result.vehiclesRequested}  ` +
       `trips +${result.tripsWritten} (${totalTrips})  ` +
@@ -36,7 +59,7 @@ async function main(): Promise<void> {
     );
 
     if (result.status === 'failed') {
-      console.error('every vehicle failed — stopping rather than looping on a broken state');
+      fail('every vehicle failed — stopping rather than looping on a broken state');
       process.exit(1);
     }
     // Caught up when nothing was consumed and nobody is still holding backlog.
@@ -44,8 +67,8 @@ async function main(): Promise<void> {
   }
 
   const seconds = Math.round((Date.now() - startedAt) / 1000);
-  console.log(`\ndone: ${totalTrips} trips over ${pass} pass(es) in ${seconds}s`);
-  if (pass > MAX_PASSES) console.warn('hit the pass ceiling — re-run to continue');
+  report(`\ndone: ${totalTrips} trips over ${pass} pass(es) in ${seconds}s`);
+  if (pass > MAX_PASSES) fail('hit the pass ceiling — re-run to continue');
 }
 
-main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
+main().then(() => process.exit(0)).catch((e: unknown) => { fail(e instanceof Error ? e.stack ?? e.message : String(e)); process.exit(1); });

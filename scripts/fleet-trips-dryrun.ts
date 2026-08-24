@@ -5,6 +5,29 @@
 import { Pool } from 'pg';
 import { DEFAULT_SEGMENT_OPTIONS, segmentTrips, type TripPosition } from '../src/modules/fleet/trips/tripSegmenter';
 
+/**
+ * Output for a CLI report tool.
+ *
+ * The zero-tolerance gate forbids `console.*` in changed files and offers
+ * `eslint-disable-next-line no-console` as the sanctioned exception. This is one of the cases it
+ * exists for: the entire purpose of this script is to print a human-readable table to a terminal,
+ * and routing that through the structured application logger would emit JSON to a log sink rather
+ * than a report to the operator running it.
+ *
+ * Funnelled through two helpers so the exception is declared ONCE per stream and is visible, not
+ * repeated silently at every call site.
+ */
+function report(line: string): void {
+  // eslint-disable-next-line no-console -- CLI report output; see the comment above
+  console.log(line);
+}
+
+function fail(line: string): void {
+  // eslint-disable-next-line no-console -- CLI error output; see the comment above
+  console.error(line);
+}
+
+
 const days = Number(process.argv[2] ?? 7);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -23,8 +46,8 @@ async function main() {
   const opts = { ...DEFAULT_SEGMENT_OPTIONS, now: new Date().toISOString() };
   let totals = { trips: 0, ignitionOff: 0, timeout: 0, open: 0, km: 0, idle: 0, moving: 0 };
 
-  console.log(`\nvehicle      prov      trips  ign_off  timeout  open   km      idle_h  longest_h`);
-  console.log('-'.repeat(78));
+  report(`\nvehicle      prov      trips  ign_off  timeout  open   km      idle_h  longest_h`);
+  report('-'.repeat(78));
 
   for (const v of vehicles) {
     const { rows } = await pool.query(
@@ -52,19 +75,19 @@ async function main() {
       timeout: totals.timeout + to, open: totals.open + op, km: totals.km + km,
       idle: totals.idle + idle, moving: totals.moving + moving };
 
-    console.log(
+    report(
       `${(v.registration ?? '?').padEnd(12)} ${(v.provider ?? '').padEnd(9)} ` +
       `${String(trips.length).padStart(5)} ${String(off).padStart(8)} ${String(to).padStart(8)} ` +
       `${String(op).padStart(5)} ${km.toFixed(0).padStart(6)} ${(idle/3600).toFixed(1).padStart(7)} ` +
       `${longest.toFixed(1).padStart(9)}`);
   }
 
-  console.log('-'.repeat(78));
-  console.log(`TOTAL over ${days}d: ${totals.trips} trips — ${totals.ignitionOff} genuine, ` +
+  report('-'.repeat(78));
+  report(`TOTAL over ${days}d: ${totals.trips} trips — ${totals.ignitionOff} genuine, ` +
     `${totals.timeout} timeout, ${totals.open} open`);
-  console.log(`  distance ${totals.km.toFixed(0)} km | moving ${(totals.moving/3600).toFixed(1)}h | idle ${(totals.idle/3600).toFixed(1)}h`);
+  report(`  distance ${totals.km.toFixed(0)} km | moving ${(totals.moving/3600).toFixed(1)}h | idle ${(totals.idle/3600).toFixed(1)}h`);
   const pct = totals.trips ? (100 * totals.ignitionOff / totals.trips) : 0;
-  console.log(`  metric-eligible: ${pct.toFixed(1)}% of trips`);
+  report(`  metric-eligible: ${pct.toFixed(1)}% of trips`);
   await pool.end();
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e: unknown) => { fail(e instanceof Error ? e.stack ?? e.message : String(e)); process.exit(1); });
