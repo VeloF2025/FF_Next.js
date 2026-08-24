@@ -34,7 +34,8 @@ import { MONTH_LOAD_CONCURRENCY } from '../operationsFactSelection';
 import { getOperationsAnalytics } from '../operationsAnalyticsService';
 import { resetOperationsMocks } from './operationsMocks';
 import {
-  MANAGER, NOW, PROJECT, SITE, filters, incident, monitorRun, notification, presence, viewer,
+  MANAGER, NOW, OTHER_PROJECT, PROJECT, SITE,
+  filters, incident, monitorRun, notification, presence, viewer,
 } from './operationsTestFixtures';
 
 function keysOf(cards: readonly { metricKey: string }[]): string[] {
@@ -146,6 +147,42 @@ describe('a filter that makes a fact kind inapplicable', () => {
     expect(factsMock.loadIncidentFacts).toHaveBeenCalledWith(
       '2026-08-01', '2026-09-01', expect.objectContaining({ projectIds: [PROJECT] }),
     );
+  });
+
+  it('intersects the viewer scope with the manager list rather than taking either whole', async () => {
+    // The case where taking one side alone still looks plausible: the viewer
+    // manages two projects, the named manager owns one of them. Either list
+    // used unintersected answers about a project the other side excluded.
+    runMock.listScopedProjectIds.mockImplementation(async (scope: { pmUserId: string }) => (
+      scope.pmUserId === MANAGER ? [PROJECT] : [PROJECT, OTHER_PROJECT]
+    ));
+    await getOperationsAnalytics(filters({ managerUserId: MANAGER }), viewer, NOW);
+    expect(factsMock.loadIncidentFacts).toHaveBeenCalledWith(
+      '2026-08-01', '2026-09-01', expect.objectContaining({ projectIds: [PROJECT] }),
+    );
+  });
+
+  it('narrows the aggregate half to that same intersection', async () => {
+    runMock.listScopedProjectIds.mockImplementation(async (scope: { pmUserId: string }) => (
+      scope.pmUserId === MANAGER ? [PROJECT] : [PROJECT, OTHER_PROJECT]
+    ));
+    await getOperationsAnalytics(
+      filters({ start: '2024-01-01', end: '2024-01-31', managerUserId: MANAGER }), viewer, NOW,
+    );
+    expect(aggregateMock.readPublishedAggregates).toHaveBeenCalledWith(
+      expect.objectContaining({ projectIds: [PROJECT] }), expect.anything(),
+    );
+  });
+
+  it('answers about neither project when the two sides are disjoint', async () => {
+    runMock.listScopedProjectIds.mockImplementation(async (scope: { pmUserId: string }) => (
+      scope.pmUserId === MANAGER ? [OTHER_PROJECT] : [PROJECT]
+    ));
+    factsMock.loadIncidentFacts.mockResolvedValue([incident()]);
+    const report = await getOperationsAnalytics(filters({ managerUserId: MANAGER }), viewer, NOW);
+    // An empty intersection is a real restriction, not "no restriction".
+    expect(report.cards).toEqual([]);
+    expect(factsMock.loadIncidentFacts).not.toHaveBeenCalled();
   });
 
   it('sends no project list at all when nothing narrows the request', async () => {
