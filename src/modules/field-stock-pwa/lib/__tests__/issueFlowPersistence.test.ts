@@ -8,10 +8,11 @@ import {
   loadIssueFlow,
   clearIssueFlow,
   ISSUE_FLOW_STORAGE_KEY,
+  MAX_AGE_MS,
   type PersistedIssueFlow,
 } from '../issueFlowPersistence';
 
-// Minimal in-memory Storage stub — vitest unit env has no window.
+// Minimal in-memory Storage stub — isolates tests from the environment.
 function makeStorage(): Storage {
   const map = new Map<string, string>();
   return {
@@ -50,7 +51,7 @@ function flowAt(step: PersistedIssueFlow['step']): PersistedIssueFlow {
 }
 
 beforeEach(() => {
-  vi.stubGlobal('window', { sessionStorage: makeStorage() });
+  vi.stubGlobal('window', { localStorage: makeStorage() });
 });
 
 describe('issueFlowPersistence', () => {
@@ -76,22 +77,39 @@ describe('issueFlowPersistence', () => {
   });
 
   it('rejects corrupt JSON and unknown steps', () => {
-    window.sessionStorage.setItem(ISSUE_FLOW_STORAGE_KEY, '{not json');
+    window.localStorage.setItem(ISSUE_FLOW_STORAGE_KEY, '{not json');
     expect(loadIssueFlow()).toBeNull();
-    window.sessionStorage.setItem(ISSUE_FLOW_STORAGE_KEY, JSON.stringify({ ...flowAt('scan-serials'), step: 'done' }));
+    window.localStorage.setItem(ISSUE_FLOW_STORAGE_KEY, JSON.stringify({ ...flowAt('scan-serials'), savedAt: Date.now(), step: 'done' }));
     expect(loadIssueFlow()).toBeNull();
   });
 
   it('rejects a step whose required objects are missing', () => {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       ISSUE_FLOW_STORAGE_KEY,
-      JSON.stringify({ ...flowAt('scan-serials'), stockItem: null })
+      JSON.stringify({ ...flowAt('scan-serials'), savedAt: Date.now(), stockItem: null })
     );
     expect(loadIssueFlow()).toBeNull();
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       ISSUE_FLOW_STORAGE_KEY,
-      JSON.stringify({ ...flowAt('pick-item'), technician: null })
+      JSON.stringify({ ...flowAt('pick-item'), savedAt: Date.now(), technician: null })
     );
+    expect(loadIssueFlow()).toBeNull();
+  });
+
+  it('discards a flow saved longer than MAX_AGE_MS ago, keeps a recent one', () => {
+    window.localStorage.setItem(
+      ISSUE_FLOW_STORAGE_KEY,
+      JSON.stringify({ ...flowAt('scan-serials'), savedAt: Date.now() - MAX_AGE_MS - 1 })
+    );
+    expect(loadIssueFlow()).toBeNull();
+    // and the stale entry is removed, not left behind
+    expect(window.localStorage.getItem(ISSUE_FLOW_STORAGE_KEY)).toBeNull();
+    saveIssueFlow(flowAt('scan-serials'));
+    expect(loadIssueFlow()?.step).toBe('scan-serials');
+  });
+
+  it('rejects a payload with no savedAt stamp', () => {
+    window.localStorage.setItem(ISSUE_FLOW_STORAGE_KEY, JSON.stringify(flowAt('scan-serials')));
     expect(loadIssueFlow()).toBeNull();
   });
 
