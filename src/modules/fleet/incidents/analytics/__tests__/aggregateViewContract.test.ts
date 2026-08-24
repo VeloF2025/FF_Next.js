@@ -13,7 +13,7 @@
  * for why the grant cannot be withdrawn yet), so this is the layer that catches
  * a reader going around it.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PUBLIC_AGGREGATE_COLUMNS } from '../aggregateSchema';
@@ -31,14 +31,57 @@ const BASE_TABLE = 'fleet_operational_monthly_aggregates';
  */
 const WRITER_FILES = ['src/modules/fleet/incidents/analytics/aggregateRepository.ts'];
 
+/**
+ * Where a query can be written. The old frame was `src/modules/fleet` alone,
+ * which the blind review of PR #2604 pointed out excludes the 118 `.ts` files
+ * under `pages/api/**` that write raw SQL, all of `src/services` and `src/lib`,
+ * every script, and every `.js` and `.mjs` file anywhere. A guard that cannot
+ * see the directory the next reader will put their query in is not a guard.
+ */
+const SCANNED_ROOTS = ['pages', 'src', 'scripts', 'lib'];
+const SCANNED_EXTENSIONS = /\.(ts|tsx|js|mjs)$/;
+const SKIPPED_DIRECTORIES = new Set(['node_modules', '.next', 'dist', 'build', 'coverage']);
+
 const forward = readFileSync(MIGRATION, 'utf8');
+
+/**
+ * The table in a SQL position, not in prose — several modules name it in a doc
+ * comment to explain what may not reach it, and flagging those would train the
+ * next person to delete the explanation rather than the query.
+ *
+ * Between the keyword and the name: any run of whitespace, brackets or quotes,
+ * then an optional schema qualification, then an optional opening quote. The
+ * trailing `(?!\\w)` keeps the view (…_published) out — `_` is a word character,
+ * so no `\\b` falls between the name and its suffix — while still allowing the
+ * closing double quote of a quoted identifier.
+ *
+ * Built fresh on each call: the `g`-less form has no lastIndex to carry, but a
+ * shared literal is the kind of thing a later edit makes stateful by accident.
+ */
+function basePattern(): RegExp {
+  return new RegExp(
+    `(FROM|JOIN|INTO|UPDATE)[\\s("]+(?:public\\.)?"?${BASE_TABLE}(?!\\w)`,
+    'i',
+  );
+}
 
 function sourceFiles(directory: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(directory)) {
+    if (SKIPPED_DIRECTORIES.has(entry)) continue;
     const full = join(directory, entry);
     if (statSync(full).isDirectory()) { found.push(...sourceFiles(full)); continue; }
-    if (/\.(ts|tsx)$/.test(entry)) found.push(full);
+    if (SCANNED_EXTENSIONS.test(entry)) found.push(full);
+  }
+  return found;
+}
+
+function scannedFiles(): string[] {
+  const found: string[] = [];
+  for (const root of SCANNED_ROOTS) {
+    const full = join(REPO_ROOT, root);
+    if (!existsSync(full)) continue;
+    found.push(...sourceFiles(full));
   }
   return found;
 }
@@ -75,20 +118,51 @@ describe('migration 527 publishes exactly the allow-listed surface', () => {
 
 describe('nothing reads the base table behind the view', () => {
   it('queries the base table only in the writer', () => {
-    // Matches the table in a SQL position, not in prose — several modules name
-    // it in a doc comment to explain what may not reach it, and flagging those
-    // would train the next person to delete the explanation rather than the
-    // query. The trailing \b keeps the view (…_published) out: `_` is a word
-    // character, so no boundary falls between the name and the suffix.
-    const pattern = new RegExp(`(FROM|JOIN|INTO|UPDATE)\\s+${BASE_TABLE}\\b`, 'i');
     const offenders: string[] = [];
-    for (const file of sourceFiles(join(REPO_ROOT, 'src', 'modules', 'fleet'))) {
+    for (const file of scannedFiles()) {
       const relativePath = relative(REPO_ROOT, file).split('\\').join('/');
       if (WRITER_FILES.includes(relativePath)) continue;
       if (relativePath.includes('__tests__')) continue;
-      if (pattern.test(readFileSync(file, 'utf8'))) offenders.push(relativePath);
+      if (basePattern().test(readFileSync(file, 'utf8'))) offenders.push(relativePath);
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('scans the roots a query could actually be written in', () => {
+    // The frame is the guard. If this ever shrinks back to one module, the
+    // assertion above passes for the wrong reason.
+    const scanned = scannedFiles().map((file) => relative(REPO_ROOT, file).split('\\').join('/'));
+    expect(scanned.some((path) => path.startsWith('pages/api/'))).toBe(true);
+    expect(scanned.some((path) => path.startsWith('src/services/'))).toBe(true);
+    expect(scanned.some((path) => path.startsWith('scripts/'))).toBe(true);
+    expect(scanned.some((path) => path.endsWith('.js') || path.endsWith('.mjs'))).toBe(true);
+    expect(scanned.length).toBeGreaterThan(1000);
+  });
+
+  it('catches the schema-qualified and quoted spellings of the same read', () => {
+    // The first version of this pattern demanded whitespace straight after the
+    // keyword and nothing between it and the bare name, so `public.` or a pair
+    // of double quotes walked past it.
+    for (const bypass of [
+      'SELECT * FROM public.fleet_operational_monthly_aggregates',
+      'SELECT * FROM "fleet_operational_monthly_aggregates"',
+      'SELECT * FROM public."fleet_operational_monthly_aggregates"',
+      'SELECT * FROM\n  fleet_operational_monthly_aggregates',
+      'JOIN(fleet_operational_monthly_aggregates)',
+      'update public.fleet_operational_monthly_aggregates set is_active = false',
+    ]) {
+      expect(basePattern().test(bypass)).toBe(true);
+    }
+  });
+
+  it('still lets the view and prose through', () => {
+    for (const allowed of [
+      'SELECT * FROM fleet_operational_monthly_aggregates_published',
+      'SELECT * FROM public."fleet_operational_monthly_aggregates_published"',
+      '// nothing may read fleet_operational_monthly_aggregates directly',
+    ]) {
+      expect(basePattern().test(allowed)).toBe(false);
+    }
   });
 
   it('reads the aggregates through the view in the retention coverage gate', () => {
