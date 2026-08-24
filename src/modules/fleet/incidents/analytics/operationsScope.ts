@@ -135,6 +135,12 @@ export async function resolveRange(
   }
 
   const policy = await getEffectiveAnalyticsRetentionSettings(now);
+  // Conservative on purpose while `live_retention_enabled` is off: the purge is
+  // reporting only, so an older month's detail is usually still there and a
+  // drill-down could have answered it. Reading the policy boundary rather than
+  // the surviving rows means the answer does not change on the day an operator
+  // turns deletion on — and a month that reports `aggregate_only` today is one
+  // that would genuinely have nothing to show tomorrow.
   const retainedDetailFrom = firstFullyRetainedMonth(now, policy.retentionMonths);
   const months = monthsBetween(filters.start, filters.end);
 

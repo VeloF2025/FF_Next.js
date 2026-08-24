@@ -216,3 +216,76 @@ describe('a site read together with a project', () => {
     );
   });
 });
+
+describe('which incident a filter keeps', () => {
+  const KEPT = 'kept';
+  const DROPPED = 'dropped';
+
+  /**
+   * Two incidents differing in exactly one attribute, and the ids that survive.
+   *
+   * Asserting the count alone would pass for a predicate that kept the wrong
+   * one, so the ids are what is checked: a filter that inverted its comparison
+   * would return `dropped` and still return one row.
+   */
+  async function survivorsOf(
+    overrides: Partial<Parameters<typeof incident>[0]>,
+    filter: Parameters<typeof filters>[0],
+  ): Promise<string[]> {
+    factsMock.loadIncidentFacts.mockResolvedValue([
+      incident({ incidentId: KEPT }),
+      incident({ incidentId: DROPPED, ...overrides }),
+    ]);
+    const page = await getOperationsDrillDown(filters(filter), viewer, {}, NOW);
+    return page.incidentIds;
+  }
+
+  it('keeps only the incident about the named driver', async () => {
+    expect(await survivorsOf({ contributorKey: 'another-driver' }, { staffId: DRIVER })).toEqual([KEPT]);
+  });
+
+  it('keeps only the incident on the named vehicle', async () => {
+    const vehicle = 'aaaaaaa2-0000-4000-8000-000000000002';
+    factsMock.loadIncidentFacts.mockResolvedValue([
+      incident({ incidentId: KEPT, vehicleId: vehicle }),
+      incident({ incidentId: DROPPED, vehicleId: null }),
+    ]);
+    const page = await getOperationsDrillDown(filters({ vehicleId: vehicle }), viewer, {}, NOW);
+    expect(page.incidentIds).toEqual([KEPT]);
+  });
+
+  it('keeps only the incident of the named type', async () => {
+    expect(await survivorsOf({ incidentType: 'left_early' }, { incidentType: 'late' })).toEqual([KEPT]);
+  });
+
+  it('keeps only the incident at the named severity', async () => {
+    expect(await survivorsOf({ severity: 'normal' }, { severity: 'high' })).toEqual([KEPT]);
+  });
+
+  it('keeps only the incident with the named outcome', async () => {
+    expect(await survivorsOf({ outcome: 'false_positive' }, { outcome: 'confirmed' })).toEqual([KEPT]);
+  });
+
+  it('keeps only the incident whose evidence state was asked for', async () => {
+    // op_evidence is the one filter that cannot reach SQL: evidence_available
+    // is computed in a LATERAL subquery, so this predicate is the whole filter.
+    expect(await survivorsOf({ evidenceAvailable: false }, { evidenceAvailable: true })).toEqual([KEPT]);
+  });
+
+  it('keeps the incident with no evidence when that is what was asked for', async () => {
+    factsMock.loadIncidentFacts.mockResolvedValue([
+      incident({ incidentId: KEPT, evidenceAvailable: false }),
+      incident({ incidentId: DROPPED, evidenceAvailable: true }),
+    ]);
+    const page = await getOperationsDrillDown(filters({ evidenceAvailable: false }), viewer, {}, NOW);
+    expect(page.incidentIds).toEqual([KEPT]);
+  });
+
+  it('keeps only the incident at the named site', async () => {
+    const otherSite = 'aaaaaaa3-0000-4000-8000-000000000003';
+    expect(await survivorsOf(
+      { dimension: { projectId: PROJECT, operationalSiteId: otherSite } },
+      { operationalSiteId: SITE },
+    )).toEqual([KEPT]);
+  });
+});

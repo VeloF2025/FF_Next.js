@@ -176,3 +176,51 @@ describe('the fixture itself', () => {
     expect(value.toISOString()).toBe('2024-02-29T22:00:00.000Z');
   });
 });
+
+describe('placeholders and binds, for every branch', () => {
+  /** The highest `$n` the statement references. */
+  function highestPlaceholder(sql: string): number {
+    const found = [...sql.matchAll(/\$(\d+)/g)].map((match) => Number(match[1]));
+    return found.length === 0 ? 0 : Math.max(...found);
+  }
+
+  const branches: Array<[string, Parameters<typeof readPublishedAggregates>[0]]> = [
+    ['organisation / managed projects', request],
+    ['one site', { ...request, operationalSiteId: SITE }],
+    ['one site inside one project', { ...request, operationalSiteId: SITE, projectId: PROJECT }],
+    ['one project', { ...request, projectId: PROJECT }],
+    ['a manager project list', { ...request, projectIds: [PROJECT, OTHER_PROJECT] }],
+  ];
+
+  for (const [name, dimensions] of branches) {
+    it.each([['unrestricted', unrestricted], ['scoped', restricted]])(
+      `binds exactly as many parameters as the %s ${name} statement references`,
+      async (_kind, scope) => {
+        // A branch whose SQL says $3 while its caller binds the value fifth
+        // does not fail at build time and does not fail in review. Postgres
+        // rejects it at bind time, for that viewer, on that branch alone.
+        vi.clearAllMocks();
+        db.query.mockResolvedValue([row()]);
+        await readPublishedAggregates(dimensions, scope);
+        const sql = String(db.query.mock.calls[0]?.[0]);
+        const params = (db.query.mock.calls[0]?.[1] ?? []) as unknown[];
+        expect(highestPlaceholder(sql)).toBe(params.length);
+      },
+    );
+  }
+
+  it('spends $3 and $4 on the scope predicate, so a branch parameter starts at $5', async () => {
+    await readPublishedAggregates({ ...request, projectId: PROJECT }, restricted);
+    const sql = String(db.query.mock.calls[0]?.[0]);
+    expect(sql).toContain('p.project_manager = $3::uuid');
+    expect(sql).toContain('p.project_manager = $4::uuid');
+    expect(sql).toContain('a.dimension_project_id = $5::uuid');
+  });
+
+  it('spends nothing on scope when unrestricted, so a branch parameter starts at $3', async () => {
+    await readPublishedAggregates({ ...request, projectId: PROJECT }, unrestricted);
+    const sql = String(db.query.mock.calls[0]?.[0]);
+    expect(sql).not.toContain('project_manager');
+    expect(sql).toContain('a.dimension_project_id = $3::uuid');
+  });
+});

@@ -133,7 +133,8 @@ describe('a filter that makes a fact kind inapplicable', () => {
 });
 
 describe('the per-request fan-out', () => {
-  it('never has more than the cap of months in flight at once', async () => {
+  /** Runs a twelve-month range and reports the most months ever in flight. */
+  async function peakMonthsInFlight(): Promise<number> {
     let inFlight = 0;
     let peak = 0;
     factsMock.loadIncidentFacts.mockImplementation(async () => {
@@ -144,8 +145,22 @@ describe('the per-request fan-out', () => {
       return [];
     });
     await getOperationsAnalytics(filters({ start: '2025-09-01', end: '2026-08-31' }), viewer, NOW);
+    return peak;
+  }
+
+  it('holds four months in flight at once, not the whole range', async () => {
+    // The literal, not MONTH_LOAD_CONCURRENCY: comparing the measurement to the
+    // constant it is meant to pin passes for any value the constant takes,
+    // including twelve — which is the state this cap exists to prevent.
+    const peak = await peakMonthsInFlight();
     expect(factsMock.loadIncidentFacts).toHaveBeenCalledTimes(12);
-    expect(peak).toBeLessThanOrEqual(MONTH_LOAD_CONCURRENCY);
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(peak).toBeLessThan(12);
+  });
+
+  it('keeps the exported cap and the behaviour it names in step', async () => {
+    expect(MONTH_LOAD_CONCURRENCY).toBe(4);
+    expect(await peakMonthsInFlight()).toBe(MONTH_LOAD_CONCURRENCY);
   });
 
   it('still loads every month in the range', async () => {
