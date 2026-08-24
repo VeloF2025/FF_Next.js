@@ -12,7 +12,7 @@
  * Loaded on its own request so a long history never delays opening the drawer,
  * and paged, so an incident with hundreds of entries stays readable.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { log } from '@/lib/logger';
 import { IncidentApiError, incidentApi, type IncidentTimelineEntry } from './incidentApi';
 import type { TimelineSource } from '../analytics/aggregateSchema';
@@ -46,24 +46,48 @@ function TimelineRow({ item }: { item: IncidentTimelineEntry }) {
   );
 }
 
-export interface IncidentTimelineProps { incidentId: string }
+export interface IncidentTimelineProps {
+  incidentId: string;
+  /**
+   * Bumped by the drawer after an action or an upload. The chronology otherwise
+   * refetches only when the incident changes, so an acknowledgement made in the
+   * open drawer would leave the entry that records it invisible until reopen.
+   */
+  refreshKey?: number;
+}
 
-export function IncidentTimeline({ incidentId }: IncidentTimelineProps) {
+export function IncidentTimeline({ incidentId, refreshKey = 0 }: IncidentTimelineProps) {
   const [entries, setEntries] = useState<IncidentTimelineEntry[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<IncidentApiError | null>(null);
   const [loading, setLoading] = useState(true);
+  const controller = useRef<AbortController | null>(null);
+  // Incremented per request. A response is applied only while it is still the
+  // newest one asked for: switching from incident A to incident B before A's
+  // page arrives would otherwise overwrite B's chronology with A's entries.
+  const generation = useRef(0);
 
   async function loadPage(from: string | null, append: boolean): Promise<void> {
+    controller.current?.abort();
+    const request = new AbortController();
+    controller.current = request;
+    generation.current += 1;
+    const issued = generation.current;
+    const isCurrent = (): boolean => generation.current === issued;
     setLoading(true);
     try {
-      const page = await incidentApi.timeline(incidentId, from);
+      const page = await incidentApi.timeline(incidentId, from, request.signal);
+      if (!isCurrent()) return;
       // Append rather than replace: a failed second page must never look like
       // the incident lost the history the manager was already reading.
       setEntries((current) => (append ? [...current, ...page.entries] : page.entries));
       setCursor(page.nextCursor);
       setError(null);
     } catch (caught) {
+      // A superseded request is discarded silently — it was abandoned on
+      // purpose, and reporting it would show the manager an error about an
+      // incident they have already navigated away from.
+      if (!isCurrent()) return;
       // Rendered *and* logged: the banner tells the manager the chronology is
       // incomplete, and the log is what makes a chronology that quietly stops
       // loading for one incident diagnosable later.
@@ -72,15 +96,16 @@ export function IncidentTimeline({ incidentId }: IncidentTimelineProps) {
         ? caught
         : new IncidentApiError('The chronology could not be loaded', 0, 'UNKNOWN_ERROR'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }
 
   useEffect(() => {
     setEntries([]); setCursor(null); setError(null);
     void loadPage(null, false);
+    return () => { controller.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incidentId]);
+  }, [incidentId, refreshKey]);
 
   return (
     <section aria-label="Incident chronology">

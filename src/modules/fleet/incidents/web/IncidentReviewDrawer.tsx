@@ -198,6 +198,10 @@ export function IncidentReviewDrawer({ incidentId, canEdit, returnFocus, onClose
   const closeButton = useRef<HTMLButtonElement>(null);
   const [detail, setDetail] = useState<IncidentDetail | null>(null);
   const [error, setError] = useState<IncidentApiError | null>(null);
+  // The chronology loads on its own request and otherwise refetches only when
+  // the incident changes, so an action or an upload made in the open drawer has
+  // to tell it to read again — `load()` below refreshes the detail, not it.
+  const [chronologyVersion, setChronologyVersion] = useState(0);
 
   const load = async (): Promise<void> => {
     try { setDetail(await incidentApi.detail(incidentId)); setError(null); }
@@ -222,7 +226,11 @@ export function IncidentReviewDrawer({ incidentId, canEdit, returnFocus, onClose
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
   }
 
-  const refreshAfterChange = (): void => { void load(); onChanged(); };
+  const refreshAfterChange = (): void => {
+    void load();
+    setChronologyVersion((version) => version + 1);
+    onChanged();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -240,7 +248,7 @@ export function IncidentReviewDrawer({ incidentId, canEdit, returnFocus, onClose
           {/* Added beside the existing sections, not in place of them (stage 8, task 6):
               the chronology carries no bodies, so the activity and attachment lists above
               remain the only place a manager reads a comment or opens evidence. */}
-          <IncidentTimeline incidentId={detail.id} />
+          <IncidentTimeline incidentId={detail.id} refreshKey={chronologyVersion} />
           <IncidentActionPanel incident={detail} canEdit={canEdit} onSubmitted={refreshAfterChange} />
           <EvidenceUploadForm incidentId={detail.id} canEdit={canEdit} onUploaded={refreshAfterChange} />
         </div>}

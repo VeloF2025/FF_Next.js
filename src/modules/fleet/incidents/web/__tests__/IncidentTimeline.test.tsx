@@ -141,3 +141,49 @@ describe('IncidentTimeline pagination', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
 });
+
+describe('IncidentTimeline staleness', () => {
+  it('discards a first-page response that arrives after the incident changed', async () => {
+    const pending = deferred<Response>();
+    fetchMock.mockReturnValueOnce(pending.promise);
+    const { rerender } = render(<IncidentTimeline incidentId="incident-1" />);
+    fetchMock.mockResolvedValue(ok(page({ entries: [entry({ stableId: 'manager:from-2' })] })));
+    rerender(<IncidentTimeline incidentId="incident-2" />);
+    await waitFor(() => expect(screen.getByTestId('timeline-manager:from-2')).toBeTruthy());
+
+    // The abandoned request for incident-1 now answers. Its entries belong to a
+    // different incident and must never reach the list the manager is reading.
+    await act(async () => { pending.resolve(ok(page({ entries: [entry({ stableId: 'manager:from-1' })] }))); });
+    await flush();
+    expect(screen.queryByTestId('timeline-manager:from-1')).toBeNull();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByTestId('timeline-manager:from-2')).toBeTruthy();
+  });
+
+  it('aborts the in-flight request when the incident changes', async () => {
+    fetchMock.mockReturnValueOnce(deferred<Response>().promise);
+    const { rerender } = render(<IncidentTimeline incidentId="incident-1" />);
+    rerender(<IncidentTimeline incidentId="incident-2" />);
+    await flush();
+    const first = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(first?.signal?.aborted).toBe(true);
+  });
+});
+
+describe('IncidentTimeline refresh', () => {
+  it('reloads the chronology when the drawer reports a change', async () => {
+    render(<IncidentTimeline incidentId="incident-1" refreshKey={0} />);
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(1));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches when the refresh key changes, and not otherwise', async () => {
+    const { rerender } = render(<IncidentTimeline incidentId="incident-1" refreshKey={0} />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    rerender(<IncidentTimeline incidentId="incident-1" refreshKey={0} />);
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    rerender(<IncidentTimeline incidentId="incident-1" refreshKey={1} />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  });
+});
