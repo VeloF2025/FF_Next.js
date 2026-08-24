@@ -3,11 +3,19 @@
 **Status: INTERNAL. Still not a published anonymous dataset — read "What is still open" before
 exposing it, and treat section 3 as live.**
 
-The two items that blocked a read path were first declared closed on 2026-08-24. A blind review of
-PR #2604 reopened the first of them the same day, with two working attacks, and it was closed again
-on a different footing. What that history is worth recording for: the first attempt's rule was
-*local* — it asked what had been published at the cell in front of it — and both attacks simply
-walked to a neighbouring cell and came back. Read the state below as of the second attempt.
+The two items that blocked a read path were first declared closed on 2026-08-24. Two blind reviews
+of PR #2604 reopened the first of them, five working attacks between them, and it has now been
+closed three times. What that history is worth recording for:
+
+1. The first rule was *local* — it asked what had been published at the cell in front of it. Both
+   attacks walked to a neighbouring cell and came back.
+2. The second was global but *incomplete*: it dropped relations that had no known variable, it did
+   not model the incidents nobody reviewed, and it forgot that a published row prints its own
+   DENOMINATOR — so a withheld population could be sitting in full in a surviving row's denominator
+   column.
+
+Read the state below as of the third attempt, and read "What this actually guarantees" before
+treating it as settled.
 
 - **Cross-key differencing (open item 1)** — closed by `derivability.ts`, which decides against what
   a reader can DERIVE rather than against what was published anywhere in particular.
@@ -133,12 +141,16 @@ not modelled at all. Neither cell was ever examined by the rule that was suppose
 **How it is closed now.** `derivationModel.ts` names every value a reader could hold — one metric
 key at one cell, plus the two internal denominator tallies and the subset complements — and every
 identity between them: a parent is the sum of its children, a partition's total is the sum of its
-members, a superset is its subset plus the complement. A variable is known if a published row states
-it, if a published row carries it as a denominator, or if nobody is behind it. `derivability.ts`
-row-reduces the resulting linear system. Each reduced row is a combination of withheld values whose
-value the published rows fix; the people behind it are the union of its supports, and that group
-must be empty or reach `k`. A row reducing to a single variable is the case that hands one cell over
-outright.
+members, a superset is its subset plus the complement. The nesting pairs are DERIVED from
+`metricCalculator`'s `DENOMINATOR_OF` rather than listed by hand, because a hand-written list is
+exactly what missed three of them.
+
+A variable is known if a published row states it, if a published row PRINTS IT AS A DENOMINATOR, or
+if nobody is behind it. `derivability.ts` row-reduces the resulting linear system and then asks, of
+each small group of withheld variables, whether the reader can pin down some combination of exactly
+those. That is a question about the row SPACE, not about the basis the elimination happened to
+produce — a randomised sweep found a pair of withheld incident cells whose sum was pinned by a
+combination no basis row named.
 
 `suppression.ts#repairDerivability` then withholds rows — smallest support first, ties on the row's
 identity, so a re-run stays byte-identical — until no such combination remains. It terminates
@@ -151,6 +163,16 @@ Four things about this are worth knowing:
   in a relation and repeated. That is strictly weaker, and the randomised property test found a
   residual it could not see within 56 configurations — three cells across two sites, pinned only by
   ADDING two relations together.
+- **A relation with no known variable is still a constraint.** Admitting only anchored relations
+  reads as harmless and is not: an anchorless relation hands over no number by itself, but combines
+  with an anchored one to pin something neither could pin alone. The anchor test belongs AFTER
+  elimination, on the reduced row, where "did the published rows give this away" can be asked.
+- **A published row prints its denominator.** `input.requests_sent` can be withheld from the cube
+  and printed in full in the denominator column of the `input.responses_received` row beside it.
+  Three families were exposed this way.
+- **Incidents nobody reviewed.** `outcome.reviewed_total` is bumped only where an incident HAS an
+  outcome. The difference from `incident.total` is a quantity with people behind it, no metric key,
+  and no partition — until it was modelled, nothing could see it.
 - **Withholding every member is not always enough.** Where a partition's members do not between
   them cover everyone the total counts, the total is still published with nothing left to hide the
   residual behind. So the total goes too — `presence.scheduled_days` for presence, and
@@ -166,10 +188,39 @@ Four things about this are worth knowing:
   invariant is re-established after every round (`cascadeWithholding`).
 
 **Where the test oracle lives, and why it is written twice.** `__tests__/derivabilityOracle.ts`
-answers the same question by its own Gaussian elimination and declares its own table of relations
-rather than importing `metricPartitions.ts`. That is deliberate: the second finding was a MISSING
-relation, and an oracle importing the model it audits cannot notice one. It is what turned the
-propagation closure's weakness into a failing test rather than a silent assumption.
+answers the same question by a deliberately different method, and shares as little with the code it
+audits as can be managed:
+
+| | `derivability.ts` | the oracle |
+|---|---|---|
+| arithmetic | floating point, zero within 1e-9 | exact `bigint` rationals |
+| question | does the row space meet these variables' span? | is this combination uniquely determined? |
+| computed from | the row space | the NULL space |
+| anchoring | anchors carried through the reduction | the system solved twice, with and without the published rows |
+| relations | `metricPartitions.ts` | rebuilt from `metricCalculator`'s tables |
+
+The first version of the oracle shared all five and was worth very little. Four of the five findings
+against this module were reproduced by the sweep the oracle drives; the fifth was found by reading.
+
+## What this actually guarantees
+
+Stated precisely, because "no group of fewer than 5 can be identified" is not what is enforced:
+
+- **Complete** for single values. No withheld metric cell, partition total or subset complement is
+  recoverable while fewer than `k` people are behind it. All five reproduced attacks were of this
+  shape or one step from it.
+- **Complete for pairs and triples** of withheld CELLS whose combined support is under the
+  threshold — the residual rule, extended past the elimination basis to the whole row space.
+- **NOT searched:** combinations of four or more withheld cells. None has been observed across
+  450 randomised configurations of every relation-carrying family plus 4,000 presence-only ones,
+  but that is a bound on the search, not a proof.
+- **NOT searched:** combinations that include a subset COMPLEMENT. Those are checked one at a time,
+  where their support means something. A complement's support is a lower BOUND, and summing bounds
+  stops meaning anything — the three complements of one presence partition add up to twice its
+  total, so their bounds union to fewer people than the total's own support. Judging that a
+  disclosure is an artefact of how it was written down.
+- **Still not** l-diversity. Everything in the "What actually holds" section above about a residual
+  of 1,005 over six people stands unchanged.
 
 ### 2. Retired rows — CLOSED 2026-08-24
 
