@@ -70,24 +70,53 @@ Three tiers:
   else. One value per component means no difference can be taken inside it.
 - **NONE** — otherwise nothing.
 
-The **organisation takes the minimum tier over its projects**, and must clear its own check at that
-tier besides.
+The organisation is decided differently, because it is the only level with published children.
+Subtract the projects that published from the organisation and what is left is the sum of the ones
+that did not, so that sum has to be safe. The organisation publishes at the highest tier `T` where
+all three of these hold:
+
+1. its own numbers pass the tier-`T` check;
+2. **every project is all-in or all-out** — it publishes at `T` or better, or it publishes nothing;
+3. the projects publishing nothing, aggregated into ONE VIRTUAL CELL with supports unioned and
+   complements taken from the calculator's own tallies, pass the tier-`T` check themselves.
 
 A component rooted on an internal tally has no row to publish at TOTAL_ONLY — `incident.total` is no
 metric key — so for incidents the two lower tiers collapse into one.
 
 ### The proof
 
-Three lines, which is the point of the redesign.
-
 1. **Within a component at FULL**: any value a reader computes is a linear combination of that
    component's variables, and every one of them clears `k`.
 2. **Within a component at TOTAL_ONLY**: one value is published, so there is no combination to take.
-3. **Across levels**: every key the organisation publishes is published by EVERY project, because
-   the organisation's tier is the minimum. So `organisation - sum(projects) = 0`. There is no
-   residual to bound — which is what three earlier designs kept failing to do.
+3. **Across levels**: by condition 2 the projects divide into those publishing at least the
+   organisation's key set and those publishing nothing. So for every key the organisation publishes,
+   `organisation - sum(publishing projects)` is exactly the virtual cell's value for that key — and
+   by condition 3 the virtual cell passed the same check every real cell passes. At FULL that means
+   every one of its variables clears `k`, complements included; at TOTAL_ONLY, its root does.
+4. **The reader recovers the virtual cell's WHOLE component**, not one key of it, which is why the
+   check is the full tier check and not merely "its total clears `k`". Where only one project is
+   silent the virtual cell IS that project, so that project must pass in full.
+5. **Where no project is silent** the virtual cell has nobody behind anything, every check passes
+   vacuously, and the difference across levels is zero.
 
 Across components there is no relation at all, so mixed tiers at one cell are safe by construction.
+
+Conditions 2 and 3 were both learned from the randomised sweep rather than designed, and both are
+worth stating as traps:
+
+- **A project half-in is not safe.** An earlier version asked only that the silent projects be safe.
+  A project publishing its ROOT while the organisation published MEMBERS couples the two groups
+  through the organisation's member values, and seed 196 pinned a four-person residual through that
+  coupling. Hence all-in or all-out.
+- **The virtual cell's complements are load-bearing, and only the SUBSET ones.** A partition
+  member's complement is the union of the other members, so it clears whenever they do — checking it
+  is free but adds nothing. A subset complement is counted separately by `metricCalculator` because
+  it cannot be inferred from the members at all: two silent projects can have six people between
+  them sending and receiving notifications while the notifications that FAILED belong to two.
+
+This replaced taking the MINIMUM tier over the projects — the special case that refuses whenever any
+project is silent. It was sound and needlessly lossy: one small project silenced the organisation
+entirely.
 
 ### Why the complements have to be counted, not inferred
 
@@ -151,26 +180,21 @@ record rather than an inference from row counts.
 
 ## What it costs, measured
 
-On two projects — one of three sites and twenty staff, one of a single site and four — with `k = 5`:
+On two projects — one of three sites and twenty staff, one of a single site and six — with `k = 5`:
 
 | | value |
 |---|---|
-| informational rows published | 10 |
-| components carrying information that publish | 4 of 15 (26.7%) |
-| levels published | project only |
+| informational rows published | 21 |
+| components carrying information that publish | 12 of 15 (80.0%) |
+| levels published | organisation and project |
 
-Remove the four-person project and the same fixture publishes 20 rows across organisation and
-project. **Every organisation row disappears because one small project exists.** That is the minimum
-rule doing exactly what it is specified and proved to do, and it is almost certainly not what anyone
-wants.
+Under the minimum rule the same fixture published 10 rows, 4 of 15 components, and **no organisation
+row at all**.
 
-The tighter rule that would fix it, for whoever picks this up: instead of taking the minimum, let
-the organisation publish a component at tier T when the AGGREGATE of the projects not publishing at
-T — treated as one virtual cell — itself passes the tier-T check. The proof survives, because
-`organisation - sum(published projects)` is then that virtual cell, and it clears the threshold by
-the same test every other cell does. The trap is the case of exactly ONE non-publishing project:
-there the virtual cell IS that project, so it must pass the check in full, complements included —
-which is where a naive "its total clears k" relaxation would leak.
+One case the virtual cell cannot rescue, and no rule can: a project of four people, with `k = 5`.
+The residual an organisation row would leave is those four, however it is computed. That is the
+threshold refusing, not the rule being lossy, and `belowThresholdMonth` in the fixtures keeps it
+where it belongs — the organisation goes quiet and the project rows still publish.
 
 ## Where the code is
 

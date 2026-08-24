@@ -138,21 +138,36 @@ export function configurationFor(seed: number): OperationsFact[] {
 
 /**
  * The month the usability target is measured on: TWO projects — one of three
- * sites and twenty staff, one of a single site and four — and a month of
+ * sites and twenty staff, one of a single site and six — and a month of
  * ordinary operations over both.
  *
  * The second project is the point. It is small enough that several of its
- * components cannot clear the threshold, and the organisation takes the MINIMUM
- * tier over its projects, so it drags the organisation's row down with it. A
- * one-project fixture never exercises that and would report a number the rule
- * does not actually deliver.
+ * components fall short of FULL, so it is regularly one of the projects the
+ * organisation would be leaving behind, which is exactly what the virtual-cell
+ * rule has to reason about. A one-project fixture never exercises that.
+ *
+ * Six and not four, deliberately. A four-person project is below the threshold
+ * outright: the residual it leaves is four people whatever rule is applied, so
+ * an organisation row containing it can never be published and measuring
+ * usability on it would be measuring `k`, not the rule.
+ * `belowThresholdMonth` keeps that case, where it belongs.
  */
 export function realisticMonth(): OperationsFact[] {
   return [
     ...projectMonth('p-velocity', [
       { id: 's-north', size: 8 }, { id: 's-central', size: 7 }, { id: 's-south', size: 5 },
     ], 20260824),
-    ...projectMonth('p-pilot', [{ id: 's-pilot', size: 4 }], 20260901),
+    ...projectMonth('p-pilot', [{ id: 's-pilot', size: 6 }], 20260901),
+  ];
+}
+
+/** The same month with a project that cannot clear the threshold at all. */
+export function belowThresholdMonth(): OperationsFact[] {
+  return [
+    ...projectMonth('p-velocity', [
+      { id: 's-north', size: 8 }, { id: 's-central', size: 7 }, { id: 's-south', size: 5 },
+    ], 20260824),
+    ...projectMonth('p-tiny', [{ id: 's-tiny', size: 4 }], 20260901),
   ];
 }
 

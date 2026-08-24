@@ -16,21 +16,18 @@ import { describe, expect, it } from 'vitest';
 import { calculateMonthly } from '../metricCalculator';
 import { releaseAnonymousGroups, releaseTiers } from '../suppression';
 import { COMPONENT_OF } from '../metricRelations';
-import { realisticMonth } from './factFixtures';
+import { belowThresholdMonth, realisticMonth } from './factFixtures';
 
 /**
  * Set from the measurement, not from a wish, and raised whenever the
  * measurement rises.
  *
- * It is LOW, and the reason is worth knowing rather than tuning away: the
- * organisation takes the minimum tier over its projects, so the four-person
- * pilot project in the fixture — under the threshold on every component — takes
- * the organisation down with it. Every organisation row disappears because one
- * small project exists. That is the min rule working exactly as specified and
- * proved; it is also almost certainly not what anyone wants, and the disclosure
- * note records the tighter rule that would fix it.
+ * It was 0.25 under the rule that took the MINIMUM tier over the projects: the
+ * small project failed FULL, so the organisation published nothing at all. The
+ * virtual-cell rule asks instead whether the projects being left behind are
+ * safe to leave behind, and the same fixture now reaches 80%.
  */
-const FLOOR = 0.25;
+const FLOOR = 0.7;
 
 const COMPONENT_ROOT_OF = new Map(
   [...COMPONENT_OF.entries()].map(([key, component]) => [key, component.root]),
@@ -78,28 +75,24 @@ describe('a realistic month publishes something worth reading', () => {
     expect(fraction).toBeGreaterThanOrEqual(FLOOR);
   });
 
-  it('publishes project rows, no site rows, and — here — no organisation row', () => {
+  it('publishes organisation and project rows, and none below them', () => {
     const rows = releaseAnonymousGroups(calculateMonthly(realisticMonth(), K), K).filter(informational);
     const levels = new Set(rows.map((row) => row.dimensionLevel));
     console.log(`[usability] ${rows.length} informational rows across levels: ${[...levels].sort().join(', ') || 'none'}`);
     expect(rows.length).toBeGreaterThan(0);
     expect(levels.has('project')).toBe(true);
+    expect(levels.has('organisation')).toBe(true);
     expect(levels.has('site')).toBe(false);
-    // Pinned deliberately, as the cost of the minimum rule rather than as a
-    // property worth having: the pilot project clears nothing, so the
-    // organisation clears nothing. If a later change makes this true, the
-    // assertion should be inverted and the floor above raised — not deleted.
-    expect(levels.has('organisation')).toBe(false);
   });
 
-  it('publishes the organisation once every project can carry it', () => {
-    // The same fixture without the small project: the minimum has nothing to
-    // drag it down, and the organisation appears.
-    const facts = realisticMonth().filter((fact) => fact.dimension.projectId !== 'p-pilot');
-    const rows = releaseAnonymousGroups(calculateMonthly(facts, K), K).filter(informational);
+  it('goes quiet at the organisation when a project is below the threshold outright', () => {
+    // Four people. The residual an organisation row would leave is those four,
+    // whatever rule is applied — so this is `k` refusing, not the rule being
+    // lossy, and it is the one case the virtual cell cannot rescue.
+    const rows = releaseAnonymousGroups(calculateMonthly(belowThresholdMonth(), K), K).filter(informational);
     const levels = new Set(rows.map((row) => row.dimensionLevel));
-    console.log(`[usability] without the pilot project: ${rows.length} informational rows across ${[...levels].sort().join(', ')}`);
-    expect(levels.has('organisation')).toBe(true);
+    console.log(`[usability] with a four-person project: ${rows.length} informational rows across ${[...levels].sort().join(', ') || 'none'}`);
     expect(levels.has('project')).toBe(true);
+    expect(levels.has('organisation')).toBe(false);
   });
 });

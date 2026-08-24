@@ -32,35 +32,58 @@
  * `incident.total` is no metric key — has no row to publish at TOTAL_ONLY, so
  * for those two tiers collapse into one.
  *
- * ## The two things that make it provable
+ * ## The organisation, and the cell that does not exist
  *
- * **Sites are never published.** Migration 527's view exposes organisation and
+ * Sites are never published: migration 527's view exposes organisation and
  * project rows only, and neither `contributor_count` nor any histogram column.
- * A whole class of channel disappears with the columns.
+ * A whole class of channel disappears with the columns. A project therefore has
+ * no published children and nothing to be differenced against.
  *
- * **The organisation takes the MINIMUM tier over its projects**, and must clear
- * its own check at that tier besides. This is what closes cross-level
- * differencing, and the proof is one line: every key the organisation publishes
- * is published by EVERY project, so `organisation - sum(projects) = 0` and the
- * difference carries no information. Without the minimum, the organisation's row
- * minus the projects that survived would be the withheld projects' sum — which
- * is exactly the residual three designs kept failing to bound.
+ * The organisation does. Subtract the projects that published from the
+ * organisation and what is left is the sum of the projects that did not — so
+ * that sum has to be safe. `organisationTier` builds it: ONE VIRTUAL CELL over
+ * exactly the withheld projects, with supports UNIONED and complements taken
+ * from the calculator's own tallies, and asks it to pass the same tier check
+ * every real cell passes. The organisation publishes at the highest tier where
+ * both its own check and the virtual cell's hold.
  *
- * Within a component the argument is as short. Any value a reader computes is a
- * linear combination of that component's variables; at FULL every one of those
- * clears `k`, and at TOTAL_ONLY there is a single value and so no combination to
- * take. Across components there is no relation at all. See
- * `.claude/modules/fleet-analytics-disclosure.md` for what this does NOT claim.
+ * ### The proof
+ *
+ * Fix a component and a tier `T`, and let `W` be the projects not publishing at
+ * `T` or better.
+ *
+ * 1. **Within a published component at FULL**, any value a reader computes is a
+ *    linear combination of that component's variables, and every one of them
+ *    clears `k`. At TOTAL_ONLY there is a single value and so no combination to
+ *    take. Across components there is no relation at all.
+ * 2. **Across levels**, for every key the organisation publishes at `T`, each
+ *    project outside `W` publishes it too — a higher tier publishes a superset
+ *    of a lower tier's keys. So `organisation - sum(projects outside W)` is
+ *    exactly the virtual cell's value for that key, and the virtual cell passed
+ *    the tier-`T` check: at FULL every one of its variables clears `k`, at
+ *    TOTAL_ONLY its root does.
+ * 3. **The reader can recover the virtual cell's whole component**, not just one
+ *    key of it, which is why the check has to be the full tier check and not
+ *    merely "its total clears `k`". Where `W` is a single project the virtual
+ *    cell IS that project, so that project must itself pass in full,
+ *    complements included — the case a weaker relaxation would leak through.
+ * 4. **Where `W` is empty** the virtual cell has nobody behind anything, every
+ *    check passes vacuously, and the difference is zero.
+ *
+ * This replaced taking the MINIMUM tier over the projects, which is the special
+ * case of the above that refuses whenever `W` is non-empty. It was sound and
+ * needlessly lossy: one four-person project silenced the organisation entirely.
  *
  * Pure: no SQL, no clock, no configuration lookup. The threshold is passed in
  * from the effective settings row.
  */
 import type { AggregateDimensionLevel, AggregateMetricKind, OperationsMetricKey } from './aggregateSchema';
 import { metricKindFor } from './aggregateSchema';
-import type { CalculatedMetricGroup } from './facts';
 import type { CalculatedSiteMonth } from './metricCalculator';
 import type { MetricComponent } from './metricRelations';
 import { METRIC_COMPONENTS } from './metricRelations';
+import type { Accumulator, Cell, MonthScope } from './releaseCells';
+import { buildCell, monthScopes, supportSize } from './releaseCells';
 import type { DurationHistogram } from './types';
 
 export interface ReleasedAggregate {
@@ -80,95 +103,7 @@ export interface ReleasedAggregate {
 export const RELEASE_TIERS = ['none', 'total_only', 'full'] as const;
 export type ReleaseTier = (typeof RELEASE_TIERS)[number];
 
-interface Accumulator {
-  numerator: number;
-  denominator: number | null;
-  histogram: DurationHistogram | null;
-  contributors: Set<string>;
-}
-
-/** One (month, version, level, dimension) — the scope a tier is decided for. */
-interface Cell {
-  monthStart: string;
-  metricVersion: number;
-  level: AggregateDimensionLevel;
-  projectId: string | null;
-  /** Metric keys and internal variables alike. */
-  values: Map<string, Accumulator>;
-}
-
-const emptyAccumulator = (): Accumulator => ({ numerator: 0, denominator: null, histogram: null, contributors: new Set() });
-
-/** Adds `source` into `target` in place. Contributors UNION; they never add. */
-function accumulate(target: Accumulator, source: Accumulator): void {
-  target.numerator += source.numerator;
-  if (source.denominator !== null) target.denominator = (target.denominator ?? 0) + source.denominator;
-  const incoming = source.histogram;
-  if (incoming) {
-    const base = target.histogram
-      ?? { sampleCount: 0, sumSeconds: 0, buckets: incoming.buckets.map(() => 0) };
-    target.histogram = {
-      sampleCount: base.sampleCount + incoming.sampleCount,
-      sumSeconds: base.sumSeconds + incoming.sumSeconds,
-      buckets: base.buckets.map((count, index) => count + (incoming.buckets[index] ?? 0)),
-    };
-  }
-  for (const contributor of source.contributors) target.contributors.add(contributor);
-}
-
-function accumulatorFrom(group: CalculatedMetricGroup): Accumulator {
-  return {
-    numerator: group.numerator,
-    denominator: group.denominator,
-    histogram: group.histogram ? { ...group.histogram, buckets: [...group.histogram.buckets] } : null,
-    contributors: new Set(group.contributors),
-  };
-}
-
-function addInto(cell: Cell, variable: string, source: Accumulator): void {
-  const target = cell.values.get(variable) ?? emptyAccumulator();
-  cell.values.set(variable, target);
-  accumulate(target, source);
-}
-
-/**
- * Rolls the site-months up into the two levels that may be published. Sites are
- * summed and then dropped: they are the input to a project's numbers, never a
- * row. Internal variables roll up the same way — a project's tier turns on who
- * is behind the PROJECT's complements, not on any one site's.
- */
-function rollUp(siteMonths: readonly CalculatedSiteMonth[]): Map<string, Cell> {
-  const cells = new Map<string, Cell>();
-  const cellFor = (
-    monthStart: string, metricVersion: number, level: AggregateDimensionLevel, projectId: string | null,
-  ): Cell => {
-    const id = `${monthStart}|${metricVersion}|${level}|${projectId ?? ''}`;
-    const existing = cells.get(id);
-    if (existing) return existing;
-    const created: Cell = { monthStart, metricVersion, level, projectId, values: new Map() };
-    cells.set(id, created);
-    return created;
-  };
-
-  for (const siteMonth of siteMonths) {
-    const scopes = [
-      cellFor(siteMonth.monthStart, siteMonth.metricVersion, 'project', siteMonth.projectId),
-      cellFor(siteMonth.monthStart, siteMonth.metricVersion, 'organisation', null),
-    ];
-    for (const group of siteMonth.groups) {
-      const source = accumulatorFrom(group);
-      for (const scope of scopes) addInto(scope, group.metricKey, source);
-    }
-    for (const [variable, contributors] of siteMonth.internalSupport) {
-      const source = { ...emptyAccumulator(), contributors: new Set(contributors) };
-      for (const scope of scopes) addInto(scope, variable, source);
-    }
-  }
-  return cells;
-}
-
-const supportSize = (cell: Cell, variable: string): number =>
-  cell.values.get(variable)?.contributors.size ?? 0;
+const rank = (tier: ReleaseTier): number => RELEASE_TIERS.indexOf(tier);
 
 /**
  * Everyone behind a partition member's complement: the other members, unioned —
@@ -203,10 +138,50 @@ function ownTier(cell: Cell, component: MetricComponent, minimumContributors: nu
   return supportSize(cell, component.root) >= minimumContributors ? 'total_only' : 'none';
 }
 
-const rank = (tier: ReleaseTier): number => RELEASE_TIERS.indexOf(tier);
-const lower = (a: ReleaseTier, b: ReleaseTier): ReleaseTier => (rank(a) <= rank(b) ? a : b);
+/**
+ * The highest tier at which the organisation may publish.
+ *
+ * Three conditions, and the middle one is the one a randomised sweep had to
+ * teach me.
+ *
+ * 1. The organisation's own numbers pass the tier-`T` check.
+ * 2. **Every project is all-in or all-out**: it publishes at `T` or better, or
+ *    it publishes nothing at all. A project sitting in between — publishing its
+ *    root total while the organisation publishes members — couples the two
+ *    groups through the organisation's member values, and combinations across
+ *    that coupling can pin down a handful of people. Seed 196 of the sweep is
+ *    exactly that shape: three projects, one at TOTAL_ONLY, the organisation at
+ *    FULL, and a four-person residual falling out of the arithmetic.
+ * 3. The projects publishing nothing, aggregated into ONE VIRTUAL CELL with
+ *    supports unioned and complements taken from the calculator's own tallies,
+ *    pass the tier-`T` check themselves.
+ */
+function organisationTier(
+  scope: MonthScope, organisation: Cell, projectTiers: ReadonlyMap<string, ReleaseTier>,
+  component: MetricComponent, minimumContributors: number,
+): ReleaseTier {
+  const own = ownTier(organisation, component, minimumContributors);
+  const tierOf = (projectId: string): ReleaseTier => projectTiers.get(projectId) ?? 'none';
+  const silent = [...scope.byProject.entries()].filter(([projectId]) => tierOf(projectId) === 'none');
 
-function toRow(cell: Cell, key: OperationsMetricKey, value: Accumulator, withDenominator: boolean): ReleasedAggregate {
+  for (const tier of ['full', 'total_only'] as const) {
+    if (rank(own) < rank(tier)) continue;
+    const allInOrAllOut = [...scope.byProject.keys()].every(
+      (projectId) => tierOf(projectId) === 'none' || rank(tierOf(projectId)) >= rank(tier),
+    );
+    if (!allInOrAllOut) continue;
+    const virtual = buildCell(
+      silent.flatMap(([, siteMonths]) => siteMonths), scope.monthStart, scope.metricVersion,
+      'organisation', null,
+    );
+    if (rank(ownTier(virtual, component, minimumContributors)) >= rank(tier)) return tier;
+  }
+  return 'none';
+}
+
+function toRow(
+  cell: Cell, key: OperationsMetricKey, value: Accumulator, withDenominator: boolean,
+): ReleasedAggregate {
   const denominator = withDenominator ? value.denominator : null;
   return {
     monthStart: cell.monthStart,
@@ -242,28 +217,43 @@ function rowsFor(
 
 const LEVEL_ORDER: Record<AggregateDimensionLevel, number> = { site: 0, project: 1, organisation: 2 };
 
+interface Decision {
+  cell: Cell;
+  component: MetricComponent;
+  tier: ReleaseTier;
+}
+
 /**
- * The tier every (cell, component) settles on, organisation minimum included.
- * One traversal serves both the release and the usability report, so the rule
- * the two describe cannot drift apart.
+ * The tier every (cell, component) settles on. One traversal serves both the
+ * release and the usability report, so the rule the two describe cannot drift.
  */
-function decide(
-  siteMonths: readonly CalculatedSiteMonth[], minimumContributors: number,
-): { cell: Cell; component: MetricComponent; tier: ReleaseTier }[] {
-  const cells = rollUp(siteMonths);
-  const projects = [...cells.values()].filter((cell) => cell.level === 'project');
-  const decided: { cell: Cell; component: MetricComponent; tier: ReleaseTier }[] = [];
-  for (const cell of cells.values()) {
+function decide(siteMonths: readonly CalculatedSiteMonth[], minimumContributors: number): Decision[] {
+  const decided: Decision[] = [];
+  for (const scope of monthScopes(siteMonths)) {
+    const { monthStart, metricVersion } = scope;
+    const projects = new Map(
+      [...scope.byProject.entries()].map(
+        ([projectId, months]) => [projectId, buildCell(months, monthStart, metricVersion, 'project', projectId)],
+      ),
+    );
+    const organisation = buildCell(
+      [...scope.byProject.values()].flat(), monthStart, metricVersion, 'organisation', null,
+    );
+
     for (const component of METRIC_COMPONENTS) {
-      let tier = ownTier(cell, component, minimumContributors);
-      if (cell.level === 'organisation') {
-        for (const project of projects) {
-          if (project.monthStart !== cell.monthStart) continue;
-          if (project.metricVersion !== cell.metricVersion) continue;
-          tier = lower(tier, ownTier(project, component, minimumContributors));
-        }
+      const tiers = new Map(
+        [...projects.entries()].map(
+          ([projectId, cell]) => [projectId, ownTier(cell, component, minimumContributors)],
+        ),
+      );
+      for (const [projectId, cell] of projects) {
+        decided.push({ cell, component, tier: tiers.get(projectId)! });
       }
-      decided.push({ cell, component, tier });
+      decided.push({
+        cell: organisation,
+        component,
+        tier: organisationTier(scope, organisation, tiers, component, minimumContributors),
+      });
     }
   }
   return decided;
