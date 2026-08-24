@@ -14,8 +14,9 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { log } from '@/lib/logger';
-import { IncidentApiError, incidentApi, type IncidentTimelineEntry } from './incidentApi';
-import type { TimelineSource } from '../analytics/aggregateSchema';
+import { IncidentApiError } from './incidentApi';
+import { incidentTimelineApi } from './incidentTimelineApi';
+import type { IncidentTimelineEntry, TimelineSource } from '../analytics/types';
 
 const SOURCE_LABELS: Record<TimelineSource, string> = {
   system: 'System', manager: 'Manager', driver: 'Driver',
@@ -76,7 +77,7 @@ export function IncidentTimeline({ incidentId, refreshKey = 0 }: IncidentTimelin
     const isCurrent = (): boolean => generation.current === issued;
     setLoading(true);
     try {
-      const page = await incidentApi.timeline(incidentId, from, request.signal);
+      const page = await incidentTimelineApi.timeline(incidentId, from, request.signal);
       if (!isCurrent()) return;
       // Append rather than replace: a failed second page must never look like
       // the incident lost the history the manager was already reading.

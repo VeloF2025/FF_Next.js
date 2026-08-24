@@ -1318,3 +1318,31 @@ despite being designed as one. Adversarial review (PR #2594, 2026-08-23) found d
 channels that per-key suppression does not close. Read
 [`fleet-analytics-disclosure.md`](./fleet-analytics-disclosure.md) before exposing it through any
 API, export, report, or UI.
+
+## Incident chronology (`GET /api/fleet/incidents/[incidentId]/timeline`)
+
+| Method | Endpoint | Gate |
+|---|---|---|
+| GET | `/api/fleet/incidents/[incidentId]/timeline` | `fleet.incidents:view` + project scope |
+
+One ordered view of what happened to an incident, merged in memory from five PR4-7 tables
+(`..._actions`, `..._observations`, `fleet_incident_attendance_correction_links`,
+`user_notifications`, `fleet_incident_retention_hold_actions`). **There is no timeline table
+and there never will be one** — `migrationContract.test.ts` asserts it.
+
+Three things to know before changing it:
+
+- **Summaries are never free text.** Every entry's summary is a label from an enum-keyed map,
+  or a label with a database-computed count. No `note`, filename, storage locator, or JSONB
+  blob is selected by any of the five queries; `timelineService.test.ts` greps the SQL and
+  fails if a forbidden column reappears. That grep matches on a word boundary, so it does
+  **not** catch `recipient_count` — any new column that names a person must be added by hand.
+- **Paging is a keyset, per source.** Each query is bounded `(occurred_at, id)` strictly past
+  the cursor and stops at `limit + 1` rows. An instant-only bound is not a smaller version of
+  this — being inclusive it re-reads the cursor row every page, so `nextCursor` is never
+  emitted and the chronology dies after two pages (caught in review of PR #2603). The cursor
+  encodes `occurredAt|table|id`; the fixed table order in `timelineService.ts` is half the
+  sort key and must never be reordered. `recordedAt` is reported but never sorted on — no
+  source can bound a read on another source's `recordedAt`.
+- **Scope failures answer 403, missing incidents 404** — the same pair, in the same order, as
+  `GET /api/fleet/incidents/[incidentId]`. `limit` above 200 is a 400, never a silent clamp.

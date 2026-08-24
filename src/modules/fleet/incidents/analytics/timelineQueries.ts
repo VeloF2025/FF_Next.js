@@ -28,25 +28,43 @@ import type { IncidentActionType, IncidentVisibility } from '../types';
 import type { RetentionHoldActionType } from './aggregateSchema';
 
 /**
- * What makes the merge bounded. Each source is asked only for rows at or after
- * the cursor position, in the same ascending order the service merges in, and
- * for at most `limit + 1` of them — the caller passes `limit + 1` so one extra
- * row can answer "is there another page" without a second read.
+ * What makes the merge bounded, and what makes it able to reach the end.
+ *
+ * Every source is read as a keyset: strictly past the cursor's position in the
+ * very order the service merges on, `(occurred_at, id)`. An instant-only bound
+ * cannot do this. It has to be inclusive, because entries sharing the cursor's
+ * instant still have to be reachable — and being inclusive it re-reads the
+ * cursor row on every page after the first, spending one of the `limit + 1`
+ * slots on a row the merge then discards. `remaining` can then never exceed
+ * `limit`, so `nextCursor` is never emitted and the chronology stops dead after
+ * two pages. An instant-only ORDER BY is the same failure one level down: with
+ * more rows on one instant than a page holds, the database may return a
+ * different arbitrary subset per page, and rows in no subset are never shown.
  *
  * `limit + 1` rows per source is enough to be correct, not merely cheap: the
- * merged page is the `limit` smallest entries at or after the cursor, and a
- * source can contribute at most `limit + 1` of the rows that decide it. A row a
- * source did not return is one that could not have appeared on this page.
+ * merged page is the `limit` smallest entries after the cursor, and a source can
+ * contribute at most `limit + 1` of the rows that decide it. A row a source did
+ * not return is one that could not have appeared on this page.
  *
- * The bound is on `occurredAt` alone and inclusive (`>=`), because ties on
- * `occurredAt` are broken by `recordedAt` and `stableId` in memory — an
- * exclusive bound would drop an entry that shares the cursor's second but sorts
- * after it.
+ * Because the keyset is exact, nothing the sources return is filtered out again
+ * in memory. The predicate below is the only place the cursor is applied.
  */
 export interface TimelineBound {
-  /** Rows are read from this instant onward. `null` reads from the beginning. */
+  /** The cursor's instant. `null` reads from the beginning of the history. */
   after: string | null;
-  /** Maximum rows this source may return. */
+  /**
+   * The cursor row's id, set only for the source the cursor row came from —
+   * ids are meaningless across tables. `null` on the others, which is what the
+   * `IS NULL` arm of the predicate reads as "no id to be past".
+   */
+  afterId: string | null;
+  /**
+   * Whether this source's rows sharing the cursor's instant sort after the
+   * cursor. The service decides it from the fixed source order, since an id
+   * comparison cannot settle a tie between two different tables.
+   */
+  includeAtInstant: boolean;
+  /** Maximum rows this source may return — `limit + 1`. */
   limit: number;
 }
 
@@ -101,10 +119,12 @@ export async function listActionSource(
      SELECT id, action_type, actor_user_id, is_system_actor, occurred_at, visibility
        FROM fleet_operational_incident_actions
       WHERE incident_id = $1::uuid
-        AND occurred_at >= COALESCE($2::timestamptz, '-infinity'::timestamptz)
-      ORDER BY occurred_at
-      LIMIT $3`,
-    [incidentId, bound.after, bound.limit],
+        AND (occurred_at > COALESCE($2::timestamptz, '-infinity'::timestamptz)
+             OR (occurred_at = $2::timestamptz AND $4::boolean
+                 AND ($3::uuid IS NULL OR id > $3::uuid)))
+      ORDER BY occurred_at, id
+      LIMIT $5`,
+    [incidentId, bound.after, bound.afterId, bound.includeAtInstant, bound.limit],
   );
 }
 
@@ -121,10 +141,12 @@ export async function listObservationSource(
      SELECT id, observed_at, recorded_at
        FROM fleet_operational_incident_observations
       WHERE incident_id = $1::uuid
-        AND observed_at >= COALESCE($2::timestamptz, '-infinity'::timestamptz)
-      ORDER BY observed_at
-      LIMIT $3`,
-    [incidentId, bound.after, bound.limit],
+        AND (observed_at > COALESCE($2::timestamptz, '-infinity'::timestamptz)
+             OR (observed_at = $2::timestamptz AND $4::boolean
+                 AND ($3::uuid IS NULL OR id > $3::uuid)))
+      ORDER BY observed_at, id
+      LIMIT $5`,
+    [incidentId, bound.after, bound.afterId, bound.includeAtInstant, bound.limit],
   );
 }
 
@@ -142,10 +164,12 @@ export async function listAttendanceSource(
      SELECT id, linked_at
        FROM fleet_incident_attendance_correction_links
       WHERE incident_id = $1::uuid
-        AND linked_at >= COALESCE($2::timestamptz, '-infinity'::timestamptz)
-      ORDER BY linked_at
-      LIMIT $3`,
-    [incidentId, bound.after, bound.limit],
+        AND (linked_at > COALESCE($2::timestamptz, '-infinity'::timestamptz)
+             OR (linked_at = $2::timestamptz AND $4::boolean
+                 AND ($3::uuid IS NULL OR id > $3::uuid)))
+      ORDER BY linked_at, id
+      LIMIT $5`,
+    [incidentId, bound.after, bound.afterId, bound.includeAtInstant, bound.limit],
   );
 }
 
@@ -159,11 +183,13 @@ export async function listAttendanceSource(
  * it was, though a fan-out that straddles a minute boundary is reported as the
  * two buckets it landed in rather than as one entry.
  *
- * The cursor bound is floored to the minute for the same reason the grouping is:
- * reading from a mid-minute instant would count only part of that minute's
- * fan-out. The partial bucket it would produce sorts before the cursor and is
- * dropped by the merge anyway, so flooring keeps every bucket that survives a
- * whole one.
+ * This source keys on the bucket rather than on a row id, because the bucket is
+ * its identity as well as its instant: a bucket is atomic, so the cursor's own
+ * bucket is behind the cursor in full and the keyset is a plain `>`. The WHERE
+ * clause is floored to the minute for the same reason the grouping is — reading
+ * from a mid-minute instant would count only part of that minute's fan-out —
+ * and the HAVING clause is what actually applies the cursor, since a bucket
+ * cannot be judged before it has been grouped.
  */
 export async function listNotificationSource(
   incidentId: string, bound: TimelineBound,
@@ -175,9 +201,12 @@ export async function listNotificationSource(
       WHERE source_module = 'fleet-incidents' AND source_id = $1
         AND created_at >= COALESCE(date_trunc('minute', $2::timestamptz), '-infinity'::timestamptz)
       GROUP BY date_trunc('minute', created_at)
+     HAVING date_trunc('minute', created_at) > COALESCE($2::timestamptz, '-infinity'::timestamptz)
+             OR (date_trunc('minute', created_at) = $2::timestamptz AND $4::boolean
+                 AND ($3::timestamptz IS NULL OR date_trunc('minute', created_at) > $3::timestamptz))
       ORDER BY date_trunc('minute', created_at)
-      LIMIT $3`,
-    [incidentId, bound.after, bound.limit],
+      LIMIT $5`,
+    [incidentId, bound.after, bound.afterId, bound.includeAtInstant, bound.limit],
   );
 }
 
@@ -191,9 +220,11 @@ export async function listRetentionHoldSource(
        FROM fleet_incident_retention_hold_actions a
        JOIN fleet_incident_retention_holds h ON h.id = a.hold_id
       WHERE h.incident_id = $1::uuid
-        AND a.occurred_at >= COALESCE($2::timestamptz, '-infinity'::timestamptz)
-      ORDER BY a.occurred_at
-      LIMIT $3`,
-    [incidentId, bound.after, bound.limit],
+        AND (a.occurred_at > COALESCE($2::timestamptz, '-infinity'::timestamptz)
+             OR (a.occurred_at = $2::timestamptz AND $4::boolean
+                 AND ($3::uuid IS NULL OR a.id > $3::uuid)))
+      ORDER BY a.occurred_at, a.id
+      LIMIT $5`,
+    [incidentId, bound.after, bound.afterId, bound.includeAtInstant, bound.limit],
   );
 }
