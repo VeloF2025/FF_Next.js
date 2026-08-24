@@ -8,10 +8,11 @@ import {
   loadIssueFlow,
   clearIssueFlow,
   ISSUE_FLOW_STORAGE_KEY,
+  MAX_AGE_MS,
   type PersistedIssueFlow,
 } from '../issueFlowPersistence';
 
-// Minimal in-memory Storage stub — vitest unit env has no window.
+// Minimal in-memory Storage stub — isolates tests from the environment.
 function makeStorage(): Storage {
   const map = new Map<string, string>();
   return {
@@ -36,6 +37,7 @@ const item = {
 
 function flowAt(step: PersistedIssueFlow['step']): PersistedIssueFlow {
   return {
+    ownerStaffId: 'staff-1',
     step,
     sourceLocation: { id: 'wh-1', name: 'Main WH' },
     technician: tech,
@@ -50,13 +52,13 @@ function flowAt(step: PersistedIssueFlow['step']): PersistedIssueFlow {
 }
 
 beforeEach(() => {
-  vi.stubGlobal('window', { sessionStorage: makeStorage() });
+  vi.stubGlobal('window', { localStorage: makeStorage() });
 });
 
 describe('issueFlowPersistence', () => {
   it('round-trips a mid-flow state, dropping pending-validation rows', () => {
     saveIssueFlow(flowAt('scan-serials'));
-    const restored = loadIssueFlow();
+    const restored = loadIssueFlow('staff-1');
     expect(restored).not.toBeNull();
     expect(restored?.step).toBe('scan-serials');
     expect(restored?.technician?.id).toBe('tech-1');
@@ -66,33 +68,64 @@ describe('issueFlowPersistence', () => {
   it('saving a step-1 flow clears instead of persisting', () => {
     saveIssueFlow(flowAt('scan-serials'));
     saveIssueFlow({ ...flowAt('pick-warehouse'), technician: null, stockItem: null, scanned: [] });
-    expect(loadIssueFlow()).toBeNull();
+    expect(loadIssueFlow('staff-1')).toBeNull();
   });
 
   it('clearIssueFlow removes the saved flow', () => {
     saveIssueFlow(flowAt('sign-submit'));
     clearIssueFlow();
-    expect(loadIssueFlow()).toBeNull();
+    expect(loadIssueFlow('staff-1')).toBeNull();
   });
 
   it('rejects corrupt JSON and unknown steps', () => {
-    window.sessionStorage.setItem(ISSUE_FLOW_STORAGE_KEY, '{not json');
-    expect(loadIssueFlow()).toBeNull();
-    window.sessionStorage.setItem(ISSUE_FLOW_STORAGE_KEY, JSON.stringify({ ...flowAt('scan-serials'), step: 'done' }));
-    expect(loadIssueFlow()).toBeNull();
+    window.localStorage.setItem(ISSUE_FLOW_STORAGE_KEY, '{not json');
+    expect(loadIssueFlow('staff-1')).toBeNull();
+    window.localStorage.setItem(ISSUE_FLOW_STORAGE_KEY, JSON.stringify({ ...flowAt('scan-serials'), savedAt: Date.now(), step: 'done' }));
+    expect(loadIssueFlow('staff-1')).toBeNull();
   });
 
   it('rejects a step whose required objects are missing', () => {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       ISSUE_FLOW_STORAGE_KEY,
-      JSON.stringify({ ...flowAt('scan-serials'), stockItem: null })
+      JSON.stringify({ ...flowAt('scan-serials'), savedAt: Date.now(), stockItem: null })
     );
-    expect(loadIssueFlow()).toBeNull();
-    window.sessionStorage.setItem(
+    expect(loadIssueFlow('staff-1')).toBeNull();
+    window.localStorage.setItem(
       ISSUE_FLOW_STORAGE_KEY,
-      JSON.stringify({ ...flowAt('pick-item'), technician: null })
+      JSON.stringify({ ...flowAt('pick-item'), savedAt: Date.now(), technician: null })
     );
-    expect(loadIssueFlow()).toBeNull();
+    expect(loadIssueFlow('staff-1')).toBeNull();
+  });
+
+  it('discards a flow saved longer than MAX_AGE_MS ago, keeps a recent one', () => {
+    window.localStorage.setItem(
+      ISSUE_FLOW_STORAGE_KEY,
+      JSON.stringify({ ...flowAt('scan-serials'), savedAt: Date.now() - MAX_AGE_MS - 1 })
+    );
+    expect(loadIssueFlow('staff-1')).toBeNull();
+    // and the stale entry is removed, not left behind
+    expect(window.localStorage.getItem(ISSUE_FLOW_STORAGE_KEY)).toBeNull();
+    saveIssueFlow(flowAt('scan-serials'));
+    expect(loadIssueFlow('staff-1')?.step).toBe('scan-serials');
+  });
+
+  it('rejects a flow saved by a different staff member and clears it', () => {
+    saveIssueFlow(flowAt('scan-serials'));
+    expect(loadIssueFlow('staff-2')).toBeNull();
+    expect(window.localStorage.getItem(ISSUE_FLOW_STORAGE_KEY)).toBeNull();
+  });
+
+  it('rejects a savedAt stamp in the future (clock rolled back)', () => {
+    window.localStorage.setItem(
+      ISSUE_FLOW_STORAGE_KEY,
+      JSON.stringify({ ...flowAt('scan-serials'), savedAt: Date.now() + 60_000 })
+    );
+    expect(loadIssueFlow('staff-1')).toBeNull();
+  });
+
+  it('rejects a payload with no savedAt stamp', () => {
+    window.localStorage.setItem(ISSUE_FLOW_STORAGE_KEY, JSON.stringify(flowAt('scan-serials')));
+    expect(loadIssueFlow('staff-1')).toBeNull();
   });
 
   it('never throws against the real environment storage', () => {
@@ -101,7 +134,7 @@ describe('issueFlowPersistence', () => {
     // asserts graceful behaviour, not leftovers from the environment.
     clearIssueFlow();
     expect(() => saveIssueFlow(flowAt('pick-warehouse'))).not.toThrow();
-    expect(loadIssueFlow()).toBeNull();
+    expect(loadIssueFlow('staff-1')).toBeNull();
     expect(() => clearIssueFlow()).not.toThrow();
   });
 });

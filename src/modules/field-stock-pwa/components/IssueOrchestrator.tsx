@@ -79,17 +79,19 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
   // follow-up render to re-save it — an ordering coincidence, not a design.
   const pendingRestoreRef = React.useRef(false);
   React.useEffect(() => {
-    const saved = loadIssueFlow();
+    const saved = loadIssueFlow(profile.staffId);
     if (saved) {
       pendingRestoreRef.current = true;
-      setFlow({ ...saved, result: null });
+      const { ownerStaffId: _owner, ...rest } = saved;
+      setFlow({ ...rest, result: null });
     }
-  }, []);
+  }, [profile.staffId]);
   React.useEffect(() => {
     if (pendingRestoreRef.current) { pendingRestoreRef.current = false; return; }
     const { step } = flow;
     if (step === 'done') { clearIssueFlow(); return; }
     saveIssueFlow({
+      ownerStaffId: profile.staffId,
       step,
       sourceLocation: flow.sourceLocation,
       technician: flow.technician,
@@ -97,7 +99,7 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
       scanned: flow.scanned,
       quantity: flow.quantity,
     });
-  }, [flow]);
+  }, [flow, profile.staffId]);
 
   const isDirty =
     flow.step !== 'pick-warehouse' &&
