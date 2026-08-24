@@ -1,0 +1,251 @@
+/**
+ * Persistence for continuously-built trips.
+ *
+ * A window is REPLACED, not accumulated. `deleteTripsFrom` clears the window being rebuilt and the
+ * recomputed trips are then inserted, so the result depends only on the positions -- never on how
+ * many times the builder has run over them. The upsert on `(vehicle_id, ignition_on_at)` remains
+ * as a second line of defence within a single run.
+ *
+ * ## The late-arrival lookback
+ *
+ * Positions carry both `recorded_at` (when the vehicle was there) and `received_at` (when we
+ * heard about it). Trackers buffer while out of coverage and flush later, so a position with an
+ * OLDER `recorded_at` can land after the watermark has already moved past it. A watermark applied
+ * naively to `recorded_at` would step over those rows forever and silently lose the trips they
+ * belong to. Watermarking on `received_at` instead would re-order the stream the segmenter depends
+ * on being chronological.
+ *
+ * The lookback alone was not enough: a time-based floor can land in the MIDDLE of a journey, and
+ * the rebuild then produced a trip with a different `ignition_on_at` that INSERTed beside the
+ * original instead of replacing it. `tripBuildService` therefore pulls the read start back to the
+ * last recorded trip's own start, so a window always begins at a trip boundary.
+ */
+import { query, queryOne, transaction } from '@/lib/db-pool';
+import type { SegmentedTrip, TripPosition } from './tripSegmenter';
+
+/**
+ * How far before the watermark a run reconsiders, to catch positions that arrived late.
+ *
+ * Sized against the observed sampling: cartrack averages 1.7 minutes between fixes, ituran 72.
+ * Six hours covers a tracker that buffered through a long out-of-coverage stretch without making
+ * every run rescan the day.
+ *
+ * NOTE this is only a FLOOR. `tripBuildService` pulls the read start back further, to the start of
+ * the last trip it already recorded, so a window never begins in the middle of a journey. A bare
+ * time-based lookback bisected trips and minted duplicate fragments -- see the segmenter header.
+ */
+export const LATE_ARRIVAL_LOOKBACK_MINUTES = 6 * 60;
+
+interface PositionRow extends Record<string, unknown> {
+  recorded_at: string | Date;
+  ignition: boolean | null;
+  lat: string | number | null;
+  lon: string | number | null;
+  speed_kph: string | number | null;
+  odometer_km: string | number | null;
+}
+
+/** node-postgres returns NUMERIC as a string to avoid precision loss; coordinates need numbers. */
+function num(value: string | number | null): number | null {
+  if (value === null) return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function iso(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+export interface TrackedVehicle {
+  vehicleId: string;
+  trackerId: string | null;
+  provider: string | null;
+}
+
+/**
+ * Vehicles worth building trips for: those with at least one position.
+ *
+ * Driven by the position stream rather than the vehicle register, because a vehicle without a
+ * tracker has nothing to segment - 5 of the 23 active vehicles are in that state, which is a
+ * data-collection gap this job cannot close.
+ */
+export async function listVehiclesWithPositions(): Promise<TrackedVehicle[]> {
+  const rows = await query<{ vehicle_id: string; tracker_id: string | null; provider: string | null }>(
+    `/* fleet-trips:vehicles */
+     SELECT DISTINCT ON (p.vehicle_id)
+            p.vehicle_id, p.tracker_id, p.provider
+     FROM fleet_vehicle_positions p
+     WHERE p.vehicle_id IS NOT NULL
+     -- p.id breaks the tie: production has 1,007 duplicate (vehicle_id, recorded_at) pairs, and
+     -- without it DISTINCT ON picks tracker_id/provider non-deterministically between runs.
+     ORDER BY p.vehicle_id, p.recorded_at DESC, p.id DESC`,
+    [],
+  );
+  return rows.map((r) => ({ vehicleId: r.vehicle_id, trackerId: r.tracker_id, provider: r.provider }));
+}
+
+/** The newest position already folded into a trip, or null if this vehicle is untouched. */
+export async function readWatermark(vehicleId: string): Promise<string | null> {
+  const row = await queryOne<{ last_position_at: string | Date | null }>(
+    `/* fleet-trips:watermark-read */
+     SELECT last_position_at FROM fleet_trip_build_watermarks WHERE vehicle_id = $1`,
+    [vehicleId],
+  );
+  return row?.last_position_at ? iso(row.last_position_at) : null;
+}
+
+export async function writeWatermark(
+  vehicleId: string, lastPositionAt: string, processed: number,
+): Promise<void> {
+  await query(
+    `/* fleet-trips:watermark-write */
+     INSERT INTO fleet_trip_build_watermarks (vehicle_id, last_position_at, last_built_at, positions_processed)
+     VALUES ($1, $2::timestamptz, now(), $3)
+     ON CONFLICT (vehicle_id) DO UPDATE
+       SET last_position_at = GREATEST(
+             fleet_trip_build_watermarks.last_position_at, EXCLUDED.last_position_at),
+           last_built_at = now(),
+           positions_processed = fleet_trip_build_watermarks.positions_processed + EXCLUDED.positions_processed`,
+    [vehicleId, lastPositionAt, processed],
+  );
+}
+
+/**
+ * Positions for one vehicle after the watermark, minus the lookback, in chronological order.
+ *
+ * `limit` bounds a single run so one vehicle with a long backlog cannot starve the others; the
+ * caller loops until a run returns fewer rows than it asked for.
+ */
+export async function loadPositions(
+  vehicleId: string, from: string | null, limit: number,
+): Promise<TripPosition[]> {
+  // Two explicit branches rather than a conditional SQL fragment: interpolated tagged-template
+  // conditionals are broken in this repo and silently produce a malformed query.
+  const rows = from === null
+    ? await query<PositionRow>(
+        `/* fleet-trips:positions-all */
+         SELECT recorded_at, ignition, lat, lon, speed_kph, odometer_km
+         FROM fleet_vehicle_positions
+         WHERE vehicle_id = $1
+         ORDER BY recorded_at, id
+         LIMIT $2`,
+        [vehicleId, limit],
+      )
+    : await query<PositionRow>(
+        `/* fleet-trips:positions-from */
+         SELECT recorded_at, ignition, lat, lon, speed_kph, odometer_km
+         FROM fleet_vehicle_positions
+         WHERE vehicle_id = $1
+           AND recorded_at >= $2::timestamptz
+         ORDER BY recorded_at, id
+         LIMIT $3`,
+        [vehicleId, from, limit],
+      );
+
+  return rows.map((r) => ({
+    recordedAt: iso(r.recorded_at),
+    ignition: r.ignition,
+    lat: num(r.lat),
+    lon: num(r.lon),
+    speedKph: num(r.speed_kph),
+    odometerKm: num(r.odometer_km),
+  }));
+}
+
+
+
+/**
+ * The start of the last trip that began AT OR BEFORE `at`.
+ *
+ * This is the trip that could CONTAIN `at`, and it is the only correct anchor for a rebuild
+ * window. The previous version returned the most recent trip regardless of position and the caller
+ * took the earlier of that and the lookback floor -- which, whenever the vehicle had driven within
+ * the lookback, selected the bare floor. A floor landing inside an OLDER journey then bisected it:
+ * the DELETE cleared from the floor so the original row survived, and segmentation restarted at
+ * the floor minted a second metric-eligible trip nested inside the first. Duration and distance
+ * inflated 38%, every row internally consistent, and it did not self-heal.
+ *
+ * Returns null when no trip starts at or before `at`, in which case `at` cannot bisect anything.
+ */
+export async function loadTripAnchorBefore(vehicleId: string, at: string): Promise<string | null> {
+  const row = await queryOne<{ ignition_on_at: string | Date }>(
+    `/* fleet-trips:anchor-before */
+     SELECT ignition_on_at FROM fleet_vehicle_trips
+     WHERE vehicle_id = $1 AND ignition_on_at <= $2::timestamptz
+     ORDER BY ignition_on_at DESC
+     LIMIT 1`,
+    [vehicleId, at],
+  );
+  return row ? iso(row.ignition_on_at) : null;
+}
+
+const UPSERT_SQL = `/* fleet-trips:upsert */
+  INSERT INTO fleet_vehicle_trips (
+    vehicle_id, tracker_id, provider,
+    ignition_on_at, ignition_off_at, close_reason,
+    on_lat, on_lon, off_lat, off_lon,
+    duration_seconds, moving_seconds, idle_seconds,
+    distance_km, max_speed_kph, start_odometer_km, end_odometer_km, position_count
+  ) VALUES (
+    $1, $2, $3, $4::timestamptz, $5::timestamptz, $6,
+    $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+  )
+  ON CONFLICT (vehicle_id, ignition_on_at) DO UPDATE SET
+    ignition_off_at = EXCLUDED.ignition_off_at,
+    close_reason = EXCLUDED.close_reason,
+    off_lat = EXCLUDED.off_lat,
+    off_lon = EXCLUDED.off_lon,
+    duration_seconds = EXCLUDED.duration_seconds,
+    moving_seconds = EXCLUDED.moving_seconds,
+    idle_seconds = EXCLUDED.idle_seconds,
+    distance_km = EXCLUDED.distance_km,
+    max_speed_kph = EXCLUDED.max_speed_kph,
+    start_odometer_km = EXCLUDED.start_odometer_km,
+    end_odometer_km = EXCLUDED.end_odometer_km,
+    position_count = EXCLUDED.position_count,
+    updated_at = now()`;
+
+/**
+ * Replaces every trip for this vehicle at or after `from` with `trips`, atomically.
+ *
+ * The delete and the inserts MUST share one transaction. Run as separate statements, a failure
+ * between them — a constraint violation, a dropped connection, the process dying — leaves the
+ * window deleted and not rewritten. The next run would rebuild it, so a transient failure
+ * self-heals, but a PERSISTENT one (a row the schema keeps refusing) deletes the same window on
+ * every tick and the vehicle's history stays gone while reading as a legitimate "no trips".
+ * Silent absence is the failure mode this module exists to avoid.
+ *
+ * `from` is anchored by the caller at a trip boundary, so this never touches history outside the
+ * window being rebuilt.
+ *
+ * Returns how many rows were cleared, for the caller's diagnostics.
+ */
+export async function replaceWindow(
+  vehicle: TrackedVehicle, from: string, trips: readonly SegmentedTrip[],
+): Promise<{ deleted: number; written: number }> {
+  return transaction(async (client) => {
+    // RETURNING because this repo's TxnClient hands back rows, not a pg Result — there is no
+    // rowCount to read.
+    const cleared = await client.query<{ id: string }>(
+      `/* fleet-trips:delete-window */
+       DELETE FROM fleet_vehicle_trips
+       WHERE vehicle_id = $1 AND ignition_on_at >= $2::timestamptz
+       RETURNING id`,
+      [vehicle.vehicleId, from],
+    );
+
+    for (const t of trips) {
+      await client.query(UPSERT_SQL, [
+        vehicle.vehicleId, vehicle.trackerId, vehicle.provider,
+        t.ignitionOnAt, t.ignitionOffAt, t.closeReason,
+        t.onLat, t.onLon, t.offLat, t.offLon,
+        t.durationSeconds, t.movingSeconds, t.idleSeconds,
+        t.distanceKm, t.maxSpeedKph, t.startOdometerKm, t.endOdometerKm, t.positionCount,
+      ]);
+    }
+
+    return { deleted: cleared.length, written: trips.length };
+  });
+}
+
+
