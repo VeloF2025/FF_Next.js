@@ -13,7 +13,10 @@
  * app is open (or returns into a fresh tab), it comes back EMPTY and the
  * storeman still landed on step 1. localStorage survives process death. Entries
  * older than MAX_AGE_MS are discarded on load so a stale flow from a previous
- * shift never resurfaces.
+ * shift never resurfaces. The flow is scoped to the storeman who saved it
+ * (ownerStaffId): localStorage outlives the login session on a shared device,
+ * and another staff member must never resume — or submit — someone else's
+ * staged issue. A mismatched or missing owner discards the entry.
  *
  * Not persisted: signature, proof photo, submit result — the user lands back
  * on the step they were on and re-signs. 'pending-validation' rows are dropped
@@ -35,6 +38,8 @@ const RESUMABLE_STEPS: ReadonlySet<string> = new Set([
 ]);
 
 export interface PersistedIssueFlow {
+  /** staffId of the logged-in storeman who saved this flow. */
+  ownerStaffId: string;
   step: ResumableIssueStep;
   sourceLocation: { id: string; name: string } | null;
   technician: PwaTechSummary | null;
@@ -82,11 +87,12 @@ export function clearIssueFlow(): void {
 }
 
 /**
- * Restore a previously saved flow, or null when absent/corrupt/not resumable.
+ * Restore a previously saved flow, or null when absent/corrupt/not resumable,
+ * expired, or saved by a different staff member than `expectedStaffId`.
  * Guards the invariants each step's render relies on (e.g. scan-serials needs
  * a stockItem) so a partial or tampered payload never renders a broken step.
  */
-export function loadIssueFlow(): PersistedIssueFlow | null {
+export function loadIssueFlow(expectedStaffId: string): PersistedIssueFlow | null {
   const store = storage();
   if (!store) return null;
   let parsed: unknown;
@@ -101,7 +107,14 @@ export function loadIssueFlow(): PersistedIssueFlow | null {
   if (typeof parsed !== 'object' || parsed === null) return null;
   const flow = parsed as Partial<PersistedIssueFlow> & { savedAt?: unknown };
 
-  if (typeof flow.savedAt !== 'number' || Date.now() - flow.savedAt > MAX_AGE_MS) {
+  // Reject future stamps too (device clock rolled back): the TTL is a privacy
+  // boundary and a negative age must not be treated as "fresh".
+  const age = typeof flow.savedAt === 'number' ? Date.now() - flow.savedAt : NaN;
+  if (!(age >= 0 && age <= MAX_AGE_MS)) {
+    clearIssueFlow();
+    return null;
+  }
+  if (typeof flow.ownerStaffId !== 'string' || flow.ownerStaffId !== expectedStaffId) {
     clearIssueFlow();
     return null;
   }
@@ -121,6 +134,7 @@ export function loadIssueFlow(): PersistedIssueFlow | null {
     : [];
 
   return {
+    ownerStaffId: flow.ownerStaffId,
     step: flow.step as ResumableIssueStep,
     sourceLocation: flow.sourceLocation ?? null,
     technician: flow.technician ?? null,
