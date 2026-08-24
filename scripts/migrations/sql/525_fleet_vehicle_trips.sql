@@ -132,8 +132,11 @@ CREATE INDEX IF NOT EXISTS ix_fleet_vehicle_trips_vehicle_time
 CREATE INDEX IF NOT EXISTS ix_fleet_vehicle_trips_time
   ON fleet_vehicle_trips (ignition_on_at DESC);
 
--- The builder reopens the one open trip per vehicle on every run, so it must be instant.
-CREATE INDEX IF NOT EXISTS ix_fleet_vehicle_trips_open
+-- At most ONE open trip per vehicle, enforced rather than assumed. A vehicle cannot be on two
+-- journeys at once, and the builder loads "the" open trip to continue it -- if two ever existed
+-- that load would silently pick one and the other would be orphaned mid-journey, never closed and
+-- never counted. UNIQUE makes that unrepresentable instead of merely unlikely.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_fleet_vehicle_trips_one_open_per_vehicle
   ON fleet_vehicle_trips (vehicle_id) WHERE close_reason = 'open';
 
 -- The address resolver's work queue: trips still awaiting a street address.
