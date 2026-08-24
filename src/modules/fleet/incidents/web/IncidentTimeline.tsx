@@ -1,0 +1,110 @@
+/**
+ * The incident's chronology (stage 8, task 6): one ordered view of what happened,
+ * merged server-side from detection, review, driver, Attendance, notification,
+ * and retention-hold sources.
+ *
+ * It sits beside the drawer's existing activity and attachment sections rather
+ * than replacing them — those render the bodies (a manager's comment, a driver's
+ * explanation, an evidence link), which the chronology deliberately never
+ * carries. This component renders only what the server sent: a time, a source, a
+ * fixed summary, and a name where there is one.
+ *
+ * Loaded on its own request so a long history never delays opening the drawer,
+ * and paged, so an incident with hundreds of entries stays readable.
+ */
+import { useEffect, useState } from 'react';
+import { log } from '@/lib/logger';
+import { IncidentApiError, incidentApi, type IncidentTimelineEntry } from './incidentApi';
+import type { TimelineSource } from '../analytics/aggregateSchema';
+
+const SOURCE_LABELS: Record<TimelineSource, string> = {
+  system: 'System', manager: 'Manager', driver: 'Driver',
+  attendance: 'Attendance', notification: 'Notification', retention_hold: 'Retention hold',
+};
+
+function sast(value: string): string {
+  return new Date(value).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' });
+}
+
+function TimelineRow({ item }: { item: IncidentTimelineEntry }) {
+  // Only shown when the two genuinely differ — observations are the one source
+  // that knows when it found out separately from when the thing happened, and
+  // claiming a delay on every other row would be an invention.
+  const recordedLater = item.recordedAt !== item.occurredAt;
+  return (
+    <li data-testid={`timeline-${item.stableId}`} className="border-l-2 border-[var(--ff-border-light)] py-1 pl-3">
+      <p className="text-sm text-[var(--ff-text-primary)]">
+        {item.summary}
+        <span className="ml-2 text-xs uppercase text-[var(--ff-text-tertiary)]">{SOURCE_LABELS[item.source]}</span>
+      </p>
+      <p className="text-xs text-[var(--ff-text-secondary)]">
+        {sast(item.occurredAt)}
+        {recordedLater && <span> · recorded {sast(item.recordedAt)}</span>}
+        {item.actorLabel && <span> · {item.actorLabel}</span>}
+      </p>
+    </li>
+  );
+}
+
+export interface IncidentTimelineProps { incidentId: string }
+
+export function IncidentTimeline({ incidentId }: IncidentTimelineProps) {
+  const [entries, setEntries] = useState<IncidentTimelineEntry[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [error, setError] = useState<IncidentApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function loadPage(from: string | null, append: boolean): Promise<void> {
+    setLoading(true);
+    try {
+      const page = await incidentApi.timeline(incidentId, from);
+      // Append rather than replace: a failed second page must never look like
+      // the incident lost the history the manager was already reading.
+      setEntries((current) => (append ? [...current, ...page.entries] : page.entries));
+      setCursor(page.nextCursor);
+      setError(null);
+    } catch (caught) {
+      // Rendered *and* logged: the banner tells the manager the chronology is
+      // incomplete, and the log is what makes a chronology that quietly stops
+      // loading for one incident diagnosable later.
+      log.error('Failed to load Fleet incident chronology', { error: caught, incidentId }, 'fleet');
+      setError(caught instanceof IncidentApiError
+        ? caught
+        : new IncidentApiError('The chronology could not be loaded', 0, 'UNKNOWN_ERROR'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    setEntries([]); setCursor(null); setError(null);
+    void loadPage(null, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incidentId]);
+
+  return (
+    <section aria-label="Incident chronology">
+      <h4 className="font-medium text-[var(--ff-text-primary)]">Chronology</h4>
+      {error && (
+        <p role="alert" className="text-sm text-red-700">
+          {error.kind === 'permission' ? 'You cannot view this chronology.' : 'The chronology could not be loaded.'}
+        </p>
+      )}
+      {loading && entries.length === 0 && !error && (
+        <p className="text-sm text-[var(--ff-text-secondary)]">Loading chronology…</p>
+      )}
+      {!loading && !error && entries.length === 0 && (
+        <p className="text-sm text-[var(--ff-text-secondary)]">No chronology recorded yet.</p>
+      )}
+      {entries.length > 0 && <ul className="mt-2 space-y-1">{entries.map((item) => (
+        <TimelineRow key={item.stableId} item={item} />
+      ))}</ul>}
+      {cursor && (
+        <button type="button" disabled={loading} onClick={() => { void loadPage(cursor, true); }}
+          className="mt-2 rounded border border-[var(--ff-border-light)] px-3 py-1 text-sm text-[var(--ff-text-primary)]">
+          Load more
+        </button>
+      )}
+    </section>
+  );
+}

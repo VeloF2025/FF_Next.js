@@ -165,6 +165,16 @@ export interface IncidentTimelineEntry {
   actorLabel: string | null;
 }
 
+/**
+ * One page of chronology. The cursor encodes the ordering triple of the last
+ * entry returned, so a page boundary that falls between two entries sharing an
+ * `occurredAt` still resumes in exactly one place.
+ */
+export interface IncidentTimelinePage {
+  entries: IncidentTimelineEntry[];
+  nextCursor: string | null;
+}
+
 export interface OperationsMetricValue {
   metricKey: OperationsMetricKey;
   numerator: number;

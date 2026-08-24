@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { incidentApi, IncidentApiError, type EvidenceUploadBody } from './incidentApi';
 import { IncidentActionPanel } from './IncidentActionPanel';
+import { IncidentTimeline } from './IncidentTimeline';
 import type { IncidentAction, IncidentDetail, IncidentVisibility } from '../types';
 import type { AttendanceCorrectionState, DriverInputState } from '../driver/types';
 
@@ -236,6 +237,10 @@ export function IncidentReviewDrawer({ incidentId, canEdit, returnFocus, onClose
         {detail && <div className="mt-4 space-y-5">
           <DriverInputStatus driverInput={detail.driverInput} />
           <DetailSections detail={detail} />
+          {/* Added beside the existing sections, not in place of them (stage 8, task 6):
+              the chronology carries no bodies, so the activity and attachment lists above
+              remain the only place a manager reads a comment or opens evidence. */}
+          <IncidentTimeline incidentId={detail.id} />
           <IncidentActionPanel incident={detail} canEdit={canEdit} onSubmitted={refreshAfterChange} />
           <EvidenceUploadForm incidentId={detail.id} canEdit={canEdit} onUploaded={refreshAfterChange} />
         </div>}

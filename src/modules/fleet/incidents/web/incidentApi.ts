@@ -24,6 +24,9 @@ import type {
 import type {
   DriverConcernCategory, DriverInputRequestResult, DriverInputSettings,
 } from '../driver/types';
+import type { IncidentTimelineEntry, IncidentTimelinePage } from '../analytics/types';
+
+export type { IncidentTimelineEntry, IncidentTimelinePage };
 
 export type { ActiveUserOption };
 
@@ -265,6 +268,15 @@ export const incidentApi = {
   resolveStaffMember(id: string, signal?: AbortSignal): Promise<ActiveUserOption | null> {
     return request<{ id: string; name: string }>(`/api/staff?id=${encodeURIComponent(id)}`, { signal })
       .then((staff) => ({ id: staff.id, name: staff.name })).catch(() => null);
+  },
+  /**
+   * One page of the incident chronology (stage 8, task 6). Loaded on demand
+   * rather than folded into the detail read: the drawer is usable without it,
+   * and an incident with a long history should not slow down every open.
+   */
+  timeline(incidentId: string, cursor?: string | null, signal?: AbortSignal): Promise<IncidentTimelinePage> {
+    const params = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+    return request<IncidentTimelinePage>(`/api/fleet/incidents/${encodeURIComponent(incidentId)}/timeline${params}`, { signal });
   },
 };
 
