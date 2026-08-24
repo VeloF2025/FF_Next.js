@@ -104,7 +104,11 @@ export function IncidentTimeline({ incidentId, refreshKey = 0 }: IncidentTimelin
   useEffect(() => {
     setEntries([]); setCursor(null); setError(null);
     void loadPage(null, false);
-    return () => { controller.current?.abort(); };
+    // Bumped as well as aborted: the abort rejects the in-flight promise, and
+    // without moving the generation on, that rejection is still the newest
+    // request as far as `loadPage` knows — so it would log an AbortError as a
+    // failed chronology and set state on a component that has gone away.
+    return () => { generation.current += 1; controller.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incidentId, refreshKey]);
 

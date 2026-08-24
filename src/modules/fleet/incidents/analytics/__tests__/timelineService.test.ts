@@ -20,7 +20,9 @@ vi.mock('../../reviewQueries', () => coreMock);
 const namesMock = vi.hoisted(() => ({ resolveActiveUserNames: vi.fn() }));
 vi.mock('../../settingsRepository', () => namesMock);
 
-import { getIncidentTimeline, IncidentTimelineAccessDeniedError } from '../timelineService';
+import {
+  getIncidentTimeline, IncidentTimelineAccessDeniedError, IncidentTimelineCursorError,
+} from '../timelineService';
 import { IncidentNotFoundError } from '../../incidentRepository';
 
 const INCIDENT = '11111111-1111-4111-8111-111111111111';
@@ -49,12 +51,38 @@ const SOURCE_KEYS: Record<string, { time: string; id: string }> = {
 };
 
 /**
+ * Postgres stores these columns as `timestamptz` — microsecond precision — and
+ * node-pg hands them back as a JavaScript `Date`, which has only milliseconds.
+ * Three digits are dropped somewhere between the database and the service on
+ * every row, so a mock that models time as a `Date` cannot see the bug that
+ * costs. Fixture times are written at full precision and the mock returns what
+ * the driver really returns: the truncated `Date` for the column the entry
+ * displays, and the untruncated string for the key it is ordered and paged on.
+ */
+function us(value: string | Date): string {
+  const text = typeof value === 'string' ? value : value.toISOString();
+  const parsed = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?Z$/.exec(text);
+  if (!parsed) throw new Error(`fixture timestamp is not a UTC ISO instant: ${text}`);
+  return `${parsed[1]}.${(parsed[2] ?? '').padEnd(6, '0')}Z`;
+}
+
+/** What node-pg gives the service for a `timestamptz` column: milliseconds only. */
+function asDriverDate(microseconds: string): Date {
+  return new Date(microseconds);
+}
+
+/**
  * A mock that returns every row regardless of the bound it was handed cannot
  * fail a pagination test — it answers page two with the whole history, which is
  * exactly what a broken keyset would have to be caught doing. So this applies
  * the cursor predicate, the ordering, and the LIMIT the way the database would,
  * and a query whose parameters it cannot honour is an error rather than a
  * silent full read.
+ *
+ * Comparisons happen on the microsecond key, normalised on both sides, so a
+ * cursor that has lost precision compares here exactly as it would in Postgres
+ * — `.123456 > .123` is true, as the database says, not false as a raw string
+ * comparison of two different widths would have it.
  */
 function respondWith(rows: Rows): void {
   db.query.mockImplementation(async (text: string, params: unknown[]) => {
@@ -67,17 +95,27 @@ function respondWith(rows: Rows): void {
     if (typeof limit !== 'number') throw new Error(`timeline query ${tag} passed no row limit`);
     if (typeof includeAtInstant !== 'boolean') throw new Error(`timeline query ${tag} passed no instant rule`);
 
-    const at = (row: Record<string, unknown>, column: string): number => Date.parse(String(row[column]));
-    const key = (row: Record<string, unknown>): string => String(row[keys.id]);
+    const sortAt = (row: Record<string, unknown>): string => us(String(row[keys.time]));
+    // For notifications the bucket is the identity, and it is keyed at full
+    // precision too — so the id of a notification row is its own sort key.
+    const key = (row: Record<string, unknown>): string => (
+      keys.id === keys.time ? sortAt(row) : String(row[keys.id])
+    );
     const ordered = [...(rows[tag] ?? [])].sort((left, right) => (
-      at(left, keys.time) - at(right, keys.time) || (key(left) < key(right) ? -1 : Number(key(left) > key(right)))
+      (sortAt(left) < sortAt(right) ? -1 : Number(sortAt(left) > sortAt(right)))
+        || (key(left) < key(right) ? -1 : Number(key(left) > key(right)))
     ));
-    const bounded = after === null ? ordered : ordered.filter((row) => {
-      const instant = at(row, keys.time) - Date.parse(after);
-      if (instant !== 0) return instant > 0;
-      return includeAtInstant && (afterId === null || key(row) > afterId);
+    const afterKey = after === null ? null : us(after);
+    const afterIdKey = afterId !== null && keys.id === keys.time ? us(afterId) : afterId;
+    const bounded = afterKey === null ? ordered : ordered.filter((row) => {
+      if (sortAt(row) !== afterKey) return sortAt(row) > afterKey;
+      return includeAtInstant && (afterIdKey === null || key(row) > afterIdKey);
     });
-    return bounded.slice(0, limit);
+    return bounded.slice(0, limit).map((row) => ({
+      ...row,
+      [keys.time]: asDriverDate(sortAt(row)),
+      sort_at: sortAt(row),
+    }));
   });
 }
 
@@ -302,6 +340,39 @@ describe('getIncidentTimeline pagination', () => {
     expect(page.nextCursor).toBeNull();
   });
 
+  /**
+   * A decodable cursor whose third field is rubbish used to reach Postgres as
+   * `$3::uuid` and fail the cast — 22P02, which surfaces as a logged 500. It is
+   * a malformed request, so it has to be refused as one before any source is
+   * read.
+   */
+  it('rejects a decodable cursor whose id is not the shape its table is keyed by', async () => {
+    const cursor = (position: string): string => Buffer.from(position, 'utf8').toString('base64url');
+    const malformed = [
+      '2026-08-13T08:00:00.000000Z|actions|not-a-uuid',
+      '2026-08-13T08:00:00.000000Z|retention_holds|1; DROP TABLE',
+      '2026-08-13T08:00:00.000000Z|notifications|not-an-instant',
+    ];
+    for (const position of malformed) {
+      db.query.mockClear();
+      await expect(getIncidentTimeline(INCIDENT, viewer, { cursor: cursor(position) }))
+        .rejects.toThrow(IncidentTimelineCursorError);
+      expect(db.query).not.toHaveBeenCalled();
+    }
+  });
+
+  it('accepts the id shape each table is actually keyed by', async () => {
+    const cursor = (position: string): string => Buffer.from(position, 'utf8').toString('base64url');
+    respondWith({});
+    await expect(getIncidentTimeline(INCIDENT, viewer, {
+      cursor: cursor(`2026-08-13T08:00:00.000000Z|actions|${actionRow.id}`),
+    })).resolves.toBeTruthy();
+    // The notification bucket is an instant, not an id.
+    await expect(getIncidentTimeline(INCIDENT, viewer, {
+      cursor: cursor('2026-08-13T08:00:00.000000Z|notifications|2026-08-13T08:00:00.000000Z'),
+    })).resolves.toBeTruthy();
+  });
+
   it('rejects a cursor that does not decode', async () => {
     respondWith({ actions: many });
     await expect(getIncidentTimeline(INCIDENT, viewer, { cursor: 'not-a-cursor' })).rejects.toThrow(/cursor/i);
@@ -433,6 +504,36 @@ describe('getIncidentTimeline pages the whole history', () => {
     expect([...seen].sort()).toEqual(longHistory.map((row) => `manager:${row.id}`).sort());
   });
 
+  it('pages entries a millisecond cannot tell apart', async () => {
+    // Five rows on one microsecond instant. A cursor that carries only
+    // milliseconds says `.123` where the rows say `.123456`, and Postgres reads
+    // `.123456 > .123` as true — so every page re-reads the whole group and the
+    // walk never advances past the first two.
+    const rows = [0, 1, 2, 3, 4].map((index) => ({
+      ...actionRow,
+      id: `aaaaaaa1-0000-4000-8000-00000000000${index}`,
+      occurred_at: '2026-08-13T08:00:00.123456Z',
+    }));
+    respondWith({ actions: rows });
+    const seen = await walkEveryPage(2);
+    expect(seen).toHaveLength(5);
+    expect(new Set(seen).size).toBe(5);
+    expect(seen).toEqual(rows.map((row) => `manager:${row.id}`));
+  });
+
+  it('orders on the microsecond, not on the millisecond it rounds to', async () => {
+    // Two rows inside one millisecond, ordered oppositely by id and by
+    // microsecond. Truncated to milliseconds they tie, the tie-break falls to
+    // the id, and the order the cursor advances through is not the order the
+    // rows are in — so a page can be handed back a row it already showed while
+    // the other is never reached.
+    const later = { ...actionRow, id: 'aaaaaaa1-0000-4000-8000-000000000001', occurred_at: '2026-08-13T08:00:00.123999Z' };
+    const earlier = { ...actionRow, id: 'aaaaaaa1-0000-4000-8000-000000000002', occurred_at: '2026-08-13T08:00:00.123456Z' };
+    respondWith({ actions: [later, earlier] });
+    const seen = await walkEveryPage(1);
+    expect(seen).toEqual([`manager:${earlier.id}`, `manager:${later.id}`]);
+  });
+
   it('pages sources that share one instant without repeating an entry', async () => {
     // Three tables, one instant, a page that holds one entry. Nothing filters
     // the sources again in memory, so a source whose rows sort *before* the
@@ -490,6 +591,16 @@ describe('getIncidentTimeline source bounding', () => {
         + '             OR (a.occurred_at = $2::timestamptz AND $4::boolean\n'
         + '                 AND ($3::uuid IS NULL OR a.id > $3::uuid)))',
     };
+    // The mock builds `sort_at` from the fixture, so it cannot see the SQL stop
+    // selecting one at full precision. `US` is six digits; `MS` is three, which
+    // is exactly the truncation the cursor was losing rows to.
+    const SORT_KEY: Record<string, string> = {
+      actions: `to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_at`,
+      observations: `to_char(observed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_at`,
+      attendance: `to_char(linked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_at`,
+      notifications: `to_char(date_trunc('minute', created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_at`,
+      retention_holds: `to_char(a.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_at`,
+    };
     const ORDER_BY: Record<string, string> = {
       actions: 'ORDER BY occurred_at, id',
       observations: 'ORDER BY observed_at, id',
@@ -502,6 +613,7 @@ describe('getIncidentTimeline source bounding', () => {
     for (const call of db.query.mock.calls) {
       const sql = String(call[0]);
       const tag = /fleet-incident-timeline:([a-z_]+)/.exec(sql)?.[1] ?? '';
+      expect(sql).toContain(SORT_KEY[tag]);
       expect(sql).toContain(KEYSET[tag]);
       expect(sql).toContain(ORDER_BY[tag]);
       expect(sql).toMatch(/LIMIT \$5/);
@@ -525,7 +637,9 @@ describe('getIncidentTimeline source bounding', () => {
     await getIncidentTimeline(INCIDENT, viewer, { limit: 2, cursor: first.nextCursor });
     expect(db.query).toHaveBeenCalledTimes(5);
     for (const call of db.query.mock.calls) {
-      expect((call[1] as unknown[])[1]).toBe('2026-08-13T08:01:00.000Z');
+      // Full precision, and never the millisecond `Date` the entry displays —
+      // a text-to-timestamptz cast keeps all six digits.
+      expect((call[1] as unknown[])[1]).toBe('2026-08-13T08:01:00.000000Z');
     }
     // Only the source the cursor row came from is given an id to be past; an id
     // from another table would be compared against rows it says nothing about.

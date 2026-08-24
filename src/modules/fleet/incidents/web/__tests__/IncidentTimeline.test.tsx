@@ -1,6 +1,10 @@
 /** @vitest-environment jsdom */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const logMock = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
+vi.mock('@/lib/logger', () => ({ log: logMock }));
+
 import { IncidentTimeline } from '../IncidentTimeline';
 import type { IncidentTimelineEntry, IncidentTimelinePage } from '../../analytics/types';
 
@@ -28,6 +32,14 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   const promise = new Promise<T>((done) => { resolve = done; });
   return { promise, resolve };
 }
+/** A request that stays in flight until it is aborted, then rejects the way fetch does. */
+function abortable(): Promise<Response> {
+  return new Promise<Response>((_resolve, reject) => {
+    const init = fetchMock.mock.calls.at(-1)?.[1] as RequestInit | undefined;
+    init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+  });
+}
+
 async function flush(): Promise<void> { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); }
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -185,5 +197,27 @@ describe('IncidentTimeline refresh', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     rerender(<IncidentTimeline incidentId="incident-1" refreshKey={1} />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe('IncidentTimeline teardown', () => {
+  it('does not report the request that unmounting abandoned as a failed chronology', async () => {
+    // Aborting rejects the in-flight fetch. Without moving the generation on,
+    // that rejection is still the newest request as far as the loader knows, so
+    // it would log a failed chronology and set state on a gone component.
+    fetchMock.mockImplementationOnce(() => abortable());
+    const { unmount } = render(<IncidentTimeline incidentId="incident-1" />);
+    unmount();
+    await flush();
+    expect(logMock.error).not.toHaveBeenCalled();
+  });
+
+  it('does not report the request that changing incident abandoned', async () => {
+    fetchMock.mockImplementationOnce(() => abortable());
+    const { rerender } = render(<IncidentTimeline incidentId="incident-1" />);
+    rerender(<IncidentTimeline incidentId="incident-2" />);
+    await flush();
+    expect(logMock.error).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

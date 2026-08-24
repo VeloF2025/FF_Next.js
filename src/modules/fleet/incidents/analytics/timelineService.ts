@@ -28,6 +28,10 @@ import {
   listActionSource, listAttendanceSource, listNotificationSource,
   listObservationSource, listRetentionHoldSource, type TimelineBound,
 } from './timelineQueries';
+import {
+  boundFor, comparePositions, decodeCursor, encodeCursor,
+  type PositionedEntry, type TimelineTable,
+} from './timelineCursor';
 import type { IncidentTimelineEntry, IncidentTimelinePage, TimelineSource } from './types';
 
 /**
@@ -39,9 +43,7 @@ export class IncidentTimelineAccessDeniedError extends Error {
   constructor(message: string) { super(message); this.name = 'IncidentTimelineAccessDeniedError'; }
 }
 
-export class IncidentTimelineCursorError extends Error {
-  constructor(message: string) { super(message); this.name = 'IncidentTimelineCursorError'; }
-}
+export { IncidentTimelineCursorError } from './timelineCursor';
 
 export interface IncidentTimelineViewer {
   userId: string;
@@ -83,38 +85,13 @@ function iso(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-/**
- * The five tables the chronology merges, in the order they break a tie on the
- * same instant. It is the source *table* that ranks, not the `TimelineSource`
- * label an entry is displayed with: one table (`actions`) produces manager,
- * driver, and system entries, so the label cannot identify which keyset a
- * cursor belongs to. The order itself is arbitrary but must never change — it
- * is half of the sort key a cursor is a position in.
- */
-const TIMELINE_TABLES = ['actions', 'observations', 'attendance', 'notifications', 'retention_holds'] as const;
-type TimelineTable = typeof TIMELINE_TABLES[number];
-const TABLE_RANK: Record<TimelineTable, number> = {
-  actions: 0, observations: 1, attendance: 2, notifications: 3, retention_holds: 4,
-};
-
-/**
- * An entry plus where it sits in the merged order. `sortId` is the value the
- * source's own keyset compares — a row id everywhere except notifications,
- * whose minute bucket is its identity — and it is kept beside the entry rather
- * than parsed back out of `stableId`, which is a display value.
- */
-interface PositionedEntry {
-  table: TimelineTable;
-  sortId: string;
-  entry: IncidentTimelineEntry;
-}
-
 function entry(
-  table: TimelineTable, source: TimelineSource, id: string, entryType: string,
+  table: TimelineTable, source: TimelineSource, id: string, sortAt: string, entryType: string,
   occurredAt: string, recordedAt: string, summary: string, actorLabel: string | null,
 ): PositionedEntry {
   return {
     table,
+    sortAt,
     sortId: id,
     entry: { stableId: `${source}:${id}`, source, entryType, occurredAt, recordedAt, summary, actorLabel },
   };
@@ -131,68 +108,6 @@ function actionSource(row: { is_system_actor: boolean; visibility: string }): Ti
   return row.is_system_actor ? 'system' : 'manager';
 }
 
-/**
- * The merged order, and the exact order every source keyset reproduces:
- * instant, then table, then the source's own id. `recordedAt` is deliberately
- * not part of it — it is a second timestamp the entry reports, not a position,
- * and no source can bound a read on another source's `recordedAt`.
- */
-function comparePositions(left: PositionedEntry, right: PositionedEntry): number {
-  if (left.entry.occurredAt !== right.entry.occurredAt) {
-    return left.entry.occurredAt < right.entry.occurredAt ? -1 : 1;
-  }
-  if (left.table !== right.table) return TABLE_RANK[left.table] - TABLE_RANK[right.table];
-  if (left.sortId === right.sortId) return 0;
-  return left.sortId < right.sortId ? -1 : 1;
-}
-
-interface TimelinePosition { occurredAt: string; table: TimelineTable; sortId: string }
-
-function encodeCursor(last: PositionedEntry): string {
-  return Buffer.from(`${last.entry.occurredAt}|${last.table}|${last.sortId}`, 'utf8').toString('base64url');
-}
-
-/**
- * A cursor is a position, not a token to be trusted: it is decoded back into the
- * same three ordering fields, and an unknown table or an unparseable instant is
- * refused rather than defaulted. A tampered cursor can only move the window,
- * never widen what the query returns.
- */
-function decodeCursor(cursor: string): TimelinePosition {
-  const parts = Buffer.from(cursor, 'base64url').toString('utf8').split('|');
-  const [occurredAt, table, sortId] = parts;
-  if (parts.length !== 3 || !occurredAt || !table || !sortId
-    || !TIMELINE_TABLES.includes(table as TimelineTable) || Number.isNaN(Date.parse(occurredAt))) {
-    throw new IncidentTimelineCursorError('The timeline cursor could not be read');
-  }
-  return { occurredAt, table: table as TimelineTable, sortId };
-}
-
-/**
- * The bound one source is read with. Rows sharing the cursor's instant are the
- * whole difficulty: they sort after the cursor only if their table ranks after
- * the cursor's, and within the cursor's own table only if their id does. A
- * source ranked before the cursor's takes none of them.
- */
-function boundFor(table: TimelineTable, after: TimelinePosition | null, limit: number): TimelineBound {
-  if (!after) return { after: null, afterId: null, includeAtInstant: false, limit };
-  const rank = TABLE_RANK[table] - TABLE_RANK[after.table];
-  return {
-    after: after.occurredAt,
-    afterId: rank === 0 ? after.sortId : null,
-    includeAtInstant: rank >= 0,
-    limit,
-  };
-}
-
-/**
- * Validation lives on the route, which answers 400 rather than silently
- * clamping (`parseLimit` in `pages/api/fleet/incidents/[incidentId]/timeline.ts`).
- * This is the defence for a direct caller only, and it deliberately does not
- * clamp either: a limit this function cannot honour falls back to the default
- * rather than being quietly reshaped into a different number of rows, so no
- * caller can be answered a page size the route would have rejected.
- */
 function resolveLimit(limit: number | undefined): number {
   if (limit === undefined) return TIMELINE_DEFAULT_LIMIT;
   if (!Number.isInteger(limit) || limit < 1 || limit > TIMELINE_MAX_LIMIT) return TIMELINE_DEFAULT_LIMIT;
@@ -253,16 +168,16 @@ export async function getIncidentTimeline(
   const merged: PositionedEntry[] = [
     ...actions.map((row) => {
       const at = iso(row.occurred_at);
-      return entry('actions', actionSource(row), row.id, row.action_type, at, at,
+      return entry('actions', actionSource(row), row.id, row.sort_at, row.action_type, at, at,
         ACTION_SUMMARIES[row.action_type] ?? 'Incident updated', labelFor(row.actor_user_id));
     }),
     ...observations.map((row) => entry(
-      'observations', 'system', row.id, 'observation_recorded', iso(row.observed_at), iso(row.recorded_at),
-      'Condition observed', null,
+      'observations', 'system', row.id, row.sort_at, 'observation_recorded',
+      iso(row.observed_at), iso(row.recorded_at), 'Condition observed', null,
     )),
     ...attendance.map((row) => {
       const at = iso(row.linked_at);
-      return entry('attendance', 'attendance', row.id, 'correction_linked', at, at,
+      return entry('attendance', 'attendance', row.id, row.sort_at, 'correction_linked', at, at,
         'Attendance correction linked', null);
     }),
     // The count is a number the database computed, not text anyone typed, and it
@@ -272,12 +187,13 @@ export async function getIncidentTimeline(
     // never read, so the audience can be sized but not named.
     ...notifications.map((row) => {
       const at = iso(row.occurred_at);
-      return entry('notifications', 'notification', at, 'notification_delivered', at, at,
-        `Notified ${row.recipient_count} recipients`, null);
+      return entry('notifications', 'notification', row.sort_at, row.sort_at, 'notification_delivered',
+        at, at, `Notified ${row.recipient_count} recipients`, null);
     }),
     ...holds.map((row) => {
       const at = iso(row.occurred_at);
-      return entry('retention_holds', 'retention_hold', row.id, `retention_hold_${row.action_type}`, at, at,
+      return entry('retention_holds', 'retention_hold', row.id, row.sort_at,
+        `retention_hold_${row.action_type}`, at, at,
         HOLD_SUMMARIES[row.action_type] ?? 'Retention hold updated', labelFor(row.actor_user_id));
     }),
   ].sort(comparePositions);
@@ -286,6 +202,8 @@ export async function getIncidentTimeline(
   // the cursor, so a row that reached this point belongs on this page; filtering
   // again would only be able to hide a keyset that had stopped working.
   const page = merged.slice(0, limit);
-  const nextCursor = merged.length > limit && page.length > 0 ? encodeCursor(page[page.length - 1]!) : null;
+  // `merged.length > limit` already means the slice is full, so there is always
+  // a last entry to encode; a further emptiness check here would be unreachable.
+  const nextCursor = merged.length > limit ? encodeCursor(page[page.length - 1]!) : null;
   return { entries: page.map((positioned) => positioned.entry), nextCursor };
 }

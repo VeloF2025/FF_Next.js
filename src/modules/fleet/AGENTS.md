@@ -45,7 +45,7 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 | POST | `/api/my/fleet/incidents/[incidentId]/evidence` | Driver evidence upload |
 | POST | `/api/my/fleet/incidents/[incidentId]/attendance-correction-link` | Link an existing Attendance correction |
 | POST | `/api/fleet/incidents/[incidentId]/request-driver-input` | Manager requests optional driver input |
-| GET | `/api/fleet/incidents/[incidentId]/timeline` | Scoped incident chronology, keyset-paged (`cursor`, `limit`≤200) |
+| GET | `/api/fleet/incidents/[incidentId]/timeline` | Scoped incident chronology, keyset-paged on a µs `sort_at` (`cursor`, `limit`≤200) |
 
 ## Database Tables
 - `fleet_vehicles` — vehicle registry

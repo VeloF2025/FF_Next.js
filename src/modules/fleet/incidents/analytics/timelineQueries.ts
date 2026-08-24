@@ -24,6 +24,28 @@
  * per source, whether or not the caller is resuming after a cursor.
  */
 import { query } from '@/lib/db-pool';
+
+/**
+ * The ordering and paging key, rendered as text at the database's own
+ * precision.
+ *
+ * These columns are `timestamptz`, which keeps microseconds. node-pg returns
+ * them as a JavaScript `Date`, which keeps milliseconds — so reading the key off
+ * the returned value silently drops three digits, and a cursor built from it
+ * says `.123` where the row says `.123456`. Postgres then reads
+ * `occurred_at > '...123'` as true *for the cursor row itself*: the last row of
+ * every page comes back as the first row of the next. Two rows inside one
+ * millisecond make it worse than a repeat — ordered one way by the truncated
+ * key and the other by microsecond, the walk stops advancing altogether and a
+ * row is never reached.
+ *
+ * So the key is selected as text, at full width, and never rebuilt from a
+ * `Date`. Fixed-width UTC text also compares lexicographically in exactly the
+ * order it compares chronologically, which is what lets the merge sort on it
+ * without parsing it back into a value that cannot hold it.
+ */
+const SORT_KEY = (column: string): string =>
+  `to_char(${column} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_at`;
 import type { IncidentActionType, IncidentVisibility } from '../types';
 import type { RetentionHoldActionType } from './aggregateSchema';
 
@@ -71,6 +93,8 @@ export interface TimelineBound {
 export interface ActionSourceRow extends Record<string, unknown> {
   id: string;
   action_type: IncidentActionType;
+  /** Full-precision UTC sort key — see `SORT_KEY` above. */
+  sort_at: string;
   actor_user_id: string | null;
   is_system_actor: boolean;
   occurred_at: string | Date;
@@ -80,22 +104,30 @@ export interface ActionSourceRow extends Record<string, unknown> {
 export interface ObservationSourceRow extends Record<string, unknown> {
   id: string;
   observed_at: string | Date;
+  /** Full-precision UTC sort key — see `SORT_KEY` above. */
+  sort_at: string;
   recorded_at: string | Date;
 }
 
 export interface AttendanceSourceRow extends Record<string, unknown> {
   id: string;
   linked_at: string | Date;
+  /** Full-precision UTC sort key — see `SORT_KEY` above. */
+  sort_at: string;
 }
 
 export interface NotificationSourceRow extends Record<string, unknown> {
   occurred_at: string | Date;
   recipient_count: number;
+  /** Full-precision UTC sort key — see `SORT_KEY` above. */
+  sort_at: string;
 }
 
 export interface RetentionHoldSourceRow extends Record<string, unknown> {
   id: string;
   action_type: RetentionHoldActionType;
+  /** Full-precision UTC sort key — see `SORT_KEY` above. */
+  sort_at: string;
   actor_user_id: string | null;
   occurred_at: string | Date;
 }
@@ -116,7 +148,8 @@ export async function listActionSource(
 ): Promise<ActionSourceRow[]> {
   return query<ActionSourceRow>(
     `/* fleet-incident-timeline:actions */
-     SELECT id, action_type, actor_user_id, is_system_actor, occurred_at, visibility
+     SELECT id, action_type, actor_user_id, is_system_actor, occurred_at, visibility,
+            ${SORT_KEY('occurred_at')}
        FROM fleet_operational_incident_actions
       WHERE incident_id = $1::uuid
         AND (occurred_at > COALESCE($2::timestamptz, '-infinity'::timestamptz)
@@ -138,7 +171,7 @@ export async function listObservationSource(
 ): Promise<ObservationSourceRow[]> {
   return query<ObservationSourceRow>(
     `/* fleet-incident-timeline:observations */
-     SELECT id, observed_at, recorded_at
+     SELECT id, observed_at, recorded_at, ${SORT_KEY('observed_at')}
        FROM fleet_operational_incident_observations
       WHERE incident_id = $1::uuid
         AND (observed_at > COALESCE($2::timestamptz, '-infinity'::timestamptz)
@@ -161,7 +194,7 @@ export async function listAttendanceSource(
 ): Promise<AttendanceSourceRow[]> {
   return query<AttendanceSourceRow>(
     `/* fleet-incident-timeline:attendance */
-     SELECT id, linked_at
+     SELECT id, linked_at, ${SORT_KEY('linked_at')}
        FROM fleet_incident_attendance_correction_links
       WHERE incident_id = $1::uuid
         AND (linked_at > COALESCE($2::timestamptz, '-infinity'::timestamptz)
@@ -190,13 +223,21 @@ export async function listAttendanceSource(
  * from a mid-minute instant would count only part of that minute's fan-out —
  * and the HAVING clause is what actually applies the cursor, since a bucket
  * cannot be judged before it has been grouped.
+ *
+ * One consequence worth knowing: a bucket is ordered by the minute it starts,
+ * not by when its rows were written. A notification whose rows were created
+ * after another source's event can therefore sit before that event in the
+ * chronology, by up to the width of a minute. The alternative — ordering
+ * notifications on the raw `created_at` — is what would let the size of the
+ * audience be counted off the shape of the chronology, so the minute stays.
  */
 export async function listNotificationSource(
   incidentId: string, bound: TimelineBound,
 ): Promise<NotificationSourceRow[]> {
   return query<NotificationSourceRow>(
     `/* fleet-incident-timeline:notifications */
-     SELECT date_trunc('minute', created_at) AS occurred_at, COUNT(*)::int AS recipient_count
+     SELECT date_trunc('minute', created_at) AS occurred_at, COUNT(*)::int AS recipient_count,
+            ${SORT_KEY("date_trunc('minute', created_at)")}
        FROM user_notifications
       WHERE source_module = 'fleet-incidents' AND source_id = $1
         AND created_at >= COALESCE(date_trunc('minute', $2::timestamptz), '-infinity'::timestamptz)
@@ -216,7 +257,7 @@ export async function listRetentionHoldSource(
 ): Promise<RetentionHoldSourceRow[]> {
   return query<RetentionHoldSourceRow>(
     `/* fleet-incident-timeline:retention_holds */
-     SELECT a.id, a.action_type, a.actor_user_id, a.occurred_at
+     SELECT a.id, a.action_type, a.actor_user_id, a.occurred_at, ${SORT_KEY('a.occurred_at')}
        FROM fleet_incident_retention_hold_actions a
        JOIN fleet_incident_retention_holds h ON h.id = a.hold_id
       WHERE h.incident_id = $1::uuid
