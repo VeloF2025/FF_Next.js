@@ -42,6 +42,17 @@ export interface PresenceFact extends FactBase {
 export interface IncidentFact extends FactBase {
   kind: 'incident';
   contributorKey: string;
+  /**
+   * The following three exist for the RETAINED half of the operations analytics
+   * read path (stage 8 task 7), which filters and drills down on facts while the
+   * detail behind them still exists. The calculator ignores them and no
+   * aggregate carries them — `releaseAnonymousGroups` emits counts only, and
+   * `suppression.test.ts` asserts no contributor identity leaves the calculator.
+   * They must never become a dimension or a metric key.
+   */
+  incidentId: string;
+  severity: string;
+  vehicleId: string | null;
   /** The bare type, e.g. `late`; prefixed to `incident.late` by the calculator. */
   incidentType: string;
   /** The bare outcome, e.g. `confirmed`; null while the incident is unreviewed. */

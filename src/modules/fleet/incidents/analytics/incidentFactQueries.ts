@@ -22,10 +22,13 @@ import { toWorkDate } from './sastDates';
 export const RECURRENCE_WINDOW_DAYS = 90;
 
 interface IncidentRow extends Record<string, unknown> {
+  id: string;
   work_date: string | Date;
   project_id: string;
   operational_site_id: string;
   staff_id: string;
+  severity: string;
+  vehicle_id: string | null;
   incident_type: string;
   outcome: string | null;
   acknowledgement_seconds: string | number | null;
@@ -48,10 +51,13 @@ function toSeconds(value: string | number | null): number | null {
 
 const INCIDENT_FACT_SQL = `/* fleet-analytics-facts:incidents */
   SELECT
+    i.id,
     i.work_date,
     i.project_id,
     i.operational_site_id,
     i.staff_id,
+    i.severity,
+    i.vehicle_id,
     i.incident_type,
     i.outcome,
     EXTRACT(EPOCH FROM (i.acknowledged_at - i.opened_at))::bigint  AS acknowledgement_seconds,
@@ -121,6 +127,9 @@ export async function loadIncidentFacts(
     workDate: toWorkDate(row.work_date),
     dimension: { projectId: row.project_id, operationalSiteId: row.operational_site_id },
     contributorKey: row.staff_id,
+    incidentId: row.id,
+    severity: row.severity,
+    vehicleId: row.vehicle_id,
     incidentType: row.incident_type,
     outcome: row.outcome,
     acknowledgementSeconds: toSeconds(row.acknowledgement_seconds),
