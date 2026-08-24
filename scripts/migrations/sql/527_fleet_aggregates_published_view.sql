@@ -1,4 +1,4 @@
--- 525_fleet_aggregates_published_view.sql
+-- 527_fleet_aggregates_published_view.sql
 --
 -- Adds fleet_operational_monthly_aggregates_published: the only relation any
 -- read path may use to read PR8 operational aggregates.

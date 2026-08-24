@@ -8,7 +8,7 @@
  * A query that forgets `AND is_active = true` does not fail; it returns MORE
  * rows, and the extra rows are the withheld groups.
  *
- * Migration 525 hard-codes the predicate in a view. These tests make using it
+ * Migration 527 hard-codes the predicate in a view. These tests make using it
  * mandatory: the database still permits a direct read (see the migration header
  * for why the grant cannot be withdrawn yet), so this is the layer that catches
  * a reader going around it.
@@ -19,8 +19,8 @@ import { describe, expect, it } from 'vitest';
 import { PUBLIC_AGGREGATE_COLUMNS } from '../aggregateSchema';
 
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
-const MIGRATION = join(REPO_ROOT, 'scripts', 'migrations', 'sql', '525_fleet_aggregates_published_view.sql');
-const ROLLBACK = join(REPO_ROOT, 'scripts', 'migrations', 'sql', 'rollback_525_fleet_aggregates_published_view.sql');
+const MIGRATION = join(REPO_ROOT, 'scripts', 'migrations', 'sql', '527_fleet_aggregates_published_view.sql');
+const ROLLBACK = join(REPO_ROOT, 'scripts', 'migrations', 'sql', 'rollback_527_fleet_aggregates_published_view.sql');
 const VIEW_NAME = 'fleet_operational_monthly_aggregates_published';
 const BASE_TABLE = 'fleet_operational_monthly_aggregates';
 
@@ -43,7 +43,7 @@ function sourceFiles(directory: string): string[] {
   return found;
 }
 
-describe('migration 525 publishes exactly the allow-listed surface', () => {
+describe('migration 527 publishes exactly the allow-listed surface', () => {
   it('selects every column the allow-list names, and no other', () => {
     const body = /AS\s*\nSELECT([\s\S]*?)FROM fleet_operational_monthly_aggregates/.exec(forward);
     expect(body).not.toBeNull();

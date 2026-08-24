@@ -1,5 +1,5 @@
 /**
- * Contract for migration 525 (the published aggregates view), against real
+ * Contract for migration 527 (the published aggregates view), against real
  * Postgres.
  *
  * The unit tests beside this one assert what the migration FILE says. That is
@@ -24,15 +24,15 @@ import { join } from 'node:path';
 import { Pool } from 'pg';
 import { PUBLIC_AGGREGATE_COLUMNS } from '@/modules/fleet/incidents/analytics/aggregateSchema';
 
-const SCHEMA = 'mig525_published_view_scratch';
+const SCHEMA = 'mig527_published_view_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
 const SCOPED_URL = `${BASE_URL}${BASE_URL.includes('?') ? '&' : '?'}options=${encodeURIComponent(`-c search_path=${SCHEMA}`)}`;
 const SQL_DIR = join(process.cwd(), 'scripts/migrations/sql');
 const INCIDENTS = readFileSync(join(SQL_DIR, '510_fleet_operational_incidents.sql'), 'utf8');
 const DRIVER_INPUT = readFileSync(join(SQL_DIR, '511_fleet_incident_driver_input.sql'), 'utf8');
 const RETENTION = readFileSync(join(SQL_DIR, '518_fleet_operational_analytics_retention.sql'), 'utf8');
-const FORWARD = readFileSync(join(SQL_DIR, '525_fleet_aggregates_published_view.sql'), 'utf8');
-const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_525_fleet_aggregates_published_view.sql'), 'utf8');
+const FORWARD = readFileSync(join(SQL_DIR, '527_fleet_aggregates_published_view.sql'), 'utf8');
+const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_527_fleet_aggregates_published_view.sql'), 'utf8');
 
 const VIEW = 'fleet_operational_monthly_aggregates_published';
 const BASE_TABLE = 'fleet_operational_monthly_aggregates';

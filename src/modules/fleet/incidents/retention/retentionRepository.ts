@@ -197,7 +197,7 @@ export async function listIncidentStorageObjects(incidentId: string): Promise<In
  */
 export async function hasCompleteAggregateCoverage(monthStart: string, metricVersion: number): Promise<boolean> {
   const row = await queryOne<CountRow>(
-    // Reads the published view (migration 525), not the base table: the view
+    // Reads the published view (migration 527), not the base table: the view
     // hard-codes `is_active = true`, so a superseded generation cannot be
     // counted as coverage by a query that forgot the predicate.
     `/* fleet-retention:coverage */

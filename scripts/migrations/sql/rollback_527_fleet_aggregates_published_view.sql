@@ -1,6 +1,6 @@
--- rollback_525_fleet_aggregates_published_view.sql
+-- rollback_527_fleet_aggregates_published_view.sql
 --
--- Reverses 525_fleet_aggregates_published_view.sql by dropping the published
+-- Reverses 527_fleet_aggregates_published_view.sql by dropping the published
 -- view. The descriptor after the number matches the forward file's exactly — a
 -- rollback whose name does not match its migration is how the wrong rollback
 -- gets applied silently.

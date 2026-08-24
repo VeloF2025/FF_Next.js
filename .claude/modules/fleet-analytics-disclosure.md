@@ -9,7 +9,7 @@ written:
 - **Cross-key differencing (was open item 1)** — closed by `metricPartitions.ts`, applied at every
   cell by `suppression.ts#applyPartitionRule`. See "The metric keys are not independent" below for
   what it now does.
-- **Retired rows (was open item 2)** — closed by migration 525's
+- **Retired rows (was open item 2)** — closed by migration 527's
   `fleet_operational_monthly_aggregates_published` view, which hard-codes `is_active = true`, plus
   a CI guard that fails the build if any file outside the writer queries the base table.
 
@@ -119,7 +119,7 @@ open a new violation. The loop around them is a backstop for a future rule witho
 was no view and no RLS, and the first reader that forgot `AND is_active = true` would have read
 withheld groups — silently, because the omission returns more rows rather than an error.
 
-Migration 525 adds `fleet_operational_monthly_aggregates_published`, a `security_barrier` view over
+Migration 527 adds `fleet_operational_monthly_aggregates_published`, a `security_barrier` view over
 the allow-listed columns with `is_active = true` hard-coded, and `retentionRepository.ts`'s coverage
 gate — the only reader that existed — now goes through it.
 
