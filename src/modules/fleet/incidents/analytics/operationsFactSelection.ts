@@ -63,7 +63,7 @@ async function mapWithLimit<T, R>(
  * about the data: these attributes belong to an individual incident, so neither
  * a monthly aggregate nor a presence fact carries them.
  */
-const hasIncidentShapedFilter = hasRetainedOnlyFilter;
+export const hasIncidentShapedFilter = hasRetainedOnlyFilter;
 
 /** The metric keys no incident fact can produce, whatever the incidents say. */
 const NON_INCIDENT_METRIC_KEYS: readonly OperationsMetricKey[] = [

@@ -22,6 +22,29 @@ import {
   OperationsAccessDeniedError, OperationsFilterConflictError,
 } from '@/modules/fleet/incidents/analytics/operationsAnalyticsService';
 
+/**
+ * The gates ONE route registers, with nothing else in the recording.
+ *
+ * A single shared record cannot answer this question: both routes register the
+ * same gate at import, so `toContainEqual` stays true when either one loses it.
+ * Re-importing a single route into a fresh module registry is what makes the
+ * two claims independent — and each route builds its gate once, at import, so
+ * this is also the only place the registration can be observed.
+ */
+async function gatesRegisteredByAnalytics(): Promise<Array<[string, string]>> {
+  vi.resetModules();
+  mocks.gates.length = 0;
+  await import('@/pages/api/fleet/analytics/operations');
+  return [...mocks.gates];
+}
+
+async function gatesRegisteredByDrillDown(): Promise<Array<[string, string]>> {
+  vi.resetModules();
+  mocks.gates.length = 0;
+  await import('@/pages/api/fleet/analytics/operations/drill-down');
+  return [...mocks.gates];
+}
+
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
 const PROJECT = '33333333-3333-4333-8333-333333333333';
@@ -56,10 +79,6 @@ async function call(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Deliberately NOT cleared: both routes build their permission gate once, at
-  // import, rather than rebuilding it on every request. Resetting the record
-  // here would make the gate assertions below pass only for a route that
-  // rebuilds it — which is the thing they must not require.
   mocks.staff.mockResolvedValue(STAFF);
   mocks.analytics.mockResolvedValue(report);
   mocks.drillDown.mockResolvedValue({ mode: 'retained_detail', values: [], incidentIds: [], nextCursor: null });
@@ -72,9 +91,8 @@ describe('GET /api/fleet/analytics/operations', () => {
     expect(result.headers.Allow).toBe('GET');
   });
 
-  it('gates on fleet.incidents view', async () => {
-    await call(analyticsHandler, 'GET');
-    expect(mocks.gates).toContainEqual(['fleet.incidents', 'view']);
+  it('gates on fleet.incidents view, on its own', async () => {
+    expect(await gatesRegisteredByAnalytics()).toEqual([['fleet.incidents', 'view']]);
   });
 
   it('rejects an unauthenticated request', async () => {
@@ -153,9 +171,8 @@ describe('GET /api/fleet/analytics/operations/drill-down', () => {
     expect(result.status).toBe(405);
   });
 
-  it('gates on fleet.incidents view', async () => {
-    await call(drillDownHandler, 'GET');
-    expect(mocks.gates).toContainEqual(['fleet.incidents', 'view']);
+  it('gates on fleet.incidents view, on its own', async () => {
+    expect(await gatesRegisteredByDrillDown()).toEqual([['fleet.incidents', 'view']]);
   });
 
   it('parses the filters with the same parser as the analytics endpoint', async () => {

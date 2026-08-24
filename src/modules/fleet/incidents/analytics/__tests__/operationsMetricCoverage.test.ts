@@ -34,7 +34,7 @@ import { MONTH_LOAD_CONCURRENCY } from '../operationsFactSelection';
 import { getOperationsAnalytics } from '../operationsAnalyticsService';
 import { resetOperationsMocks } from './operationsMocks';
 import {
-  NOW, PROJECT, SITE, filters, incident, monitorRun, notification, presence, viewer,
+  MANAGER, NOW, PROJECT, SITE, filters, incident, monitorRun, notification, presence, viewer,
 } from './operationsTestFixtures';
 
 function keysOf(cards: readonly { metricKey: string }[]): string[] {
@@ -122,6 +122,36 @@ describe('a filter that makes a fact kind inapplicable', () => {
   it('reports every key when nothing narrows the request', async () => {
     const report = await getOperationsAnalytics(filters(), viewer, NOW);
     expect(keysOf(report.cards)).toContain('presence.scheduled_days');
+  });
+
+  it('pushes the projects in scope into the fact query, not only into the JS filter', async () => {
+    // Without this the loaders scan every project in the company and the rows
+    // are discarded in Node — the filter still looks right and the cost is
+    // invisible from the response.
+    runMock.listScopedProjectIds.mockResolvedValue([PROJECT]);
+    await getOperationsAnalytics(filters(), viewer, NOW);
+    for (const load of [factsMock.loadIncidentFacts, factsMock.loadNotificationFacts, monitorMock.loadMonitorRunFacts]) {
+      expect(load).toHaveBeenCalledWith(
+        '2026-08-01', '2026-09-01', expect.objectContaining({ projectIds: [PROJECT] }),
+      );
+    }
+  });
+
+  it('narrows the fact query to the manager project list too', async () => {
+    runMock.listScopedProjectIds.mockImplementation(async (scope: { pmUserId: string }) => (
+      scope.pmUserId === MANAGER ? [PROJECT] : [PROJECT, 'another-project']
+    ));
+    scopeMock.resolveIncidentScope.mockResolvedValue({ unrestricted: true, pmUserId: PROJECT, pmStaffId: null });
+    await getOperationsAnalytics(filters({ managerUserId: MANAGER }), viewer, NOW);
+    expect(factsMock.loadIncidentFacts).toHaveBeenCalledWith(
+      '2026-08-01', '2026-09-01', expect.objectContaining({ projectIds: [PROJECT] }),
+    );
+  });
+
+  it('sends no project list at all when nothing narrows the request', async () => {
+    scopeMock.resolveIncidentScope.mockResolvedValue({ unrestricted: true, pmUserId: PROJECT, pmStaffId: null });
+    await getOperationsAnalytics(filters(), viewer, NOW);
+    expect(factsMock.loadIncidentFacts.mock.calls[0]?.[2]).not.toHaveProperty('projectIds');
   });
 
   it('pushes a site filter into the fact query rather than only filtering in JS', async () => {
