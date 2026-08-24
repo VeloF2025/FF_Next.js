@@ -352,6 +352,10 @@ describe('getIncidentTimeline pagination', () => {
       '2026-08-13T08:00:00.000000Z|actions|not-a-uuid',
       '2026-08-13T08:00:00.000000Z|retention_holds|1; DROP TABLE',
       '2026-08-13T08:00:00.000000Z|notifications|not-an-instant',
+      // `Date.parse` accepts both of these; a `::timestamptz` cast refuses them
+      // as 22007, which is a 500 for what is a malformed request.
+      '2026-08-13T08:00:00.000000Z|notifications|2026',
+      '2026-08-13T08:00:00.000000Z|notifications|2026-08-24 (x)',
     ];
     for (const position of malformed) {
       db.query.mockClear();
@@ -359,6 +363,26 @@ describe('getIncidentTimeline pagination', () => {
         .rejects.toThrow(IncidentTimelineCursorError);
       expect(db.query).not.toHaveBeenCalled();
     }
+  });
+
+  it('rejects an instant that only Date.parse would accept', async () => {
+    // Same trap one field earlier: the position itself reaches the database as
+    // `$2::timestamptz`, so it is pinned to the exact shape `SORT_KEY` writes.
+    const cursor = (position: string): string => Buffer.from(position, 'utf8').toString('base64url');
+    for (const sortAt of ['2026', '2026-08-24 (x)', '2026-08-13T08:00:00.000Z', '2026-08-13 08:00:00.000000Z']) {
+      db.query.mockClear();
+      await expect(getIncidentTimeline(INCIDENT, viewer, {
+        cursor: cursor(`${sortAt}|actions|${actionRow.id}`),
+      })).rejects.toThrow(IncidentTimelineCursorError);
+      expect(db.query).not.toHaveBeenCalled();
+    }
+  });
+
+  it('refuses an empty cursor rather than quietly answering page one', async () => {
+    respondWith({ actions: many });
+    await expect(getIncidentTimeline(INCIDENT, viewer, { cursor: '' }))
+      .rejects.toThrow(IncidentTimelineCursorError);
+    expect(db.query).not.toHaveBeenCalled();
   });
 
   it('accepts the id shape each table is actually keyed by', async () => {

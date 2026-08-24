@@ -40,7 +40,14 @@ function abortable(): Promise<Response> {
   });
 }
 
-async function flush(): Promise<void> { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); }
+/**
+ * Settles the loader's whole chain inside `act`: the fetch promise, the
+ * `response.json()` await behind it, and the state updates that follow. Two
+ * ticks leave the last of those outside `act`, which is what React warns about.
+ */
+async function flush(): Promise<void> {
+  await act(async () => { for (let tick = 0; tick < 5; tick += 1) await Promise.resolve(); });
+}
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -191,12 +198,19 @@ describe('IncidentTimeline refresh', () => {
 
   it('refetches when the refresh key changes, and not otherwise', async () => {
     const { rerender } = render(<IncidentTimeline incidentId="incident-1" refreshKey={0} />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    // Let the mount read settle before re-rendering, so the counts below are
+    // about the refresh key and not about a page still arriving.
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     rerender(<IncidentTimeline incidentId="incident-1" refreshKey={0} />);
     await flush();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     rerender(<IncidentTimeline incidentId="incident-1" refreshKey={1} />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    // Settled, not merely issued: waiting only for the call count leaves the
+    // response landing after the test ends, which React reports as an update
+    // outside act(...).
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -110,6 +110,19 @@ describe('GET /api/fleet/incidents/{incidentId}/timeline', () => {
     expect(result.status).toBe(400);
   });
 
+  it('refuses an empty cursor rather than quietly answering page one', async () => {
+    // `?cursor=` is a caller trying to page. Answering page one without saying
+    // so is how a client silently restarts a walk it thought it was continuing.
+    mocks.timeline.mockRejectedValue(new IncidentTimelineCursorError('The timeline cursor could not be read'));
+    const result = await call('GET', { query: { incidentId: INCIDENT, cursor: '' } });
+    expect(result.status).toBe(400);
+    // The route must hand the empty string on as a cursor rather than dropping
+    // it — it is the service that knows an empty position is not a first page.
+    expect(mocks.timeline).toHaveBeenCalledWith(
+      INCIDENT, expect.anything(), { limit: undefined, cursor: '' },
+    );
+  });
+
   it('refuses a repeated cursor parameter', async () => {
     const result = await call('GET', { query: { incidentId: INCIDENT, cursor: ['a', 'b'] } });
     expect(result.status).toBe(400);

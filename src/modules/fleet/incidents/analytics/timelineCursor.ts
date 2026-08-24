@@ -71,6 +71,15 @@ const UUID_KEYED: ReadonlySet<TimelineTable> = new Set<TimelineTable>([
   'actions', 'observations', 'attendance', 'retention_holds',
 ]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * Exactly what `SORT_KEY` in `timelineQueries.ts` emits, and nothing else.
+ * `Date.parse` is not a substitute: it accepts `2026` and `2026-08-24 (x)`,
+ * which a `::timestamptz` cast rejects as 22007 — the same malformed-request
+ * reaching the database as a logged 500 that validating the id was meant to
+ * stop. A cursor field is machine-written, so the only shape worth accepting is
+ * the one we write.
+ */
+const SORT_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
 export function encodeCursor(last: PositionedEntry): string {
   return Buffer.from(`${last.sortAt}|${last.table}|${last.sortId}`, 'utf8').toString('base64url');
@@ -82,21 +91,22 @@ export function encodeCursor(last: PositionedEntry): string {
  * rather than defaulted. A tampered cursor can only move the window, never widen
  * what the query returns.
  *
- * `sortId` is validated to the shape its own table's keyset compares it as,
- * because it reaches the database as `$3::uuid` or `$3::timestamptz`. Without
- * that, a cursor that decodes but carries rubbish in the third field is a cast
- * failure — Postgres 22P02, surfacing as a logged 500 for what is a malformed
- * request the caller should be told about with a 400.
+ * Both timestamps and the id are validated to the exact shape they are written
+ * in, because they reach the database as `$2::timestamptz`, `$3::uuid`, or
+ * `$3::timestamptz`. Anything a cast would refuse has to be refused here first:
+ * a cursor that decodes but carries rubbish is otherwise a 22P02 or a 22007,
+ * surfacing as a logged 500 for what is a malformed request the caller should be
+ * told about with a 400.
  */
 export function decodeCursor(cursor: string): TimelinePosition {
   const parts = Buffer.from(cursor, 'base64url').toString('utf8').split('|');
   const [sortAt, table, sortId] = parts;
   if (parts.length !== 3 || !sortAt || !table || !sortId
-    || !TIMELINE_TABLES.includes(table as TimelineTable) || Number.isNaN(Date.parse(sortAt))) {
+    || !TIMELINE_TABLES.includes(table as TimelineTable) || !SORT_AT.test(sortAt)) {
     throw new IncidentTimelineCursorError('The timeline cursor could not be read');
   }
   const keyed = table as TimelineTable;
-  const usable = UUID_KEYED.has(keyed) ? UUID.test(sortId) : !Number.isNaN(Date.parse(sortId));
+  const usable = UUID_KEYED.has(keyed) ? UUID.test(sortId) : SORT_AT.test(sortId);
   if (!usable) throw new IncidentTimelineCursorError('The timeline cursor could not be read');
   return { sortAt, table: keyed, sortId };
 }

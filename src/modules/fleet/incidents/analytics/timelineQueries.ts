@@ -218,11 +218,14 @@ export async function listAttendanceSource(
  *
  * This source keys on the bucket rather than on a row id, because the bucket is
  * its identity as well as its instant: a bucket is atomic, so the cursor's own
- * bucket is behind the cursor in full and the keyset is a plain `>`. The WHERE
- * clause is floored to the minute for the same reason the grouping is — reading
- * from a mid-minute instant would count only part of that minute's fan-out —
- * and the HAVING clause is what actually applies the cursor, since a bucket
- * cannot be judged before it has been grouped.
+ * bucket is behind the cursor in full and the keyset is a plain `>`.
+ *
+ * The cursor is applied by the HAVING clause, because a bucket cannot be judged
+ * before it has been grouped — the HAVING is what excludes the cursor's own
+ * bucket. The WHERE floor is not doing that work and does not need to: it is an
+ * index-friendly lower bound that lets the scan skip rows no surviving bucket
+ * can contain, floored to the minute so a bucket is never counted from part of
+ * its rows.
  *
  * One consequence worth knowing: a bucket is ordered by the minute it starts,
  * not by when its rows were written. A notification whose rows were created

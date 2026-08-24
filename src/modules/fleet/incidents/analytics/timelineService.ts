@@ -146,7 +146,11 @@ export async function getIncidentTimeline(
     throw new IncidentTimelineAccessDeniedError('You cannot view this Fleet incident');
   }
 
-  const after = options.cursor ? decodeCursor(options.cursor) : null;
+  // An empty cursor is a malformed one, not an absent one: `?cursor=` is a
+  // caller trying to page and getting page one back without being told.
+  const after = options.cursor === undefined || options.cursor === null
+    ? null
+    : decodeCursor(options.cursor);
   const limit = resolveLimit(options.limit);
   // One row past the page is what tells `nextCursor` there is another page. Read
   // it from every source, because any of them could own that row.
