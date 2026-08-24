@@ -28,9 +28,27 @@
  * a combination of unknowns whose value the published rows fix, and a row that
  * reduces to a single unknown fixes that value outright.
  *
- * Every reduced row is then a disclosure question. The people behind it are the
- * union of its unknowns' supports, and that group must be empty — the value is
- * then zero and describes nobody — or reach `minimumContributors`.
+ * The question asked of the reduced system is then, for each small group of
+ * withheld variables: can the reader pin down SOME combination of exactly
+ * these? That is a question about the row SPACE, not about the basis the
+ * elimination happened to produce — a randomised sweep found a pair of withheld
+ * incident cells whose sum was pinned by a combination no basis row named. If
+ * the answer is yes, the people behind that combination are the union of those
+ * variables' supports, and that group must be empty — the value is then zero and
+ * describes nobody — or reach `minimumContributors`.
+ *
+ * The search covers every withheld variable on its own, and every pair and
+ * triple of withheld CELLS. Two deliberate bounds:
+ *
+ * - Four or more cells added together are not enumerated. No such shape has been
+ *   observed across the randomised sweeps; it is a bound on the search, not a
+ *   claim that none exists.
+ * - Complements do not enter the combinations, only the singles. A complement's
+ *   support is a BOUND, and summing bounds stops meaning anything: the three
+ *   complements of one presence partition add up to twice its total, so their
+ *   bounds union to fewer people than the total's own support while the quantity
+ *   they pin is the total itself. Judging that a disclosure is an artefact of
+ *   how it was written down, not a fact about anybody.
  *
  * Reduction rather than "keep handing over the last unknown in a relation",
  * because the two are not the same rule. The weaker one was written first and a
@@ -38,16 +56,30 @@
  * three cells across two sites, pinned only by ADDING two relations together.
  * One unknown at a time never forms that sum.
  *
- * Only relations anchored on a published row are admitted. A relation known
- * solely through withheld variables states an identity among unknowns and hands
- * over no number; one known solely through absent keys hands over a zero that
- * was never withheld. Neither could be repaired by publishing less, so reporting
- * either would be a permanent false alarm.
+ * EVERY relation enters the system, including ones with no known variable at
+ * all. Those are not inert: they are constraints, and a constraint combines with
+ * an anchored row to pin something neither could pin alone. Dropping them before
+ * elimination — which the first version of this file did — loses exactly that,
+ * and a randomised search found the loss at seed 34: two published level
+ * relations pin a site's scheduled and confirmed days, the site's own partition
+ * is anchorless, and adding them together leaves one person's unconfirmed day.
+ *
+ * The anchor test belongs AFTER elimination, on the reduced row. A reduced row
+ * with no anchors is a pure identity among withheld values — it hands over no
+ * number, and no amount of publishing less would change that — so reporting it
+ * would be a permanent false alarm. Anchors are carried through the row
+ * operations for exactly this reason, and they double as the list of rows the
+ * caller can withhold to break the derivation.
  *
  * Pure: no SQL, no clock, no settings lookup.
  */
 import type { DerivationValue, Variable } from './derivationModel';
 import { buildRelations, buildVariables, valueIdOf } from './derivationModel';
+import type { EliminationRow } from './derivationSolver';
+import { COMPLEMENT_PREFIX } from './metricPartitions';
+import {
+  TOLERANCE, candidateSubsets, copyRow, eliminate, leftoverOf, pinsSomething, pivotsOf,
+} from './derivationSolver';
 
 export type { DerivationValue } from './derivationModel';
 export { valueIdOf } from './derivationModel';
@@ -68,44 +100,6 @@ export interface DerivabilityViolation {
    * relation unknown again, which is what the caller needs to act on.
    */
   anchors: readonly string[];
-}
-
-const TOLERANCE = 1e-9;
-
-interface EliminationRow {
-  coefficients: number[];
-  /** Published rows the knowns in every contributing relation rest on. */
-  anchors: Set<string>;
-}
-
-/**
- * Reduced row echelon form, carrying each row's anchors through the
- * combinations. Every coefficient starts at 1 or -1 over a system this sparse,
- * so ordinary floating point stays exact enough for a comparison against zero.
- */
-function eliminate(rows: EliminationRow[], width: number): EliminationRow[] {
-  let pivot = 0;
-  for (let column = 0; column < width && pivot < rows.length; column += 1) {
-    let candidate = -1;
-    for (let row = pivot; row < rows.length; row += 1) {
-      if (Math.abs(rows[row]!.coefficients[column]!) > TOLERANCE) { candidate = row; break; }
-    }
-    if (candidate === -1) continue;
-    [rows[pivot], rows[candidate]] = [rows[candidate]!, rows[pivot]!];
-    const scale = rows[pivot]!.coefficients[column]!;
-    for (let c = column; c < width; c += 1) rows[pivot]!.coefficients[c]! /= scale;
-    for (let row = 0; row < rows.length; row += 1) {
-      if (row === pivot) continue;
-      const factor = rows[row]!.coefficients[column]!;
-      if (Math.abs(factor) < TOLERANCE) continue;
-      for (let c = column; c < width; c += 1) {
-        rows[row]!.coefficients[c]! -= factor * rows[pivot]!.coefficients[c]!;
-      }
-      for (const anchor of rows[pivot]!.anchors) rows[row]!.anchors.add(anchor);
-    }
-    pivot += 1;
-  }
-  return rows.slice(0, pivot);
 }
 
 /**
@@ -144,33 +138,95 @@ export function derivabilityViolations(
   for (const relation of relations) {
     const anchors = new Set<string>();
     for (const id of relation.variables) {
-      if (!read(id).known) continue;
       for (const anchor of read(id).anchors) anchors.add(anchor);
     }
-    if (anchors.size === 0) continue;
     const coefficients = new Array<number>(unknowns.length).fill(0);
     let touched = false;
     relation.variables.forEach((id, index) => {
       const at = column.get(id);
       if (at === undefined) return;
-      // The relation is `total = sum(members)`; only the sign matters here.
+      // The relation is `total = sum(parts)`; only the sign matters here.
       coefficients[at] = (coefficients[at] ?? 0) + (index === 0 ? 1 : -1);
       touched = true;
     });
     if (touched) rows.push({ coefficients, anchors });
   }
 
+  // ONE SYSTEM PER CONNECTED COMPONENT. Presence never shares a relation with
+  // driver input, and a site's cells never share one with another project's, so
+  // the matrix is block diagonal and a pinned combination always lies inside a
+  // single block. Elimination is cubic, so solving the blocks separately is the
+  // difference between a sweep that finishes and one that does not.
+  const componentOf = new Map<number, number>();
+  const merge = (a: number, b: number): void => {
+    const [from, into] = [componentOf.get(a)!, componentOf.get(b)!];
+    if (from === into) return;
+    for (const [index, component] of componentOf) if (component === from) componentOf.set(index, into);
+  };
+  for (let index = 0; index < unknowns.length; index += 1) componentOf.set(index, index);
+  const touchedBy = rows.map(
+    (row) => row.coefficients.map((value, index) => ({ value, index }))
+      .filter(({ value }) => Math.abs(value) > TOLERANCE).map(({ index }) => index),
+  );
+  for (const touched of touchedBy) for (const index of touched) merge(index, touched[0]!);
+
+  const blocks = new Map<number, number[]>();
+  for (const [index, component] of componentOf) {
+    blocks.set(component, [...(blocks.get(component) ?? []), index]);
+  }
+
   const violations: DerivabilityViolation[] = [];
-  for (const row of eliminate(rows, unknowns.length)) {
-    const involved = unknowns.filter((_, index) => Math.abs(row.coefficients[index]!) > TOLERANCE);
-    if (involved.length === 0) continue;
-    const residual = new Set<string>();
-    for (const id of involved) for (const person of read(id).support) residual.add(person);
-    if (residual.size === 0 || residual.size >= minimumContributors) continue;
-    violations.push({
-      unknowns: involved, residual: residual.size,
-      recoveredOutright: involved.length === 1, anchors: [...row.anchors].sort(),
+  for (const block of [...blocks.values()].map((columns) => columns.sort((a, b) => a - b))) {
+    const local = new Map(block.map((index, position) => [index, position]));
+    const width = block.length;
+    const blockRows: EliminationRow[] = [];
+    rows.forEach((row, position) => {
+      if (touchedBy[position]!.length === 0 || !local.has(touchedBy[position]![0]!)) return;
+      const coefficients = new Array<number>(width).fill(0);
+      for (const index of touchedBy[position]!) coefficients[local.get(index)!] = row.coefficients[index]!;
+      blockRows.push({ coefficients, anchors: new Set(row.anchors) });
     });
+    if (blockRows.length === 0) continue;
+
+    const reduced = eliminate(blockRows.map(copyRow), width);
+    const pivots = pivotsOf(reduced, width);
+    const peopleLocal = (position: number): ReadonlySet<string> => read(unknowns[block[position]!]!).support;
+
+    const small: number[] = [];
+    for (let position = 0; position < width; position += 1) {
+      const size = peopleLocal(position).size;
+      if (size > 0 && size < minimumContributors) small.push(position);
+    }
+    if (small.length === 0) continue;
+    const cells = small.filter(
+      (position) => !unknowns[block[position]!]!.includes(`#${COMPLEMENT_PREFIX}`),
+    );
+    const leftovers = new Map(
+      small.map((position) => [position, leftoverOf(reduced, pivots, position, width)]),
+    );
+
+    const found: number[][] = [];
+    for (const subset of candidateSubsets(small, cells, peopleLocal, minimumContributors)) {
+      if (found.some((earlier) => earlier.every((position) => subset.includes(position)))) continue;
+      if (!pinsSomething(subset.map((position) => leftovers.get(position)!), width)) continue;
+      found.push(subset);
+      const residual = new Set<string>();
+      for (const position of subset) for (const person of peopleLocal(position)) residual.add(person);
+      if (residual.size === 0 || residual.size >= minimumContributors) continue;
+      // The reader's knowledge has to rest on a published row. A combination
+      // pinned only by identities among withheld values hands over no number,
+      // and no amount of publishing less would change that.
+      const anchors = new Set<string>();
+      for (const row of reduced) {
+        if (!subset.some((position) => Math.abs(row.coefficients[position]!) > TOLERANCE)) continue;
+        for (const anchor of row.anchors) anchors.add(anchor);
+      }
+      if (anchors.size === 0) continue;
+      violations.push({
+        unknowns: subset.map((position) => unknowns[block[position]!]!), residual: residual.size,
+        recoveredOutright: subset.length === 1, anchors: [...anchors].sort(),
+      });
+    }
   }
 
   return violations.sort(

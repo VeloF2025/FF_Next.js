@@ -173,8 +173,8 @@ function applyFact(tally: Tally, fact: OperationsFact): void {
  * Counted only to serve as denominators. Neither is a publishable metric key,
  * so neither is ever emitted as a row.
  */
-const INCIDENT_DENOMINATOR = 'incident.total';
-const OUTCOME_DENOMINATOR = 'outcome.reviewed_total';
+export const INCIDENT_DENOMINATOR = 'incident.total';
+export const OUTCOME_DENOMINATOR = 'outcome.reviewed_total';
 
 /**
  * The population each ratio divides by, as an internal tally key. A metric
@@ -194,10 +194,31 @@ const DENOMINATOR_OF: Partial<Record<OperationsMetricKey, string>> = {
 
 const TIMING_KEYS = new Set<string>(TIMING_METRIC_KEYS);
 
-function denominatorKeyFor(metricKey: OperationsMetricKey): string | null {
+export function denominatorKeyFor(metricKey: OperationsMetricKey): string | null {
   if (metricKey.startsWith('outcome.')) return OUTCOME_DENOMINATOR;
   return DENOMINATOR_OF[metricKey] ?? null;
 }
+
+/**
+ * The inverse of `denominatorKeyFor`: for each population, the keys whose
+ * published row PRINTS it in the denominator column.
+ *
+ * Disclosure control needs this and must not restate it. A row carrying a
+ * denominator publishes that denominator as surely as a row of its own would,
+ * so a value withheld from the cube can still be sitting in a surviving row's
+ * `denominator`. Deriving the map here — rather than writing a second copy of
+ * it next to the suppression rules — means a metric given a denominator in
+ * `DENOMINATOR_OF` cannot be given one without the guard noticing.
+ */
+export const DENOMINATOR_CARRIERS: ReadonlyMap<string, readonly OperationsMetricKey[]> = (() => {
+  const carriers = new Map<string, OperationsMetricKey[]>();
+  for (const metricKey of OPERATIONS_METRIC_KEYS) {
+    const population = denominatorKeyFor(metricKey);
+    if (population === null) continue;
+    carriers.set(population, [...(carriers.get(population) ?? []), metricKey]);
+  }
+  return carriers;
+})();
 
 /**
  * The people a metric is actually about - and nobody else.

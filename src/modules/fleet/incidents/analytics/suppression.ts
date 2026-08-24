@@ -138,8 +138,8 @@ function applyPartitionRule(cells: readonly ReleaseCell[], minimumContributors: 
 
 /**
  * A withheld parent publishes nothing beneath it: its children would rebuild it.
- * The per-key pass already honours this, but the partition rule can withhold a
- * parent afterwards, so it has to be re-established.
+ * The per-key pass honours this already; the later rules can withhold a parent
+ * afterwards, so it has to be re-established.
  */
 function cascadeWithholding(cells: readonly ReleaseCell[]): boolean {
   const withheldOrganisation = new Set<string>();
@@ -226,12 +226,23 @@ function repairDerivability(cells: readonly ReleaseCell[], minimumContributors: 
       (a, b) => a.accumulator.contributors.size - b.accumulator.contributors.size
         || valueIdOf(cellId(a), a.metricKey).localeCompare(valueIdOf(cellId(b), b.metricKey)),
     )[0];
-    // Every violation is anchored on a published row, so there is always one to
-    // give up; the guard is a backstop, not an expected path.
-    if (!sacrifice) return;
+    // Every violation carries the anchors it rests on, and an anchor is by
+    // construction a published row. No candidate means the model and the release
+    // decision have gone out of step, and continuing would store rows whose
+    // disclosure was never resolved.
+    if (!sacrifice) {
+      throw new Error(
+        `fleet aggregates: derivable residual of ${first.residual} with no published row to withhold `
+        + `(${first.unknowns.join(' + ')})`,
+      );
+    }
     sacrifice.published = false;
     cascadeWithholding(cells);
   }
+  // The loop withholds one published row per round, so it cannot need more
+  // rounds than there are cells. Falling out of it means that reasoning is
+  // wrong, and the rows about to be stored are not known to be safe.
+  throw new Error('fleet aggregates: suppression did not converge on a non-derivable release');
 }
 
 export function releaseAnonymousGroups(
@@ -259,10 +270,14 @@ export function releaseAnonymousGroups(
   // open a new violation. The loop is the backstop for a future rule without
   // that property; it terminates because withholding is monotonic over finitely
   // many cells.
+  let settled = false;
   for (let pass = 0; pass <= cells.length; pass += 1) {
     const partitioned = applyPartitionRule(cells, minimumContributors);
     const cascaded = cascadeWithholding(cells);
-    if (!partitioned && !cascaded) break;
+    if (!partitioned && !cascaded) { settled = true; break; }
+  }
+  if (!settled) {
+    throw new Error('fleet aggregates: the per-key and partition rules did not reach a fixed point');
   }
 
   repairDerivability(cells, minimumContributors);
