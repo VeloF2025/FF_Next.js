@@ -20,7 +20,7 @@
  * original instead of replacing it. `tripBuildService` therefore pulls the read start back to the
  * last recorded trip's own start, so a window always begins at a trip boundary.
  */
-import { query, queryOne } from '@/lib/db-pool';
+import { query, queryOne, transaction } from '@/lib/db-pool';
 import type { SegmentedTrip, TripPosition } from './tripSegmenter';
 
 /**
@@ -171,29 +171,6 @@ export async function loadLastTripStart(vehicleId: string): Promise<string | nul
   return row ? iso(row.ignition_on_at) : null;
 }
 
-/**
- * Removes every trip for this vehicle at or after `from`, so the window can be replaced wholesale.
- *
- * This is what reaps orphan fragments. Upserting alone could not: a rebuild whose window began at
- * a different point produced a trip with a different `ignition_on_at` -- the conflict key -- so it
- * INSERTed beside the old row instead of replacing it, and one journey accumulated into three
- * metric-eligible trips across successive runs. Deleting the window first makes the recomputed set
- * authoritative.
- *
- * Bounded by `from`, which the caller anchors at a trip boundary, so this never touches history
- * outside the window being rebuilt.
- */
-export async function deleteTripsFrom(vehicleId: string, from: string): Promise<number> {
-  const rows = await query<{ id: string }>(
-    `/* fleet-trips:delete-window */
-     DELETE FROM fleet_vehicle_trips
-     WHERE vehicle_id = $1 AND ignition_on_at >= $2::timestamptz
-     RETURNING id`,
-    [vehicleId, from],
-  );
-  return rows.length;
-}
-
 const UPSERT_SQL = `/* fleet-trips:upsert */
   INSERT INTO fleet_vehicle_trips (
     vehicle_id, tracker_id, provider,
@@ -221,23 +198,46 @@ const UPSERT_SQL = `/* fleet-trips:upsert */
     updated_at = now()`;
 
 /**
- * Writes trips for one vehicle.
+ * Replaces every trip for this vehicle at or after `from` with `trips`, atomically.
  *
- * Deliberately does NOT touch the location columns: those are owned by the address resolver, and
- * overwriting them here would discard resolved addresses every time a run re-processed a trip
- * within the lookback window.
+ * The delete and the inserts MUST share one transaction. Run as separate statements, a failure
+ * between them — a constraint violation, a dropped connection, the process dying — leaves the
+ * window deleted and not rewritten. The next run would rebuild it, so a transient failure
+ * self-heals, but a PERSISTENT one (a row the schema keeps refusing) deletes the same window on
+ * every tick and the vehicle's history stays gone while reading as a legitimate "no trips".
+ * Silent absence is the failure mode this module exists to avoid.
+ *
+ * `from` is anchored by the caller at a trip boundary, so this never touches history outside the
+ * window being rebuilt.
+ *
+ * Returns how many rows were cleared, for the caller's diagnostics.
  */
-export async function upsertTrips(
-  vehicle: TrackedVehicle, trips: readonly SegmentedTrip[],
-): Promise<number> {
-  for (const t of trips) {
-    await query(UPSERT_SQL, [
-      vehicle.vehicleId, vehicle.trackerId, vehicle.provider,
-      t.ignitionOnAt, t.ignitionOffAt, t.closeReason,
-      t.onLat, t.onLon, t.offLat, t.offLon,
-      t.durationSeconds, t.movingSeconds, t.idleSeconds,
-      t.distanceKm, t.maxSpeedKph, t.startOdometerKm, t.endOdometerKm, t.positionCount,
-    ]);
-  }
-  return trips.length;
+export async function replaceWindow(
+  vehicle: TrackedVehicle, from: string, trips: readonly SegmentedTrip[],
+): Promise<{ deleted: number; written: number }> {
+  return transaction(async (client) => {
+    // RETURNING because this repo's TxnClient hands back rows, not a pg Result — there is no
+    // rowCount to read.
+    const cleared = await client.query<{ id: string }>(
+      `/* fleet-trips:delete-window */
+       DELETE FROM fleet_vehicle_trips
+       WHERE vehicle_id = $1 AND ignition_on_at >= $2::timestamptz
+       RETURNING id`,
+      [vehicle.vehicleId, from],
+    );
+
+    for (const t of trips) {
+      await client.query(UPSERT_SQL, [
+        vehicle.vehicleId, vehicle.trackerId, vehicle.provider,
+        t.ignitionOnAt, t.ignitionOffAt, t.closeReason,
+        t.onLat, t.onLon, t.offLat, t.offLon,
+        t.durationSeconds, t.movingSeconds, t.idleSeconds,
+        t.distanceKm, t.maxSpeedKph, t.startOdometerKm, t.endOdometerKm, t.positionCount,
+      ]);
+    }
+
+    return { deleted: cleared.length, written: trips.length };
+  });
 }
+
+

@@ -15,8 +15,7 @@ const mocks = vi.hoisted(() => ({
   loadPositions: vi.fn(),
   readWatermark: vi.fn(),
   writeWatermark: vi.fn(),
-  upsertTrips: vi.fn(),
-  deleteTripsFrom: vi.fn(),
+  replaceWindow: vi.fn(),
 }));
 
 vi.mock('../tripRepository', () => ({ ...mocks, LATE_ARRIVAL_LOOKBACK_MINUTES: 6 * 60 }));
@@ -42,8 +41,9 @@ beforeEach(() => {
   mocks.loadLastTripStart.mockResolvedValue(null);
   mocks.readWatermark.mockResolvedValue(null);
   mocks.writeWatermark.mockResolvedValue(undefined);
-  mocks.upsertTrips.mockImplementation(async (_v, trips) => trips.length);
-  mocks.deleteTripsFrom.mockResolvedValue(0);
+  mocks.replaceWindow.mockImplementation(async (_v, _from, trips) => ({
+    deleted: 0, written: trips.length,
+  }));
   mocks.loadPositions.mockResolvedValue([]);
 });
 
@@ -72,12 +72,44 @@ describe('buildTripsForVehicle', () => {
     const result = await buildTripsForVehicle(VEHICLE, OPTS);
     expect(result.tripsWritten).toBe(0);
     expect(mocks.writeWatermark).not.toHaveBeenCalled();
-    expect(mocks.upsertTrips).not.toHaveBeenCalled();
+    expect(mocks.replaceWindow).not.toHaveBeenCalled();
   });
 
-  it('does not clear a window when there is nothing to rebuild', async () => {
+  it('does not touch a window when there is nothing to rebuild', async () => {
     await buildTripsForVehicle(VEHICLE, OPTS);
-    expect(mocks.deleteTripsFrom).not.toHaveBeenCalled();
+    expect(mocks.replaceWindow).not.toHaveBeenCalled();
+  });
+
+  it('clears from readFrom, NOT from the first position returned', async () => {
+    // loadPositions filters `recorded_at >= from`, so the first row can be LATER than readFrom.
+    // Deleting from the first row would leave a trip anchored at readFrom undeleted — and the
+    // recomputed set starts after it, so nothing replaces it either. That stale row survives every
+    // rebuild: the same orphan class the window replacement exists to eliminate.
+    mocks.readWatermark.mockResolvedValue('2026-08-01T12:00:00.000Z');
+    mocks.loadLastTripStart.mockResolvedValue('2026-08-01T05:00:00.000Z');
+    // No position at 05:00 — the earliest is 06:30.
+    mocks.loadPositions.mockResolvedValueOnce([pos('06:30', true), pos('07:00', false)]);
+
+    await buildTripsForVehicle(VEHICLE, OPTS);
+
+    const [, fromArg] = mocks.replaceWindow.mock.calls[0]!;
+    expect(fromArg).toBe('2026-08-01T05:00:00.000Z');
+    expect(fromArg).not.toBe('2026-08-01T06:30:00.000Z');
+  });
+
+  it('clears and rewrites the window ATOMICALLY, in one call', async () => {
+    // Separate delete and insert statements would leave the window deleted and unwritten if the
+    // insert failed -- and a PERSISTENT failure would re-clear it every tick, so the vehicle's
+    // history would stay gone while reading as a legitimate "no trips".
+    mocks.loadPositions.mockResolvedValueOnce([pos('06:00', true), pos('07:00', false)]);
+
+    await buildTripsForVehicle(VEHICLE, OPTS);
+
+    expect(mocks.replaceWindow).toHaveBeenCalledTimes(1);
+    const [vehicleArg, fromArg, tripsArg] = mocks.replaceWindow.mock.calls[0]!;
+    expect(vehicleArg).toBe(VEHICLE);
+    expect(fromArg).toBe('2026-08-01T06:00:00.000Z');
+    expect(tripsArg).toHaveLength(1);
   });
 
   it('clears the window before writing the recomputed trips', async () => {
@@ -89,10 +121,11 @@ describe('buildTripsForVehicle', () => {
 
     // The last trip's start is earlier than the lookback floor, so it wins — the window begins at
     // a trip boundary, never inside a journey.
-    expect(mocks.deleteTripsFrom).toHaveBeenCalledWith('v1', '2026-08-01T06:00:00.000Z');
-    const deleteOrder = mocks.deleteTripsFrom.mock.invocationCallOrder[0]!;
-    const upsertOrder = mocks.upsertTrips.mock.invocationCallOrder[0]!;
-    expect(deleteOrder).toBeLessThan(upsertOrder);
+    // The last trip's start precedes the lookback floor, so it wins: the window opens at a trip
+    // boundary, never inside a journey.
+    expect(mocks.replaceWindow).toHaveBeenCalledWith(
+      VEHICLE, '2026-08-01T06:00:00.000Z', expect.any(Array),
+    );
   });
 });
 

@@ -12,8 +12,8 @@
  */
 import { log } from '@/lib/logger';
 import {
-  deleteTripsFrom, LATE_ARRIVAL_LOOKBACK_MINUTES, listVehiclesWithPositions, loadLastTripStart,
-  loadPositions, readWatermark, upsertTrips, writeWatermark, type TrackedVehicle,
+  LATE_ARRIVAL_LOOKBACK_MINUTES, listVehiclesWithPositions, loadLastTripStart, loadPositions,
+  readWatermark, replaceWindow, writeWatermark, type TrackedVehicle,
 } from './tripRepository';
 import { DEFAULT_SEGMENT_OPTIONS, segmentTrips, type SegmentOptions } from './tripSegmenter';
 
@@ -107,11 +107,14 @@ export async function buildTripsForVehicle(
 
     const { trips, lastPositionAt } = segmentTrips(positions, options);
 
-    // Clear before insert, in that order. Upserting alone cannot reap a row the rebuild no longer
-    // produces -- a trip whose start moved, or one that a longer view now shows was a fragment.
+    // Clear and rewrite as ONE transaction. Upserting alone cannot reap a row the rebuild no
+    // longer produces -- a trip whose start moved, or one a longer view now shows was a fragment
+    // -- but a delete that is not atomic with its rewrite is worse: a persistent insert failure
+    // would clear the window on every tick and the vehicle's history would stay gone while
+    // reading as a legitimate "no trips".
     const windowStart = readFrom ?? positions[0]!.recordedAt;
-    await deleteTripsFrom(vehicle.vehicleId, windowStart);
-    if (trips.length > 0) tripsWritten += await upsertTrips(vehicle, trips);
+    const replaced = await replaceWindow(vehicle, windowStart, trips);
+    tripsWritten += replaced.written;
 
     positionsProcessed += positions.length;
     if (lastPositionAt) {
