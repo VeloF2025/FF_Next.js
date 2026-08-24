@@ -18,6 +18,11 @@
 --
 -- Additive only: two new tables, no ALTER against anything existing.
 
+-- btree_gist provides the equality operator class GiST needs for `vehicle_id WITH =` in the
+-- exclusion constraint below. Already installed on this database; IF NOT EXISTS keeps the
+-- migration runnable against a fresh one.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 -- ---------------------------------------------------------------------------
 -- Trips
 -- ---------------------------------------------------------------------------
@@ -67,6 +72,18 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_trips (
   duration_seconds BIGINT,
   moving_seconds BIGINT,
   idle_seconds BIGINT,
+
+  -- The part of the trip that could NOT honestly be called moving or idling, because the gap
+  -- between fixes was too long to attribute by the speed of the fix that closed it.
+  --
+  -- GENERATED, so it cannot drift from the three columns it derives from. It exists because
+  -- claiming the uncertainty is "visible in duration - moving - idle" is worthless if nothing
+  -- carries it: ituran's median inter-fix gap is 2,020s against a 300s attribution ceiling, so for
+  -- more than half the fleet almost NO time is attributed while distance accrues in full. Without
+  -- this column an API can report 1,183 km against 0.0 hours of moving time and look correct.
+  unattributed_seconds BIGINT GENERATED ALWAYS AS (
+    GREATEST(COALESCE(duration_seconds, 0) - COALESCE(moving_seconds, 0) - COALESCE(idle_seconds, 0), 0)
+  ) STORED,
 
   distance_km NUMERIC(10,2),
   max_speed_kph NUMERIC(6,2),
@@ -151,6 +168,22 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_trips (
   CONSTRAINT fleet_vehicle_trips_lon_range CHECK (
     (on_lon IS NULL OR on_lon BETWEEN -180 AND 180)
     AND (off_lon IS NULL OR off_lon BETWEEN -180 AND 180)
+  ),
+
+  -- A vehicle cannot be on two journeys at the same time, so overlapping trips are made
+  -- UNREPRESENTABLE rather than merely unlikely.
+  --
+  -- This is the structural guard, and it is here because the failure it catches is otherwise
+  -- silent and self-consistent: a rebuild whose window opened INSIDE an existing journey minted a
+  -- second trip nested within the first, both `ignition_off`, both metric-eligible, inflating
+  -- duration and distance by 38% with every row passing every other constraint. Nothing in the
+  -- data looked wrong. Now the write fails loudly instead.
+  --
+  -- An open trip has a NULL end, so its range is unbounded above: nothing may be recorded after an
+  -- open trip begins, which is exactly right.
+  CONSTRAINT fleet_vehicle_trips_no_overlap EXCLUDE USING gist (
+    vehicle_id WITH =,
+    tstzrange(ignition_on_at, ignition_off_at) WITH &&
   )
 );
 

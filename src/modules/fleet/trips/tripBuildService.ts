@@ -12,7 +12,7 @@
  */
 import { log } from '@/lib/logger';
 import {
-  LATE_ARRIVAL_LOOKBACK_MINUTES, listVehiclesWithPositions, loadLastTripStart, loadPositions,
+  LATE_ARRIVAL_LOOKBACK_MINUTES, listVehiclesWithPositions, loadPositions, loadTripAnchorBefore,
   readWatermark, replaceWindow, writeWatermark, type TrackedVehicle,
 } from './tripRepository';
 import { DEFAULT_SEGMENT_OPTIONS, segmentTrips, type SegmentOptions } from './tripSegmenter';
@@ -57,29 +57,27 @@ export interface VehicleBuildResult {
 }
 
 /**
- * The instant a rebuild should start reading from, or null to read from the beginning.
+ * How far back a rebuild reconsiders, before any trip-boundary anchoring.
  *
- * Two floors, and the EARLIER wins:
- *
- *  - the late-arrival lookback before the watermark, which catches positions that were buffered
- *    out of coverage and flushed after the watermark had already passed them;
- *  - the start of the last trip already recorded, so the window never begins inside a journey.
- *
- * The second is the one that was missing. A bare time floor can land mid-trip, and the rebuild
- * then produces a trip with a different `ignition_on_at` -- the conflict key -- which INSERTs
- * beside the original rather than replacing it. One journey became three metric-eligible rows
- * across successive runs, each internally consistent and each wrong.
- *
- * Deliberately anchored on the last trip whatever its state, not just an open one: a trip closed
- * as `timeout` at a previous batch boundary must be reconsidered too, or it stays truncated.
+ * Catches positions buffered out of coverage and flushed after the watermark had already passed
+ * them. Null watermark means the vehicle has never been built: read everything.
  */
-export function resolveReadFrom(watermark: string | null, lastTripStart: string | null): string | null {
+export function lookbackFloor(watermark: string | null): string | null {
   if (watermark === null) return null;
-  const lookbackFloor = new Date(
-    Date.parse(watermark) - LATE_ARRIVAL_LOOKBACK_MINUTES * 60_000,
-  ).toISOString();
-  if (lastTripStart === null) return lookbackFloor;
-  return lastTripStart < lookbackFloor ? lastTripStart : lookbackFloor;
+  return new Date(Date.parse(watermark) - LATE_ARRIVAL_LOOKBACK_MINUTES * 60_000).toISOString();
+}
+
+/**
+ * Where a rebuild window opens: the floor, pulled back to the start of whatever trip contains it.
+ *
+ * The anchor MUST be the last trip beginning at or before the floor. An earlier version took
+ * `min(floor, lastTripStart)`, which selects the bare floor whenever the vehicle drove within the
+ * lookback -- the normal case -- and a floor landing inside an older journey bisected it into two
+ * metric-eligible trips, one nested in the other. See `loadTripAnchorBefore`.
+ */
+export function resolveReadFrom(floor: string | null, anchorBefore: string | null): string | null {
+  if (floor === null) return null;
+  return anchorBefore ?? floor;
 }
 
 /**
@@ -93,8 +91,10 @@ export async function buildTripsForVehicle(
   vehicle: TrackedVehicle, options: SegmentOptions,
 ): Promise<VehicleBuildResult> {
   const watermark = await readWatermark(vehicle.vehicleId);
-  const lastTripStart = await loadLastTripStart(vehicle.vehicleId);
-  let readFrom = resolveReadFrom(watermark, lastTripStart);
+  const floor = lookbackFloor(watermark);
+  // The anchor is the trip that CONTAINS the floor, so the window never opens mid-journey.
+  const anchor = floor === null ? null : await loadTripAnchorBefore(vehicle.vehicleId, floor);
+  let readFrom = resolveReadFrom(floor, anchor);
 
   let tripsWritten = 0;
   let positionsProcessed = 0;

@@ -50,7 +50,7 @@ beforeEach(() => {
   mocks.query.mockResolvedValue([]);
   mocks.queryOne.mockResolvedValue({
     total: '0', eligible: '0', timed_out: '0', still_open: '0',
-    distance_km: '0', moving_seconds: '0', idle_seconds: '0',
+    distance_km: '0', moving_seconds: '0', idle_seconds: '0', unattributed_seconds: '0',
     active_vehicles: '23', tracked_vehicles: '18',
   });
 });
@@ -157,6 +157,7 @@ describe('honesty of the response', () => {
         : {
             total: '10', eligible: '7', timed_out: '2', still_open: '1',
             distance_km: '123.45', moving_seconds: '3600', idle_seconds: '1800',
+            unattributed_seconds: '5400',
           }
     ));
 
@@ -167,6 +168,9 @@ describe('honesty of the response', () => {
     // The 3 trips missing from the totals are named, not silently absent.
     expect(res.body.data.summary.excluded).toEqual({ timedOut: 2, stillOpen: 1 });
     expect(res.body.data.summary.distanceKm).toBe(123.45);
+    // The remainder must be reported, not left implicit. 5,400s here against 3,600s moving:
+    // without this figure the caller reads 123 km on one hour of driving.
+    expect(res.body.data.summary.unattributedSeconds).toBe(5400);
   });
 
   it('reports tracker coverage so a partial answer does not read as complete', async () => {
@@ -174,7 +178,7 @@ describe('honesty of the response', () => {
       String(sql).includes('coverage')
         ? { active_vehicles: '23', tracked_vehicles: '18' }
         : { total: '0', eligible: '0', timed_out: '0', still_open: '0',
-            distance_km: '0', moving_seconds: '0', idle_seconds: '0' }
+            distance_km: '0', moving_seconds: '0', idle_seconds: '0', unattributed_seconds: '0' }
     ));
 
     const res = await call({ from: '2026-08-01', to: '2026-08-31' });
@@ -189,6 +193,7 @@ describe('honesty of the response', () => {
       on_location_text: null, off_location_text: null,
       on_nearest_place_label: null, off_nearest_place_label: null,
       duration_seconds: '3600', moving_seconds: '3000', idle_seconds: '600',
+      unattributed_seconds: '0',
       distance_km: '10.5', max_speed_kph: '95',
     })));
 
@@ -205,6 +210,7 @@ describe('honesty of the response', () => {
       on_location_text: 'Centurion', off_location_text: null,
       on_nearest_place_label: 'Depot', off_nearest_place_label: null,
       duration_seconds: '3600', moving_seconds: '3000', idle_seconds: '600',
+      unattributed_seconds: '0',
       distance_km: '10.5', max_speed_kph: '95',
     }]);
 

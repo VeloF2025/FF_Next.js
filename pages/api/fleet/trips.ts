@@ -11,7 +11,13 @@
  *    excluded ones are COUNTED and returned, so the caller can see what was left out instead of
  *    wondering why the totals look low.
  *
- * 2. Coverage is reported. Only 18 of 23 active vehicles carry a tracker, so a fleet-wide total is
+ * 2. Unattributed time is reported. An interval longer than the segmenter's ceiling is counted in
+ *    a trip's duration but attributed to neither moving nor idle, because attributing it by the
+ *    speed of the fix that closed it would book half an hour of driving as idling. That remainder
+ *    is returned rather than left implicit — a summary showing 1,183 km against 0.0 hours of
+ *    moving time is not wrong, but it is unreadable without it.
+ *
+ * 3. Coverage is reported. Only 18 of 23 active vehicles carry a tracker, so a fleet-wide total is
  *    a total for the tracked subset. Returning that ratio stops a partial answer reading as a
  *    complete one.
  *
@@ -55,6 +61,7 @@ interface TripRow extends Record<string, unknown> {
   on_location_text: string | null; off_location_text: string | null;
   on_nearest_place_label: string | null; off_nearest_place_label: string | null;
   duration_seconds: string | null; moving_seconds: string | null; idle_seconds: string | null;
+  unattributed_seconds: string | null;
   distance_km: string | null; max_speed_kph: string | null;
 }
 
@@ -106,7 +113,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
                 t.counts_toward_metrics, t.on_lat, t.on_lon, t.off_lat, t.off_lon,
                 t.on_location_text, t.off_location_text,
                 t.on_nearest_place_label, t.off_nearest_place_label,
-                t.duration_seconds, t.moving_seconds, t.idle_seconds,
+                t.duration_seconds, t.moving_seconds, t.idle_seconds, t.unattributed_seconds,
                 t.distance_km, t.max_speed_kph
          FROM fleet_vehicle_trips t
          LEFT JOIN fleet_vehicles v ON v.id = t.vehicle_id
@@ -121,7 +128,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
                 t.counts_toward_metrics, t.on_lat, t.on_lon, t.off_lat, t.off_lon,
                 t.on_location_text, t.off_location_text,
                 t.on_nearest_place_label, t.off_nearest_place_label,
-                t.duration_seconds, t.moving_seconds, t.idle_seconds,
+                t.duration_seconds, t.moving_seconds, t.idle_seconds, t.unattributed_seconds,
                 t.distance_km, t.max_speed_kph
          FROM fleet_vehicle_trips t
          LEFT JOIN fleet_vehicles v ON v.id = t.vehicle_id
@@ -143,7 +150,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
                 count(*) FILTER (WHERE close_reason = 'open') AS still_open,
                 COALESCE(sum(distance_km) FILTER (WHERE counts_toward_metrics), 0) AS distance_km,
                 COALESCE(sum(moving_seconds) FILTER (WHERE counts_toward_metrics), 0) AS moving_seconds,
-                COALESCE(sum(idle_seconds) FILTER (WHERE counts_toward_metrics), 0) AS idle_seconds
+                COALESCE(sum(idle_seconds) FILTER (WHERE counts_toward_metrics), 0) AS idle_seconds,
+                COALESCE(sum(unattributed_seconds) FILTER (WHERE counts_toward_metrics), 0) AS unattributed_seconds
          FROM fleet_vehicle_trips
          WHERE ignition_on_at >= $1::timestamptz AND ignition_on_at <= $2::timestamptz`,
         [startAt, endAt],
@@ -156,7 +164,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
                 count(*) FILTER (WHERE close_reason = 'open') AS still_open,
                 COALESCE(sum(distance_km) FILTER (WHERE counts_toward_metrics), 0) AS distance_km,
                 COALESCE(sum(moving_seconds) FILTER (WHERE counts_toward_metrics), 0) AS moving_seconds,
-                COALESCE(sum(idle_seconds) FILTER (WHERE counts_toward_metrics), 0) AS idle_seconds
+                COALESCE(sum(idle_seconds) FILTER (WHERE counts_toward_metrics), 0) AS idle_seconds,
+                COALESCE(sum(unattributed_seconds) FILTER (WHERE counts_toward_metrics), 0) AS unattributed_seconds
          FROM fleet_vehicle_trips
          WHERE vehicle_id = $1
            AND ignition_on_at >= $2::timestamptz AND ignition_on_at <= $3::timestamptz`,
@@ -192,6 +201,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       durationSeconds: num(r.duration_seconds),
       movingSeconds: num(r.moving_seconds),
       idleSeconds: num(r.idle_seconds),
+      // Time inside the trip that could not honestly be called moving or idling, because the gap
+      // between fixes was too long to attribute. Returned so a consumer can see it rather than
+      // reading near-zero moving time as "this vehicle barely moves".
+      unattributedSeconds: num(r.unattributed_seconds),
       distanceKm: num(r.distance_km),
       maxSpeedKph: num(r.max_speed_kph),
     })),
@@ -206,6 +219,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       distanceKm: Number(summary?.distance_km ?? 0),
       movingSeconds: Number(summary?.moving_seconds ?? 0),
       idleSeconds: Number(summary?.idle_seconds ?? 0),
+      // The remainder, surfaced deliberately. Sampling density varies enormously by provider —
+      // cartrack's median inter-fix gap is 8 seconds, ituran's is 2,020 — so for sparse providers
+      // almost NO time can be attributed while distance accrues in full. Without this figure a
+      // caller sees full distance against near-zero moving time and reads it as a slow fleet
+      // rather than as a measurement limit.
+      unattributedSeconds: Number(summary?.unattributed_seconds ?? 0),
     },
     coverage: {
       activeVehicles: Number(coverage?.active_vehicles ?? 0),

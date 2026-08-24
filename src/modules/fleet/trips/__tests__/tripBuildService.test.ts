@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   listVehiclesWithPositions: vi.fn(),
-  loadLastTripStart: vi.fn(),
+  loadTripAnchorBefore: vi.fn(),
   loadPositions: vi.fn(),
   readWatermark: vi.fn(),
   writeWatermark: vi.fn(),
@@ -21,7 +21,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../tripRepository', () => ({ ...mocks, LATE_ARRIVAL_LOOKBACK_MINUTES: 6 * 60 }));
 
 import {
-  buildTrips, buildTripsForVehicle, MAX_BATCHES_PER_VEHICLE, POSITION_BATCH_SIZE, resolveReadFrom,
+  buildTrips, buildTripsForVehicle, lookbackFloor, MAX_BATCHES_PER_VEHICLE, POSITION_BATCH_SIZE,
+  resolveReadFrom,
 } from '../tripBuildService';
 import { DEFAULT_SEGMENT_OPTIONS, type SegmentOptions } from '../tripSegmenter';
 
@@ -40,7 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.FLEET_TRIP_TIMEOUT_MINUTES;
   mocks.listVehiclesWithPositions.mockResolvedValue([VEHICLE]);
-  mocks.loadLastTripStart.mockResolvedValue(null);
+  mocks.loadTripAnchorBefore.mockResolvedValue(null);
   mocks.readWatermark.mockResolvedValue(null);
   mocks.writeWatermark.mockResolvedValue(undefined);
   mocks.replaceWindow.mockImplementation(async (_v, _from, trips) => ({
@@ -88,7 +89,8 @@ describe('buildTripsForVehicle', () => {
     // recomputed set starts after it, so nothing replaces it either. That stale row survives every
     // rebuild: the same orphan class the window replacement exists to eliminate.
     mocks.readWatermark.mockResolvedValue('2026-08-01T12:00:00.000Z');
-    mocks.loadLastTripStart.mockResolvedValue('2026-08-01T05:00:00.000Z');
+    // A journey began at 05:00, before the 06:00 floor — the window must open there.
+    mocks.loadTripAnchorBefore.mockResolvedValue('2026-08-01T05:00:00.000Z');
     // No position at 05:00 — the earliest is 06:30.
     mocks.loadPositions.mockResolvedValueOnce([pos('06:30', true), pos('07:00', false)]);
 
@@ -116,15 +118,14 @@ describe('buildTripsForVehicle', () => {
 
   it('clears the window before writing the recomputed trips', async () => {
     mocks.readWatermark.mockResolvedValue('2026-08-01T12:00:00.000Z');
-    mocks.loadLastTripStart.mockResolvedValue('2026-08-01T06:00:00.000Z');
+    mocks.loadTripAnchorBefore.mockResolvedValue('2026-08-01T06:00:00.000Z');
     mocks.loadPositions.mockResolvedValueOnce([pos('06:00', true), pos('07:00', false)]);
 
     await buildTripsForVehicle(VEHICLE, OPTS);
 
     // The last trip's start is earlier than the lookback floor, so it wins — the window begins at
     // a trip boundary, never inside a journey.
-    // The last trip's start precedes the lookback floor, so it wins: the window opens at a trip
-    // boundary, never inside a journey.
+    // The anchor is the trip containing the floor, so the window opens at a trip boundary.
     expect(mocks.replaceWindow).toHaveBeenCalledWith(
       VEHICLE, '2026-08-01T06:00:00.000Z', expect.any(Array),
     );
@@ -137,7 +138,7 @@ describe('the stall guard', () => {
     // own start -- exactly where this batch began. Without the guard the loop re-reads and
     // re-replaces the same window until the batch budget is gone, doing no work and hiding it.
     mocks.readWatermark.mockResolvedValue('2026-08-01T12:00:00.000Z');
-    mocks.loadLastTripStart.mockResolvedValue('2026-08-01T06:00:00.000Z');
+    mocks.loadTripAnchorBefore.mockResolvedValue('2026-08-01T06:00:00.000Z');
 
     // A full batch that is one unbroken trip beginning exactly at readFrom.
     const oneLongTrip = Array.from({ length: POSITION_BATCH_SIZE }, (_, i) => ({
@@ -232,40 +233,46 @@ describe('buildTrips', () => {
   });
 });
 
+describe('lookbackFloor', () => {
+  it('is null when the vehicle has never been built', () => {
+    expect(lookbackFloor(null)).toBeNull();
+  });
+
+  it('reaches back the full lookback', () => {
+    expect(lookbackFloor('2026-08-01T12:00:00.000Z')).toBe('2026-08-01T06:00:00.000Z');
+  });
+});
+
 describe('resolveReadFrom', () => {
-  it('reads from the beginning when there is no watermark', () => {
+  it('reads everything when there is no floor', () => {
     expect(resolveReadFrom(null, null)).toBeNull();
-    expect(resolveReadFrom(null, '2026-08-01T06:00:00.000Z')).toBeNull();
+    expect(resolveReadFrom(null, '2026-08-01T05:00:00.000Z')).toBeNull();
   });
 
-  it('uses the lookback floor when no trip has been recorded', () => {
-    expect(resolveReadFrom('2026-08-01T12:00:00.000Z', null))
-      .toBe('2026-08-01T06:00:00.000Z');   // 12:00 minus 6h
-  });
-
-  it('pulls back to the last trip start when it precedes the lookback floor', () => {
-    // THE FIX. A bare 6h floor would begin at 06:00 — inside a journey that started at 05:00 —
-    // and the rebuild would mint a second trip under a different ignition_on_at.
-    expect(resolveReadFrom('2026-08-01T12:00:00.000Z', '2026-08-01T05:00:00.000Z'))
+  it('opens at the trip that CONTAINS the floor, not at the floor', () => {
+    // THE FIX. The floor at 06:00 falls inside a journey that began at 05:00. Opening there would
+    // leave the 05:00 row undeleted and mint a second, nested, metric-eligible trip — measured at
+    // +38% duration and distance, stable across reruns.
+    expect(resolveReadFrom('2026-08-01T06:00:00.000Z', '2026-08-01T05:00:00.000Z'))
       .toBe('2026-08-01T05:00:00.000Z');
   });
 
-  it('keeps the lookback floor when the last trip starts after it', () => {
-    // No need to reconsider further back than the floor; the trip is wholly inside the window.
-    expect(resolveReadFrom('2026-08-01T12:00:00.000Z', '2026-08-01T09:00:00.000Z'))
+  it('uses the floor when no trip begins at or before it', () => {
+    // Nothing to bisect, so the floor is safe.
+    expect(resolveReadFrom('2026-08-01T06:00:00.000Z', null))
       .toBe('2026-08-01T06:00:00.000Z');
   });
 
-  it('never begins a window after the last recorded trip started', () => {
-    // The property that matters, stated directly: whatever the inputs, the window cannot open
-    // inside a journey already on record.
-    for (const [wm, last] of [
-      ['2026-08-01T12:00:00.000Z', '2026-08-01T05:00:00.000Z'],
-      ['2026-08-01T12:00:00.000Z', '2026-08-01T11:59:00.000Z'],
-      ['2026-08-01T06:30:00.000Z', '2026-08-01T00:10:00.000Z'],
+  it('NEVER opens a window after the trip that could contain it', () => {
+    // The property, stated directly. The previous implementation took min(floor, lastTripStart),
+    // which selected the bare floor whenever the vehicle had driven recently — the normal case —
+    // and this assertion is what it failed.
+    for (const [floor, anchor] of [
+      ['2026-08-01T06:00:00.000Z', '2026-08-01T05:00:00.000Z'],
+      ['2026-08-01T08:10:00.000Z', '2026-08-01T07:00:00.000Z'],
+      ['2026-08-01T23:59:59.000Z', '2026-08-01T00:00:00.000Z'],
     ] as const) {
-      const from = resolveReadFrom(wm, last)!;
-      expect(from <= last).toBe(true);
+      expect(resolveReadFrom(floor, anchor)).toBe(anchor);
     }
   });
 });

@@ -76,7 +76,9 @@ export async function listVehiclesWithPositions(): Promise<TrackedVehicle[]> {
             p.vehicle_id, p.tracker_id, p.provider
      FROM fleet_vehicle_positions p
      WHERE p.vehicle_id IS NOT NULL
-     ORDER BY p.vehicle_id, p.recorded_at DESC`,
+     -- p.id breaks the tie: production has 1,007 duplicate (vehicle_id, recorded_at) pairs, and
+     -- without it DISTINCT ON picks tracker_id/provider non-deterministically between runs.
+     ORDER BY p.vehicle_id, p.recorded_at DESC, p.id DESC`,
     [],
   );
   return rows.map((r) => ({ vehicleId: r.vehicle_id, trackerId: r.tracker_id, provider: r.provider }));
@@ -153,20 +155,26 @@ export async function loadPositions(
 
 
 /**
- * The `ignition_on_at` of the most recent trip recorded for this vehicle, whatever its state.
+ * The start of the last trip that began AT OR BEFORE `at`.
  *
- * The build anchors its read window at or before this, so a window never begins inside a journey
- * already on record. Deliberately NOT restricted to open trips: a trip closed as `timeout` at a
- * previous batch boundary must also be reconsidered, or it stays truncated forever.
+ * This is the trip that could CONTAIN `at`, and it is the only correct anchor for a rebuild
+ * window. The previous version returned the most recent trip regardless of position and the caller
+ * took the earlier of that and the lookback floor -- which, whenever the vehicle had driven within
+ * the lookback, selected the bare floor. A floor landing inside an OLDER journey then bisected it:
+ * the DELETE cleared from the floor so the original row survived, and segmentation restarted at
+ * the floor minted a second metric-eligible trip nested inside the first. Duration and distance
+ * inflated 38%, every row internally consistent, and it did not self-heal.
+ *
+ * Returns null when no trip starts at or before `at`, in which case `at` cannot bisect anything.
  */
-export async function loadLastTripStart(vehicleId: string): Promise<string | null> {
+export async function loadTripAnchorBefore(vehicleId: string, at: string): Promise<string | null> {
   const row = await queryOne<{ ignition_on_at: string | Date }>(
-    `/* fleet-trips:last-trip-start */
+    `/* fleet-trips:anchor-before */
      SELECT ignition_on_at FROM fleet_vehicle_trips
-     WHERE vehicle_id = $1
+     WHERE vehicle_id = $1 AND ignition_on_at <= $2::timestamptz
      ORDER BY ignition_on_at DESC
      LIMIT 1`,
-    [vehicleId],
+    [vehicleId, at],
   );
   return row ? iso(row.ignition_on_at) : null;
 }
