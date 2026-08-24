@@ -85,7 +85,10 @@ async function backfill(): Promise<void> {
     }
     // Caught up when no vehicle is still holding backlog.
     //
-    // NOT `positionsProcessed === 0`: that can never happen. `buildTrips` deliberately re-reads
+    // NOT `positionsProcessed === 0`: once any vehicle has positions, that never comes back true.
+    // (It does for a genuinely empty fleet -- `listVehiclesWithPositions` returns nothing and the
+    // vehicle loop never runs -- but backlog is zero there too, so this condition still breaks on
+    // pass 1.) The reason it cannot go to zero otherwise: `buildTrips` deliberately re-reads
     // the last 6 hours on every run so late-arriving positions are not stepped over, so each pass
     // consumes that tail again and rebuilds it -- identically, since a window is replaced rather
     // than accumulated. Waiting for zero looped until MAX_PASSES and then exited 1 with "re-run
