@@ -72,11 +72,21 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
   // open for the photo-serial fallback): restore the saved flow on mount,
   // persist on every change. Restore runs in an effect — not the useState
   // initializer — so SSR markup and first client render match.
+  //
+  // pendingRestoreRef: both effects run in the same initial flush, and the save
+  // effect's closure still sees the pre-restore INITIAL state (step 1 → clear).
+  // Without the guard it would delete the entry just restored and rely on the
+  // follow-up render to re-save it — an ordering coincidence, not a design.
+  const pendingRestoreRef = React.useRef(false);
   React.useEffect(() => {
     const saved = loadIssueFlow();
-    if (saved) setFlow({ ...saved, result: null });
+    if (saved) {
+      pendingRestoreRef.current = true;
+      setFlow({ ...saved, result: null });
+    }
   }, []);
   React.useEffect(() => {
+    if (pendingRestoreRef.current) { pendingRestoreRef.current = false; return; }
     const { step } = flow;
     if (step === 'done') { clearIssueFlow(); return; }
     saveIssueFlow({
