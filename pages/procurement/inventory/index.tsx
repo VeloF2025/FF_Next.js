@@ -761,6 +761,7 @@ function StockTakesTabContent() {
   const [formData, setFormData] = useState({
     name: '',
     stock_take_type: 'full',
+    count_method: 'blind',
     notes: '',
     location_id: '',
   });
@@ -805,7 +806,7 @@ function StockTakesTabContent() {
 
   const openNewModal = () => {
     const today = new Date().toISOString().slice(0, 10);
-    setFormData({ name: `Stock Take ${today}`, stock_take_type: 'full', notes: '', location_id: '' });
+    setFormData({ name: `Stock Take ${today}`, stock_take_type: 'full', count_method: 'blind', notes: '', location_id: '' });
     setShowModal(true);
   };
 
@@ -1064,6 +1065,18 @@ function StockTakesTabContent() {
                   <option value="full">Full Stock Take</option>
                   <option value="partial">Partial Stock Take</option>
                   <option value="spot">Spot Check</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Count Method</label>
+                <select
+                  value={formData.count_method}
+                  onChange={(e) => setFormData({ ...formData, count_method: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+                >
+                  <option value="blind">Blind — counters don&apos;t see expected quantities</option>
+                  <option value="physical">Open — expected quantities visible while counting</option>
                 </select>
               </div>
 

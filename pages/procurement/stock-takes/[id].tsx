@@ -21,10 +21,13 @@ import {
   Save,
   Eye,
   EyeOff,
+  Plus,
 } from 'lucide-react';
+import { StockItemSelector } from '@/components/procurement/StockItemSelector';
 import type { StockTake, StockTakeLine } from '@/types/procurement/stockTake.types';
 import { STOCK_TAKE_STATUSES, LINE_STATUSES } from '@/types/procurement/stockTake.types';
 import { notificationService } from '@/services/core/NotificationService';
+import { log } from '@/lib/logger';
 
 export default function StockTakeDetailPage() {
   const router = useRouter();
@@ -39,6 +42,7 @@ export default function StockTakeDetailPage() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
   const [countValue, setCountValue] = useState<string>('');
+  const [showAddItem, setShowAddItem] = useState(false);
 
   const fetchStockTake = useCallback(async () => {
     if (!id) return;
@@ -56,7 +60,7 @@ export default function StockTakeDetailPage() {
         router.push('/procurement/stock-takes');
       }
     } catch (error) {
-      console.error('Error fetching stock take:', error);
+      log.error('Error fetching stock take', { error, module: 'stock-takes' });
       notificationService.error('Failed to load stock take');
     } finally {
       setIsLoading(false);
@@ -86,7 +90,7 @@ export default function StockTakeDetailPage() {
         notificationService.error(data.error?.message || `Failed to ${action} stock take`);
       }
     } catch (error) {
-      console.error(`Error ${action}ing stock take:`, error);
+      log.error('Error performing stock take action', { error, action, module: 'stock-takes' });
       notificationService.error(`Failed to ${action} stock take`);
     } finally {
       setIsActionLoading(false);
@@ -110,7 +114,7 @@ export default function StockTakeDetailPage() {
         notificationService.error(data.error?.message || 'Failed to initialize items');
       }
     } catch (error) {
-      console.error('Error initializing items:', error);
+      log.error('Error initializing items', { error, module: 'stock-takes' });
       notificationService.error('Failed to initialize items');
     } finally {
       setIsActionLoading(false);
@@ -140,8 +144,58 @@ export default function StockTakeDetailPage() {
         notificationService.error(data.error?.message || 'Failed to record count');
       }
     } catch (error) {
-      console.error('Error recording count:', error);
+      log.error('Error recording count', { error, module: 'stock-takes' });
       notificationService.error('Failed to record count');
+    }
+  };
+
+  const handleAddItem = async (item: { stockItemId: string }) => {
+    if (!id) return;
+    setShowAddItem(false);
+    setIsActionLoading(true);
+    try {
+      const res = await fetch(`/api/procurement/stock-takes/${id}/lines`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock_item_id: item.stockItemId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        notificationService.success('Item added to count sheet');
+        fetchStockTake();
+      } else {
+        notificationService.error(data.error?.message || 'Failed to add item');
+      }
+    } catch (error) {
+      log.error('Error adding stock take line', { error, module: 'stock-takes' });
+      notificationService.error('Failed to add item');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleZeroRemaining = async (uncounted: number) => {
+    if (!id) return;
+    if (!confirm(`Record a count of 0 for the ${uncounted} item(s) not counted yet?`)) return;
+    setIsActionLoading(true);
+    try {
+      const res = await fetch(`/api/procurement/stock-takes/${id}/count`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zero_remaining: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        notificationService.success(data.data?.message || 'Remaining items zeroed');
+        fetchStockTake();
+      } else {
+        notificationService.error(data.error?.message || 'Failed to zero remaining items');
+      }
+    } catch (error) {
+      log.error('Error zeroing remaining lines', { error, module: 'stock-takes' });
+      notificationService.error('Failed to zero remaining items');
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -220,6 +274,7 @@ export default function StockTakeDetailPage() {
 
   const canEdit = stockTake.status === 'in_progress';
   const isBlindCount = stockTake.count_method === 'blind' && canEdit;
+  const uncountedCount = lines.filter(l => l.counted_quantity === null).length;
 
   return (
     <AppLayout>
@@ -267,6 +322,26 @@ export default function StockTakeDetailPage() {
                 Start Counting
               </button>
             )}
+            {canEdit && (
+              <button
+                onClick={() => setShowAddItem(true)}
+                disabled={isActionLoading}
+                className="px-4 py-2 border border-gray-600 text-gray-300 hover:bg-gray-700/50 font-medium rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" />
+                Add Item
+              </button>
+            )}
+            {canEdit && uncountedCount > 0 && (
+              <button
+                onClick={() => handleZeroRemaining(uncountedCount)}
+                disabled={isActionLoading}
+                className="px-4 py-2 border border-yellow-600 text-yellow-400 hover:bg-yellow-600/10 font-medium rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                Zero Remaining ({uncountedCount})
+              </button>
+            )}
             {stockTake.status === 'in_progress' && (
               <button
                 onClick={() => handleAction('complete')}
@@ -300,8 +375,9 @@ export default function StockTakeDetailPage() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-4 gap-4">
+        {/* Summary Cards — variance figures are hidden during a blind count:
+            counted + variance would reveal the expected quantity. */}
+        <div className={`grid ${isBlindCount ? 'grid-cols-2' : 'grid-cols-4'} gap-4`}>
           <div className="bg-[#1a1d23] rounded-lg p-4 border border-gray-700/50">
             <p className="text-gray-400 text-sm">Total Items</p>
             <p className="text-2xl font-semibold text-white">{stockTake.total_items || lines.length}</p>
@@ -312,6 +388,7 @@ export default function StockTakeDetailPage() {
               {stockTake.counted_items || lines.filter(l => l.counted_quantity !== null).length}
             </p>
           </div>
+          {!isBlindCount && (<>
           <div className="bg-[#1a1d23] rounded-lg p-4 border border-gray-700/50">
             <p className="text-gray-400 text-sm">With Variance</p>
             <p className="text-2xl font-semibold text-yellow-400">
@@ -326,6 +403,7 @@ export default function StockTakeDetailPage() {
               {formatCurrency(Math.abs(stockTake.calc_variance_value || stockTake.total_variance_value || 0))}
             </p>
           </div>
+          </>)}
         </div>
 
         {/* Progress Bar */}
@@ -366,6 +444,7 @@ export default function StockTakeDetailPage() {
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
+            {!isBlindCount && (
             <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
               <input
                 type="checkbox"
@@ -375,6 +454,7 @@ export default function StockTakeDetailPage() {
               />
               Variance only
             </label>
+            )}
           </div>
 
           {/* Table */}
@@ -387,7 +467,9 @@ export default function StockTakeDetailPage() {
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Expected</th>
                 )}
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Counted</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Variance</th>
+                {!isBlindCount && (
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Variance</th>
+                )}
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">Status</th>
                 {canEdit && <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">Action</th>}
               </tr>
@@ -395,7 +477,7 @@ export default function StockTakeDetailPage() {
             <tbody>
               {filteredLines.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 7 : 6} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={4 + (isBlindCount ? 0 : 2) + (canEdit ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">
                     <Box className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>No items to display</p>
                     {stockTake.status === 'draft' && lines.length === 0 && (
@@ -437,6 +519,7 @@ export default function StockTakeDetailPage() {
                         </span>
                       )}
                     </td>
+                    {!isBlindCount && (
                     <td className="px-4 py-3 text-right">
                       {line.variance_quantity !== 0 ? (
                         <span className={`font-medium ${line.variance_quantity > 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -446,6 +529,7 @@ export default function StockTakeDetailPage() {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
+                    )}
                     <td className="px-4 py-3 text-center">
                       {getLineStatusBadge(line.status)}
                     </td>
@@ -478,6 +562,13 @@ export default function StockTakeDetailPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Add an item found during the count that isn't on the sheet */}
+        <StockItemSelector
+          isOpen={showAddItem}
+          onClose={() => setShowAddItem(false)}
+          onSelect={handleAddItem}
+        />
       </div>
     </AppLayout>
   );
