@@ -42,10 +42,11 @@
 -- compares checksums against the BASE table, which is where the column lives.
 --
 -- `generalized_from_level` is likewise absent. Under the tier rule it carries no
--- information: sites are never published, so a project row is always generalized
--- from site, and the organisation takes the minimum tier over its projects, so
--- an organisation row is never generalized from project. A column whose value is
--- a function of its level tells a reader nothing and is not published.
+-- information. No site row is written, so a project row is always generalized
+-- from site; and the organisation publishes only over projects that are all-in
+-- or all-out, so the column would say the same thing on every organisation row
+-- of a given tier. A column whose value is a function of its level tells a
+-- reader nothing and is not published.
 --
 -- DROP then CREATE, rather than CREATE OR REPLACE. Postgres will not let a
 -- replacement DROP a column from an existing view — "cannot drop columns from

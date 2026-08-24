@@ -30,8 +30,12 @@ nothing left to search for.
 Migration 527's `fleet_operational_monthly_aggregates_published` view, and nothing else. It is
 narrower than the base table in two ways, both load-bearing:
 
-- **Organisation and project rows only.** Site aggregates are computed, stored, and never published.
-  A site is the smallest group there is and the one an outsider can most easily put a name to.
+- **Organisation and project rows only.** No site row is written at all: the release rule decides at
+  organisation and project level and never builds a site cell. The view's predicate is therefore
+  DEFENCE IN DEPTH — it bounds what a reader can see if a future writer or a hand-run backfill ever
+  puts a site row there, and it keeps out the site rows earlier versions of this code did write,
+  which are still in the table. A site is the smallest group there is and the one an outsider can
+  most easily put a name to.
 - **No `contributor_count`, no `sample_count`, no `sum_seconds`, no `bucket_*`.** These were
   disclosure CHANNELS, not metadata. `cc(scheduled) - cc(confirmed) = 1` names a single person
   without touching a numerator, and round 3 measured 658 such hits over 300 seeded months;
@@ -172,11 +176,27 @@ Two things about it are worth knowing:
   review. Verified 2026-08-24: neither the view nor the migration exists in the shared database, so
   no deployed reader is disturbed.
 
-`hasCompleteAggregateCoverage` counts rows through the view, and the view no longer returns site
-rows. A month aggregated by the OLD code whose stored rows are all site-level will therefore report
-no coverage and its incidents will not be purged. Failing closed is the right direction for a
-deletion gate, and the coverage question is already flagged below as needing an explicit per-month
-record rather than an inference from row counts.
+### Operational consequence: months that will stop reporting coverage
+
+`hasCompleteAggregateCoverage` counts rows through the view, and the view returns no site rows. A
+month whose STORED rows are all site-level — written by an earlier version of this code, before the
+rule stopped producing them — will therefore count zero and report no coverage. Its incidents are
+then never purged.
+
+- **Direction.** It fails CLOSED. Nothing is deleted that should not have been; the gate simply stops
+  authorising deletion for those months.
+- **Is anything deleting today?** No. `live_retention_enabled` defaults to `false` in migration 518
+  and reads `false` in the shared database (checked 2026-08-24). The retention run reports what it
+  WOULD delete rather than deleting it, so this consequence is inert until that flag is turned on.
+  Check it before enabling: `SELECT live_retention_enabled FROM fleet_operational_analytics_settings`.
+- **Which months.** Only those outside the nightly recompute window. A month still inside the window
+  is recomputed on the next run and gets organisation and project rows like any other.
+- **The backfill.** Re-run the aggregation cron for the affected months — the same job, over an older
+  range. It recomputes them under the current rule and writes organisation and project rows, at
+  which point coverage reports normally. No data migration and no SQL by hand.
+- **The underlying problem is still the one below**: coverage is INFERRED from the presence of rows
+  rather than recorded per month. Until that changes, "no rows" and "no qualifying data" are the same
+  observation.
 
 ## What it costs, measured
 
@@ -195,6 +215,19 @@ One case the virtual cell cannot rescue, and no rule can: a project of four peop
 The residual an organisation row would leave is those four, however it is computed. That is the
 threshold refusing, not the rule being lossy, and `belowThresholdMonth` in the fixtures keeps it
 where it belongs — the organisation goes quiet and the project rows still publish.
+
+## Running the checks
+
+```bash
+npx vitest run src/modules/fleet/incidents/analytics          # the unit suite; ~32 randomised months
+SEEDS=400 npx vitest run …/__tests__/releaseDisclosure.test.ts  # the extended sweep
+npm run typecheck:analytics-tests                             # the tests themselves, which the root tsconfig excludes
+TEST_DATABASE_URL=… npm run test:migrations -- tests/migrations/527_fleet_aggregates_published_view.test.ts
+```
+
+`typecheck:analytics-tests` is deliberately not wired into a CI gate: its only errors today are
+pre-existing ones in `src/modules/fleet/operations`, reached transitively, and turning it into a gate
+would mean fixing those first. The analytics tree and its `__tests__` are clean under it.
 
 ## Where the code is
 

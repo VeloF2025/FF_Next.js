@@ -34,10 +34,13 @@
  *
  * ## The organisation, and the cell that does not exist
  *
- * Sites are never published: migration 527's view exposes organisation and
- * project rows only, and neither `contributor_count` nor any histogram column.
- * A whole class of channel disappears with the columns. A project therefore has
- * no published children and nothing to be differenced against.
+ * No site row is ever built: `decide` works at organisation and project level
+ * and nothing below. Migration 527's view restricts to those two levels anyway,
+ * as defence in depth against a future writer and against the site rows earlier
+ * versions of this code left in the table, and publishes neither
+ * `contributor_count` nor any histogram column — a whole class of channel
+ * disappears with those. A project therefore has no published children and
+ * nothing to be differenced against.
  *
  * The organisation does. Subtract the projects that published from the
  * organisation and what is left is the sum of the projects that did not — so

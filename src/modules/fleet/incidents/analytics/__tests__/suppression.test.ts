@@ -4,9 +4,14 @@
  * The threat is not "a row with four people in it" — the aggregate table's CHECK
  * already refuses that. It is DIFFERENCING, and the answer is no longer to
  * publish cautiously and then search for what a reader could recover. A
- * component is published whole, or reduced to its root total, or not at all; and
- * the organisation takes the minimum tier over its projects, so
- * `organisation - sum(projects)` is zero rather than a residual.
+ * component is published whole, or reduced to its root total, or not at all.
+ *
+ * The organisation is the only level with published children, so it is decided
+ * differently: it publishes at a tier only if every project is ALL-IN OR
+ * ALL-OUT at that tier, and if the projects publishing nothing — aggregated
+ * into one VIRTUAL CELL — pass the same check a real cell passes. Then
+ * `organisation - sum(publishing projects)` is exactly that virtual cell, and
+ * it has already cleared the threshold.
  *
  * Facts go through the real calculator, never hand-built groups: the complements
  * the rule turns on are COUNTED there, and reconstructing them from contributor
@@ -106,7 +111,8 @@ describe('the organisation asks whether what it leaves behind is safe to leave',
   it('publishes over two withheld projects whose people together clear the threshold', () => {
     // Neither small project can publish anything: three people each. Their
     // AGGREGATE is six, so the residual an organisation row leaves describes
-    // six people and is safe. Taking the minimum tier refused this outright.
+    // six people and is safe. The rule this replaced, which took the minimum
+    // tier over the projects, refused this outright.
     const facts = [
       ...confirmedRoster('big', 'b', 9),
       ...confirmedRoster('small-a', 'a', 3),

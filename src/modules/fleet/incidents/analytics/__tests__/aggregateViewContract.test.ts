@@ -150,10 +150,11 @@ describe('migration 527 publishes exactly the columns the allow-list names', () 
   });
 
   it('does not publish generalized_from_level, which now says nothing', () => {
-    // Sites are never published, so a project row is always generalized from
-    // site; the organisation takes the minimum tier over its projects, so an
-    // organisation row is never generalized from project. A column whose value
-    // is a function of its level is not information.
+    // No site row is written, so a project row is always generalized from
+    // site; and the organisation publishes only over projects that are all-in
+    // or all-out, so the column reads the same on every organisation row of a
+    // given tier. A column whose value is a function of its level is not
+    // information.
     expect(selectedColumns()).not.toContain('generalized_from_level');
   });
 

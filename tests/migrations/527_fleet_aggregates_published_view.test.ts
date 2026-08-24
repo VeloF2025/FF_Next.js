@@ -88,13 +88,19 @@ const admin = new Pool({ connectionString: BASE_URL, ssl: false, max: 1 });
 const db = new Pool({ connectionString: SCOPED_URL, ssl: false, max: 1 });
 
 /** One storable aggregate row. `contributor_count` clears the table's CHECK. */
-async function insertAggregate(monthStart: string, metricKey: string, numerator: number, isActive: boolean): Promise<void> {
+async function insertAggregate(
+  monthStart: string, metricKey: string, numerator: number, isActive: boolean,
+  level: 'organisation' | 'project' | 'site' = 'organisation',
+): Promise<void> {
   await db.query(
     `INSERT INTO ${BASE_TABLE}
-       (metric_version, month_start, dimension_level, metric_key, metric_kind,
-        numerator, denominator, contributor_count, is_active)
-     VALUES (1, $1::date, 'organisation', $2, 'count', $3, NULL, 7, $4)`,
-    [monthStart, metricKey, numerator, isActive],
+       (metric_version, month_start, dimension_level, dimension_project_id, dimension_site_id,
+        metric_key, metric_kind, numerator, denominator, contributor_count, is_active)
+     VALUES (1, $1::date, $5,
+             CASE WHEN $5 = 'organisation' THEN NULL ELSE $6::uuid END,
+             CASE WHEN $5 = 'site' THEN $7::uuid ELSE NULL END,
+             $2, 'count', $3, NULL, 7, $4)`,
+    [monthStart, metricKey, numerator, isActive, level, PROJECT, SITE],
   );
 }
 
@@ -145,6 +151,28 @@ describe('the view exists only once its migration runs', () => {
 
 describe('what the view actually returns', () => {
   beforeEach(async () => { await db.query(FORWARD); });
+
+  it('hides a site row, whatever put it there', async () => {
+    // The release rule never builds a site cell, so nothing it writes can be
+    // one. The predicate is defence in depth: against a future writer, against
+    // a hand-run backfill, and against the site rows earlier versions of this
+    // code did write and which are still in the table. A site is the smallest
+    // group there is. Asserted against a real view rather than against the
+    // migration text, because it is the database that has to enforce it.
+    await insertAggregate('2026-02-01', 'incident.late', 5, true, 'organisation');
+    await insertAggregate('2026-02-01', 'incident.late', 3, true, 'project');
+    await insertAggregate('2026-02-01', 'incident.late', 2, true, 'site');
+
+    const base = await db.query<{ dimension_level: string }>(
+      `SELECT dimension_level FROM ${BASE_TABLE} ORDER BY dimension_level`,
+    );
+    const published = await db.query<{ dimension_level: string }>(
+      `SELECT dimension_level FROM ${VIEW} ORDER BY dimension_level`,
+    );
+
+    expect(base.rows.map((row) => row.dimension_level)).toEqual(['organisation', 'project', 'site']);
+    expect(published.rows.map((row) => row.dimension_level)).toEqual(['organisation', 'project']);
+  });
 
   it('hides a superseded generation — the property the view exists for', async () => {
     await insertAggregate('2026-01-01', 'incident.late', 5, true);

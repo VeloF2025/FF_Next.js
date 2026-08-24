@@ -25,13 +25,17 @@ const leaksIn = (facts: readonly OperationsFact[]): string[] => {
 
 /**
  * The oracle solves the reader's whole system in exact integer arithmetic, which
- * is not cheap: the unit suite runs a slice and the full sweep is one variable
- * away. `SEEDS=400 npx vitest run …/releaseDisclosure.test.ts` runs it.
+ * is not cheap — roughly four tenths of a second per month. The unit suite runs
+ * a slice small enough to stay out of the way; the extended sweep is one
+ * variable away:
+ *
+ *     SEEDS=400 npx vitest run src/modules/fleet/incidents/analytics/__tests__/releaseDisclosure.test.ts
  *
  * The slice is not a sample of a fixed set — seeds are consecutive from 1, so
- * the unit run and the full run agree on the months they share.
+ * the unit run and the extended run agree on every month they share, and the
+ * extended run is what a change to the release rule should be checked against.
  */
-const SEEDS = Number(process.env['SEEDS'] ?? 150);
+const SEEDS = Number(process.env['SEEDS'] ?? 32);
 
 describe('nothing below the threshold is derivable', () => {
   it(`holds across ${SEEDS} randomised months, facts through the real calculator`, () => {
@@ -162,8 +166,10 @@ describe('the three channels round 3 reproduced', () => {
    * TWO-CELL COMBINATIONS. Four variables across two cells were pinned together
    * outside the previous guarantee's stated reach. The tier rule does not have a
    * reach: a component is published whole or not at all, and the organisation
-   * takes the minimum tier over its projects, so `organisation - sum(projects)`
-   * is zero rather than a residual.
+   * publishes only where every project is all-in or all-out and the projects
+   * publishing nothing, aggregated into one virtual cell, clear the threshold
+   * themselves — so `organisation - sum(publishing projects)` is that virtual
+   * cell rather than an unbounded residual.
    */
   it('leaves no two-cell combination to pin', () => {
     const facts: OperationsFact[] = [];
