@@ -24,7 +24,6 @@ import type {
 import type {
   DriverConcernCategory, DriverInputRequestResult, DriverInputSettings,
 } from '../driver/types';
-
 export type { ActiveUserOption };
 
 const LIFECYCLE_STATUSES: readonly IncidentLifecycleStatus[] = ['open', 'acknowledged', 'under_review', 'resolved', 'dismissed'];
@@ -137,6 +136,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   if (!response.ok || !isSuccessEnvelope<T>(body)) throw new IncidentApiError('Fleet incident response was invalid', response.status, 'INVALID_RESPONSE');
   return body.data;
 }
+
+/** Shared with `incidentTimelineApi.ts` so there is one envelope decoder, not two. */
+export { request as incidentRequest };
 
 export interface IncidentActionBody {
   actionType: 'acknowledged' | 'review_started' | 'commented' | 'resolved' | 'dismissed';
