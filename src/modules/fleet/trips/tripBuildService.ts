@@ -137,6 +137,13 @@ export async function buildTrips(requestedAt: string): Promise<TripBuildResult> 
     } catch (error) {
       vehiclesFailed += 1;
       // The watermark is untouched on failure, so the next run retries this exact window.
+      //
+      // This logs the raw message where the cron HANDLER deliberately logs only `error.name`, and
+      // the difference is intentional. The handler is the outer boundary: it can catch anything,
+      // including a pool-construction failure whose message embeds a connection string. Here the
+      // errors are Postgres query errors from this vehicle's own statements, whose text ("relation
+      // does not exist", "violates check constraint X") is the ONLY thing that makes a failing
+      // vehicle diagnosable. Dropping it to `error.name` yields "Error" and nothing else.
       log.error(
         '[fleet-trips] vehicle build failed; its watermark is unchanged and it will retry',
         {

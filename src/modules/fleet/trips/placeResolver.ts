@@ -142,7 +142,12 @@ async function loadUnresolved(limit: number): Promise<UnresolvedRow[]> {
  * paces those. A failure caches nothing and leaves the column null, so the trip is retried on a
  * later pass rather than being permanently stamped "unknown".
  */
-function toLocality(g: { city?: string; municipalDistrict?: string; province?: string } | null): string | null {
+/**
+ * Exported for its own tests. It is small, but it is the function that decides what a human
+ * actually reads as the place a trip started, and its failure modes (an empty string joined into
+ * ", , Gauteng", a null becoming the text "null") are silent and cosmetic-looking.
+ */
+export function toLocality(g: { city?: string; municipalDistrict?: string; province?: string } | null): string | null {
   if (!g) return null;
   const parts = [g.city, g.municipalDistrict, g.province].filter((v) => v && v.trim() !== '');
   return parts.length > 0 ? parts.join(', ') : null;
