@@ -20,7 +20,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../tripRepository', () => ({ ...mocks, LATE_ARRIVAL_LOOKBACK_MINUTES: 6 * 60 }));
 
-import { buildTrips, buildTripsForVehicle, resolveReadFrom } from '../tripBuildService';
+import {
+  buildTrips, buildTripsForVehicle, MAX_BATCHES_PER_VEHICLE, POSITION_BATCH_SIZE, resolveReadFrom,
+} from '../tripBuildService';
 import { DEFAULT_SEGMENT_OPTIONS, type SegmentOptions } from '../tripSegmenter';
 
 const NOW = '2026-08-01T18:00:00.000Z';
@@ -126,6 +128,49 @@ describe('buildTripsForVehicle', () => {
     expect(mocks.replaceWindow).toHaveBeenCalledWith(
       VEHICLE, '2026-08-01T06:00:00.000Z', expect.any(Array),
     );
+  });
+});
+
+describe('the stall guard', () => {
+  it('stops instead of spinning when one trip fills an entire batch', async () => {
+    // If a single journey is longer than one batch, the next window would start at that trip's
+    // own start -- exactly where this batch began. Without the guard the loop re-reads and
+    // re-replaces the same window until the batch budget is gone, doing no work and hiding it.
+    mocks.readWatermark.mockResolvedValue('2026-08-01T12:00:00.000Z');
+    mocks.loadLastTripStart.mockResolvedValue('2026-08-01T06:00:00.000Z');
+
+    // A full batch that is one unbroken trip beginning exactly at readFrom.
+    const oneLongTrip = Array.from({ length: POSITION_BATCH_SIZE }, (_, i) => ({
+      ...pos('06:00', true),
+      recordedAt: new Date(Date.parse('2026-08-01T06:00:00.000Z') + i * 1000).toISOString(),
+    }));
+    mocks.loadPositions.mockResolvedValue(oneLongTrip);
+
+    const result = await buildTripsForVehicle(VEHICLE, OPTS);
+
+    // One batch, then stop — not MAX_BATCHES_PER_VEHICLE of them.
+    expect(mocks.loadPositions).toHaveBeenCalledTimes(1);
+    expect(result.batches).toBeLessThan(MAX_BATCHES_PER_VEHICLE);
+    // And it must SAY there is more, not report a clean finish over a window it could not advance.
+    expect(result.moreRemaining).toBe(true);
+  });
+
+  it('reports backlog rather than silence when the batch ceiling is reached', async () => {
+    // Each batch advances, so the loop runs to the ceiling; the caller must learn there is more.
+    let n = 0;
+    mocks.loadPositions.mockImplementation(async () => {
+      const base = Date.parse('2026-08-01T00:00:00.000Z') + (n += 1) * 3_600_000;
+      return Array.from({ length: POSITION_BATCH_SIZE }, (_, i) => ({
+        ...pos('06:00', true),
+        ignition: i === POSITION_BATCH_SIZE - 1 ? false : true,
+        recordedAt: new Date(base + i * 1000).toISOString(),
+      }));
+    });
+
+    const result = await buildTripsForVehicle(VEHICLE, OPTS);
+
+    expect(result.batches).toBe(MAX_BATCHES_PER_VEHICLE);
+    expect(result.moreRemaining).toBe(true);
   });
 });
 
