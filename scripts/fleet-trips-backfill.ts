@@ -5,8 +5,16 @@
  * implementation. A separate backfill routine is how the historical rows end up subtly different
  * from the live ones, and the difference is invisible until someone reports on both together.
  *
- * Safe to re-run and safe to interrupt: every write is an upsert on (vehicle_id, ignition_on_at),
- * and each vehicle's watermark advances only as far as it actually got.
+ * Safe to re-run and safe to interrupt: each pass replaces the window it rebuilds, and a vehicle's
+ * watermark advances only as far as it actually got.
+ *
+ * `now` is wall clock here, and that is correct AS LONG AS windows are anchored at trip
+ * boundaries. It was not always: when batches could end mid-journey, a fresh `new Date()` applied
+ * to July data made `silentFor` astronomically over the timeout, so every batch edge landing
+ * inside a trip closed it as `timeout` and split the journey -- excluding its first half from
+ * every metric. With the window now anchored at the last trip's start, a trip is never evaluated
+ * against `now` until the run reaches the true end of that vehicle's data, which is exactly when
+ * wall clock IS the right question: is this vehicle still out, or did its tracker go quiet?
  *
  * Position history currently starts 2026-07-16, so this is roughly six weeks over 18 vehicles.
  *

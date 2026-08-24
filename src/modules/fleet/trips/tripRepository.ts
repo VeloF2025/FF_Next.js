@@ -1,10 +1,10 @@
 /**
  * Persistence for continuously-built trips.
  *
- * Every write is idempotent on `(vehicle_id, ignition_on_at)` - the trip's identity - so running
- * the builder twice over the same window updates rows in place rather than duplicating them. That
- * matters more than usual here: the open trip at the end of one run is the same trip the next run
- * closes, and a backfill re-runs windows that the incremental job has already covered.
+ * A window is REPLACED, not accumulated. `deleteTripsFrom` clears the window being rebuilt and the
+ * recomputed trips are then inserted, so the result depends only on the positions -- never on how
+ * many times the builder has run over them. The upsert on `(vehicle_id, ignition_on_at)` remains
+ * as a second line of defence within a single run.
  *
  * ## The late-arrival lookback
  *
@@ -12,21 +12,27 @@
  * heard about it). Trackers buffer while out of coverage and flush later, so a position with an
  * OLDER `recorded_at` can land after the watermark has already moved past it. A watermark applied
  * naively to `recorded_at` would step over those rows forever and silently lose the trips they
- * belong to.
+ * belong to. Watermarking on `received_at` instead would re-order the stream the segmenter depends
+ * on being chronological.
  *
- * So each run re-reads a lookback window before the watermark. The upsert makes re-processing
- * free, and the alternative - watermarking on `received_at` - would re-order the stream the
- * segmenter depends on being chronological.
+ * The lookback alone was not enough: a time-based floor can land in the MIDDLE of a journey, and
+ * the rebuild then produced a trip with a different `ignition_on_at` that INSERTed beside the
+ * original instead of replacing it. `tripBuildService` therefore pulls the read start back to the
+ * last recorded trip's own start, so a window always begins at a trip boundary.
  */
 import { query, queryOne } from '@/lib/db-pool';
 import type { SegmentedTrip, TripPosition } from './tripSegmenter';
 
 /**
- * How far before the watermark each run re-reads, to catch positions that arrived late.
+ * How far before the watermark a run reconsiders, to catch positions that arrived late.
  *
  * Sized against the observed sampling: cartrack averages 1.7 minutes between fixes, ituran 72.
  * Six hours covers a tracker that buffered through a long out-of-coverage stretch without making
  * every run rescan the day.
+ *
+ * NOTE this is only a FLOOR. `tripBuildService` pulls the read start back further, to the start of
+ * the last trip it already recorded, so a window never begins in the middle of a journey. A bare
+ * time-based lookback bisected trips and minted duplicate fragments -- see the segmenter header.
  */
 export const LATE_ARRIVAL_LOOKBACK_MINUTES = 6 * 60;
 
@@ -109,29 +115,29 @@ export async function writeWatermark(
  * caller loops until a run returns fewer rows than it asked for.
  */
 export async function loadPositions(
-  vehicleId: string, since: string | null, limit: number,
+  vehicleId: string, from: string | null, limit: number,
 ): Promise<TripPosition[]> {
   // Two explicit branches rather than a conditional SQL fragment: interpolated tagged-template
   // conditionals are broken in this repo and silently produce a malformed query.
-  const rows = since === null
+  const rows = from === null
     ? await query<PositionRow>(
         `/* fleet-trips:positions-all */
          SELECT recorded_at, ignition, lat, lon, speed_kph, odometer_km
          FROM fleet_vehicle_positions
          WHERE vehicle_id = $1
-         ORDER BY recorded_at
+         ORDER BY recorded_at, id
          LIMIT $2`,
         [vehicleId, limit],
       )
     : await query<PositionRow>(
-        `/* fleet-trips:positions-since */
+        `/* fleet-trips:positions-from */
          SELECT recorded_at, ignition, lat, lon, speed_kph, odometer_km
          FROM fleet_vehicle_positions
          WHERE vehicle_id = $1
-           AND recorded_at > ($2::timestamptz - ($3 || ' minutes')::interval)
-         ORDER BY recorded_at
-         LIMIT $4`,
-        [vehicleId, since, String(LATE_ARRIVAL_LOOKBACK_MINUTES), limit],
+           AND recorded_at >= $2::timestamptz
+         ORDER BY recorded_at, id
+         LIMIT $3`,
+        [vehicleId, from, limit],
       );
 
   return rows.map((r) => ({
@@ -144,53 +150,48 @@ export async function loadPositions(
   }));
 }
 
-interface OpenTripRow extends Record<string, unknown> {
-  ignition_on_at: string | Date;
-  on_lat: string | number | null;
-  on_lon: string | number | null;
-  duration_seconds: string | number | null;
-  moving_seconds: string | number | null;
-  idle_seconds: string | number | null;
-  distance_km: string | number | null;
-  max_speed_kph: string | number | null;
-  start_odometer_km: string | number | null;
-  end_odometer_km: string | number | null;
-  position_count: number;
-}
+
 
 /**
- * The one trip left open for this vehicle, so an incremental run continues the journey instead of
- * splitting it at the batch boundary. A partial unique index guarantees there is at most one.
+ * The `ignition_on_at` of the most recent trip recorded for this vehicle, whatever its state.
+ *
+ * The build anchors its read window at or before this, so a window never begins inside a journey
+ * already on record. Deliberately NOT restricted to open trips: a trip closed as `timeout` at a
+ * previous batch boundary must also be reconsidered, or it stays truncated forever.
  */
-export async function loadOpenTrip(vehicleId: string): Promise<SegmentedTrip | null> {
-  const row = await queryOne<OpenTripRow>(
-    `/* fleet-trips:open */
-     SELECT ignition_on_at, on_lat, on_lon, duration_seconds, moving_seconds, idle_seconds,
-            distance_km, max_speed_kph, start_odometer_km, end_odometer_km, position_count
-     FROM fleet_vehicle_trips
-     WHERE vehicle_id = $1 AND close_reason = 'open'
+export async function loadLastTripStart(vehicleId: string): Promise<string | null> {
+  const row = await queryOne<{ ignition_on_at: string | Date }>(
+    `/* fleet-trips:last-trip-start */
+     SELECT ignition_on_at FROM fleet_vehicle_trips
+     WHERE vehicle_id = $1
      ORDER BY ignition_on_at DESC
      LIMIT 1`,
     [vehicleId],
   );
-  if (!row) return null;
-  return {
-    ignitionOnAt: iso(row.ignition_on_at),
-    ignitionOffAt: null,
-    closeReason: 'open',
-    onLat: num(row.on_lat),
-    onLon: num(row.on_lon),
-    offLat: null,
-    offLon: null,
-    durationSeconds: Number(row.duration_seconds ?? 0),
-    movingSeconds: Number(row.moving_seconds ?? 0),
-    idleSeconds: Number(row.idle_seconds ?? 0),
-    distanceKm: Number(row.distance_km ?? 0),
-    maxSpeedKph: num(row.max_speed_kph),
-    startOdometerKm: num(row.start_odometer_km),
-    endOdometerKm: num(row.end_odometer_km),
-    positionCount: row.position_count,
-  };
+  return row ? iso(row.ignition_on_at) : null;
+}
+
+/**
+ * Removes every trip for this vehicle at or after `from`, so the window can be replaced wholesale.
+ *
+ * This is what reaps orphan fragments. Upserting alone could not: a rebuild whose window began at
+ * a different point produced a trip with a different `ignition_on_at` -- the conflict key -- so it
+ * INSERTed beside the old row instead of replacing it, and one journey accumulated into three
+ * metric-eligible trips across successive runs. Deleting the window first makes the recomputed set
+ * authoritative.
+ *
+ * Bounded by `from`, which the caller anchors at a trip boundary, so this never touches history
+ * outside the window being rebuilt.
+ */
+export async function deleteTripsFrom(vehicleId: string, from: string): Promise<number> {
+  const rows = await query<{ id: string }>(
+    `/* fleet-trips:delete-window */
+     DELETE FROM fleet_vehicle_trips
+     WHERE vehicle_id = $1 AND ignition_on_at >= $2::timestamptz
+     RETURNING id`,
+    [vehicleId, from],
+  );
+  return rows.length;
 }
 
 const UPSERT_SQL = `/* fleet-trips:upsert */

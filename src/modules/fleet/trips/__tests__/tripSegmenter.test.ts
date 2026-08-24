@@ -140,6 +140,44 @@ describe('segmentTrips', () => {
       expect(trips).toEqual([]);
     });
 
+    it('does NOT let a null ignition bridge a long silence into a counted trip', () => {
+      // THE ORDERING BUG. When the staleness check sat AFTER the null branch, a null-ignition
+      // position arriving on the far side of a 42-hour gap hit `continue` and never reached it —
+      // so this produced ONE ignition_off trip of 152,400 seconds, marked metric-eligible. That
+      // is exactly the phantom this whole module exists to prevent, and production has
+      // null-ignition rows adjacent to multi-hour gaps today.
+      const trips = segmentTrips([
+        p('06:00', true),
+        p('06:10', true),
+        { ...p('06:10', null), recordedAt: '2026-08-03T00:10:00.000Z' },  // +42h, null
+        { ...p('06:10', false), recordedAt: '2026-08-03T00:40:00.000Z' },
+      ], { ...OPTS, now: '2026-08-03T02:00:00.000Z' }).trips;
+
+      // The real 10-minute trip, closed as timeout where it was last seen.
+      expect(trips[0]?.closeReason).toBe('timeout');
+      expect(trips[0]?.durationSeconds).toBe(600);
+      expect(trips[0]?.ignitionOffAt).toBe('2026-08-01T06:10:00.000Z');
+
+      // Nothing spanning the silence may be counted.
+      const counted = trips.filter((t) => t.closeReason === 'ignition_off');
+      expect(counted.every((t) => t.durationSeconds < 3600)).toBe(true);
+      expect(trips.some((t) => t.durationSeconds > 100_000)).toBe(false);
+    });
+
+    it('checks staleness before deciding what a null ignition means', () => {
+      // The same shape with the gap ENDING on a null: the trip must already be closed by the
+      // timeout, so the null extends nothing.
+      const trips = segmentTrips([
+        p('06:00', true),
+        { ...p('06:00', null), recordedAt: '2026-08-02T06:00:00.000Z' },   // +24h, null
+      ], { ...OPTS, now: '2026-08-02T07:00:00.000Z' }).trips;
+
+      expect(trips).toHaveLength(1);
+      expect(trips[0]?.closeReason).toBe('timeout');
+      expect(trips[0]?.durationSeconds).toBe(0);
+      expect(trips[0]?.positionCount).toBe(1);
+    });
+
     it('never closes a trip on a null, but still lets it accrue time', () => {
       const trips = segmentTrips([
         p('06:00', true), p('06:30', null), p('07:00', false),
@@ -153,18 +191,51 @@ describe('segmentTrips', () => {
 
   describe('measurements', () => {
     it('splits time into moving and idling by speed', () => {
+      // Intervals kept inside the attribution ceiling — cartrack samples every ~1.7 min, so this
+      // is the normal case. Longer gaps are deliberately NOT attributed; see the test below.
       const trips = segmentTrips([
         p('06:00', true, { speedKph: 0 }),
-        p('06:10', true, { speedKph: 60 }),   // 10 min moving
-        p('06:20', true, { speedKph: 0 }),    // 10 min idling
-        p('06:30', false, { speedKph: 0 }),   // 10 min idling
+        p('06:03', true, { speedKph: 60 }),   // 3 min moving
+        p('06:06', true, { speedKph: 0 }),    // 3 min idling
+        p('06:09', false, { speedKph: 0 }),   // 3 min idling
       ], OPTS).trips;
 
-      expect(trips[0]?.movingSeconds).toBe(600);
-      expect(trips[0]?.idleSeconds).toBe(1200);
+      expect(trips[0]?.movingSeconds).toBe(180);
+      expect(trips[0]?.idleSeconds).toBe(360);
       // The schema refuses parts exceeding the whole; assert the same here.
       expect(trips[0]!.movingSeconds + trips[0]!.idleSeconds)
         .toBeLessThanOrEqual(trips[0]!.durationSeconds);
+    });
+
+    it('leaves a long gap UNATTRIBUTED rather than guessing which bucket it belongs to', () => {
+      // ituran's median gap is 34 minutes. Attributing the whole interval by the speed of the fix
+      // that CLOSES it would book half an hour of driving as idling merely because the vehicle
+      // happened to be at rest when the next fix landed. The uncertainty belongs in
+      // duration - (moving + idle), not in a confident split.
+      const trips = segmentTrips([
+        p('06:00', true, { speedKph: 80 }),
+        p('06:34', true, { speedKph: 0 }),    // 34 min gap, ends at rest
+        p('06:35', false, { speedKph: 0 }),   // 1 min, attributable
+      ], OPTS).trips;
+
+      expect(trips[0]?.durationSeconds).toBe(2100);
+      expect(trips[0]?.idleSeconds).toBe(60);      // only the short interval
+      expect(trips[0]?.movingSeconds).toBe(0);
+      // 2040 seconds are counted in the trip but attributed to neither bucket.
+      const unattributed = trips[0]!.durationSeconds - trips[0]!.movingSeconds - trips[0]!.idleSeconds;
+      expect(unattributed).toBe(2040);
+    });
+
+    it('treats an unreported speed as unknown, not as stationary', () => {
+      // `speedKph ?? 0` conflated "the tracker did not say" with "the vehicle was still".
+      const trips = segmentTrips([
+        p('06:00', true, { speedKph: 60 }),
+        p('06:02', true, { speedKph: null }),
+        p('06:03', false, { speedKph: 0 }),
+      ], OPTS).trips;
+
+      expect(trips[0]?.idleSeconds).toBe(60);   // the last minute only
+      expect(trips[0]?.movingSeconds).toBe(0);
     });
 
     it('accrues distance between fixes', () => {
@@ -211,45 +282,44 @@ describe('segmentTrips', () => {
     it('advances time through a position that lost its GPS fix', () => {
       const trips = segmentTrips([
         p('06:00', true, { speedKph: 60 }),
-        p('06:10', true, { lat: null, lon: null, speedKph: 60 }),
-        p('06:20', false, { speedKph: 0 }),
+        p('06:03', true, { lat: null, lon: null, speedKph: 60 }),
+        p('06:06', false, { speedKph: 0 }),
       ], OPTS).trips;
 
-      // Losing a fix is not the same as standing still.
-      expect(trips[0]?.durationSeconds).toBe(1200);
-      expect(trips[0]?.movingSeconds).toBe(600);
+      // Losing a fix is not the same as standing still: the clock keeps running.
+      expect(trips[0]?.durationSeconds).toBe(360);
+      expect(trips[0]?.movingSeconds).toBe(180);
     });
   });
 
-  describe('incremental building', () => {
-    it('continues a carried-over open trip instead of splitting the journey', () => {
-      const first = segmentTrips([
-        { ...p('06:00', true), recordedAt: '2026-08-01T17:40:00.000Z' },
-      ], OPTS);
-      expect(first.trips[0]?.closeReason).toBe('open');
-
-      const second = segmentTrips(
-        [{ ...p('06:00', false), recordedAt: '2026-08-01T17:55:00.000Z' }],
-        OPTS,
-        first.trips[0],
-      );
-
-      expect(second.trips).toHaveLength(1);
-      // One journey with its original start, not a new trip beginning at 17:55.
-      expect(second.trips[0]?.ignitionOnAt).toBe('2026-08-01T17:40:00.000Z');
-      expect(second.trips[0]?.closeReason).toBe('ignition_off');
+  describe('no carried state', () => {
+    it('takes no carry: a window is recomputed from its own positions', () => {
+      // The previous design threaded the last open trip back in and reconstructed it lossily —
+      // re-anchoring its last-seen position to its START, which collapsed duration to zero while
+      // moving time survived, violating the table's CHECK and stalling that vehicle for good.
+      // segmentTrips now has arity 2; there is nothing to reconstruct.
+      expect(segmentTrips.length).toBe(2);
     });
 
-    it('does not carry over a trip that was already closed', () => {
-      const closed = segmentTrips([p('06:00', true), p('07:00', false)], OPTS).trips[0];
-      const next = segmentTrips([p('12:00', true), p('13:00', false)], OPTS, closed);
+    it('computes a whole journey when given the whole journey', () => {
+      const trips = segmentTrips([
+        p('06:00', true, { speedKph: 60 }),
+        p('06:02', true, { speedKph: 60 }),
+        p('06:04', true, { speedKph: 60 }),
+        p('06:06', false, { speedKph: 0 }),
+      ], OPTS).trips;
 
-      expect(next.trips).toHaveLength(1);
-      expect(next.trips[0]?.ignitionOnAt).toBe('2026-08-01T12:00:00.000Z');
+      expect(trips).toHaveLength(1);
+      expect(trips[0]?.ignitionOnAt).toBe('2026-08-01T06:00:00.000Z');
+      expect(trips[0]?.ignitionOffAt).toBe('2026-08-01T06:06:00.000Z');
+      expect(trips[0]?.durationSeconds).toBe(360);
+      // The invariant the old carry broke.
+      expect(trips[0]!.movingSeconds + trips[0]!.idleSeconds)
+        .toBeLessThanOrEqual(trips[0]!.durationSeconds);
     });
 
     it('is deterministic — the same input twice gives byte-identical output', () => {
-      const input = [p('06:00', true), p('06:30', true, { speedKph: 40 }), p('07:00', false)];
+      const input = [p('06:00', true), p('06:03', true, { speedKph: 40 }), p('06:06', false)];
       expect(JSON.stringify(segmentTrips(input, OPTS)))
         .toBe(JSON.stringify(segmentTrips(input, OPTS)));
     });

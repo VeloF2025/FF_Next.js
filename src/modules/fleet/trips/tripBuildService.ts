@@ -12,12 +12,10 @@
  */
 import { log } from '@/lib/logger';
 import {
-  listVehiclesWithPositions, loadOpenTrip, loadPositions, readWatermark, upsertTrips,
-  writeWatermark, type TrackedVehicle,
+  deleteTripsFrom, LATE_ARRIVAL_LOOKBACK_MINUTES, listVehiclesWithPositions, loadLastTripStart,
+  loadPositions, readWatermark, upsertTrips, writeWatermark, type TrackedVehicle,
 } from './tripRepository';
-import {
-  DEFAULT_SEGMENT_OPTIONS, segmentTrips, type SegmentedTrip, type SegmentOptions,
-} from './tripSegmenter';
+import { DEFAULT_SEGMENT_OPTIONS, segmentTrips, type SegmentOptions } from './tripSegmenter';
 
 const MODULE = 'FleetTripBuild';
 
@@ -59,47 +57,86 @@ export interface VehicleBuildResult {
 }
 
 /**
- * Builds trips for one vehicle from its watermark forward.
+ * The instant a rebuild should start reading from, or null to read from the beginning.
  *
- * The open trip is carried in memory across batches AND persisted each time, so a run that dies
- * midway leaves a consistent record rather than a journey with no beginning.
+ * Two floors, and the EARLIER wins:
+ *
+ *  - the late-arrival lookback before the watermark, which catches positions that were buffered
+ *    out of coverage and flushed after the watermark had already passed them;
+ *  - the start of the last trip already recorded, so the window never begins inside a journey.
+ *
+ * The second is the one that was missing. A bare time floor can land mid-trip, and the rebuild
+ * then produces a trip with a different `ignition_on_at` -- the conflict key -- which INSERTs
+ * beside the original rather than replacing it. One journey became three metric-eligible rows
+ * across successive runs, each internally consistent and each wrong.
+ *
+ * Deliberately anchored on the last trip whatever its state, not just an open one: a trip closed
+ * as `timeout` at a previous batch boundary must be reconsidered too, or it stays truncated.
+ */
+export function resolveReadFrom(watermark: string | null, lastTripStart: string | null): string | null {
+  if (watermark === null) return null;
+  const lookbackFloor = new Date(
+    Date.parse(watermark) - LATE_ARRIVAL_LOOKBACK_MINUTES * 60_000,
+  ).toISOString();
+  if (lastTripStart === null) return lookbackFloor;
+  return lastTripStart < lookbackFloor ? lastTripStart : lookbackFloor;
+}
+
+/**
+ * Rebuilds trips for one vehicle from a trip-boundary-anchored window.
+ *
+ * Each batch REPLACES its window rather than adding to it: the window is cleared and the
+ * recomputed trips inserted, so the outcome depends only on the positions. No accumulated state
+ * crosses a batch, which is what makes re-processing idempotent instead of additive.
  */
 export async function buildTripsForVehicle(
   vehicle: TrackedVehicle, options: SegmentOptions,
 ): Promise<VehicleBuildResult> {
-  let carried: SegmentedTrip | null = await loadOpenTrip(vehicle.vehicleId);
-  let watermark = await readWatermark(vehicle.vehicleId);
+  const watermark = await readWatermark(vehicle.vehicleId);
+  const lastTripStart = await loadLastTripStart(vehicle.vehicleId);
+  let readFrom = resolveReadFrom(watermark, lastTripStart);
+
   let tripsWritten = 0;
   let positionsProcessed = 0;
   let batches = 0;
   let moreRemaining = false;
 
   for (batches = 0; batches < MAX_BATCHES_PER_VEHICLE; batches += 1) {
-    const positions = await loadPositions(vehicle.vehicleId, watermark, POSITION_BATCH_SIZE);
+    const positions = await loadPositions(vehicle.vehicleId, readFrom, POSITION_BATCH_SIZE);
     if (positions.length === 0) break;
 
-    const { trips, lastPositionAt } = segmentTrips(positions, options, carried);
-    if (trips.length > 0) {
-      tripsWritten += await upsertTrips(vehicle, trips);
-      const last = trips[trips.length - 1];
-      carried = last && last.closeReason === 'open' ? last : null;
-    }
+    const { trips, lastPositionAt } = segmentTrips(positions, options);
+
+    // Clear before insert, in that order. Upserting alone cannot reap a row the rebuild no longer
+    // produces -- a trip whose start moved, or one that a longer view now shows was a fragment.
+    const windowStart = readFrom ?? positions[0]!.recordedAt;
+    await deleteTripsFrom(vehicle.vehicleId, windowStart);
+    if (trips.length > 0) tripsWritten += await upsertTrips(vehicle, trips);
 
     positionsProcessed += positions.length;
     if (lastPositionAt) {
       await writeWatermark(vehicle.vehicleId, lastPositionAt, positions.length);
-      // Never let the in-run watermark move BACKWARDS. `loadPositions` reads from
-      // `watermark - lookback`, so if a batch does not span the full lookback window the next
-      // batch would re-read most of the same rows and the loop could burn its batch budget
-      // without converging. The DB write already guards this with GREATEST; this is the same
-      // guarantee for the in-memory copy. Cannot trigger at current density (max 1,688 positions
-      // in any 6h window per vehicle, against a 5,000 batch size) -- but density is not a
-      // property this loop should depend on.
-      if (watermark === null || lastPositionAt > watermark) watermark = lastPositionAt;
     }
 
-    // A short batch means we have caught up; anything else means more is waiting.
     if (positions.length < POSITION_BATCH_SIZE) break;
+
+    // The next batch starts at the last trip this batch produced, so a journey straddling the
+    // batch edge is recomputed whole rather than continued from summarised state. Falling back to
+    // the last position only when the batch produced no trip at all.
+    const lastTrip = trips[trips.length - 1];
+    const nextFrom = lastTrip ? lastTrip.ignitionOnAt : lastPositionAt;
+    if (nextFrom === null || (readFrom !== null && nextFrom <= readFrom)) {
+      // No forward progress is possible -- a single trip larger than one batch. Stop rather than
+      // spin re-reading the same window until the batch budget is gone.
+      log.warn(
+        '[fleet-trips] a single trip exceeds one batch; stopping this vehicle for the tick',
+        { vehicleId: vehicle.vehicleId, readFrom, positions: positions.length },
+        MODULE,
+      );
+      moreRemaining = true;
+      break;
+    }
+    readFrom = nextFrom;
     if (batches === MAX_BATCHES_PER_VEHICLE - 1) moreRemaining = true;
   }
 

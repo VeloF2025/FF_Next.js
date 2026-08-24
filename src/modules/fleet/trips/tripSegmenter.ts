@@ -16,6 +16,20 @@
  * stamped `timeout`. The schema then excludes it from metrics via a generated column. A
  * confidently wrong number is worse than a visibly missing one.
  *
+ * ## A window is RECOMPUTED, never accumulated
+ *
+ * `segmentTrips` takes no carried-over state. An earlier version threaded the previous run's open
+ * trip back in, and it was wrong in three compounding ways: the reconstruction re-anchored the
+ * trip's last-seen position to its START (so duration collapsed to zero while moving time did
+ * not, violating the table's own CHECK and stalling that vehicle permanently); the caller's
+ * lookback re-fed positions already folded into those totals, inflating distance by 67%; and a
+ * lookback floor landing inside a closed trip minted a second trip under a different
+ * `ignition_on_at`, so one journey became three.
+ *
+ * All three dissolve if a trip is only ever computed from the complete, contiguous run of its own
+ * positions. So the caller anchors every read at a trip boundary and replaces the whole window.
+ * Re-processing is then idempotent by construction rather than by careful bookkeeping.
+ *
  * ## Null ignition is not a transition
  *
  * ituran leaves `ignition` null on ~6% of rows. A null is missing information, not "off" - so it
@@ -60,6 +74,17 @@ export interface SegmentOptions {
   stalenessTimeoutSeconds: number;
   /** At or below this speed a position counts as idling rather than moving. */
   idleSpeedThresholdKph: number;
+  /**
+   * An interval longer than this is counted in the trip's duration but attributed to NEITHER
+   * moving nor idle.
+   *
+   * The interval between two fixes is attributed by the speed of the fix that CLOSES it, which is
+   * only honest when the fixes are close together. ituran's median gap is 34 minutes: half an hour
+   * of driving that happens to end at a red light would otherwise be booked as 34 minutes of
+   * idling. Leaving a long gap unattributed makes the uncertainty visible in
+   * `duration - (moving + idle)` instead of inventing a confident split.
+   */
+  maxAttributableIntervalSeconds: number;
   /** The instant the run is evaluated as of. Passed in so re-runs are deterministic. */
   now: string;
 }
@@ -69,6 +94,9 @@ export const DEFAULT_SEGMENT_OPTIONS: Omit<SegmentOptions, 'now'> = {
   // same-day silence. Configurable in settings so it can be tuned without a deploy.
   stalenessTimeoutSeconds: 120 * 60,
   idleSpeedThresholdKph: 2,
+  // 5 minutes: comfortably above cartrack's 1.7-minute average so normal sampling is fully
+  // attributed, well below ituran's 34-minute median so its gaps are not guessed at.
+  maxAttributableIntervalSeconds: 5 * 60,
 };
 
 interface OpenTrip {
@@ -118,9 +146,13 @@ function beginTrip(p: TripPosition): OpenTrip {
  */
 function extendTrip(trip: OpenTrip, p: TripPosition, options: SegmentOptions): void {
   const elapsed = seconds(trip.lastAt, p.recordedAt);
-  const speed = p.speedKph ?? 0;
-  if (speed > options.idleSpeedThresholdKph) trip.movingSeconds += elapsed;
-  else trip.idleSeconds += elapsed;
+  // A gap too long to attribute honestly, or a position that never reported a speed, counts
+  // toward the trip's duration but toward neither bucket. `speedKph ?? 0` would have conflated
+  // "not reported" with "stationary" and silently booked unknown time as idling.
+  if (elapsed <= options.maxAttributableIntervalSeconds && p.speedKph !== null) {
+    if (p.speedKph > options.idleSpeedThresholdKph) trip.movingSeconds += elapsed;
+    else trip.idleSeconds += elapsed;
+  }
 
   if (trip.lastLat !== null && trip.lastLon !== null && p.lat !== null && p.lon !== null) {
     // NOTE the property names: Coordinate is { lat, lon }. Passing { latitude, longitude } here
@@ -195,47 +227,39 @@ export interface SegmentResult {
 /**
  * Segments `positions` (one vehicle, ascending by `recordedAt`) into trips.
  *
- * `carriedOpen` is the trip left open by the previous run, so an incremental build continues a
- * journey rather than splitting it at the batch boundary.
+ * Takes NO carried state: every trip is computed from the complete, contiguous run of its own
+ * positions. The caller is responsible for anchoring the window at a trip boundary and replacing
+ * that window wholesale -- see `tripBuildService`. That contract is what makes re-processing
+ * idempotent by construction; see the module header for the three defects the previous
+ * carry-based version produced.
  */
 export function segmentTrips(
   positions: readonly TripPosition[],
   options: SegmentOptions,
-  carriedOpen?: SegmentedTrip | null,
 ): SegmentResult {
   const trips: SegmentedTrip[] = [];
   let open: OpenTrip | null = null;
 
-  if (carriedOpen && carriedOpen.closeReason === 'open') {
-    open = {
-      onAt: carriedOpen.ignitionOnAt,
-      onLat: carriedOpen.onLat,
-      onLon: carriedOpen.onLon,
-      startOdometer: carriedOpen.startOdometerKm,
-      lastAt: carriedOpen.ignitionOnAt,
-      lastLat: carriedOpen.onLat,
-      lastLon: carriedOpen.onLon,
-      lastOdometer: carriedOpen.endOdometerKm,
-      movingSeconds: carriedOpen.movingSeconds,
-      idleSeconds: carriedOpen.idleSeconds,
-      distanceKm: carriedOpen.distanceKm,
-      maxSpeed: carriedOpen.maxSpeedKph,
-      positionCount: carriedOpen.positionCount,
-    };
-  }
 
   for (const p of positions) {
+    // STALENESS IS CHECKED FIRST, before the null-ignition branch below.
+    //
+    // The order is the whole point. When this test sat after the null branch, a null-ignition
+    // position arriving on the far side of a long silence hit `continue` and never reached it --
+    // so `true / [42h gap] / null / false` produced ONE ignition_off trip of 152,400 seconds,
+    // marked metric-eligible. That is precisely the phantom this module, the migration header and
+    // the test file all exist to prevent, and it was reachable in production: there are
+    // null-ignition rows adjacent to multi-hour gaps today.
+    if (open && seconds(open.lastAt, p.recordedAt) > options.stalenessTimeoutSeconds) {
+      trips.push(closeTrip(open, 'timeout'));
+      open = null;
+    }
+
     // A null ignition carries no transition. It still extends an open trip - the vehicle did not
     // stop existing - but it can neither start nor end one.
     if (p.ignition === null) {
       if (open) extendTrip(open, p, options);
       continue;
-    }
-
-    // Silence longer than the timeout ends the trip where it was last seen, not here.
-    if (open && seconds(open.lastAt, p.recordedAt) > options.stalenessTimeoutSeconds) {
-      trips.push(closeTrip(open, 'timeout'));
-      open = null;
     }
 
     if (p.ignition) {

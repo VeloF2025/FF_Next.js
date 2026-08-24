@@ -3,23 +3,25 @@
  *
  * What is tested here is not segmentation — that has its own suite — but the properties whose
  * failure is silent: a vehicle that fails must not cost the others or advance its watermark, the
- * batch loop must terminate, and an open trip must survive a batch boundary rather than the
- * journey being split in two.
+ * batch loop must terminate, and a window must be REPLACED rather than added to. The last of
+ * those is the one that was wrong: upserting alone cannot reap a row the rebuild no longer
+ * produces, so one journey accumulated into three metric-eligible trips across successive runs.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   listVehiclesWithPositions: vi.fn(),
-  loadOpenTrip: vi.fn(),
+  loadLastTripStart: vi.fn(),
   loadPositions: vi.fn(),
   readWatermark: vi.fn(),
   writeWatermark: vi.fn(),
   upsertTrips: vi.fn(),
+  deleteTripsFrom: vi.fn(),
 }));
 
-vi.mock('../tripRepository', () => mocks);
+vi.mock('../tripRepository', () => ({ ...mocks, LATE_ARRIVAL_LOOKBACK_MINUTES: 6 * 60 }));
 
-import { buildTrips, buildTripsForVehicle, POSITION_BATCH_SIZE } from '../tripBuildService';
+import { buildTrips, buildTripsForVehicle, resolveReadFrom } from '../tripBuildService';
 import { DEFAULT_SEGMENT_OPTIONS, type SegmentOptions } from '../tripSegmenter';
 
 const NOW = '2026-08-01T18:00:00.000Z';
@@ -37,10 +39,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.FLEET_TRIP_TIMEOUT_MINUTES;
   mocks.listVehiclesWithPositions.mockResolvedValue([VEHICLE]);
-  mocks.loadOpenTrip.mockResolvedValue(null);
+  mocks.loadLastTripStart.mockResolvedValue(null);
   mocks.readWatermark.mockResolvedValue(null);
   mocks.writeWatermark.mockResolvedValue(undefined);
   mocks.upsertTrips.mockImplementation(async (_v, trips) => trips.length);
+  mocks.deleteTripsFrom.mockResolvedValue(0);
   mocks.loadPositions.mockResolvedValue([]);
 });
 
@@ -72,42 +75,24 @@ describe('buildTripsForVehicle', () => {
     expect(mocks.upsertTrips).not.toHaveBeenCalled();
   });
 
-  it('carries an open trip across a batch boundary instead of splitting the journey', async () => {
-    // A full batch that leaves the vehicle running, then the batch that closes it.
-    const full = Array.from({ length: POSITION_BATCH_SIZE }, (_, i) => ({
-      ...pos('17:00', true),
-      recordedAt: new Date(Date.parse('2026-08-01T17:00:00.000Z') + i * 1000).toISOString(),
-    }));
-    mocks.loadPositions
-      .mockResolvedValueOnce(full)
-      .mockResolvedValueOnce([{ ...pos('17:00', false), recordedAt: '2026-08-01T17:55:00.000Z' }]);
-
+  it('does not clear a window when there is nothing to rebuild', async () => {
     await buildTripsForVehicle(VEHICLE, OPTS);
-
-    // Second batch's segmentation received the open trip from the first.
-    const secondWrite = mocks.upsertTrips.mock.calls[1]?.[1];
-    expect(secondWrite).toHaveLength(1);
-    expect(secondWrite[0].closeReason).toBe('ignition_off');
-    // The journey kept its original start rather than beginning at 17:55.
-    expect(secondWrite[0].ignitionOnAt).toBe('2026-08-01T17:00:00.000Z');
+    expect(mocks.deleteTripsFrom).not.toHaveBeenCalled();
   });
 
-  it('resumes from a previously persisted open trip', async () => {
-    mocks.loadOpenTrip.mockResolvedValue({
-      ignitionOnAt: '2026-08-01T17:40:00.000Z', ignitionOffAt: null, closeReason: 'open',
-      onLat: -26.2, onLon: 28.0, offLat: null, offLon: null,
-      durationSeconds: 0, movingSeconds: 0, idleSeconds: 0, distanceKm: 0,
-      maxSpeedKph: null, startOdometerKm: null, endOdometerKm: null, positionCount: 1,
-    });
-    mocks.loadPositions.mockResolvedValueOnce([
-      { ...pos('17:00', false), recordedAt: '2026-08-01T17:50:00.000Z' },
-    ]);
+  it('clears the window before writing the recomputed trips', async () => {
+    mocks.readWatermark.mockResolvedValue('2026-08-01T12:00:00.000Z');
+    mocks.loadLastTripStart.mockResolvedValue('2026-08-01T06:00:00.000Z');
+    mocks.loadPositions.mockResolvedValueOnce([pos('06:00', true), pos('07:00', false)]);
 
     await buildTripsForVehicle(VEHICLE, OPTS);
 
-    const written = mocks.upsertTrips.mock.calls[0]?.[1];
-    expect(written[0].ignitionOnAt).toBe('2026-08-01T17:40:00.000Z');
-    expect(written[0].closeReason).toBe('ignition_off');
+    // The last trip's start is earlier than the lookback floor, so it wins — the window begins at
+    // a trip boundary, never inside a journey.
+    expect(mocks.deleteTripsFrom).toHaveBeenCalledWith('v1', '2026-08-01T06:00:00.000Z');
+    const deleteOrder = mocks.deleteTripsFrom.mock.invocationCallOrder[0]!;
+    const upsertOrder = mocks.upsertTrips.mock.invocationCallOrder[0]!;
+    expect(deleteOrder).toBeLessThan(upsertOrder);
   });
 });
 
@@ -116,7 +101,7 @@ describe('buildTrips', () => {
     mocks.listVehiclesWithPositions.mockResolvedValue([
       VEHICLE, { vehicleId: 'v2', trackerId: null, provider: 'ituran' },
     ]);
-    mocks.loadOpenTrip
+    mocks.readWatermark
       .mockRejectedValueOnce(new Error('tracker table locked'))
       .mockResolvedValue(null);
     mocks.loadPositions.mockResolvedValue([pos('06:00', true), pos('07:00', false)]);
@@ -166,5 +151,43 @@ describe('buildTrips', () => {
     const result = await buildTrips(NOW);
     expect(result.status).toBe('succeeded');
     expect(result.vehiclesRequested).toBe(0);
+  });
+});
+
+describe('resolveReadFrom', () => {
+  it('reads from the beginning when there is no watermark', () => {
+    expect(resolveReadFrom(null, null)).toBeNull();
+    expect(resolveReadFrom(null, '2026-08-01T06:00:00.000Z')).toBeNull();
+  });
+
+  it('uses the lookback floor when no trip has been recorded', () => {
+    expect(resolveReadFrom('2026-08-01T12:00:00.000Z', null))
+      .toBe('2026-08-01T06:00:00.000Z');   // 12:00 minus 6h
+  });
+
+  it('pulls back to the last trip start when it precedes the lookback floor', () => {
+    // THE FIX. A bare 6h floor would begin at 06:00 — inside a journey that started at 05:00 —
+    // and the rebuild would mint a second trip under a different ignition_on_at.
+    expect(resolveReadFrom('2026-08-01T12:00:00.000Z', '2026-08-01T05:00:00.000Z'))
+      .toBe('2026-08-01T05:00:00.000Z');
+  });
+
+  it('keeps the lookback floor when the last trip starts after it', () => {
+    // No need to reconsider further back than the floor; the trip is wholly inside the window.
+    expect(resolveReadFrom('2026-08-01T12:00:00.000Z', '2026-08-01T09:00:00.000Z'))
+      .toBe('2026-08-01T06:00:00.000Z');
+  });
+
+  it('never begins a window after the last recorded trip started', () => {
+    // The property that matters, stated directly: whatever the inputs, the window cannot open
+    // inside a journey already on record.
+    for (const [wm, last] of [
+      ['2026-08-01T12:00:00.000Z', '2026-08-01T05:00:00.000Z'],
+      ['2026-08-01T12:00:00.000Z', '2026-08-01T11:59:00.000Z'],
+      ['2026-08-01T06:30:00.000Z', '2026-08-01T00:10:00.000Z'],
+    ] as const) {
+      const from = resolveReadFrom(wm, last)!;
+      expect(from <= last).toBe(true);
+    }
   });
 });
