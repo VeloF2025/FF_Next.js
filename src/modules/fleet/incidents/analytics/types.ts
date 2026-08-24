@@ -179,9 +179,13 @@ export interface OperationsMetricValue {
   metricKey: OperationsMetricKey;
   numerator: number;
   denominator: number | null;
+  /**
+   * Live months only. A published aggregate carries no histogram columns at
+   * all — they were removed from the view because a bucket count is a
+   * differencing channel — so a purged month reports null here rather than a
+   * shape that would read as "no durations were recorded".
+   */
   histogram: DurationHistogram | null;
-  /** True when this value came from a generalized (suppressed) group. */
-  generalized: boolean;
 }
 
 export interface OperationsAnalyticsResponse {

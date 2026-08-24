@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_RANGE_MONTHS, OperationsFilterError, hasRetainedOnlyFilter, parseOperationsFilters,
-  retainedOnlyFilterNames,
+  hasIncidentShapedFilter, retainedOnlyFilterNames,
 } from '../operationsFilters';
 
 const PROJECT = '11111111-1111-4111-8111-111111111111';
@@ -131,10 +131,21 @@ describe('retained-only filters', () => {
     }
   });
 
-  it('does not count the two dimensions an aggregate actually has', () => {
-    expect(hasRetainedOnlyFilter(parseOperationsFilters({
-      ...range, op_project: PROJECT, op_site: SITE,
-    }))).toBe(false);
+  it('counts op_site, which the published view has no row for', () => {
+    // Organisation and project rows only. A site answered from its project's
+    // row would cover every other site in that project.
+    expect(hasRetainedOnlyFilter(parseOperationsFilters({ ...range, op_site: SITE }))).toBe(true);
+  });
+
+  it('does not count op_project, which the view does publish', () => {
+    expect(hasRetainedOnlyFilter(parseOperationsFilters({ ...range, op_project: PROJECT }))).toBe(false);
+  });
+
+  it('leaves op_site out of the incident-shaped set, which decides fact kinds', () => {
+    // Every fact carries a site, so a site filter narrows presence and monitor
+    // runs rather than making them inapplicable.
+    expect(hasIncidentShapedFilter(parseOperationsFilters({ ...range, op_site: SITE }))).toBe(false);
+    expect(hasIncidentShapedFilter(parseOperationsFilters({ ...range, op_type: 'late' }))).toBe(true);
   });
 
   it('names the filters that were actually given, in a stable order', () => {

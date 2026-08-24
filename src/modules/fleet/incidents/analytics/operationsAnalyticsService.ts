@@ -18,9 +18,11 @@
  * access is already confined to the projects the viewer manages, and every
  * incident behind the number is one they can open in their own queue.
  *
- * The historic half keeps every suppression the aggregates were released
- * under, and says so through `generalized` and `suppressionNotices` rather
- * than quietly presenting a partial figure as a total.
+ * The historic half is whatever migration 527's view published for that month,
+ * and it says what is MISSING rather than filling the gap. A component released
+ * at the TOTAL_ONLY tier carries its root total and none of its members; those
+ * members are omitted from the response and a notice says so, because rendering
+ * them as zero would turn "withheld" into "none happened".
  *
  * ## Why the same calculator
  *
@@ -30,6 +32,7 @@
  */
 import type { IncidentFact, OperationsFact } from './facts';
 import { calculateMonthlyMetrics } from './metricCalculator';
+import { METRIC_COMPONENTS } from './metricRelations';
 import type { PublishedAggregate } from './operationsAggregateQueries';
 import { readPublishedAggregates } from './operationsAggregateQueries';
 import { loadRetainedFacts, omittedMetricKeys } from './operationsFactSelection';
@@ -74,13 +77,59 @@ function valuesFromFacts(
     upsertValue(values, {
       metricKey: group.metricKey, numerator: group.numerator, denominator: group.denominator,
       histogram: group.histogram ? { ...group.histogram, buckets: [...group.histogram.buckets] } : null,
-      // A live month is not generalized: it is the detail itself, not a stand-in
-      // for a group too small to publish.
-      generalized: false,
     });
     byMonth.set(group.monthStart, values);
   }
   return byMonth;
+}
+
+/**
+ * One published row as a metric value.
+ *
+ * A published row carries no histogram: the view has no bucket columns, and a
+ * bucket count over a purged month is a differencing channel, which is why they
+ * were removed. Null is the honest answer — "we no longer hold the durations" —
+ * where an empty bucket array would read as "no durations were recorded".
+ */
+function publishedValue(row: PublishedAggregate): OperationsMetricValue {
+  return {
+    metricKey: row.metricKey,
+    numerator: row.numerator,
+    denominator: row.denominator,
+    histogram: null,
+  };
+}
+
+/**
+ * Whether any component came back as a total with its breakdown withheld.
+ *
+ * That is the TOTAL_ONLY tier as it appears from this side: the component's
+ * root key is present and at least one of its other keys is not. The members
+ * are simply absent from the response — never rendered as zero, which would
+ * claim the opposite of what happened — so without this notice a reader would
+ * see a total with nothing under it and no reason given.
+ *
+ * A component with NO rows at all is not this case: nothing was published for
+ * it, which the "no published figures" notice covers when it holds for the
+ * whole selection.
+ */
+function withheldBreakdownNotice(published: readonly PublishedAggregate[]): string | null {
+  const byMonth = new Map<string, Set<string>>();
+  for (const row of published) {
+    const keys = byMonth.get(row.monthStart) ?? new Set<string>();
+    keys.add(row.metricKey);
+    byMonth.set(row.monthStart, keys);
+  }
+  for (const keys of byMonth.values()) {
+    for (const component of METRIC_COMPONENTS) {
+      if (component.rootKey === null || !keys.has(component.rootKey)) continue;
+      if (component.keys.some((key) => !keys.has(key))) {
+        return 'Some months before the retention boundary report a total without the figures behind it: '
+          + 'the narrower groups described too few people to publish, so they are omitted rather than shown as zero.';
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -131,7 +180,7 @@ export async function getOperationsAnalytics(
   const historicByMonth = new Map<string, OperationsMetricValue[]>();
   for (const row of published) {
     const values = historicByMonth.get(row.monthStart) ?? [];
-    upsertValue(values, { ...row });
+    upsertValue(values, publishedValue(row));
     historicByMonth.set(row.monthStart, values);
   }
 
@@ -143,11 +192,8 @@ export async function getOperationsAnalytics(
   }));
 
   const suppressionNotices: string[] = [];
-  if (published.some((row) => row.generalized)) {
-    suppressionNotices.push(
-      'Some months before the retention boundary report a wider group than you asked for, because the narrower one described too few people to publish.',
-    );
-  }
+  const withheldBreakdown = withheldBreakdownNotice(published);
+  if (withheldBreakdown !== null) suppressionNotices.push(withheldBreakdown);
   if (range.historicMonths.length > 0 && published.length === 0) {
     suppressionNotices.push(
       'No published figures exist for the months before the retention boundary in this selection.',
@@ -205,7 +251,7 @@ export async function getOperationsDrillDown(
     const published = aggregateRequest === null
       ? []
       : await readPublishedAggregates(aggregateRequest, range.scope);
-    const values = foldToCards([{ values: published.map((row) => ({ ...row })) }]);
+    const values = foldToCards([{ values: published.map(publishedValue) }]);
     return { mode: 'aggregate_only', values, incidentIds: [], nextCursor: null };
   }
 

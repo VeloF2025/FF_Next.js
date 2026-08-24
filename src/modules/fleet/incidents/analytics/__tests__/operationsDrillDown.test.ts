@@ -56,7 +56,7 @@ describe('drill-down', () => {
 
   it('answers aggregate_only for a purged range, with values and no ids', async () => {
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 9, denominator: null, histogram: null, generalized: false },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 9, denominator: null },
     ]);
     const page = await getOperationsDrillDown(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, {}, NOW);
     expect(page.mode).toBe('aggregate_only');
@@ -129,6 +129,7 @@ describe('the filters an aggregate cannot answer', () => {
     ['op_severity', { severity: 'high' }],
     ['op_outcome', { outcome: 'confirmed' }],
     ['op_evidence', { evidenceAvailable: true }],
+    ['op_site', { operationalSiteId: SITE }],
   ])('refuses %s over a purged month rather than dropping it', async (name, overrides) => {
     // An aggregate row has a project and a site and nothing else. Applying any
     // of these to it would widen the answer without saying so.
@@ -205,87 +206,39 @@ describe('op_manager', () => {
   });
 });
 
-describe('a site read together with a project', () => {
-  it('asks the aggregates for both, not for the site alone', async () => {
-    await getOperationsAnalytics(
-      filters({ start: '2024-01-01', end: '2024-01-31', projectId: PROJECT, operationalSiteId: SITE }),
-      viewer, NOW,
-    );
-    expect(aggregateMock.readPublishedAggregates).toHaveBeenCalledWith(
-      expect.objectContaining({ operationalSiteId: SITE, projectId: PROJECT }), expect.anything(),
-    );
-  });
-});
+describe('op_site over a purged month', () => {
+  const historic = { start: '2024-01-01', end: '2024-01-31' };
 
-describe('which incident a filter keeps', () => {
-  const KEPT = 'kept';
-  const DROPPED = 'dropped';
-
-  /**
-   * Two incidents differing in exactly one attribute, and the ids that survive.
-   *
-   * Asserting the count alone would pass for a predicate that kept the wrong
-   * one, so the ids are what is checked: a filter that inverted its comparison
-   * would return `dropped` and still return one row.
-   */
-  async function survivorsOf(
-    overrides: Partial<Parameters<typeof incident>[0]>,
-    filter: Parameters<typeof filters>[0],
-  ): Promise<string[]> {
-    factsMock.loadIncidentFacts.mockResolvedValue([
-      incident({ incidentId: KEPT }),
-      incident({ incidentId: DROPPED, ...overrides }),
-    ]);
-    const page = await getOperationsDrillDown(filters(filter), viewer, {}, NOW);
-    return page.incidentIds;
-  }
-
-  it('keeps only the incident about the named driver', async () => {
-    expect(await survivorsOf({ contributorKey: 'another-driver' }, { staffId: DRIVER })).toEqual([KEPT]);
+  it('is refused, because no site row is published to read', async () => {
+    // Migration 527 publishes organisation and project rows only. Answering a
+    // site question from its project's row would widen it to every other site
+    // in that project without saying so.
+    await expect(getOperationsAnalytics(filters({ ...historic, operationalSiteId: SITE }), viewer, NOW))
+      .rejects.toThrow(OperationsFilterConflictError);
   });
 
-  it('keeps only the incident on the named vehicle', async () => {
-    const vehicle = 'aaaaaaa2-0000-4000-8000-000000000002';
-    factsMock.loadIncidentFacts.mockResolvedValue([
-      incident({ incidentId: KEPT, vehicleId: vehicle }),
-      incident({ incidentId: DROPPED, vehicleId: null }),
-    ]);
-    const page = await getOperationsDrillDown(filters({ vehicleId: vehicle }), viewer, {}, NOW);
-    expect(page.incidentIds).toEqual([KEPT]);
+  it('names op_site in the refusal, in the same shape as the others', async () => {
+    await expect(getOperationsAnalytics(filters({ ...historic, operationalSiteId: SITE }), viewer, NOW))
+      .rejects.toThrow(/op_site only apply to months at or after 2025-09-01/);
   });
 
-  it('keeps only the incident of the named type', async () => {
-    expect(await survivorsOf({ incidentType: 'left_early' }, { incidentType: 'late' })).toEqual([KEPT]);
+  it('is refused identically on the drill-down', async () => {
+    const withSite = filters({ ...historic, operationalSiteId: SITE });
+    const fromAnalytics = await getOperationsAnalytics(withSite, viewer, NOW).catch((e: Error) => e.message);
+    const fromDrillDown = await getOperationsDrillDown(withSite, viewer, {}, NOW).catch((e: Error) => e.message);
+    expect(fromDrillDown).toBe(fromAnalytics);
   });
 
-  it('keeps only the incident at the named severity', async () => {
-    expect(await survivorsOf({ severity: 'normal' }, { severity: 'high' })).toEqual([KEPT]);
+  it('is still answered over a retained range, where the facts carry a site', async () => {
+    factsMock.loadIncidentFacts.mockResolvedValue([incident()]);
+    const report = await getOperationsAnalytics(filters({ operationalSiteId: SITE }), viewer, NOW);
+    expect(report.cards.find((card) => card.metricKey === 'incident.late')?.numerator).toBe(1);
   });
 
-  it('keeps only the incident with the named outcome', async () => {
-    expect(await survivorsOf({ outcome: 'false_positive' }, { outcome: 'confirmed' })).toEqual([KEPT]);
-  });
-
-  it('keeps only the incident whose evidence state was asked for', async () => {
-    // op_evidence is the one filter that cannot reach SQL: evidence_available
-    // is computed in a LATERAL subquery, so this predicate is the whole filter.
-    expect(await survivorsOf({ evidenceAvailable: false }, { evidenceAvailable: true })).toEqual([KEPT]);
-  });
-
-  it('keeps the incident with no evidence when that is what was asked for', async () => {
-    factsMock.loadIncidentFacts.mockResolvedValue([
-      incident({ incidentId: KEPT, evidenceAvailable: false }),
-      incident({ incidentId: DROPPED, evidenceAvailable: true }),
-    ]);
-    const page = await getOperationsDrillDown(filters({ evidenceAvailable: false }), viewer, {}, NOW);
-    expect(page.incidentIds).toEqual([KEPT]);
-  });
-
-  it('keeps only the incident at the named site', async () => {
-    const otherSite = 'aaaaaaa3-0000-4000-8000-000000000003';
-    expect(await survivorsOf(
-      { dimension: { projectId: PROJECT, operationalSiteId: otherSite } },
-      { operationalSiteId: SITE },
-    )).toEqual([KEPT]);
+  it('never reaches the aggregate query with a site', async () => {
+    await getOperationsAnalytics(filters(historic), viewer, NOW);
+    for (const call of aggregateMock.readPublishedAggregates.mock.calls) {
+      expect(call[0]).not.toHaveProperty('operationalSiteId');
+    }
   });
 });

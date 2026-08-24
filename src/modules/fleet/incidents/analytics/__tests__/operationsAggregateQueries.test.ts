@@ -10,7 +10,9 @@
  * fixture here hands back a real `Date`, because a string fixture exercises the
  * branch that was never wrong.
  *
- * The second is scope: which statement runs, and with which parameters.
+ * The second is scope: which statement runs, and with which parameters. There
+ * is no site statement — migration 527 publishes organisation and project rows
+ * only — and no histogram, contributor-count or generalized column to read.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,7 +25,6 @@ const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
 const PROJECT = '33333333-3333-4333-8333-333333333333';
 const OTHER_PROJECT = '44444444-4444-4444-8444-444444444444';
-const SITE = '55555555-5555-4555-8555-555555555555';
 
 
 /** SAST has no DST, so the offset the driver produced is a constant. */
@@ -67,11 +68,6 @@ function row(overrides: Record<string, unknown> = {}) {
     metric_key: 'incident.late',
     numerator: 7,
     denominator: 20,
-    sample_count: null,
-    sum_seconds: null,
-    generalized_from_level: null,
-    bucket_0_300: null, bucket_301_900: null, bucket_901_1800: null,
-    bucket_1801_3600: null, bucket_3601_14400: null, bucket_over_14400: null,
     ...overrides,
   };
 }
@@ -121,27 +117,6 @@ describe('which statement runs', () => {
     expect(db.query.mock.calls[0]?.[1]).toEqual([['2024-03-01'], 1, USER, STAFF]);
   });
 
-  it('binds the site id last, after the scope parameters, when scoped', async () => {
-    await readPublishedAggregates({ ...request, operationalSiteId: SITE }, restricted);
-    expect(db.query.mock.calls[0]?.[1]).toEqual([['2024-03-01'], 1, USER, STAFF, SITE]);
-  });
-
-  it('binds the site id immediately after the base parameters when unrestricted', async () => {
-    await readPublishedAggregates({ ...request, operationalSiteId: SITE }, unrestricted);
-    expect(db.query.mock.calls[0]?.[1]).toEqual([['2024-03-01'], 1, SITE]);
-  });
-
-  it('reads a site inside a named project from both, never the site alone', async () => {
-    await readPublishedAggregates({ ...request, operationalSiteId: SITE, projectId: PROJECT }, unrestricted);
-    expect(db.query.mock.calls[0]?.[0]).toContain('aggregates-site-in-project');
-    expect(db.query.mock.calls[0]?.[1]).toEqual([['2024-03-01'], 1, SITE, PROJECT]);
-  });
-
-  it('keeps the scope parameters ahead of both when the viewer is restricted', async () => {
-    await readPublishedAggregates({ ...request, operationalSiteId: SITE, projectId: PROJECT }, restricted);
-    expect(db.query.mock.calls[0]?.[1]).toEqual([['2024-03-01'], 1, USER, STAFF, SITE, PROJECT]);
-  });
-
   it('restricts to a manager project list when one is given', async () => {
     await readPublishedAggregates({ ...request, projectIds: [PROJECT, OTHER_PROJECT] }, unrestricted);
     expect(db.query.mock.calls[0]?.[0]).toContain('aggregates-project-list');
@@ -161,10 +136,42 @@ describe('what a row carries back', () => {
     expect(aggregate?.dimensionProjectId).toBe(PROJECT);
   });
 
-  it('marks a row generalized when it stood in for a level below it', async () => {
-    db.query.mockResolvedValue([row({ generalized_from_level: 'site' })]);
+  it('reads a TOTAL_ONLY row as a total with no population to divide by', async () => {
+    // The tier publishes the component's root and nothing else, so there is no
+    // breakdown and no denominator. Null, never zero: zero would divide.
+    db.query.mockResolvedValue([row({ metric_key: 'presence.scheduled_days', numerator: 20, denominator: null })]);
     const [aggregate] = await readPublishedAggregates(request, unrestricted);
-    expect(aggregate?.generalized).toBe(true);
+    expect(aggregate).toEqual({
+      monthStart: '2024-03-01', dimensionProjectId: PROJECT,
+      metricKey: 'presence.scheduled_days', numerator: 20, denominator: null,
+    });
+  });
+
+  it('carries no histogram, contributor count, or generalized flag', async () => {
+    // They are not columns of the view. A read path that reached for one would
+    // get undefined and quietly report it as a shape the caller trusts.
+    const [aggregate] = await readPublishedAggregates(request, unrestricted);
+    expect(Object.keys(aggregate ?? {}).sort())
+      .toEqual(['denominator', 'dimensionProjectId', 'metricKey', 'monthStart', 'numerator']);
+  });
+
+  it('selects no column the published view does not have', async () => {
+    await readPublishedAggregates(request, unrestricted);
+    const sql = String(db.query.mock.calls[0]?.[0]);
+    for (const gone of ['contributor_count', 'sample_count', 'sum_seconds', 'bucket_', 'generalized_from_level']) {
+      expect(sql).not.toContain(gone);
+    }
+  });
+
+  it('never reads a site row, because none is published', async () => {
+    for (const scope of [unrestricted, restricted]) {
+      vi.clearAllMocks();
+      db.query.mockResolvedValue([row()]);
+      await readPublishedAggregates(request, scope);
+      const sql = String(db.query.mock.calls[0]?.[0]);
+      expect(sql).not.toContain("dimension_level = 'site'");
+      expect(sql).not.toContain('dimension_site_id');
+    }
   });
 });
 
@@ -186,8 +193,6 @@ describe('placeholders and binds, for every branch', () => {
 
   const branches: Array<[string, Parameters<typeof readPublishedAggregates>[0]]> = [
     ['organisation / managed projects', request],
-    ['one site', { ...request, operationalSiteId: SITE }],
-    ['one site inside one project', { ...request, operationalSiteId: SITE, projectId: PROJECT }],
     ['one project', { ...request, projectId: PROJECT }],
     ['a manager project list', { ...request, projectIds: [PROJECT, OTHER_PROJECT] }],
   ];

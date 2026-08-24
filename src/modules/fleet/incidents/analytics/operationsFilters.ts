@@ -150,24 +150,13 @@ export function parseOperationsFilters(query: RawOperationsQuery): OperationsFil
 }
 
 /**
- * The filters an aggregate cannot honour, by `op_` name, in a stable order.
+ * The filters that describe one incident rather than a group.
  *
- * An aggregate row has exactly two dimensions, a project and a site. Every
- * filter here asks about an attribute of an individual incident — who, which
- * vehicle, what type, how severe, what outcome, was there evidence — and none
- * of them survives into a monthly count. `op_driver` and `op_vehicle` are worse
- * still: an aggregate exists precisely because it describes at least `k` people,
- * so applying either would ask it a question it must not answer, and it would
- * answer by returning the rows that survive.
- *
- * Silently dropping any of them widens the result, which is the failure this
- * module refuses everywhere else. So a range that reaches past the retention
- * boundary with one of these set is refused instead.
- *
- * The same set decides which live fact kinds a request can draw on: a presence
- * or monitor-run fact carries none of these attributes either.
+ * A presence, monitor-run or notification fact carries none of these
+ * attributes, so any one of them being set decides which live fact kinds can
+ * contribute at all — and therefore which metric keys the answer may report.
  */
-export function retainedOnlyFilterNames(filters: OperationsFilters): string[] {
+export function incidentShapedFilterNames(filters: OperationsFilters): string[] {
   const names: string[] = [];
   if (filters.staffId !== undefined) names.push('op_driver');
   if (filters.vehicleId !== undefined) names.push('op_vehicle');
@@ -176,6 +165,38 @@ export function retainedOnlyFilterNames(filters: OperationsFilters): string[] {
   if (filters.outcome !== undefined) names.push('op_outcome');
   if (filters.evidenceAvailable !== undefined) names.push('op_evidence');
   return names;
+}
+
+export function hasIncidentShapedFilter(filters: OperationsFilters): boolean {
+  return incidentShapedFilterNames(filters).length > 0;
+}
+
+/**
+ * The filters a published aggregate cannot honour, by `op_` name, in a stable
+ * order. Every incident-shaped filter, plus `op_site`.
+ *
+ * `op_site` is here because migration 527's view publishes ORGANISATION and
+ * PROJECT rows only. There is no site row to read, and answering a site
+ * question from its project's row would silently widen the answer to every
+ * other site in that project — the failure this module refuses everywhere else.
+ * It remains perfectly answerable over retained months, where the facts still
+ * carry a site.
+ *
+ * The incident-shaped half is unanswerable for a different reason: an aggregate
+ * row has two dimensions and none of who, which vehicle, what type, how severe,
+ * what outcome or was-there-evidence survives into a monthly count.
+ * `op_driver` and `op_vehicle` are worse still — an aggregate exists precisely
+ * because it describes at least `k` people, so applying either would ask it a
+ * question it must not answer, and it would answer by returning the rows that
+ * survive.
+ *
+ * So a range that reaches past the retention boundary with any of them set is
+ * refused rather than answered.
+ */
+export function retainedOnlyFilterNames(filters: OperationsFilters): string[] {
+  const names = incidentShapedFilterNames(filters);
+  if (filters.operationalSiteId !== undefined) names.push('op_site');
+  return names.sort();
 }
 
 export function hasRetainedOnlyFilter(filters: OperationsFilters): boolean {

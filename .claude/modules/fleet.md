@@ -1369,6 +1369,12 @@ Every read goes through `fleet_operational_monthly_aggregates_published` (migrat
 base table: the view hard-codes `is_active = true`, and a superseded generation is the disclosive
 one. `aggregateViewContract.test.ts` fails the build if any file outside the writer reaches past it.
 
+The view is narrower than the table in two ways every reader must account for: it publishes
+**organisation and project rows only** — no site rows — and it carries **no `contributor_count`, no
+histogram columns and no `generalized_from_level`**. Release is per-component and tiered
+(FULL / TOTAL_ONLY / NONE); a TOTAL_ONLY component publishes its root total with a NULL denominator
+and none of its members.
+
 ## Operations analytics read path (PR 8 task 7)
 
 ### APIs and scope
@@ -1415,17 +1421,25 @@ they can open in their own queue. **This is a property of that gate.** Any futur
 this code with a wider audience — an export to a client, a public dashboard, a broader permission —
 invalidates the reasoning, not just the numbers.
 
-The historic half keeps every suppression the aggregates were released under and says so, through
-`generalized` on the value and a notice on the response.
+The historic half reports what was published and says what is missing. A TOTAL_ONLY component comes
+back as its root total with a NULL denominator; the members are **omitted, never rendered as zero**,
+and a notice says the narrower figures were withheld. A purged month reports `histogram: null` — the
+view has no bucket columns — rather than an empty histogram that would read as "no durations were
+recorded".
 
 ### What the API refuses, and why
 
-An aggregate row has two dimensions, a project and a site. `op_driver`, `op_vehicle`, `op_type`,
-`op_severity`, `op_outcome` and `op_evidence` each name an attribute of an individual incident and
-none survives into a monthly count, so a range reaching past the boundary with any of them set is
-**refused with a 400** naming the filters given, rather than answered by silently dropping them.
-`hasRetainedOnlyFilter` is that set, and it is also the set that decides which live fact kinds can
-contribute — one definition, because it is one fact about the data.
+`op_driver`, `op_vehicle`, `op_type`, `op_severity`, `op_outcome` and `op_evidence` each name an
+attribute of an individual incident, and none survives into a monthly count. **`op_site` is refused
+too**, for a different reason: the published view has organisation and project rows only, so there is
+no site row to read and answering from the project's row would widen the answer to every other site
+in it. A range reaching past the boundary with any of them set is **refused with a 400** naming the
+filters given, rather than answered by silently dropping them.
+
+Two predicates, not one: `hasRetainedOnlyFilter` is the set an aggregate cannot honour (the six plus
+`op_site`), and `hasIncidentShapedFilter` is the subset that decides which live fact kinds can
+contribute. They were briefly the same definition; `op_site` is what separated them, because every
+fact carries a site and a site filter narrows presence rather than making it inapplicable.
 
 A drill-down over a range that STRADDLES the boundary is refused too. Analytics can merge two
 sources because it answers in totals; a drill-down answers in incident ids and the purged months

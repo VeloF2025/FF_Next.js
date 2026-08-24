@@ -1,50 +1,37 @@
 /**
  * The arithmetic that folds months into cards.
  *
- * `generalized` is the piece with teeth. It is the only field that is STICKY:
- * once any month behind a figure stood in for a group too small to publish, the
- * figure says so for good. Combining it like the numbers around it — last write
- * wins — produces a card that silently claims to be a total, which is exactly
- * the disclosure this module exists to avoid.
+ * The denominator is the piece with teeth. A published TOTAL_ONLY row carries a
+ * total with its breakdown withheld and no population to divide by, so its
+ * denominator is null. Folding that in as a zero would turn "we cannot say"
+ * into "out of none" — a ratio that reads as catastrophic rather than absent.
  */
 import { describe, expect, it } from 'vitest';
-import { accumulateValue, emptyValue, foldToCards, mergeHistograms, upsertValue } from '../operationsMetricValues';
+import { foldToCards, mergeHistograms, upsertValue } from '../operationsMetricValues';
 import type { OperationsMetricValue } from '../types';
 
 function value(overrides: Partial<OperationsMetricValue> = {}): OperationsMetricValue {
   return {
-    metricKey: 'incident.late', numerator: 1, denominator: null, histogram: null,
-    generalized: false, ...overrides,
+    metricKey: 'incident.late', numerator: 1, denominator: null, histogram: null, ...overrides,
   };
 }
 
-describe('generalized is sticky', () => {
-  it('keeps a card generalized when the suppressed month comes FIRST', async () => {
+describe('a withheld breakdown', () => {
+  it('keeps a null denominator null rather than folding it in as zero', async () => {
+    // A TOTAL_ONLY row has no population behind it. Zero would divide; null
+    // says there is nothing to divide by.
+    const cards = foldToCards([{ values: [value({ numerator: 20, denominator: null })] }]);
+    expect(cards[0]?.denominator).toBeNull();
+  });
+
+  it('does not invent a denominator when only one of two months had one', () => {
     const cards = foldToCards([
-      { values: [value({ numerator: 5, generalized: true })] },
-      { values: [value({ numerator: 5, generalized: false })] },
+      { values: [value({ numerator: 5, denominator: null })] },
+      { values: [value({ numerator: 5, denominator: 10 })] },
     ]);
-    expect(cards[0]?.generalized).toBe(true);
-  });
-
-  it('keeps a card generalized when the suppressed month comes LAST', async () => {
-    const cards = foldToCards([
-      { values: [value({ numerator: 5, generalized: false })] },
-      { values: [value({ numerator: 5, generalized: true })] },
-    ]);
-    expect(cards[0]?.generalized).toBe(true);
-  });
-
-  it('leaves a card ungeneralized when no month behind it was', () => {
-    const cards = foldToCards([{ values: [value()] }, { values: [value()] }]);
-    expect(cards[0]?.generalized).toBe(false);
-  });
-
-  it('does not let a later clean value clear the flag on an accumulator', () => {
-    const target = emptyValue('incident.late');
-    accumulateValue(target, value({ generalized: true }));
-    accumulateValue(target, value({ generalized: false }));
-    expect(target.generalized).toBe(true);
+    // The month that reported one contributes it; the withheld month adds
+    // nothing, and is not counted as ten more or as zero more.
+    expect(cards[0]).toMatchObject({ numerator: 10, denominator: 10 });
   });
 });
 

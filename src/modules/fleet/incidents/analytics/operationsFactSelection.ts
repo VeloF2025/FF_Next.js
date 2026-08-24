@@ -25,7 +25,7 @@ import type { FactQueryScope } from './factNarrowing';
 import type { IncidentFact, OperationsFact } from './facts';
 import { loadIncidentFacts, loadNotificationFacts } from './incidentFactQueries';
 import { loadMonitorRunFacts } from './monitorFactQueries';
-import { hasRetainedOnlyFilter } from './operationsFilters';
+import { hasIncidentShapedFilter } from './operationsFilters';
 import { loadPresenceFacts, loadProjectsWithOperationalSites } from './presenceFactQueries';
 import type { OperationsFilters } from './types';
 
@@ -57,13 +57,12 @@ async function mapWithLimit<T, R>(
   return results;
 }
 
-/**
- * The incident-shaped filters, which are exactly the set an aggregate cannot
- * honour — `hasRetainedOnlyFilter`. One definition, because they are one fact
- * about the data: these attributes belong to an individual incident, so neither
- * a monthly aggregate nor a presence fact carries them.
- */
-export const hasIncidentShapedFilter = hasRetainedOnlyFilter;
+// `hasIncidentShapedFilter` lives in `operationsFilters.ts`, beside the wider
+// retained-only set it is a subset of. The two were briefly one definition,
+// which stopped being true when `op_site` became unanswerable from an
+// aggregate: a site filter is refused over a purged month, but it does NOT make
+// a presence fact inapplicable — every fact carries a site.
+export { hasIncidentShapedFilter };
 
 /** The metric keys no incident fact can produce, whatever the incidents say. */
 const NON_INCIDENT_METRIC_KEYS: readonly OperationsMetricKey[] = [

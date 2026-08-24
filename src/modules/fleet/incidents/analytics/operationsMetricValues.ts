@@ -11,7 +11,7 @@ import type { OperationsMetricKey } from './aggregateSchema';
 import type { DurationHistogram, OperationsMetricValue } from './types';
 
 export function emptyValue(metricKey: OperationsMetricKey): OperationsMetricValue {
-  return { metricKey, numerator: 0, denominator: null, histogram: null, generalized: false };
+  return { metricKey, numerator: 0, denominator: null, histogram: null };
 }
 
 export function mergeHistograms(left: DurationHistogram | null, right: DurationHistogram): DurationHistogram {
@@ -28,15 +28,16 @@ export function mergeHistograms(left: DurationHistogram | null, right: DurationH
  *
  * Ratios combine by summing numerators and denominators separately, never by
  * averaging the percentages: a month with four incidents and a month with four
- * hundred do not each contribute half of the answer. `generalized` is sticky —
- * once any month behind a figure stood in for a group too small to publish, the
- * figure says so, because the alternative is a total that silently is not one.
+ * hundred do not each contribute half of the answer.
+ *
+ * A null denominator stays null rather than becoming a zero. On a TOTAL_ONLY
+ * aggregate the breakdown was withheld, so there is no population to divide by;
+ * folding it in as zero would turn "we cannot say" into "out of none".
  */
 export function accumulateValue(target: OperationsMetricValue, value: OperationsMetricValue): void {
   target.numerator += value.numerator;
   if (value.denominator !== null) target.denominator = (target.denominator ?? 0) + value.denominator;
   if (value.histogram) target.histogram = mergeHistograms(target.histogram, value.histogram);
-  if (value.generalized) target.generalized = true;
 }
 
 /** Adds one value into a per-key list, creating the entry on first sight. */

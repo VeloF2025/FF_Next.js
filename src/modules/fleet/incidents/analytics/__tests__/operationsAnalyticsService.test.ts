@@ -102,7 +102,7 @@ describe('the retention boundary', () => {
 
   it('reads the half-purged month from the aggregates instead', async () => {
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2025-08-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 9, denominator: null, histogram: null, generalized: false },
+      { monthStart: '2025-08-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 9, denominator: null },
     ]);
     const report = await getOperationsAnalytics(filters({ start: '2025-08-01', end: '2025-08-31' }), viewer, NOW);
     expect(factsMock.loadIncidentFacts).not.toHaveBeenCalled();
@@ -131,12 +131,13 @@ describe('the retained / historic split', () => {
 
   it('reads an old month from the aggregates and never from facts', async () => {
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-03-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 7, denominator: 20, histogram: null, generalized: false },
+      { monthStart: '2024-03-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 7, denominator: 20 },
     ]);
     const report = await getOperationsAnalytics(filters({ start: '2024-03-01', end: '2024-03-31' }), viewer, NOW);
     expect(factsMock.loadIncidentFacts).not.toHaveBeenCalled();
     expect(report.cards).toEqual([
-      { metricKey: 'incident.late', numerator: 7, denominator: 20, histogram: null, generalized: false },
+      // No histogram: the published view has no bucket columns to read.
+      { metricKey: 'incident.late', numerator: 7, denominator: 20, histogram: null },
     ]);
   });
 
@@ -145,7 +146,7 @@ describe('the retained / historic split', () => {
       monthStart === '2026-08-01' ? [incident({ workDate: '2026-08-10' })] : []
     ));
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2025-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 4, denominator: null, histogram: null, generalized: false },
+      { monthStart: '2025-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 4, denominator: null },
     ]);
     const report = await getOperationsAnalytics(filters({ start: '2025-01-01', end: '2026-08-31' }), viewer, NOW);
     const january = report.series.find((month) => month.monthStart === '2025-01-01');
@@ -159,8 +160,8 @@ describe('the retained / historic split', () => {
 describe('folding months into cards', () => {
   it('sums numerators and denominators rather than averaging percentages', async () => {
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'outcome.false_positive', numerator: 1, denominator: 100, histogram: null, generalized: false },
-      { monthStart: '2024-02-01', dimensionProjectId: PROJECT, metricKey: 'outcome.false_positive', numerator: 1, denominator: 2, histogram: null, generalized: false },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'outcome.false_positive', numerator: 1, denominator: 100 },
+      { monthStart: '2024-02-01', dimensionProjectId: PROJECT, metricKey: 'outcome.false_positive', numerator: 1, denominator: 2 },
     ]);
     const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-02-29' }), viewer, NOW);
     const card = report.cards.find((c) => c.metricKey === 'outcome.false_positive');
@@ -169,23 +170,26 @@ describe('folding months into cards', () => {
     expect(card?.denominator).toBe(102);
   });
 
-  it('merges histograms bucket by bucket', async () => {
+  it('reports no histogram for a purged month, rather than an empty one', async () => {
+    // The view has no bucket columns: a bucket count over a purged month is a
+    // differencing channel. Null says "we no longer hold the durations"; an
+    // empty bucket array would say "no durations were recorded".
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'timing.acknowledgement', numerator: 0, denominator: null, histogram: { sampleCount: 2, sumSeconds: 300, buckets: [2, 0, 0, 0, 0, 0] }, generalized: false },
-      { monthStart: '2024-02-01', dimensionProjectId: PROJECT, metricKey: 'timing.acknowledgement', numerator: 0, denominator: null, histogram: { sampleCount: 3, sumSeconds: 900, buckets: [0, 3, 0, 0, 0, 0] }, generalized: false },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'timing.acknowledgement', numerator: 0, denominator: null },
     ]);
-    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-02-29' }), viewer, NOW);
-    expect(report.cards.find((c) => c.metricKey === 'timing.acknowledgement')?.histogram)
-      .toEqual({ sampleCount: 5, sumSeconds: 1200, buckets: [2, 3, 0, 0, 0, 0] });
+    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
+    expect(report.cards.find((c) => c.metricKey === 'timing.acknowledgement')?.histogram).toBeNull();
   });
 
-  it('marks a card generalized when any month behind it was', async () => {
+  it('omits a withheld member key instead of folding it in as zero', async () => {
+    // A TOTAL_ONLY component publishes its root and nothing else. Rendering the
+    // members as 0 would claim nobody was scheduled on a site that was staffed.
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null, histogram: null, generalized: false },
-      { monthStart: '2024-02-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null, histogram: null, generalized: true },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.scheduled_days', numerator: 20, denominator: null },
     ]);
-    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-02-29' }), viewer, NOW);
-    expect(report.cards.find((c) => c.metricKey === 'incident.late')?.generalized).toBe(true);
+    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
+    expect(report.cards.map((card) => card.metricKey)).toEqual(['presence.scheduled_days']);
+    expect(report.cards[0]).toMatchObject({ numerator: 20, denominator: null });
   });
 
   it('reports every month in the range, including one with nothing in it', async () => {
@@ -196,12 +200,23 @@ describe('folding months into cards', () => {
 });
 
 describe('suppression notices and freshness', () => {
-  it('says when a figure describes a wider group than was asked for', async () => {
+  it('says when a total came back without the figures behind it', async () => {
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null, histogram: null, generalized: true },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.scheduled_days', numerator: 20, denominator: null },
     ]);
     const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
-    expect(report.suppressionNotices.join(' ')).toMatch(/wider group/);
+    expect(report.suppressionNotices.join(' ')).toMatch(/without the figures behind it/);
+  });
+
+  it('adds no such notice when the whole component came back', async () => {
+    aggregateMock.readPublishedAggregates.mockResolvedValue([
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.scheduled_days', numerator: 20, denominator: null },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.confirmed_days', numerator: 18, denominator: 20 },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.unconfirmed_days', numerator: 1, denominator: 20 },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.vehicle_only_days', numerator: 1, denominator: 20 },
+    ]);
+    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
+    expect(report.suppressionNotices.join(' ')).not.toMatch(/without the figures behind it/);
   });
 
   it('says when historic months returned nothing at all', async () => {
@@ -218,7 +233,7 @@ describe('suppression notices and freshness', () => {
   it('says how many managed projects the historic half actually covered', async () => {
     runMock.listScopedProjectIds.mockResolvedValue([PROJECT, OTHER_PROJECT]);
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null, histogram: null, generalized: false },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null },
     ]);
     const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
     expect(report.suppressionNotices.join(' ')).toMatch(/1 of the 2 projects/);
@@ -226,7 +241,7 @@ describe('suppression notices and freshness', () => {
 
   it('adds no such notice when every project published', async () => {
     aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null, histogram: null, generalized: false },
+      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null },
     ]);
     const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
     expect(report.suppressionNotices.join(' ')).not.toMatch(/projects/);

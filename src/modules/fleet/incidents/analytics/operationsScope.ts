@@ -186,14 +186,11 @@ export function assertRetainedOnlyFiltersFit(filters: OperationsFilters, range: 
 export function aggregateRequestFor(
   filters: OperationsFilters, range: ResolvedRange,
 ): AggregateDimensionRequest | null {
+  // No site branch: migration 527 publishes organisation and project rows only.
+  // A request that reaches here with `op_site` set has already been refused by
+  // `assertRetainedOnlyFiltersFit`, because answering it from the project's row
+  // would widen the answer to every other site in that project.
   const base = { monthStarts: range.historicMonths, metricVersion: range.metricVersion };
-  if (filters.operationalSiteId !== undefined) {
-    // Both, when both were given: a site read without its project would answer
-    // from that site's own rows even when op_project named a different project.
-    return filters.projectId === undefined
-      ? { ...base, operationalSiteId: filters.operationalSiteId }
-      : { ...base, operationalSiteId: filters.operationalSiteId, projectId: filters.projectId };
-  }
   if (filters.projectId !== undefined) {
     if (range.allowedProjectIds !== null && !range.allowedProjectIds.includes(filters.projectId)) return null;
     return { ...base, projectId: filters.projectId };
