@@ -1330,7 +1330,7 @@ One ordered view of what happened to an incident, merged in memory from five PR4
 `user_notifications`, `fleet_incident_retention_hold_actions`). **There is no timeline table
 and there never will be one** — `migrationContract.test.ts` asserts it.
 
-Three things to know before changing it:
+Four things to know before changing it:
 
 - **Summaries are never free text.** Every entry's summary is a label from an enum-keyed map,
   or a label with a database-computed count. No `note`, filename, storage locator, or JSONB

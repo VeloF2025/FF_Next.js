@@ -32,7 +32,7 @@ import {
   boundFor, comparePositions, decodeCursor, encodeCursor,
   type PositionedEntry, type TimelineTable,
 } from './timelineCursor';
-import type { IncidentTimelineEntry, IncidentTimelinePage, TimelineSource } from './types';
+import type { IncidentTimelinePage, TimelineSource } from './types';
 
 /**
  * Defined here rather than reused from `reviewService.ts` on purpose: importing
@@ -108,6 +108,14 @@ function actionSource(row: { is_system_actor: boolean; visibility: string }): Ti
   return row.is_system_actor ? 'system' : 'manager';
 }
 
+/**
+ * Validation lives on the route, which answers 400 rather than silently
+ * clamping (`parseLimit` in `pages/api/fleet/incidents/[incidentId]/timeline.ts`).
+ * This is the defence for a direct caller only, and it deliberately does not
+ * clamp either: a limit this function cannot honour falls back to the default
+ * rather than being quietly reshaped into a different number of rows, so no
+ * caller can be answered a page size the route would have rejected.
+ */
 function resolveLimit(limit: number | undefined): number {
   if (limit === undefined) return TIMELINE_DEFAULT_LIMIT;
   if (!Number.isInteger(limit) || limit < 1 || limit > TIMELINE_MAX_LIMIT) return TIMELINE_DEFAULT_LIMIT;

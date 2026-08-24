@@ -673,10 +673,11 @@ describe('getIncidentTimeline source bounding', () => {
     expect(byTag('observations')[2]).toBeNull();
   });
 
-  it('bounds inclusively, so an entry sharing the cursor instant is not skipped', async () => {
-    // The cursor's tie-break is (occurredAt, recordedAt, stableId) and only the
-    // first of those reaches SQL, so an exclusive bound would drop a row
-    // recorded in the same second that sorts after the cursor.
+  it('still reaches an entry sharing the cursor instant, through the id arm of the keyset', async () => {
+    // The tie-break is (sortAt, table, sortId), and all three reach SQL — which
+    // is what lets the bound be strict. A bound on the instant alone would have
+    // to be inclusive to keep these rows reachable, and would then re-read the
+    // cursor row on every page.
     const at = '2026-08-13T08:00:00.000Z';
     const tied = [0, 1, 2].map((index) => ({
       ...actionRow, id: `bbbbbbb1-0000-4000-8000-00000000000${index}`, occurred_at: at,
