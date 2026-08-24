@@ -230,6 +230,39 @@ describe('the stall guard', () => {
     expect(result.moreRemaining).toBe(false);
   });
 
+  it('stalls rather than splits when a whole-batch trip closes on the final position', async () => {
+    // The accepted cost of anchoring on the straddle rather than the label. A trip that fills an
+    // entire batch and closes by genuine `ignition_off` on its LAST position is indistinguishable
+    // from one the batch cut off, so it re-anchors to its own start, makes no progress, and the
+    // stall guard stops the vehicle. Under the old label-based rule this same trip advanced --
+    // but during a backfill that rule silently fabricated a split journey instead, which is the
+    // worse failure. Stalling is loud in `vehiclesWithBacklog`; fabrication reads as real data.
+    //
+    // This is pinned because it is UNREACHABLE ONLY BY MARGIN: the largest real trip is 968
+    // positions against a 5,000 batch (99.9th pct 750). Nothing enforces that headroom. If
+    // POSITION_BATCH_SIZE is ever lowered toward the trip-length distribution, or a vehicle runs
+    // unbroken far longer than any seen so far, this fires -- and the only symptom is a warn.
+    mocks.readWatermark.mockResolvedValue('2026-08-01T12:00:00.000Z');
+    mocks.loadTripAnchorBefore.mockResolvedValue('2026-08-01T06:00:00.000Z');
+
+    const start = Date.parse('2026-08-01T06:00:00.000Z');
+    const wholeBatchTrip = Array.from({ length: POSITION_BATCH_SIZE }, (_, i) => ({
+      ...pos('06:00', true),
+      // The vehicle itself switches off, exactly on the batch's final position.
+      ignition: i === POSITION_BATCH_SIZE - 1 ? false : true,
+      recordedAt: new Date(start + i * 1000).toISOString(),
+    }));
+    mocks.loadPositions.mockResolvedValue(wholeBatchTrip);
+
+    const result = await buildTripsForVehicle(VEHICLE, OPTS);
+
+    const written = mocks.replaceWindow.mock.calls[0]![2];
+    expect(written[written.length - 1]!.closeReason).toBe('ignition_off');
+    // It stops, and it SAYS there is more rather than reporting a clean finish.
+    expect(mocks.loadPositions).toHaveBeenCalledTimes(1);
+    expect(result.moreRemaining).toBe(true);
+  });
+
   it('reports backlog rather than silence when the batch ceiling is reached', async () => {
     // Each batch advances, so the loop runs to the ceiling; the caller must learn there is more.
     let n = 0;
