@@ -300,8 +300,8 @@ func TestReconcileIntervalRejectsAggressiveOverride(t *testing.T) {
 	// 5m is the exact value that caused the incident.
 	t.Setenv("WA_RECONCILE_INTERVAL", "5m")
 	got := reconcileInterval()
-	if got < minReconcileInterval {
-		t.Fatalf("interval = %s, want the %s floor to be enforced", got, minReconcileInterval)
+	if got != minReconcileInterval {
+		t.Fatalf("interval = %s, want exactly the %s floor", got, minReconcileInterval)
 	}
 }
 
