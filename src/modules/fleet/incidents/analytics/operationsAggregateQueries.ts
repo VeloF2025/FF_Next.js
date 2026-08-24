@@ -74,13 +74,21 @@ const SCOPE_PREDICATE = `EXISTS (
 )`;
 
 /**
- * Where a branch's own parameter lands. An unrestricted branch binds nothing
- * for scope, so its parameter is third; a scoped branch has spent $3 and $4 on
- * the scope predicate, so its parameter is fifth. Postgres refuses a bind whose
- * count does not match the statement, which is why the scope parameters cannot
- * simply always be supplied.
+ * Where a branch's own parameters land. An unrestricted branch binds nothing
+ * for scope, so its first parameter is third; a scoped branch has spent $3 and
+ * $4 on the scope predicate, so its first is fifth. Postgres refuses a bind
+ * whose count does not match the statement, which is why the scope parameters
+ * cannot simply always be supplied.
  */
-const EXTRA_PARAM = { unrestricted: '$3', scoped: '$5' } as const;
+const EXTRA_PARAM = {
+  unrestricted: ['$3', '$4'] as const,
+  scoped: ['$5', '$6'] as const,
+} as const;
+
+/** `EXTRA_PARAM` read positionally, so a statement and its binds cannot drift. */
+function slot(kind: 'unrestricted' | 'scoped', index: 0 | 1): string {
+  return EXTRA_PARAM[kind][index];
+}
 
 function statement(tag: string, where: string): string {
   return `/* fleet-operations-analytics:${tag} */
@@ -90,26 +98,38 @@ function statement(tag: string, where: string): string {
 
 const SQL = {
   site: statement('aggregates-site',
-    `a.dimension_level = 'site' AND a.dimension_site_id = ${EXTRA_PARAM.unrestricted}::uuid`),
+    `a.dimension_level = 'site' AND a.dimension_site_id = ${slot('unrestricted', 0)}::uuid`),
   siteScoped: statement('aggregates-site-scoped',
-    `a.dimension_level = 'site' AND a.dimension_site_id = ${EXTRA_PARAM.scoped}::uuid AND ${SCOPE_PREDICATE}`),
+    `a.dimension_level = 'site' AND a.dimension_site_id = ${slot('scoped', 0)}::uuid AND ${SCOPE_PREDICATE}`),
+  // op_site and op_project together are not redundant: a site id the caller
+  // does not own would otherwise be answered from its own project's rows.
+  siteInProject: statement('aggregates-site-in-project',
+    `a.dimension_level = 'site' AND a.dimension_site_id = ${slot('unrestricted', 0)}::uuid
+      AND a.dimension_project_id = ${slot('unrestricted', 1)}::uuid`),
+  siteInProjectScoped: statement('aggregates-site-in-project-scoped',
+    `a.dimension_level = 'site' AND a.dimension_site_id = ${slot('scoped', 0)}::uuid
+      AND a.dimension_project_id = ${slot('scoped', 1)}::uuid AND ${SCOPE_PREDICATE}`),
   project: statement('aggregates-project',
-    `a.dimension_level = 'project' AND a.dimension_project_id = ${EXTRA_PARAM.unrestricted}::uuid`),
+    `a.dimension_level = 'project' AND a.dimension_project_id = ${slot('unrestricted', 0)}::uuid`),
   projectScoped: statement('aggregates-project-scoped',
-    `a.dimension_level = 'project' AND a.dimension_project_id = ${EXTRA_PARAM.scoped}::uuid AND ${SCOPE_PREDICATE}`),
+    `a.dimension_level = 'project' AND a.dimension_project_id = ${slot('scoped', 0)}::uuid AND ${SCOPE_PREDICATE}`),
   projectList: statement('aggregates-project-list',
-    `a.dimension_level = 'project' AND a.dimension_project_id = ANY(${EXTRA_PARAM.unrestricted}::uuid[])`),
+    `a.dimension_level = 'project' AND a.dimension_project_id = ANY(${slot('unrestricted', 0)}::uuid[])`),
   projectListScoped: statement('aggregates-project-list-scoped',
-    `a.dimension_level = 'project' AND a.dimension_project_id = ANY(${EXTRA_PARAM.scoped}::uuid[])
+    `a.dimension_level = 'project' AND a.dimension_project_id = ANY(${slot('scoped', 0)}::uuid[])
       AND ${SCOPE_PREDICATE}`),
   organisation: statement('aggregates-organisation', `a.dimension_level = 'organisation'`),
   managedProjects: statement('aggregates-managed-projects',
     `a.dimension_level = 'project' AND ${SCOPE_PREDICATE}`),
 } as const;
 
-/** The bind list for a branch that carries one parameter of its own. */
-function extraParams(base: readonly unknown[], scope: IncidentScopeFilter, extra: unknown): unknown[] {
-  return scope.unrestricted ? [...base, extra] : [...base, scope.pmUserId, scope.pmStaffId, extra];
+/** The bind list for a branch that carries parameters of its own, in `slot` order. */
+function extraParams(
+  base: readonly unknown[], scope: IncidentScopeFilter, ...extras: unknown[]
+): unknown[] {
+  return scope.unrestricted
+    ? [...base, ...extras]
+    : [...base, scope.pmUserId, scope.pmStaffId, ...extras];
 }
 
 function histogramOf(row: AggregateRow): DurationHistogram | null {
@@ -149,6 +169,12 @@ function selectFor(
   request: AggregateDimensionRequest, scope: IncidentScopeFilter, base: readonly unknown[],
 ): { text: string; params: unknown[] } {
   if (request.operationalSiteId !== undefined) {
+    if (request.projectId !== undefined) {
+      return {
+        text: scope.unrestricted ? SQL.siteInProject : SQL.siteInProjectScoped,
+        params: extraParams(base, scope, request.operationalSiteId, request.projectId),
+      };
+    }
     return {
       text: scope.unrestricted ? SQL.site : SQL.siteScoped,
       params: extraParams(base, scope, request.operationalSiteId),

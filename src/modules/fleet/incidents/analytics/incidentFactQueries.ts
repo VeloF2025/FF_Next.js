@@ -22,13 +22,13 @@
  * incident type, and pushing those into the WHERE clause is the difference
  * between scanning a company-wide month and reading the rows that will survive.
  *
- * The narrowing is assembled from a fixed list of predicates that carry only
- * `$n` placeholders; no caller value is ever put into the SQL text, and this is
- * not a conditional tagged-template fragment (CLAUDE.md) — it is one
- * parameterized statement whose optional predicates are appended verbatim.
+ * The narrowing itself lives in `factNarrowing.ts`, shared with the monitor-run
+ * loader so a filter cannot be applied to one table and forgotten on another.
  */
 import { query } from '@/lib/db-pool';
 import type { IncidentSeverity } from '../types';
+import type { FactQueryScope } from './factNarrowing';
+import { INCIDENT_FIELDS, narrowingFor } from './factNarrowing';
 import type { IncidentFact, NotificationFact } from './facts';
 import { toWorkDate } from './sastDates';
 
@@ -63,43 +63,6 @@ function toSeconds(value: string | number | null): number | null {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
 }
 
-
-/**
- * What a caller already knows it will keep. Every field narrows; none widens,
- * and an absent field means "no restriction" rather than "restrict to null".
- */
-export interface FactQueryScope {
-  /** The projects the answer may draw on. An empty list means none of them. */
-  projectIds?: readonly string[];
-  operationalSiteId?: string;
-  incidentType?: string;
-  severity?: string;
-  outcome?: string;
-  staffId?: string;
-  vehicleId?: string;
-}
-
-/**
- * The optional predicates, appended to a WHERE clause whose fixed parameters
- * are already bound. `params` is extended in place so a predicate's `$n` and
- * its value can never drift apart.
- */
-function narrowingFor(scope: FactQueryScope | undefined, params: unknown[]): string {
-  if (!scope) return '';
-  const clauses: string[] = [];
-  const add = (predicate: (position: number) => string, value: unknown): void => {
-    params.push(value);
-    clauses.push(predicate(params.length));
-  };
-  if (scope.projectIds !== undefined) add((n) => `i.project_id = ANY($${n}::uuid[])`, [...scope.projectIds]);
-  if (scope.operationalSiteId !== undefined) add((n) => `i.operational_site_id = $${n}::uuid`, scope.operationalSiteId);
-  if (scope.incidentType !== undefined) add((n) => `i.incident_type = $${n}`, scope.incidentType);
-  if (scope.severity !== undefined) add((n) => `i.severity = $${n}`, scope.severity);
-  if (scope.outcome !== undefined) add((n) => `i.outcome = $${n}`, scope.outcome);
-  if (scope.staffId !== undefined) add((n) => `i.staff_id = $${n}::uuid`, scope.staffId);
-  if (scope.vehicleId !== undefined) add((n) => `i.vehicle_id = $${n}::uuid`, scope.vehicleId);
-  return clauses.map((clause) => `\n    AND ${clause}`).join('');
-}
 
 const INCIDENT_FACT_SELECT = `/* fleet-analytics-facts:incidents */
   SELECT
@@ -178,7 +141,7 @@ export async function loadIncidentFacts(
 ): Promise<IncidentFact[]> {
   const params: unknown[] = [monthStart, nextMonthStart, RECURRENCE_WINDOW_DAYS];
   const rows = await query<IncidentRow>(
-    `${INCIDENT_FACT_SELECT}${narrowingFor(scope, params)}${INCIDENT_FACT_ORDER}`,
+    `${INCIDENT_FACT_SELECT}${narrowingFor(scope, params, 'i', INCIDENT_FIELDS)}${INCIDENT_FACT_ORDER}`,
     params,
   );
 
@@ -252,7 +215,7 @@ export async function loadNotificationFacts(
 ): Promise<NotificationFact[]> {
   const params: unknown[] = [monthStart, nextMonthStart];
   const rows = await query<NotificationRow>(
-    `${NOTIFICATION_FACT_SELECT}${narrowingFor(scope, params)}${NOTIFICATION_FACT_ORDER}`,
+    `${NOTIFICATION_FACT_SELECT}${narrowingFor(scope, params, 'i', INCIDENT_FIELDS)}${NOTIFICATION_FACT_ORDER}`,
     params,
   );
   return rows.map((row) => ({

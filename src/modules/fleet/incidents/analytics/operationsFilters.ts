@@ -150,11 +150,34 @@ export function parseOperationsFilters(query: RawOperationsQuery): OperationsFil
 }
 
 /**
- * `staffId` and `vehicleId` name one person and one vehicle. An aggregate is
- * published precisely because it describes at least `k` of them, so applying
- * either to an aggregate query would ask it a question it must not answer —
- * and would answer it, by returning the rows that survive the filter.
+ * The filters an aggregate cannot honour, by `op_` name, in a stable order.
+ *
+ * An aggregate row has exactly two dimensions, a project and a site. Every
+ * filter here asks about an attribute of an individual incident — who, which
+ * vehicle, what type, how severe, what outcome, was there evidence — and none
+ * of them survives into a monthly count. `op_driver` and `op_vehicle` are worse
+ * still: an aggregate exists precisely because it describes at least `k` people,
+ * so applying either would ask it a question it must not answer, and it would
+ * answer by returning the rows that survive.
+ *
+ * Silently dropping any of them widens the result, which is the failure this
+ * module refuses everywhere else. So a range that reaches past the retention
+ * boundary with one of these set is refused instead.
+ *
+ * The same set decides which live fact kinds a request can draw on: a presence
+ * or monitor-run fact carries none of these attributes either.
  */
+export function retainedOnlyFilterNames(filters: OperationsFilters): string[] {
+  const names: string[] = [];
+  if (filters.staffId !== undefined) names.push('op_driver');
+  if (filters.vehicleId !== undefined) names.push('op_vehicle');
+  if (filters.incidentType !== undefined) names.push('op_type');
+  if (filters.severity !== undefined) names.push('op_severity');
+  if (filters.outcome !== undefined) names.push('op_outcome');
+  if (filters.evidenceAvailable !== undefined) names.push('op_evidence');
+  return names;
+}
+
 export function hasRetainedOnlyFilter(filters: OperationsFilters): boolean {
-  return filters.staffId !== undefined || filters.vehicleId !== undefined;
+  return retainedOnlyFilterNames(filters).length > 0;
 }

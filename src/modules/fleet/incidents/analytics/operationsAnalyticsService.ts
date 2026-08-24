@@ -32,7 +32,7 @@ import type { IncidentFact, OperationsFact } from './facts';
 import { calculateMonthlyMetrics } from './metricCalculator';
 import type { PublishedAggregate } from './operationsAggregateQueries';
 import { readPublishedAggregates } from './operationsAggregateQueries';
-import { loadRetainedFacts } from './operationsFactSelection';
+import { loadRetainedFacts, omittedMetricKeys } from './operationsFactSelection';
 import { foldToCards, upsertValue } from './operationsMetricValues';
 import { latestAggregationRun } from './operationsRunQueries';
 import type { OperationsViewer, ResolvedRange } from './operationsScope';
@@ -53,9 +53,23 @@ export {
 } from './operationsScope';
 export type { OperationsViewer } from './operationsScope';
 
-function valuesFromFacts(facts: readonly OperationsFact[], metricVersion: number): Map<string, OperationsMetricValue[]> {
+/**
+ * The live months, folded into values.
+ *
+ * `calculateMonthlyMetrics` emits the complete metric set for every site-month,
+ * zeros included — which is right for the nightly job, whose job is to store a
+ * checkable row per key. Here a key that this request's filters make
+ * inapplicable is dropped instead: `presence.scheduled_days: 0` under an
+ * `op_type` filter is not a fact about the month, it is a fact about the
+ * filter, and a card cannot say which.
+ */
+function valuesFromFacts(
+  facts: readonly OperationsFact[], metricVersion: number, filters: OperationsFilters,
+): Map<string, OperationsMetricValue[]> {
+  const omitted = omittedMetricKeys(filters);
   const byMonth = new Map<string, OperationsMetricValue[]>();
   for (const group of calculateMonthlyMetrics(facts, metricVersion)) {
+    if (omitted.has(group.metricKey)) continue;
     const values = byMonth.get(group.monthStart) ?? [];
     upsertValue(values, {
       metricKey: group.metricKey, numerator: group.numerator, denominator: group.denominator,
@@ -107,7 +121,7 @@ export async function getOperationsAnalytics(
   assertRetainedOnlyFiltersFit(filters, range);
 
   const facts = await loadRetainedFacts(range.retainedMonths, filters, range.allowedProjectIds);
-  const retainedByMonth = valuesFromFacts(facts, range.metricVersion);
+  const retainedByMonth = valuesFromFacts(facts, range.metricVersion, filters);
 
   const aggregateRequest = aggregateRequestFor(filters, range);
   const published = aggregateRequest === null
@@ -142,7 +156,7 @@ export async function getOperationsAnalytics(
   const missing = missingProjectNotice(filters, range, published);
   if (missing !== null) suppressionNotices.push(missing);
 
-  const run = await latestAggregationRun();
+  const run = await latestAggregationRun(range.metricVersion);
   return {
     filters,
     metricVersion: range.metricVersion,
@@ -196,7 +210,7 @@ export async function getOperationsDrillDown(
   }
 
   const facts = await loadRetainedFacts(range.retainedMonths, filters, range.allowedProjectIds);
-  const values = foldToCards([...valuesFromFacts(facts, range.metricVersion).values()].map((v) => ({ values: v })));
+  const values = foldToCards([...valuesFromFacts(facts, range.metricVersion, filters).values()].map((v) => ({ values: v })));
 
   // Sorted so a cursor means the same thing on every request; the cursor is the
   // last id returned, which cannot drift the way an offset does when a month is

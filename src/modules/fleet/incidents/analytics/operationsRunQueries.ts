@@ -15,6 +15,22 @@ import { toWorkDate } from './sastDates';
 
 interface ProjectIdRow extends Record<string, unknown> { id: string }
 
+interface SiteProjectRow extends Record<string, unknown> { project_id: string | null }
+
+/**
+ * The project an operational site belongs to, so `op_site` can be scope-checked
+ * by the same rule as `op_project`. A site the viewer cannot reach must be
+ * refused, not answered with an empty chart that reads as "nothing happened".
+ */
+export async function projectIdForOperationalSite(siteId: string): Promise<string | null> {
+  const row = await queryOne<SiteProjectRow>(
+    `/* fleet-operations-analytics:site-project */
+     SELECT project_id FROM fleet_project_operational_sites WHERE id = $1::uuid`,
+    [siteId],
+  );
+  return row?.project_id ?? null;
+}
+
 /**
  * The projects a restricted viewer manages, by the same rule the incident queue
  * uses — `projects.project_manager` matching either the user id or the staff id,
@@ -50,17 +66,22 @@ interface FreshnessRow extends Record<string, unknown> {
  * run can report success for a month it then declined to write (a month whose
  * presence evaluation skipped days is deliberately not stored), and a freshness
  * line that trusted the run would claim coverage that does not exist.
+ *
+ * It is also scoped to the metric version the response was built under. Two
+ * versions of a month coexist in the table, so an unscoped MAX would report
+ * coverage from a definition the numbers beside it were not computed with.
  */
-export async function latestAggregationRun(): Promise<AggregationFreshness | null> {
+export async function latestAggregationRun(metricVersion: number): Promise<AggregationFreshness | null> {
   const row = await queryOne<FreshnessRow>(
     `/* fleet-operations-analytics:freshness */
      SELECT r.status,
-            (SELECT MAX(a.month_start) FROM fleet_operational_monthly_aggregates_published a) AS aggregates_through
+            (SELECT MAX(a.month_start) FROM fleet_operational_monthly_aggregates_published a
+              WHERE a.metric_version = $1::int) AS aggregates_through
        FROM fleet_operational_aggregation_runs r
       WHERE r.finished_at IS NOT NULL
       ORDER BY r.finished_at DESC
       LIMIT 1`,
-    [],
+    [metricVersion],
   );
   if (!row) return null;
   const through = row.aggregates_through;

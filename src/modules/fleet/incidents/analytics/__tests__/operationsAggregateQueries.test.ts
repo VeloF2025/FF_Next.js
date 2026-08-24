@@ -25,6 +25,34 @@ const PROJECT = '33333333-3333-4333-8333-333333333333';
 const OTHER_PROJECT = '44444444-4444-4444-8444-444444444444';
 const SITE = '55555555-5555-4555-8555-555555555555';
 
+
+/** SAST has no DST, so the offset the driver produced is a constant. */
+const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * A DATE column exactly as node-postgres hands it back from the production
+ * server, whose zone is Africa/Johannesburg: a `Date` at LOCAL midnight, whose
+ * UTC instant is therefore 22:00 on the PREVIOUS day.
+ *
+ * The local parts are pinned rather than left to `new Date(y, m, d)`. That
+ * expression reproduces the trap only in a zone ahead of UTC — run the suite
+ * under `TZ=UTC` and the fixture becomes its own UTC instant, `toISOString()`
+ * is accidentally right, and the test passes whatever the code does. Pinning
+ * both faces here makes the fixture reproduce production in every zone, so the
+ * assertion below fails on a UTC-formatting reader wherever it runs.
+ *
+ * (`process.env.TZ` cannot do this job: V8 latches the zone when the vitest
+ * worker starts and does not re-read the variable afterwards.)
+ */
+function sastDateColumn(year: number, month: number, day: number): Date {
+  const value = new Date(Date.UTC(year, month - 1, day) - SAST_OFFSET_MS);
+  return Object.assign(value, {
+    getFullYear: () => year,
+    getMonth: () => month - 1,
+    getDate: () => day,
+  });
+}
+
 const restricted = { unrestricted: false, pmUserId: USER, pmStaffId: STAFF };
 const unrestricted = { unrestricted: true, pmUserId: USER, pmStaffId: null };
 
@@ -34,7 +62,7 @@ const unrestricted = { unrestricted: true, pmUserId: USER, pmStaffId: null };
  */
 function row(overrides: Record<string, unknown> = {}) {
   return {
-    month_start: new Date(2024, 2, 1),
+    month_start: sastDateColumn(2024, 3, 1),
     dimension_project_id: PROJECT,
     metric_key: 'incident.late',
     numerator: 7,
@@ -70,7 +98,7 @@ describe('the month a row belongs to', () => {
   });
 
   it('reads January of the following year rather than the last day of December', async () => {
-    db.query.mockResolvedValue([row({ month_start: new Date(2025, 0, 1) })]);
+    db.query.mockResolvedValue([row({ month_start: sastDateColumn(2025, 1, 1) })]);
     const [aggregate] = await readPublishedAggregates(request, unrestricted);
     expect(aggregate?.monthStart).toBe('2025-01-01');
   });
@@ -103,6 +131,17 @@ describe('which statement runs', () => {
     expect(db.query.mock.calls[0]?.[1]).toEqual([['2024-03-01'], 1, SITE]);
   });
 
+  it('reads a site inside a named project from both, never the site alone', async () => {
+    await readPublishedAggregates({ ...request, operationalSiteId: SITE, projectId: PROJECT }, unrestricted);
+    expect(db.query.mock.calls[0]?.[0]).toContain('aggregates-site-in-project');
+    expect(db.query.mock.calls[0]?.[1]).toEqual([['2024-03-01'], 1, SITE, PROJECT]);
+  });
+
+  it('keeps the scope parameters ahead of both when the viewer is restricted', async () => {
+    await readPublishedAggregates({ ...request, operationalSiteId: SITE, projectId: PROJECT }, restricted);
+    expect(db.query.mock.calls[0]?.[1]).toEqual([['2024-03-01'], 1, USER, STAFF, SITE, PROJECT]);
+  });
+
   it('restricts to a manager project list when one is given', async () => {
     await readPublishedAggregates({ ...request, projectIds: [PROJECT, OTHER_PROJECT] }, unrestricted);
     expect(db.query.mock.calls[0]?.[0]).toContain('aggregates-project-list');
@@ -126,5 +165,14 @@ describe('what a row carries back', () => {
     db.query.mockResolvedValue([row({ generalized_from_level: 'site' })]);
     const [aggregate] = await readPublishedAggregates(request, unrestricted);
     expect(aggregate?.generalized).toBe(true);
+  });
+});
+
+describe('the fixture itself', () => {
+  it('has the two faces a driver DATE has: local parts, and an earlier instant', () => {
+    // If this ever stops holding, every assertion below is testing nothing.
+    const value = sastDateColumn(2024, 3, 1);
+    expect([value.getFullYear(), value.getMonth() + 1, value.getDate()]).toEqual([2024, 3, 1]);
+    expect(value.toISOString()).toBe('2024-02-29T22:00:00.000Z');
   });
 });

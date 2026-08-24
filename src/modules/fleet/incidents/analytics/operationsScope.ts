@@ -12,9 +12,9 @@ import { isProjectOwnedByScope, resolveIncidentScope } from '../reviewScope';
 import type { IncidentScopeFilter } from '../reviewScope';
 import { shiftMonth } from './aggregationService';
 import type { AggregateDimensionRequest } from './operationsAggregateQueries';
-import { hasRetainedOnlyFilter } from './operationsFilters';
-import { listScopedProjectIds } from './operationsRunQueries';
-import { sastMonthStart } from './sastDates';
+import { resolveCutoffWorkDate } from '../retention/retentionService';
+import { hasRetainedOnlyFilter, retainedOnlyFilterNames } from './operationsFilters';
+import { listScopedProjectIds, projectIdForOperationalSite } from './operationsRunQueries';
 import type { OperationsFilters } from './types';
 
 export class OperationsAccessDeniedError extends Error {
@@ -63,6 +63,30 @@ function intersectProjects(left: string[] | null, right: string[] | null): strin
   return left.filter((id) => permitted.has(id));
 }
 
+/**
+ * The first month whose detail is retained IN FULL.
+ *
+ * The purge works by DAY: `retentionService` deletes every incident with
+ * `work_date` strictly older than `resolveCutoffWorkDate`, which on the 24th of
+ * a month is the 24th of the month `retentionMonths` earlier. The month that
+ * cutoff falls in is therefore HALF purged — its first twenty-three days are
+ * gone and the rest survive.
+ *
+ * Deriving such a month live would report the surviving days as the whole
+ * month: a confident, complete-looking figure that is missing most of its
+ * input. So a month counts as retained only when its first day is at or after
+ * the cutoff, and a half-purged month is read from the released aggregates,
+ * which were written while all of its detail still existed.
+ *
+ * The cutoff is imported from the retention service rather than restated here.
+ * Two definitions of the same boundary would agree until one of them changed.
+ */
+function firstFullyRetainedMonth(now: string, retentionMonths: number): string {
+  const cutoff = resolveCutoffWorkDate(now, retentionMonths);
+  const cutoffMonth = monthStartOf(cutoff);
+  return cutoff === cutoffMonth ? cutoffMonth : shiftMonth(cutoffMonth, 1);
+}
+
 export interface ResolvedRange {
   scope: IncidentScopeFilter;
   metricVersion: number;
@@ -100,13 +124,18 @@ export async function resolveRange(
   if (filters.projectId !== undefined && !await isProjectOwnedByScope(scope, filters.projectId)) {
     throw new OperationsAccessDeniedError('You cannot view analytics for that project');
   }
+  // A site is reached through its project, so it is scope-checked the same way.
+  // Answering an out-of-scope site with an empty chart would read as "nothing
+  // happened there", which is a different and worse answer than "not yours".
+  if (filters.operationalSiteId !== undefined) {
+    const siteProjectId = await projectIdForOperationalSite(filters.operationalSiteId);
+    if (siteProjectId === null || !await isProjectOwnedByScope(scope, siteProjectId)) {
+      throw new OperationsAccessDeniedError('You cannot view analytics for that site');
+    }
+  }
 
   const policy = await getEffectiveAnalyticsRetentionSettings(now);
-  // The boundary is a South African calendar month: between midnight and 02:00
-  // SAST on the 1st, a UTC reading is still in the previous month and leaves a
-  // month whose detail has already been purged classed as retained — which then
-  // reports zero from facts that no longer exist.
-  const retainedDetailFrom = shiftMonth(sastMonthStart(now), -policy.retentionMonths);
+  const retainedDetailFrom = firstFullyRetainedMonth(now, policy.retentionMonths);
   const months = monthsBetween(filters.start, filters.end);
 
   const scopedProjectIds = scope.unrestricted ? [] : await listScopedProjectIds(scope);
@@ -138,7 +167,7 @@ export async function resolveRange(
 export function assertRetainedOnlyFiltersFit(filters: OperationsFilters, range: ResolvedRange): void {
   if (!hasRetainedOnlyFilter(filters) || range.historicMonths.length === 0) return;
   throw new OperationsFilterConflictError(
-    `op_driver and op_vehicle only apply to months at or after ${range.retainedDetailFrom}, when the detail behind them still exists`,
+    `${retainedOnlyFilterNames(filters).join(', ')} only apply to months at or after ${range.retainedDetailFrom}, when the detail behind them still exists`,
   );
 }
 
@@ -153,7 +182,11 @@ export function aggregateRequestFor(
 ): AggregateDimensionRequest | null {
   const base = { monthStarts: range.historicMonths, metricVersion: range.metricVersion };
   if (filters.operationalSiteId !== undefined) {
-    return { ...base, operationalSiteId: filters.operationalSiteId };
+    // Both, when both were given: a site read without its project would answer
+    // from that site's own rows even when op_project named a different project.
+    return filters.projectId === undefined
+      ? { ...base, operationalSiteId: filters.operationalSiteId }
+      : { ...base, operationalSiteId: filters.operationalSiteId, projectId: filters.projectId };
   }
   if (filters.projectId !== undefined) {
     if (range.allowedProjectIds !== null && !range.allowedProjectIds.includes(filters.projectId)) return null;

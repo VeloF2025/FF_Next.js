@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_RANGE_MONTHS, OperationsFilterError, hasRetainedOnlyFilter, parseOperationsFilters,
+  retainedOnlyFilterNames,
 } from '../operationsFilters';
 
 const PROJECT = '11111111-1111-4111-8111-111111111111';
@@ -120,9 +121,25 @@ describe('retained-only filters', () => {
     expect(hasRetainedOnlyFilter(parseOperationsFilters({ ...range, op_vehicle: VEHICLE }))).toBe(true);
   });
 
-  it('does not count the group filters', () => {
+  it('counts every filter that names an attribute of one incident', () => {
+    // An aggregate row has a project and a site and nothing else, so none of
+    // these survives into a monthly count.
+    for (const filter of [
+      { op_type: 'late' }, { op_severity: 'high' }, { op_outcome: 'confirmed' }, { op_evidence: 'true' },
+    ]) {
+      expect(hasRetainedOnlyFilter(parseOperationsFilters({ ...range, ...filter }))).toBe(true);
+    }
+  });
+
+  it('does not count the two dimensions an aggregate actually has', () => {
     expect(hasRetainedOnlyFilter(parseOperationsFilters({
-      ...range, op_project: PROJECT, op_site: SITE, op_type: 'late',
+      ...range, op_project: PROJECT, op_site: SITE,
     }))).toBe(false);
+  });
+
+  it('names the filters that were actually given, in a stable order', () => {
+    expect(retainedOnlyFilterNames(parseOperationsFilters({
+      ...range, op_severity: 'high', op_driver: DRIVER,
+    }))).toEqual(['op_driver', 'op_severity']);
   });
 });
