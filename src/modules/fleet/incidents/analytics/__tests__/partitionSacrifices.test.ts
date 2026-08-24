@@ -31,6 +31,12 @@ const people = (prefix: string, count: number): string[] =>
   Array.from({ length: count }, (_, index) => `${prefix}-${index}`);
 
 /**
+ * The presence-only search ran 20,000 configurations while it was the only
+ * randomised sweep there was. `derivabilityProperty.test.ts` now covers every
+ * relation-carrying family, over an oracle that solves the system exactly, so
+ * this one is cut to 4,000 — enough to keep watching the presence partition
+ * specifically, cheap enough that both can run on every change.
+ *
  * `releaseAnonymousGroups` only ever publishes a cell whose support already
  * clears the threshold, so through that path one sacrifice always covers the
  * residual. `partitionSacrifices` makes no such assumption about its input —
@@ -88,13 +94,13 @@ describe('the property over randomised configurations', () => {
     };
   }
 
-  it('never leaves a recoverable residual across 20000 random partitions', () => {
+  it('never leaves a recoverable residual across 4000 random presence partitions', () => {
     const random = makeRandom(20260824);
     const members: OperationsMetricKey[] = [
       'presence.confirmed_days', 'presence.unconfirmed_days', 'presence.vehicle_only_days',
     ];
     let checked = 0;
-    for (let iteration = 0; iteration < 20_000; iteration += 1) {
+    for (let iteration = 0; iteration < 4_000; iteration += 1) {
       const siteCount = 1 + Math.floor(random() * 3);
       const groups: CalculatedMetricGroup[] = [];
       for (let site = 0; site < siteCount; site += 1) {
@@ -112,6 +118,6 @@ describe('the property over randomised configurations', () => {
       }
       checked += 1;
     }
-    expect(checked).toBe(20_000);
+    expect(checked).toBe(4_000);
   });
 });

@@ -101,8 +101,17 @@ describe('nested subsets publish their complement (blocker 2)', () => {
   it('does not publish both halves of the pair at any level', () => {
     const released = releaseAnonymousGroups(nested, K);
     for (const level of ['site', 'project', 'organisation']) {
-      const keys = new Set(released.filter((row) => row.dimensionLevel === level).map((row) => row.metricKey));
+      const here = released.filter((row) => row.dimensionLevel === level);
+      const keys = new Set(here.map((row) => row.metricKey));
       expect(keys.has('input.requests_sent') && keys.has('input.responses_received')).toBe(false);
+      // And not through the back door either: `input.responses_received` carries
+      // `input.requests_sent` in its DENOMINATOR column, so a surviving response
+      // row prints the withheld request count in full. Checking `metricKey`
+      // alone would call that a pass.
+      const printsTheSuperset = here.some(
+        (row) => row.metricKey === 'input.responses_received' && row.denominator !== null,
+      );
+      expect(keys.has('input.requests_sent') && printsTheSuperset).toBe(false);
     }
   });
 
