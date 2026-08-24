@@ -20,6 +20,15 @@ import { DEFAULT_SEGMENT_OPTIONS, segmentTrips, type SegmentOptions } from './tr
 const MODULE = 'FleetTripBuild';
 
 /** Positions read per batch. Bounded so one backlogged vehicle cannot monopolise a run. */
+/**
+ * The advisory lock every trip builder takes, cron and backfill alike.
+ *
+ * Exported so the two callers cannot drift apart: two matching string literals in two files is a
+ * silent-failure shape -- change one and the lock stops excluding anything while still appearing
+ * to work.
+ */
+export const TRIP_BUILD_LOCK = 'fleet-build-trips';
+
 export const POSITION_BATCH_SIZE = 5000;
 
 /** Batches per vehicle per run. `POSITION_BATCH_SIZE * this` is the per-run ceiling. */
@@ -123,20 +132,28 @@ export async function buildTripsForVehicle(
 
     if (positions.length < POSITION_BATCH_SIZE) break;
 
-    // Only an OPEN trip needs re-reading from its start: it may continue into the next batch, so
-    // it must be recomputed whole rather than continued from summarised state. A CLOSED trip is
-    // final for this window, so the next batch can begin at the last position consumed.
+    // A trip that STRADDLES the batch edge must be re-read from its own start, so the journey is
+    // recomputed whole rather than continued from summarised state. What identifies a straddler
+    // is not its close reason but whether the BATCH ended it: `ignitionOffAt === lastPositionAt`
+    // means it was cut off by where we stopped reading, not by the vehicle switching off.
     //
-    // Getting this wrong stalls a vehicle permanently and silently. When the next window started
-    // at the last trip's start regardless of state, a vehicle that drove ONCE and has been parked
-    // since -- its tracker still reporting, easily 5,000 parked rows in a fortnight -- produced a
-    // batch containing exactly one closed trip beginning at `readFrom`. `nextFrom` then equalled
-    // `readFrom`, the stall guard fired, and the vehicle made no progress on that run or any
-    // subsequent one, behind a single log.warn.
+    // Keying on `closeReason === 'open'` instead was wrong, and wrong precisely during backfill.
+    // A trip still in progress at the batch edge is closed as `timeout`, not `open`, whenever its
+    // last fix is older than the staleness timeout measured against `now` -- and in a backfill
+    // `now` is the real clock against positions that are weeks old, so EVERY straddler is a
+    // `timeout`. The next window then opened at the last POSITION, mid-journey, and one real
+    // journey was stored as a truncated `timeout` half plus a second, metric-eligible
+    // `ignition_off` trip beginning at a random point on a highway. 58 of them on real data,
+    // understating fleet distance 1.6% at this batch size and 4.4% at 2,000 -- a wrong number
+    // driven by a tuning constant rather than by the vehicles, and never repaired, because the
+    // 6h lookback does not reach back that far.
+    //
+    // A trip the VEHICLE closed mid-batch is final, so the loop still advances past it and the
+    // long-parked vehicle below does not stall.
     const lastTrip = trips[trips.length - 1];
-    const nextFrom = lastTrip && lastTrip.closeReason === 'open'
-      ? lastTrip.ignitionOnAt
-      : lastPositionAt;
+    const straddlesBatchEdge = !!lastTrip
+      && (lastTrip.closeReason === 'open' || lastTrip.ignitionOffAt === lastPositionAt);
+    const nextFrom = straddlesBatchEdge ? lastTrip!.ignitionOnAt : lastPositionAt;
     if (nextFrom === null || (readFrom !== null && nextFrom <= readFrom)) {
       // No forward progress is possible -- a single trip larger than one batch. Stop rather than
       // spin re-reading the same window until the batch budget is gone.

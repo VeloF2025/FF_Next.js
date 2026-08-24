@@ -18,11 +18,10 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { cronSecretMatches } from '@/lib/cronAuth';
 import { log } from '@/lib/logger';
 import { runWithCronLock } from '@/modules/fleet/incidents/cronLock';
-import { buildTrips } from '@/modules/fleet/trips/tripBuildService';
+import { buildTrips, TRIP_BUILD_LOCK } from '@/modules/fleet/trips/tripBuildService';
 import { resolveTripPlaces } from '@/modules/fleet/trips/placeResolver';
 
 const MODULE = 'FleetBuildTripsCron';
-const CRON_LOCK_NAME = 'fleet-build-trips';
 
 /**
  * Trips whose place/locality is resolved per tick.
@@ -49,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const requestedAt = new Date().toISOString();
-    const outcome = await runWithCronLock(CRON_LOCK_NAME, async () => {
+    const outcome = await runWithCronLock(TRIP_BUILD_LOCK, async () => {
       const build = await buildTrips(requestedAt);
       // Then a bounded slice of the place/locality backlog, inside the same lock so two ticks
       // never geocode concurrently and double the request rate Nominatim sees. Bounded by count

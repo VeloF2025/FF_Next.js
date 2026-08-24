@@ -20,7 +20,8 @@
  *
  * Run:  DATABASE_URL=... npx tsx scripts/fleet-trips-backfill.ts
  */
-import { buildTrips } from '../src/modules/fleet/trips/tripBuildService';
+import { runWithCronLock } from '../src/modules/fleet/incidents/cronLock';
+import { buildTrips, TRIP_BUILD_LOCK } from '../src/modules/fleet/trips/tripBuildService';
 
 /**
  * Output for a CLI report tool.
@@ -47,7 +48,19 @@ function fail(line: string): void {
 
 const MAX_PASSES = 100;
 
-async function main(): Promise<void> {
+/**
+ * Runs the whole backfill under the SAME advisory lock the cron takes.
+ *
+ * Without it the backfill and a 15-minute cron tick build concurrently, and the exclusion
+ * constraint rejects the overlapping inserts. That much is loud and self-healing -- but the
+ * recovery is NOT state-preserving: a later clean run settles on different history than it would
+ * have, because the 6h lookback never reaches back to the windows the collision mangled. A
+ * transient overlap during `migrate -> backfill -> enable cron` permanently rewrites history.
+ *
+ * The lock is held for the entire backfill rather than per pass, so a tick firing midway skips
+ * instead of interleaving between passes.
+ */
+async function backfill(): Promise<void> {
   const startedAt = Date.now();
   let pass = 0;
   let totalTrips = 0;
@@ -77,6 +90,14 @@ async function main(): Promise<void> {
   const seconds = Math.round((Date.now() - startedAt) / 1000);
   report(`\ndone: ${totalTrips} trips over ${pass} pass(es) in ${seconds}s`);
   if (pass > MAX_PASSES) fail('hit the pass ceiling — re-run to continue');
+}
+
+async function main(): Promise<void> {
+  const outcome = await runWithCronLock(TRIP_BUILD_LOCK, backfill);
+  if (!outcome.ran) {
+    fail('another trip build holds the lock — refusing to build concurrently. Retry once it ends.');
+    process.exit(1);
+  }
 }
 
 main().then(() => process.exit(0)).catch((e: unknown) => { fail(e instanceof Error ? e.stack ?? e.message : String(e)); process.exit(1); });

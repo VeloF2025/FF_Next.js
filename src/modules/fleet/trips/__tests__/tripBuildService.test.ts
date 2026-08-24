@@ -191,6 +191,45 @@ describe('the stall guard', () => {
     expect(result.moreRemaining).toBe(false);
   });
 
+  it('re-reads a journey straddling the batch edge even though it is labelled timeout', async () => {
+    // THE BACKFILL CASE, and the one no other test here builds. A journey still in progress when
+    // the batch fills is closed by the segmenter as `timeout` -- not `open` -- whenever its last
+    // fix is older than the staleness timeout measured against `now`. During a backfill `now` is
+    // the real clock and the positions are weeks old, so EVERY straddler is labelled `timeout`.
+    //
+    // Advancing on the label rather than on the straddle opened the next window at the last
+    // POSITION, mid-journey. One real journey was then stored as a truncated `timeout` half plus
+    // a second, metric-eligible `ignition_off` trip that begins at a random point on a highway
+    // and never happened. Nothing repairs it: the 6h lookback never reaches back that far.
+    //
+    // The property that matters is whether the trip straddles the edge, which is exactly
+    // `ignitionOffAt === lastPositionAt` -- it was cut off by the batch, not by the vehicle.
+    mocks.readWatermark.mockResolvedValue(null);
+    mocks.loadTripAnchorBefore.mockResolvedValue(null);
+
+    const start = Date.parse('2026-07-21T13:19:07.000Z');
+    const stillDriving = Array.from({ length: POSITION_BATCH_SIZE }, (_, i) => ({
+      ...pos('06:00', true),
+      recordedAt: new Date(start + i * 1000).toISOString(),
+    }));
+    mocks.loadPositions
+      .mockResolvedValueOnce(stillDriving)
+      .mockResolvedValue([]);
+
+    // `now` is a month later: a backfill over historical positions.
+    const result = await buildTripsForVehicle(VEHICLE, { ...OPTS, now: '2026-08-24T10:00:00.000Z' });
+
+    const written = mocks.replaceWindow.mock.calls[0]![2];
+    expect(written[written.length - 1]!.closeReason).toBe('timeout');
+
+    // The next window must reopen at the JOURNEY'S START so it is rebuilt whole -- never at the
+    // batch's last position, which is a point in the middle of the drive.
+    expect(mocks.loadPositions).toHaveBeenCalledTimes(2);
+    const secondFrom = mocks.loadPositions.mock.calls[1]![1];
+    expect(secondFrom).toBe('2026-07-21T13:19:07.000Z');
+    expect(result.moreRemaining).toBe(false);
+  });
+
   it('reports backlog rather than silence when the batch ceiling is reached', async () => {
     // Each batch advances, so the loop runs to the ceiling; the caller must learn there is more.
     let n = 0;
