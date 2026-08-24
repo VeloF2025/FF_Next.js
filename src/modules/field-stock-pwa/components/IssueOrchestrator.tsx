@@ -22,6 +22,7 @@ import { IssueSuccess } from '@/modules/field-stock-pwa/components/IssueSuccess'
 import { StepProgress } from '@/modules/field-stock-pwa/components/StepProgress';
 import { IssueDirtyConfirmDialog } from '@/modules/field-stock-pwa/components/IssueDirtyConfirmDialog';
 import { FIELD_DEFAULT_LOCATION_ID } from '@/modules/field-stock-pwa/lib/locationDefaults';
+import { saveIssueFlow, loadIssueFlow, clearIssueFlow } from '@/modules/field-stock-pwa/lib/issueFlowPersistence';
 import type { PwaTechSummary, PwaScannedSerial, PwaPickingResult } from '@/modules/field-stock-pwa/types';
 
 // --- Types ---
@@ -66,6 +67,27 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
   const router = useRouter();
   const [flow, setFlow] = React.useState<IssueState>(INITIAL_ISSUE_STATE);
   const [showDiscardConfirm, setShowDiscardConfirm] = React.useState(false);
+
+  // Survive a page reload (Android discards the tab while the camera app is
+  // open for the photo-serial fallback): restore the saved flow on mount,
+  // persist on every change. Restore runs in an effect — not the useState
+  // initializer — so SSR markup and first client render match.
+  React.useEffect(() => {
+    const saved = loadIssueFlow();
+    if (saved) setFlow({ ...saved, result: null });
+  }, []);
+  React.useEffect(() => {
+    const { step } = flow;
+    if (step === 'done') { clearIssueFlow(); return; }
+    saveIssueFlow({
+      step,
+      sourceLocation: flow.sourceLocation,
+      technician: flow.technician,
+      stockItem: flow.stockItem,
+      scanned: flow.scanned,
+      quantity: flow.quantity,
+    });
+  }, [flow]);
 
   const isDirty =
     flow.step !== 'pick-warehouse' &&
