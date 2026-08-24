@@ -14,10 +14,22 @@
  * 2. Coverage is reported. Only 18 of 23 active vehicles carry a tracker, so a fleet-wide total is
  *    a total for the tracked subset. Returning that ratio stops a partial answer reading as a
  *    complete one.
+ *
+ * Gated on `fleet.locations`, matching its closest sibling `locations.ts`. Bare `withAuth` would
+ * let any authenticated user of any role pull every vehicle's movement history for any date range.
+ * That is a heavier disclosure than the live-position endpoint which IS gated: one position is a
+ * point in time, a trip history is a movement pattern per vehicle over weeks.
+ *
+ * `fleet.locations` is reused rather than a new `fleet.trips` because it is registered and
+ * actually granted (7 roles today), and it covers the same data class. A dedicated `fleet.trips`
+ * would be more precise, but registering it needs a migration AND role grants -- and several
+ * fleet permissions in this repo are gated on keys nobody holds, which makes those routes
+ * reachable only by super_admin. Shipping that shape here would be a dead endpoint, not tighter
+ * security.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth/middleware';
 import { query, queryOne } from '@/lib/db-pool';
 
 const MAX_RANGE_DAYS = 92;
@@ -203,4 +215,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   });
 }
 
-export default withAuth(handler);
+async function permissionRouted(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+  // Read-only endpoint: 'view' is the only action it can take.
+  return withPermission('fleet.locations', 'view')(handler)(req, res);
+}
+
+export default withAuth(permissionRouted);

@@ -88,7 +88,14 @@ export async function buildTripsForVehicle(
     positionsProcessed += positions.length;
     if (lastPositionAt) {
       await writeWatermark(vehicle.vehicleId, lastPositionAt, positions.length);
-      watermark = lastPositionAt;
+      // Never let the in-run watermark move BACKWARDS. `loadPositions` reads from
+      // `watermark - lookback`, so if a batch does not span the full lookback window the next
+      // batch would re-read most of the same rows and the loop could burn its batch budget
+      // without converging. The DB write already guards this with GREATEST; this is the same
+      // guarantee for the in-memory copy. Cannot trigger at current density (max 1,688 positions
+      // in any 6h window per vehicle, against a 5,000 batch size) -- but density is not a
+      // property this loop should depend on.
+      if (watermark === null || lastPositionAt > watermark) watermark = lastPositionAt;
     }
 
     // A short batch means we have caught up; anything else means more is waiting.

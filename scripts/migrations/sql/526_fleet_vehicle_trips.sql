@@ -1,4 +1,4 @@
--- 525_fleet_vehicle_trips.sql
+-- 526_fleet_vehicle_trips.sql
 --
 -- Durable, continuously-built trips from the position stream.
 --

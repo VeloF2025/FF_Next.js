@@ -1,6 +1,6 @@
--- rollback_525_fleet_vehicle_trips.sql
+-- rollback_526_fleet_vehicle_trips.sql
 --
--- Drops only what 525 created. 525 is additive -- it ALTERs nothing existing -- so this rollback
+-- Drops only what 526 created. 526 is additive -- it ALTERs nothing existing -- so this rollback
 -- cannot affect fleet_gps_trips, the investigation flow, or any other table.
 --
 -- Order: watermarks first, then trips. Neither references the other, so the order is for

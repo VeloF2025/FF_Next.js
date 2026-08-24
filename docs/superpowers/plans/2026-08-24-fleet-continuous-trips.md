@@ -30,7 +30,7 @@ Measured against the live shared DB on 2026-08-23/24, not assumed:
 | Tracker coverage | 23 active vehicles, **18 tracked**, 5 untracked | Trips will cover 18 vehicles; the 5 are a data-collection gap, not a code gap |
 | Named-place reference data | `fleet_authorized_locations` **0** · `fleet_vehicle_parking_locations` 5 · `project_aois` 9 | Internal place-naming is thin; see "Locations" |
 | Geocoder | Nominatim (OSM) via `pages/api/geocode.ts`, TTL cache + in-flight dedupe, shared with parking | Bulk querying breaches OSM policy and would break parking compliance |
-| Next free migration | **525** (max on disk and in `schema_migrations` is 524) | Re-verify immediately before writing — numbers move fast |
+| Next free migration | **526** — 525 was claimed by `525_stock_take_init_only_stocked_items.sql`, merged and applied mid-build on 2026-08-24. Re-verify against ALL remote branches, not just master and the DB. |
 
 ## Decisions taken
 
@@ -45,7 +45,7 @@ Measured against the live shared DB on 2026-08-23/24, not assumed:
   into JSONB forever.
 - Its read APIs (`[jobId]/trips.ts`) are job-scoped and would not surface continuous trips anyway.
 
-So: **`fleet_vehicle_trips`**, migration 525. The investigation table and flow are untouched.
+So: **`fleet_vehicle_trips`**, migration 526. The investigation table and flow are untouched.
 
 ### Closing a trip
 
@@ -106,7 +106,7 @@ Classification is a later task, not a blocker.
 ## Task DAG
 
 ```
-1 migration 525 ─┬─> 2 segmentation (pure) ─> 3 repository ─┬─> 4 incremental job ─> 5 cron endpoint
+1 migration 526 ─┬─> 2 segmentation (pure) ─> 3 repository ─┬─> 4 incremental job ─> 5 cron endpoint
                  │                                          │
                  └──────────────────────────────────────────┴─> 6 place resolver
                                                                 7 backfill script  (after 4)
@@ -115,7 +115,7 @@ Classification is a later task, not a blocker.
 
 | # | Task | Deliverable | Depends on |
 |---|---|---|---|
-| 1 | Schema | `525_fleet_vehicle_trips.sql` + rollback | — |
+| 1 | Schema | `526_fleet_vehicle_trips.sql` + rollback | — |
 | 2 | Segmentation | `tripSegmenter.ts` — pure: positions → trips, with close reasons and idle seconds | — |
 | 3 | Repository | `tripRepository.ts` — idempotent upsert on `(vehicle_id, ignition_on_at)`, watermark read/write | 1 |
 | 4 | Incremental job | `tripBuildService.ts` — per vehicle, from watermark, reopens the last open trip | 2, 3 |
@@ -124,7 +124,7 @@ Classification is a later task, not a blocker.
 | 7 | Backfill | one-off over 2026-07-16 → now, same code path as the job | 4 |
 | 8 | Read API | `pages/api/fleet/trips.ts` — vehicle + date range, honest about close reasons | 3 |
 
-## Table shape (migration 525)
+## Table shape (migration 526)
 
 ```
 fleet_vehicle_trips

@@ -8,15 +8,20 @@
  * history of exactly that class of bug. So the tests assert the literal instants that reach SQL,
  * not merely that a query happened.
  */
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ query: vi.fn(), queryOne: vi.fn() }));
 
 vi.mock('@/lib/db-pool', () => ({ query: mocks.query, queryOne: mocks.queryOne }));
-// withAuth is exercised by its own suite; here it must pass through so the handler is reachable.
-vi.mock('@/lib/auth', () => ({
+// withAuth and withPermission have their own suites; here they pass through so the handler is
+// reachable. That the route IS wrapped in both is asserted separately below against the source,
+// because a pass-through mock cannot prove a gate exists.
+vi.mock('@/lib/auth/middleware', () => ({
   withAuth: (h: unknown) => h,
+  withPermission: () => (h: unknown) => h,
 }));
 
 import handler from '@/pages/api/fleet/trips';
@@ -212,5 +217,19 @@ describe('honesty of the response', () => {
     expect(typeof trip.durationSeconds).toBe('number');
     expect(trip.start.place).toBe('Depot');
     expect(trip.start.locality).toBe('Centurion');
+  });
+});
+
+describe('access control', () => {
+  it('is gated on a permission, not merely on being logged in', () => {
+    // A pass-through mock proves nothing about the gate, so this asserts against the SOURCE.
+    // Bare withAuth would let any authenticated user of any role pull every vehicle's movement
+    // history — a heavier disclosure than the live-position endpoint, which is gated.
+    const src = readFileSync(
+      resolve(__dirname, '../trips.ts'),
+      'utf8',
+    );
+    expect(src).toContain("withPermission('fleet.locations', 'view')");
+    expect(src).toContain('export default withAuth(');
   });
 });
