@@ -36,18 +36,32 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_trips (
   off_lat NUMERIC(10,7),
   off_lon NUMERIC(10,7),
 
-  -- Reverse-geocoded street address, filled asynchronously by a throttled resolver at <= 1
-  -- request/second. Never resolved inline: Nominatim's acceptable-use policy forbids systematic
-  -- bulk querying, and the geocoder is shared with parking compliance, so a bulk pattern here
-  -- would take that feature down too. NULL means "not resolved yet", never "nowhere".
+  -- Reverse-geocoded LOCALITY -- "city, municipal district, province", not a street address. The
+  -- shared reverseGeocode is tuned for South Africa and returns those three fields only; widening
+  -- it would change a contract the parking and attendance features rely on.
+  --
+  -- Filled asynchronously by a throttled resolver at <= 1 request/second, never inline:
+  -- Nominatim's acceptable-use policy forbids systematic bulk querying, and the geocoder shares
+  -- one cache with parking compliance, so a bulk pattern here would take that feature down too.
+  -- NULL means "not resolved yet", never "nowhere".
   on_location_text TEXT,
   off_location_text TEXT,
 
-  -- Nearest known internal place (parking location or project AOI) and how far it was. Cheap,
-  -- exact, no external dependency -- this is the half of "where" that always works.
+  -- Nearest known internal place and how far it was. Cheap, exact, no external dependency --
+  -- this is the half of "where" that always works.
+  --
+  -- `kind` is required alongside the id because the id can come from two different tables
+  -- (fleet_vehicle_parking_locations or project_aois); a bare UUID would not say which, and there
+  -- is deliberately no FK for the same reason. `label` is a SNAPSHOT: parking locations are
+  -- superseded over time, so resolving the name later would silently change what a historical
+  -- trip appears to say.
   on_nearest_place_id UUID,
+  on_nearest_place_kind TEXT,
+  on_nearest_place_label TEXT,
   on_nearest_place_distance_m NUMERIC(10,1),
   off_nearest_place_id UUID,
+  off_nearest_place_kind TEXT,
+  off_nearest_place_label TEXT,
   off_nearest_place_distance_m NUMERIC(10,1),
 
   duration_seconds BIGINT,
@@ -118,6 +132,22 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_trips (
     (on_lat IS NULL OR on_lat BETWEEN -90 AND 90)
     AND (off_lat IS NULL OR off_lat BETWEEN -90 AND 90)
   ),
+  CONSTRAINT fleet_vehicle_trips_place_kind CHECK (
+    (on_nearest_place_kind IS NULL OR on_nearest_place_kind IN ('parking', 'project_aoi'))
+    AND (off_nearest_place_kind IS NULL OR off_nearest_place_kind IN ('parking', 'project_aoi'))
+  ),
+
+  -- An id without its kind is unresolvable, and a kind without an id names nothing.
+  CONSTRAINT fleet_vehicle_trips_place_paired CHECK (
+    (on_nearest_place_id IS NULL) = (on_nearest_place_kind IS NULL)
+    AND (off_nearest_place_id IS NULL) = (off_nearest_place_kind IS NULL)
+  ),
+
+  CONSTRAINT fleet_vehicle_trips_place_distance_nonnegative CHECK (
+    (on_nearest_place_distance_m IS NULL OR on_nearest_place_distance_m >= 0)
+    AND (off_nearest_place_distance_m IS NULL OR off_nearest_place_distance_m >= 0)
+  ),
+
   CONSTRAINT fleet_vehicle_trips_lon_range CHECK (
     (on_lon IS NULL OR on_lon BETWEEN -180 AND 180)
     AND (off_lon IS NULL OR off_lon BETWEEN -180 AND 180)

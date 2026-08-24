@@ -19,9 +19,19 @@ import { cronSecretMatches } from '@/lib/cronAuth';
 import { log } from '@/lib/logger';
 import { runWithCronLock } from '@/modules/fleet/incidents/cronLock';
 import { buildTrips } from '@/modules/fleet/trips/tripBuildService';
+import { resolveTripPlaces } from '@/modules/fleet/trips/placeResolver';
 
 const MODULE = 'FleetBuildTripsCron';
 const CRON_LOCK_NAME = 'fleet-build-trips';
+
+/**
+ * Trips whose place/locality is resolved per tick.
+ *
+ * 25 trips x 2 ends x 1.1s pacing is ~55s worst case, comfortably inside the wrapper's curl
+ * timeout, and at a 15-minute cadence it clears roughly 4,800 ends a day -- more than the ~1,950
+ * a week the fleet actually produces, so the backlog drains and then stays empty.
+ */
+const PLACE_RESOLVE_BATCH = 25;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'POST') {
@@ -39,7 +49,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const requestedAt = new Date().toISOString();
-    const outcome = await runWithCronLock(CRON_LOCK_NAME, () => buildTrips(requestedAt));
+    const outcome = await runWithCronLock(CRON_LOCK_NAME, async () => {
+      const build = await buildTrips(requestedAt);
+      // Then a bounded slice of the place/locality backlog, inside the same lock so two ticks
+      // never geocode concurrently and double the request rate Nominatim sees. Bounded by count
+      // rather than by the backlog, so a tick's duration stays predictable: worst case is roughly
+      // PLACE_RESOLVE_BATCH x 2 ends x 1.1s of pacing.
+      const places = await resolveTripPlaces(PLACE_RESOLVE_BATCH);
+      return { ...build, places };
+    });
     if (!outcome.ran) {
       log.info('Another trip build holds the lock — skipping this tick', undefined, MODULE);
       return apiResponse.success(res, { skipped: true });
