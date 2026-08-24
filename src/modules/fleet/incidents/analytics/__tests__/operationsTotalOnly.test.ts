@@ -42,7 +42,7 @@ const mocks = {
 
 import { getOperationsAnalytics } from '../operationsAnalyticsService';
 import { resetOperationsMocks } from './operationsMocks';
-import { NOW, PROJECT, filters, viewer } from './operationsTestFixtures';
+import { NOW, PROJECT, filters, incident, viewer } from './operationsTestFixtures';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -93,5 +93,68 @@ describe('a month released at the TOTAL_ONLY tier', () => {
   it('carries no denominator for the total, because there is no population to divide by', async () => {
     const report = await getOperationsAnalytics(filters(historic), viewer, NOW);
     expect(report.cards[0]?.denominator).toBeNull();
+  });
+});
+
+describe('a component released at NONE, beside one that was not', () => {
+  // A range that straddles the boundary: August 2025 is purged, September is
+  // retained. The purged month published its whole presence component and no
+  // incident rows at all — the incidents component is rooted on an internal
+  // tally, so it is FULL or NOTHING, never a total on its own.
+  const straddling = { start: '2025-08-01', end: '2025-09-30' };
+
+  beforeEach(() => {
+    aggregateMock.readPublishedAggregates.mockResolvedValue([
+      { monthStart: '2025-08-01', dimensionProjectId: PROJECT, metricKey: 'presence.scheduled_days', numerator: 20, denominator: null },
+      { monthStart: '2025-08-01', dimensionProjectId: PROJECT, metricKey: 'presence.confirmed_days', numerator: 18, denominator: 20 },
+      { monthStart: '2025-08-01', dimensionProjectId: PROJECT, metricKey: 'presence.unconfirmed_days', numerator: 1, denominator: 20 },
+      { monthStart: '2025-08-01', dimensionProjectId: PROJECT, metricKey: 'presence.vehicle_only_days', numerator: 1, denominator: 20 },
+    ]);
+    factsMock.loadIncidentFacts.mockImplementation(async (monthStart: string) => (
+      monthStart === '2025-09-01' ? [incident({ workDate: '2025-09-10' })] : []
+    ));
+  });
+
+  it('names the group the purged month published nothing for', async () => {
+    const report = await getOperationsAnalytics(filters(straddling), viewer, NOW);
+    expect(report.suppressionNotices.join(' '))
+      .toMatch(/No figures were published for the incident.total group in 2025-08-01/);
+  });
+
+  it('says nothing about the group that month published in full', async () => {
+    const report = await getOperationsAnalytics(filters(straddling), viewer, NOW);
+    expect(report.suppressionNotices.join(' ')).not.toMatch(/presence.scheduled_days group/);
+  });
+
+  it('marks the card that only one of the two months could contribute to', async () => {
+    // Without this a two-month incident total that only one month reported
+    // reads as a fall in incidents that did not happen.
+    const report = await getOperationsAnalytics(filters(straddling), viewer, NOW);
+    expect(report.cards.find((card) => card.metricKey === 'incident.late')?.coverage)
+      .toEqual({ months: 1, of: 2 });
+  });
+
+  it('marks the card both months did contribute to as complete', async () => {
+    const report = await getOperationsAnalytics(filters(straddling), viewer, NOW);
+    expect(report.cards.find((card) => card.metricKey === 'presence.scheduled_days')?.coverage)
+      .toEqual({ months: 2, of: 2 });
+  });
+
+  it('counts a month once even when several projects reported the key in it', async () => {
+    aggregateMock.readPublishedAggregates.mockResolvedValue([
+      { monthStart: '2025-08-01', dimensionProjectId: PROJECT, metricKey: 'presence.scheduled_days', numerator: 20, denominator: null },
+      { monthStart: '2025-08-01', dimensionProjectId: 'another-project', metricKey: 'presence.scheduled_days', numerator: 5, denominator: null },
+    ]);
+    const report = await getOperationsAnalytics(filters(straddling), viewer, NOW);
+    const card = report.cards.find((c) => c.metricKey === 'presence.scheduled_days');
+    expect(card?.numerator).toBe(25);
+    expect(card?.coverage.months).toBeLessThanOrEqual(2);
+  });
+
+  it('gives a single month value a coverage of one of one', async () => {
+    const report = await getOperationsAnalytics(filters(straddling), viewer, NOW);
+    const august = report.series.find((month) => month.monthStart === '2025-08-01');
+    expect(august?.values.find((v) => v.metricKey === 'presence.scheduled_days')?.coverage)
+      .toEqual({ months: 1, of: 1 });
   });
 });

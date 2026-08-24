@@ -1328,6 +1328,16 @@ channels that per-key suppression does not close. Read
 [`fleet-analytics-disclosure.md`](./fleet-analytics-disclosure.md) before exposing it through any
 API, export, report, or UI.
 
+Every read goes through `fleet_operational_monthly_aggregates_published` (migration 527), never the
+base table: the view hard-codes `is_active = true`, and a superseded generation is the disclosive
+one. `aggregateViewContract.test.ts` fails the build if any file outside the writer reaches past it.
+
+The view is narrower than the table in two ways every reader must account for: it publishes
+**organisation and project rows only** — no site rows — and it carries **no `contributor_count`, no
+histogram columns and no `generalized_from_level`**. Release is per-component and tiered
+(FULL / TOTAL_ONLY / NONE); a TOTAL_ONLY component publishes its root total with a NULL denominator
+and none of its members.
+
 ## Incident chronology (`GET /api/fleet/incidents/[incidentId]/timeline`)
 
 | Method | Endpoint | Gate |
@@ -1365,16 +1375,6 @@ Four things to know before changing it:
   what lets the in-memory merge use it directly. Displayed `occurredAt` stays the `Date`.
 - **Scope failures answer 403, missing incidents 404** — the same pair, in the same order, as
   `GET /api/fleet/incidents/[incidentId]`. `limit` above 200 is a 400, never a silent clamp.
-Every read goes through `fleet_operational_monthly_aggregates_published` (migration 527), never the
-base table: the view hard-codes `is_active = true`, and a superseded generation is the disclosive
-one. `aggregateViewContract.test.ts` fails the build if any file outside the writer reaches past it.
-
-The view is narrower than the table in two ways every reader must account for: it publishes
-**organisation and project rows only** — no site rows — and it carries **no `contributor_count`, no
-histogram columns and no `generalized_from_level`**. Release is per-component and tiered
-(FULL / TOTAL_ONLY / NONE); a TOTAL_ONLY component publishes its root total with a NULL denominator
-and none of its members.
-
 ## Operations analytics read path (PR 8 task 7)
 
 ### APIs and scope
@@ -1421,11 +1421,21 @@ they can open in their own queue. **This is a property of that gate.** Any futur
 this code with a wider audience — an export to a client, a public dashboard, a broader permission —
 invalidates the reasoning, not just the numbers.
 
-The historic half reports what was published and says what is missing. A TOTAL_ONLY component comes
-back as its root total with a NULL denominator; the members are **omitted, never rendered as zero**,
-and a notice says the narrower figures were withheld. A purged month reports `histogram: null` — the
-view has no bucket columns — rather than an empty histogram that would read as "no durations were
-recorded".
+The historic half reports what was published and says what is missing, per month and per component:
+
+- **TOTAL_ONLY** comes back as a root total with a NULL denominator; the members are **omitted, never
+  rendered as zero**, and a notice names the group and the months.
+- **NONE** comes back as no rows at all, and is the ONLY tier a component rooted on an internal tally
+  can reach besides FULL — `incident.total` is no metric key, so incidents are all-or-nothing. A
+  notice names those months too: nothing in the figures distinguishes "withheld" from "no incidents".
+- Every card and every series value carries `coverage: { months, of }` — how many months of the range
+  reported that key. A two-month range can hand back a two-month presence total beside a one-month
+  incident total, and without this the incident figure reads as a fall that did not happen.
+
+A purged month reports `histogram: null` — the view has no bucket columns — rather than an empty
+histogram that would read as "no durations were recorded". The managed-projects coverage notice is
+counted **per month**: over the union, a project that published in June and nothing in July looks
+fully covered while July's total is quietly short one project.
 
 ### What the API refuses, and why
 

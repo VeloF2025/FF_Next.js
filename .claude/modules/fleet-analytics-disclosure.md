@@ -268,7 +268,12 @@ rule above:
   into a monthly count. Same 400, same reason: dropping a filter WIDENS the answer without saying so.
 - **A TOTAL_ONLY component renders as a total with nothing under it.** The members are omitted from
   the response — never rendered as zero, which would say the opposite of what happened — and a notice
-  says the narrower figures were withheld. The total's denominator stays null for the same reason.
+  names the group and the months. The total's denominator stays null for the same reason.
+- **A NONE component renders as nothing, and is named too.** A component rooted on an internal tally
+  reaches only FULL or NONE, so a purged month can carry a full presence component and no incident
+  row whatever. Every card and series value therefore carries `coverage: { months, of }`, counting the
+  months of the range that reported that key: a total short a month is marked as such rather than
+  presented beside a complete one.
 - **No histogram is reported for a purged month.** The view has no bucket columns; null says "we no
   longer hold the durations" where an empty bucket array would say "none were recorded".
 

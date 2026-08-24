@@ -32,13 +32,13 @@
  */
 import type { IncidentFact, OperationsFact } from './facts';
 import { calculateMonthlyMetrics } from './metricCalculator';
-import { METRIC_COMPONENTS } from './metricRelations';
 import type { PublishedAggregate } from './operationsAggregateQueries';
 import { readPublishedAggregates } from './operationsAggregateQueries';
 import { loadRetainedFacts, omittedMetricKeys } from './operationsFactSelection';
+import { missingProjectNotice, releaseTierNotices } from './operationsNotices';
 import { foldToCards, upsertValue } from './operationsMetricValues';
 import { latestAggregationRun } from './operationsRunQueries';
-import type { OperationsViewer, ResolvedRange } from './operationsScope';
+import type { OperationsViewer } from './operationsScope';
 import {
   DRILL_DOWN_PAGE_SIZE, OperationsFilterConflictError,
   aggregateRequestFor, assertRetainedOnlyFiltersFit, monthsBetween, resolveRange,
@@ -77,6 +77,7 @@ function valuesFromFacts(
     upsertValue(values, {
       metricKey: group.metricKey, numerator: group.numerator, denominator: group.denominator,
       histogram: group.histogram ? { ...group.histogram, buckets: [...group.histogram.buckets] } : null,
+      coverage: { months: 1, of: 1 },
     });
     byMonth.set(group.monthStart, values);
   }
@@ -97,66 +98,8 @@ function publishedValue(row: PublishedAggregate): OperationsMetricValue {
     numerator: row.numerator,
     denominator: row.denominator,
     histogram: null,
+    coverage: { months: 1, of: 1 },
   };
-}
-
-/**
- * Whether any component came back as a total with its breakdown withheld.
- *
- * That is the TOTAL_ONLY tier as it appears from this side: the component's
- * root key is present and at least one of its other keys is not. The members
- * are simply absent from the response — never rendered as zero, which would
- * claim the opposite of what happened — so without this notice a reader would
- * see a total with nothing under it and no reason given.
- *
- * A component with NO rows at all is not this case: nothing was published for
- * it, which the "no published figures" notice covers when it holds for the
- * whole selection.
- */
-function withheldBreakdownNotice(published: readonly PublishedAggregate[]): string | null {
-  const byMonth = new Map<string, Set<string>>();
-  for (const row of published) {
-    const keys = byMonth.get(row.monthStart) ?? new Set<string>();
-    keys.add(row.metricKey);
-    byMonth.set(row.monthStart, keys);
-  }
-  for (const keys of byMonth.values()) {
-    for (const component of METRIC_COMPONENTS) {
-      if (component.rootKey === null || !keys.has(component.rootKey)) continue;
-      if (component.keys.some((key) => !keys.has(key))) {
-        return 'Some months before the retention boundary report a total without the figures behind it: '
-          + 'the narrower groups described too few people to publish, so they are omitted rather than shown as zero.';
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * A restricted viewer reading their own projects gets one row per project that
- * published, and a project withheld by suppression is simply absent — nothing
- * in the response distinguishes it from a project where nothing happened. The
- * total is then presented as complete when it is not, so it says so instead.
- *
- * Deliberately not phrased as "withheld": a project with no incidents at all in
- * those months is equally absent, and claiming suppression that did not happen
- * is its own kind of wrong answer.
- */
-function missingProjectNotice(
-  filters: OperationsFilters, range: ResolvedRange, published: readonly PublishedAggregate[],
-): string | null {
-  const readsManagedProjects = !range.scope.unrestricted
-    && filters.projectId === undefined && filters.operationalSiteId === undefined
-    && filters.managerUserId === undefined;
-  if (!readsManagedProjects || range.historicMonths.length === 0) return null;
-  const expected = range.scopedProjectIds.size;
-  const covered = new Set(published
-    .map((row) => row.dimensionProjectId)
-    .filter((id): id is string => id !== null)).size;
-  if (expected === 0 || covered >= expected) return null;
-  return `Figures for the months before the retention boundary cover ${covered} of the ${expected} projects you manage; `
-    + 'the rest published nothing for those months, either because nothing happened there or because the group '
-    + 'described too few people to publish.';
 }
 
 export async function getOperationsAnalytics(
@@ -191,14 +134,7 @@ export async function getOperationsAnalytics(
       .sort((a, b) => a.metricKey.localeCompare(b.metricKey)),
   }));
 
-  const suppressionNotices: string[] = [];
-  const withheldBreakdown = withheldBreakdownNotice(published);
-  if (withheldBreakdown !== null) suppressionNotices.push(withheldBreakdown);
-  if (range.historicMonths.length > 0 && published.length === 0) {
-    suppressionNotices.push(
-      'No published figures exist for the months before the retention boundary in this selection.',
-    );
-  }
+  const suppressionNotices: string[] = releaseTierNotices(range.historicMonths, published);
   const missing = missingProjectNotice(filters, range, published);
   if (missing !== null) suppressionNotices.push(missing);
 
@@ -251,12 +187,26 @@ export async function getOperationsDrillDown(
     const published = aggregateRequest === null
       ? []
       : await readPublishedAggregates(aggregateRequest, range.scope);
-    const values = foldToCards([{ values: published.map(publishedValue) }]);
+    // Folded per month, including months that published nothing, so `coverage`
+    // on each value counts the months of the RANGE rather than one bucket
+    // holding everything.
+    const byMonth = new Map<string, OperationsMetricValue[]>();
+    for (const row of published) {
+      const values = byMonth.get(row.monthStart) ?? [];
+      upsertValue(values, publishedValue(row));
+      byMonth.set(row.monthStart, values);
+    }
+    const values = foldToCards(
+      range.historicMonths.map((monthStart) => ({ values: byMonth.get(monthStart) ?? [] })),
+    );
     return { mode: 'aggregate_only', values, incidentIds: [], nextCursor: null };
   }
 
   const facts = await loadRetainedFacts(range.retainedMonths, filters, range.allowedProjectIds);
-  const values = foldToCards([...valuesFromFacts(facts, range.metricVersion, filters).values()].map((v) => ({ values: v })));
+  const byMonth = valuesFromFacts(facts, range.metricVersion, filters);
+  const values = foldToCards(
+    range.retainedMonths.map((monthStart) => ({ values: byMonth.get(monthStart) ?? [] })),
+  );
 
   // Sorted so a cursor means the same thing on every request; the cursor is the
   // last id returned, which cannot drift the way an offset does when a month is

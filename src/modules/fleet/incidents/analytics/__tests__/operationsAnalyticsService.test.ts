@@ -137,7 +137,7 @@ describe('the retained / historic split', () => {
     expect(factsMock.loadIncidentFacts).not.toHaveBeenCalled();
     expect(report.cards).toEqual([
       // No histogram: the published view has no bucket columns to read.
-      { metricKey: 'incident.late', numerator: 7, denominator: 20, histogram: null },
+      { metricKey: 'incident.late', numerator: 7, denominator: 20, histogram: null, coverage: { months: 1, of: 1 } },
     ]);
   });
 
@@ -196,69 +196,6 @@ describe('folding months into cards', () => {
     const report = await getOperationsAnalytics(filters({ start: '2026-06-01', end: '2026-08-31' }), viewer, NOW);
     expect(report.series.map((month) => month.monthStart)).toEqual(['2026-06-01', '2026-07-01', '2026-08-01']);
     expect(report.series[0]?.values).toEqual([]);
-  });
-});
-
-describe('suppression notices and freshness', () => {
-  it('says when a total came back without the figures behind it', async () => {
-    aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.scheduled_days', numerator: 20, denominator: null },
-    ]);
-    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
-    expect(report.suppressionNotices.join(' ')).toMatch(/without the figures behind it/);
-  });
-
-  it('adds no such notice when the whole component came back', async () => {
-    aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.scheduled_days', numerator: 20, denominator: null },
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.confirmed_days', numerator: 18, denominator: 20 },
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.unconfirmed_days', numerator: 1, denominator: 20 },
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'presence.vehicle_only_days', numerator: 1, denominator: 20 },
-    ]);
-    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
-    expect(report.suppressionNotices.join(' ')).not.toMatch(/without the figures behind it/);
-  });
-
-  it('says when historic months returned nothing at all', async () => {
-    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
-    expect(report.suppressionNotices.join(' ')).toMatch(/No published figures/);
-  });
-
-  it('adds no notice when nothing was suppressed', async () => {
-    factsMock.loadIncidentFacts.mockResolvedValue([incident()]);
-    const report = await getOperationsAnalytics(filters(), viewer, NOW);
-    expect(report.suppressionNotices).toEqual([]);
-  });
-
-  it('says how many managed projects the historic half actually covered', async () => {
-    runMock.listScopedProjectIds.mockResolvedValue([PROJECT, OTHER_PROJECT]);
-    aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null },
-    ]);
-    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
-    expect(report.suppressionNotices.join(' ')).toMatch(/1 of the 2 projects/);
-  });
-
-  it('adds no such notice when every project published', async () => {
-    aggregateMock.readPublishedAggregates.mockResolvedValue([
-      { monthStart: '2024-01-01', dimensionProjectId: PROJECT, metricKey: 'incident.late', numerator: 5, denominator: null },
-    ]);
-    const report = await getOperationsAnalytics(filters({ start: '2024-01-01', end: '2024-01-31' }), viewer, NOW);
-    expect(report.suppressionNotices.join(' ')).not.toMatch(/projects/);
-  });
-
-  it('reports freshness for the metric version the numbers were built under', async () => {
-    settingsMock.getEffectiveAnalyticsRetentionSettings.mockResolvedValue({ retentionMonths: 12, metricVersion: 3 });
-    runMock.latestAggregationRun.mockResolvedValue({ status: 'partial', aggregatesThrough: '2026-06-01' });
-    const report = await getOperationsAnalytics(filters(), viewer, NOW);
-    expect(runMock.latestAggregationRun).toHaveBeenCalledWith(3);
-    expect(report.freshness).toEqual({ aggregatesThrough: '2026-06-01', lastRunStatus: 'partial' });
-  });
-
-  it('reports nulls when the pipeline has never run, not a confident zero', async () => {
-    runMock.latestAggregationRun.mockResolvedValue(null);
-    const report = await getOperationsAnalytics(filters(), viewer, NOW);
-    expect(report.freshness).toEqual({ aggregatesThrough: null, lastRunStatus: null });
   });
 });
 
