@@ -87,11 +87,24 @@ export function configurationFor(seed: number): OperationsFact[] {
   const pick = (count: number): number => Math.floor(random() * count);
   const facts: OperationsFact[] = [];
 
-  for (let project = 0; project < 1 + pick(2); project += 1) {
+  // Every fourth seed is a SHARED-STAFF month: three projects, and staff drawn
+  // from one pool so the same person appears at several sites and across
+  // projects. Without it the sweep only ever saw rosters that partition
+  // cleanly, and a contributor union is exactly the thing that behaves
+  // differently when they do not — a project's support can be smaller than the
+  // sum of its sites', and the organisation's smaller again.
+  const shared = seed % 4 === 0;
+  const pool = Array.from({ length: 9 }, (_, index) => `shared-${index}`);
+  const projectCount = shared ? 3 : 1 + pick(2);
+
+  for (let project = 0; project < projectCount; project += 1) {
     const projectId = `p${project}`;
     for (let site = 0; site < 1 + pick(2); site += 1) {
       const siteId = `${projectId}s${site}`;
-      const roster = Array.from({ length: 1 + pick(6) }, (_, index) => `${siteId}-${index}`);
+      const roster = shared
+        ? pool.slice(pick(4), pick(4) + 2 + pick(6))
+        : Array.from({ length: 1 + pick(6) }, (_, index) => `${siteId}-${index}`);
+      if (roster.length === 0) continue;
       for (const person of roster) {
         for (let day = 0; day < 1 + pick(3); day += 1) {
           facts.push(presence(projectId, siteId, person, (['confirmed', 'unconfirmed', 'vehicle_only'] as const)[pick(3)]!));
@@ -124,29 +137,42 @@ export function configurationFor(seed: number): OperationsFact[] {
 }
 
 /**
- * The month the usability target is measured on: one project, three sites,
- * twenty staff between them, and a month's worth of ordinary operations. This
- * is what a customer actually has, and the release rule has to say something
- * useful about it or it is not a release rule.
+ * The month the usability target is measured on: TWO projects — one of three
+ * sites and twenty staff, one of a single site and four — and a month of
+ * ordinary operations over both.
+ *
+ * The second project is the point. It is small enough that several of its
+ * components cannot clear the threshold, and the organisation takes the MINIMUM
+ * tier over its projects, so it drags the organisation's row down with it. A
+ * one-project fixture never exercises that and would report a number the rule
+ * does not actually deliver.
  */
 export function realisticMonth(): OperationsFact[] {
-  const random = makeRandom(20260824);
-  const facts: OperationsFact[] = [];
-  const sites = [
-    { id: 's-north', size: 8 }, { id: 's-central', size: 7 }, { id: 's-south', size: 5 },
+  return [
+    ...projectMonth('p-velocity', [
+      { id: 's-north', size: 8 }, { id: 's-central', size: 7 }, { id: 's-south', size: 5 },
+    ], 20260824),
+    ...projectMonth('p-pilot', [{ id: 's-pilot', size: 4 }], 20260901),
   ];
+}
+
+function projectMonth(
+  projectId: string, sites: readonly { id: string; size: number }[], seed: number,
+): OperationsFact[] {
+  const random = makeRandom(seed);
+  const facts: OperationsFact[] = [];
   for (const site of sites) {
     const roster = Array.from({ length: site.size }, (_, index) => `${site.id}-${index}`);
     for (const person of roster) {
       for (let day = 1; day <= 20; day += 1) {
         const roll = random();
         const confirmation = roll < 0.86 ? 'confirmed' : roll < 0.95 ? 'unconfirmed' : 'vehicle_only';
-        facts.push(presence('p-velocity', site.id, person, confirmation, `2026-07-${String(day).padStart(2, '0')}`));
+        facts.push(presence(projectId, site.id, person, confirmation, `2026-07-${String(day).padStart(2, '0')}`));
       }
     }
     // Roughly one incident per person per month, spread over the roster.
     for (let n = 0; n < site.size; n += 1) {
-      facts.push(incident('p-velocity', site.id, roster[n % roster.length]!, {
+      facts.push(incident(projectId, site.id, roster[n % roster.length]!, {
         incidentType: INCIDENT_TYPES[Math.floor(random() * INCIDENT_TYPES.length)]!,
         outcome: OUTCOMES[Math.floor(random() * OUTCOMES.length)]!,
         driverInputRequested: random() < 0.9,
@@ -156,9 +182,9 @@ export function realisticMonth(): OperationsFact[] {
         isRecurrence: random() < 0.25,
       }));
     }
-    for (const person of roster) facts.push(notification('p-velocity', site.id, person, random() < 0.9));
-    facts.push(monitorRun('p-velocity', site.id, roster, true));
-    facts.push(monitorRun('p-velocity', site.id, roster, random() < 0.8));
+    for (const person of roster) facts.push(notification(projectId, site.id, person, random() < 0.9));
+    facts.push(monitorRun(projectId, site.id, roster, true));
+    facts.push(monitorRun(projectId, site.id, roster, random() < 0.8));
   }
   return facts;
 }

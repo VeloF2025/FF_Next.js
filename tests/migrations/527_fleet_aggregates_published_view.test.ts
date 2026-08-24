@@ -22,7 +22,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool } from 'pg';
-import { PUBLIC_AGGREGATE_COLUMNS } from '@/modules/fleet/incidents/analytics/aggregateSchema';
+import { PUBLISHED_VIEW_COLUMNS } from '@/modules/fleet/incidents/analytics/aggregateSchema';
 
 const SCHEMA = 'mig527_published_view_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
@@ -37,16 +37,51 @@ const ROLLBACK = readFileSync(join(SQL_DIR, 'rollback_527_fleet_aggregates_publi
 const VIEW = 'fleet_operational_monthly_aggregates_published';
 const BASE_TABLE = 'fleet_operational_monthly_aggregates';
 
+const USER = '11111111-1111-4111-8111-111111111111';
+const STAFF = '22222222-2222-4222-8222-222222222222';
+const PROJECT = '33333333-3333-4333-8333-333333333333';
+const SITE = '44444444-4444-4444-8444-444444444444';
+
+/**
+ * Everything migrations 510, 511 and 518 expect to already exist.
+ *
+ * This block used to be a shorter guess at that list, and it was wrong in a way
+ * a clean database catches and a developer's database does not: 510 and 518 both
+ * INSERT into `access_permissions` and `role_permissions`, so on a scratch schema
+ * `beforeAll` failed with `relation "access_permissions" does not exist` and
+ * every test in the file errored before it ran. Kept in step with 518's own
+ * block, which is the one that has to stay true.
+ */
 const PREREQUISITES = `
   CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now());
-  CREATE TABLE users (id UUID PRIMARY KEY, email VARCHAR(255) NOT NULL UNIQUE);
-  CREATE TABLE staff (id UUID PRIMARY KEY, first_name VARCHAR(100) NOT NULL, last_name VARCHAR(100) NOT NULL);
-  CREATE TABLE projects (id UUID PRIMARY KEY, project_name VARCHAR(255) NOT NULL);
-  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration VARCHAR(20) NOT NULL);
+  CREATE TABLE users (id UUID PRIMARY KEY, email TEXT NOT NULL UNIQUE);
+  CREATE TABLE staff (id UUID PRIMARY KEY, full_name TEXT NOT NULL);
+  CREATE TABLE projects (id UUID PRIMARY KEY, project_name TEXT NOT NULL);
+  CREATE TABLE fleet_vehicles (id UUID PRIMARY KEY, registration TEXT);
   CREATE TABLE fleet_project_operational_sites (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_status_rules (id UUID PRIMARY KEY);
   CREATE TABLE fleet_operational_assignments (id UUID PRIMARY KEY);
   CREATE TABLE attendance_adjustments (id UUID PRIMARY KEY DEFAULT gen_random_uuid());
+  CREATE TABLE access_permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), type VARCHAR(20) NOT NULL, key VARCHAR(100) UNIQUE NOT NULL,
+    parent_key VARCHAR(100), label VARCHAR(100) NOT NULL, description TEXT, route VARCHAR(200),
+    sort_order INTEGER DEFAULT 0, is_active BOOLEAN DEFAULT TRUE
+  );
+  CREATE TABLE role_permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), role VARCHAR(50) NOT NULL,
+    permission_key VARCHAR(100) NOT NULL REFERENCES access_permissions(key) ON DELETE CASCADE,
+    actions JSONB NOT NULL, UNIQUE (role, permission_key)
+  );
+  CREATE TABLE user_permission_overrides (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES users(id),
+    permission_key VARCHAR(100) NOT NULL, override_type VARCHAR(10) NOT NULL, actions JSONB NOT NULL,
+    UNIQUE (user_id, permission_key)
+  );
+  INSERT INTO users (id, email) VALUES ('${USER}', 'migration-527@example.test');
+  INSERT INTO staff (id, full_name) VALUES ('${STAFF}', 'Migration Test Staff');
+  INSERT INTO projects (id, project_name) VALUES ('${PROJECT}', 'Migration Test Project');
+  INSERT INTO fleet_project_operational_sites (id) VALUES ('${SITE}');
+  INSERT INTO access_permissions (type, key, label) VALUES ('module', 'fleet', 'Fleet');
 `;
 
 const admin = new Pool({ connectionString: BASE_URL, ssl: false, max: 1 });
@@ -129,13 +164,14 @@ describe('what the view actually returns', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('exposes exactly the allow-listed columns, in order', async () => {
+  it('exposes exactly the published column list, in order', async () => {
     const { rows } = await db.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns
         WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`,
       [SCHEMA, VIEW],
     );
-    expect(rows.map((row) => row.column_name)).toEqual([...PUBLIC_AGGREGATE_COLUMNS]);
+    // The VIEW's columns, which are a strict subset of the table's.
+    expect(rows.map((row) => row.column_name)).toEqual([...PUBLISHED_VIEW_COLUMNS]);
   });
 
   it('is a security barrier in the database, not only in the file', async () => {

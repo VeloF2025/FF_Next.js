@@ -30,18 +30,37 @@
 --    histogram is what makes a median estimable after the underlying incident
 --    has been purged. Neither is anybody's to read.
 --
+-- `checksum` is absent for the same reason, and it is the least obvious of the
+-- three. The digest is taken over a fixed field order that includes
+-- `contributor_count`, `sample_count`, `sum_seconds` and the bucket counts —
+-- and every OTHER field in that preimage is published. `canonicalize` is in the
+-- repository. So a reader with the view holds all but one unknown of a sha256
+-- preimage, and a contributor count is a small integer: a few thousand hashes
+-- recovers it exactly, for every row, and `sum_seconds` for timing rows besides.
+-- Removing three columns and publishing a fourth that reconstructs them is the
+-- kind of thing a column list has to be read as a whole to catch. The writer
+-- compares checksums against the BASE table, which is where the column lives.
+--
 -- `generalized_from_level` is likewise absent. Under the tier rule it carries no
 -- information: sites are never published, so a project row is always generalized
 -- from site, and the organisation takes the minimum tier over its projects, so
 -- an organisation row is never generalized from project. A column whose value is
 -- a function of its level tells a reader nothing and is not published.
 --
--- CREATE OR REPLACE VIEW is repeatable. It fails loudly rather than silently if
--- the column list ever diverges from an existing view's, which is the desired
--- behaviour: a column added to the base table must be added here consciously.
--- GRANT is likewise a no-op when the privilege is already held.
+-- DROP then CREATE, rather than CREATE OR REPLACE. Postgres will not let a
+-- replacement DROP a column from an existing view — "cannot drop columns from
+-- view" — and this column list has narrowed twice under review already. A
+-- migration that only applies to a database which has never seen an earlier
+-- version of it is not repeatable, and re-runnability is the property the
+-- runner relies on. Nothing depends on the view, so dropping it costs nothing;
+-- the GRANT below is reissued because DROP takes the privilege with it.
+--
+-- Verified 2026-08-24: neither the view nor this migration exists in the shared
+-- database yet, so no deployed reader is disturbed by the drop.
 
-CREATE OR REPLACE VIEW fleet_operational_monthly_aggregates_published
+DROP VIEW IF EXISTS fleet_operational_monthly_aggregates_published;
+
+CREATE VIEW fleet_operational_monthly_aggregates_published
 WITH (security_barrier = true) AS
 SELECT
   id,
@@ -56,7 +75,6 @@ SELECT
   denominator,
   is_active,
   aggregation_run_id,
-  checksum,
   created_at,
   updated_at
 FROM fleet_operational_monthly_aggregates

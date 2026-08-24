@@ -16,7 +16,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { PUBLISHED_DIMENSION_LEVELS, PUBLISHED_VIEW_COLUMNS } from '../aggregateSchema';
+import { PUBLIC_AGGREGATE_COLUMNS, PUBLISHED_DIMENSION_LEVELS, PUBLISHED_VIEW_COLUMNS } from '../aggregateSchema';
 
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
 const MIGRATION = join(REPO_ROOT, 'scripts', 'migrations', 'sql', '527_fleet_aggregates_published_view.sql');
@@ -136,6 +136,17 @@ describe('migration 527 publishes exactly the columns the allow-list names', () 
       expect(selectedColumns()).not.toContain(column);
     }
     expect(selectedColumns().filter((column) => column.startsWith('bucket_'))).toEqual([]);
+  });
+
+  it('does not publish the checksum, which would give the dropped columns back', () => {
+    // The digest is taken over a fixed field order that includes
+    // `contributor_count`, `sample_count`, `sum_seconds` and the buckets — and
+    // every OTHER field in that preimage is published. `canonicalize` is in the
+    // repository. Publishing the digest hands a reader a sha256 with one small
+    // unknown in it, which is not a hash, it is an encoding.
+    expect(selectedColumns()).not.toContain('checksum');
+    // It stays on the base table: the writer compares generations there.
+    expect([...PUBLIC_AGGREGATE_COLUMNS]).toContain('checksum');
   });
 
   it('does not publish generalized_from_level, which now says nothing', () => {

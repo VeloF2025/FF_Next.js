@@ -141,14 +141,23 @@ export const PUBLIC_AGGREGATE_COLUMNS = [
  * The columns migration 527's published view exposes — a strict subset of the
  * table's, and the actual public surface.
  *
- * Three kinds of column are missing, for two different reasons.
+ * Four kinds of column are missing, for three different reasons.
+ *
  * `contributor_count` and the histogram columns are CHANNELS: a contributor
  * count differences across metric keys exactly as a numerator does, and
  * `sum_seconds` over one sample is one person's exact duration. They stay in the
  * table because the writer needs them and a median has to remain estimable after
- * the incident is purged; they are not published. `generalized_from_level` is
- * absent for the opposite reason — under the tier rule its value is a function
- * of the row's level, so it says nothing.
+ * the incident is purged; they are not published.
+ *
+ * `checksum` is absent because it RECONSTRUCTS them. `canonicalize` hashes a
+ * fixed field order that includes all four, and every other field in that
+ * preimage is published — so one unknown small integer stands between a reader
+ * and the digest, and a few thousand hashes closes it. Dropping three columns
+ * while publishing a fourth that gives them back is what a column list has to be
+ * read as a whole to catch.
+ *
+ * `generalized_from_level` is absent for a different reason again: under the
+ * tier rule its value is a function of the row's level, so it says nothing.
  *
  * The view also restricts ROWS, to organisation and project level. Site
  * aggregates are computed, stored, and never published.
@@ -156,7 +165,7 @@ export const PUBLIC_AGGREGATE_COLUMNS = [
 export const PUBLISHED_VIEW_COLUMNS = [
   'id', 'metric_version', 'month_start', 'dimension_level', 'dimension_project_id',
   'dimension_site_id', 'metric_key', 'metric_kind', 'numerator', 'denominator',
-  'is_active', 'aggregation_run_id', 'checksum', 'created_at', 'updated_at',
+  'is_active', 'aggregation_run_id', 'created_at', 'updated_at',
 ] as const;
 
 /** The dimension levels the published view exposes. Site is deliberately absent. */

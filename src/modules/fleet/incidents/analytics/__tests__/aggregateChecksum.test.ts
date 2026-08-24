@@ -40,7 +40,7 @@ describe('checksumForAggregate', () => {
       numerator: 1,
       metricKind: 'ratio',
       metricKey: 'presence.confirmed_days',
-        dimensionSiteId: 's1',
+      dimensionSiteId: 's1',
       dimensionProjectId: 'p1',
       dimensionLevel: 'site',
       metricVersion: 1,

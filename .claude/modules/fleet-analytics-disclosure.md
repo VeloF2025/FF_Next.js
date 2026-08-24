@@ -38,6 +38,13 @@ narrower than the base table in two ways, both load-bearing:
   `sum_seconds` over a `sample_count` of one IS that person's exact duration. The base table keeps
   both — the writer needs the count for its own CHECK, and the histogram is what keeps a median
   estimable after the underlying incident has been purged — and neither is anybody's to read.
+- **No `checksum`**, which is the one that has to be reasoned about rather than seen.
+  `canonicalize` hashes a fixed field order that INCLUDES all four of the columns above, and every
+  other field in that preimage is published. The function is in the repository. So a reader holding
+  the view holds a sha256 with one small unknown left in it, and a few thousand hashes recovers the
+  contributor count exactly — for every row, and `sum_seconds` for timing rows besides. Removing
+  three columns and publishing a fourth that reconstructs them is what a column list has to be read
+  as a whole to catch. The writer compares checksums against the BASE table.
 
 `generalized_from_level` is also absent, for a different reason: under the tier rule its value is a
 function of the row's level, so it carries no information. The notion is gone from the code as well.
@@ -90,10 +97,13 @@ is, and the only place it can be counted exactly is `metricCalculator`, off the 
 the pair. Reconstructing it later from the two contributor sets gives a BOUND, and the bound
 understates badly enough to over-suppress on its own.
 
-Counting them exactly is also what surfaced a modelling hole the reviews had not: `driverInputOnTime`
-could be set without `driverInputResponded`, which made `responses_on_time ⊆ responses_received`
-false in the data while the model asserted it. The calculator now gates one on the other, the same
-way both are gated on `driverInputRequested`.
+Counting them exactly also turned up a gap between the model and the fact CONTRACT: nothing in
+`metricCalculator` required `driverInputOnTime` to imply `driverInputResponded`, while the release
+rule asserts `responses_on_time ⊆ responses_received`. In production the two cannot disagree —
+`incidentFactQueries.ts` derives both from `sub.first_submitted_at`, and the on-time expression
+tests it for NULL before comparing — so this was never a data bug. The calculator now gates one on
+the other anyway, the same way both are gated on `driverInputRequested`: defence in depth, and the
+invariant the rule depends on becomes structural rather than a property of one query.
 
 ## What this actually guarantees, and what is out of scope
 
@@ -114,6 +124,53 @@ the reader's whole system in exact integer arithmetic.
   the next says its variables crossed the threshold.
 - **Absence as inference.** A component's absence implies a support between 1 and `k-1`, or zero.
 - **Timing content.** See above: the view publishes no histogram, so a timing row is nearly empty.
+
+## Deploying this
+
+Migration 527 must be applied before this code serves a read. It is, automatically:
+`scripts/deploy-local.sh` is a launcher that fetches and runs `deploy-local-main.sh` from
+`origin/master`, and that script applies pending migrations at **step 3a, before the build** —
+`run-pending-migrations.sh`, failing the deploy on a migration error rather than continuing. So the
+ordering is structural, not something to remember.
+
+Two things about it are worth knowing:
+
+- **The database is shared between dev and production.** Applying 527 on a dev deploy creates the
+  view for production at the same moment. That is safe here only because nothing in production reads
+  it yet.
+- **The migration DROPs and recreates the view** rather than using `CREATE OR REPLACE`. Postgres
+  refuses to drop a column from a view in a replacement, and this column list narrowed twice during
+  review. Verified 2026-08-24: neither the view nor the migration exists in the shared database, so
+  no deployed reader is disturbed.
+
+`hasCompleteAggregateCoverage` counts rows through the view, and the view no longer returns site
+rows. A month aggregated by the OLD code whose stored rows are all site-level will therefore report
+no coverage and its incidents will not be purged. Failing closed is the right direction for a
+deletion gate, and the coverage question is already flagged below as needing an explicit per-month
+record rather than an inference from row counts.
+
+## What it costs, measured
+
+On two projects — one of three sites and twenty staff, one of a single site and four — with `k = 5`:
+
+| | value |
+|---|---|
+| informational rows published | 10 |
+| components carrying information that publish | 4 of 15 (26.7%) |
+| levels published | project only |
+
+Remove the four-person project and the same fixture publishes 20 rows across organisation and
+project. **Every organisation row disappears because one small project exists.** That is the minimum
+rule doing exactly what it is specified and proved to do, and it is almost certainly not what anyone
+wants.
+
+The tighter rule that would fix it, for whoever picks this up: instead of taking the minimum, let
+the organisation publish a component at tier T when the AGGREGATE of the projects not publishing at
+T — treated as one virtual cell — itself passes the tier-T check. The proof survives, because
+`organisation - sum(published projects)` is then that virtual cell, and it clears the threshold by
+the same test every other cell does. The trap is the case of exactly ONE non-publishing project:
+there the virtual cell IS that project, so it must pass the check in full, complements included —
+which is where a naive "its total clears k" relaxation would leak.
 
 ## Where the code is
 

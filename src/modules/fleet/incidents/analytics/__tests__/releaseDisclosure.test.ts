@@ -8,6 +8,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { PUBLISHED_VIEW_COLUMNS } from '../aggregateSchema';
+import { checksumForAggregate } from '../aggregateChecksum';
+import type { ReleasedAggregate } from '../suppression';
 import { calculateMonthly } from '../metricCalculator';
 import { releaseAnonymousGroups } from '../suppression';
 import { configurationFor, incident, monitorRun, notification, presence } from './factFixtures';
@@ -21,16 +23,99 @@ const leaksIn = (facts: readonly OperationsFact[]): string[] => {
   return derivableLeaks(siteMonths, releaseAnonymousGroups(siteMonths, K), K);
 };
 
+/**
+ * The oracle solves the reader's whole system in exact integer arithmetic, which
+ * is not cheap: the unit suite runs a slice and the full sweep is one variable
+ * away. `SEEDS=400 npx vitest run …/releaseDisclosure.test.ts` runs it.
+ *
+ * The slice is not a sample of a fixed set — seeds are consecutive from 1, so
+ * the unit run and the full run agree on the months they share.
+ */
+const SEEDS = Number(process.env['SEEDS'] ?? 150);
+
 describe('nothing below the threshold is derivable', () => {
-  it('holds across 320 randomised months, facts through the real calculator', () => {
+  it(`holds across ${SEEDS} randomised months, facts through the real calculator`, () => {
     let checked = 0;
-    for (let seed = 1; seed <= 320; seed += 1) {
+    for (let seed = 1; seed <= SEEDS; seed += 1) {
       const leaks = leaksIn(configurationFor(seed));
       if (leaks.length > 0) throw new Error(`seed ${seed}: ${leaks.slice(0, 3).join('; ')}`);
       checked += 1;
     }
-    expect(checked).toBe(320);
-  }, 60_000);
+    expect(checked).toBe(SEEDS);
+  }, 120_000);
+});
+
+/**
+ * What a reader of the view actually holds for one row: the released row
+ * projected onto the published column list, and nothing else.
+ *
+ * Driven by `PUBLISHED_VIEW_COLUMNS` rather than by a hand-written list, so
+ * adding a column to the view adds it to the attack below too.
+ */
+function asPublished(row: ReleasedAggregate): Record<string, unknown> {
+  const everything: Record<string, unknown> = {
+    month_start: row.monthStart,
+    metric_version: row.metricVersion,
+    dimension_level: row.dimensionLevel,
+    dimension_project_id: row.dimensionProjectId,
+    dimension_site_id: row.dimensionSiteId,
+    metric_key: row.metricKey,
+    metric_kind: row.metricKind,
+    numerator: row.numerator,
+    denominator: row.denominator,
+    contributor_count: row.contributorCount,
+    sample_count: row.histogram?.sampleCount ?? null,
+    sum_seconds: row.histogram?.sumSeconds ?? null,
+    checksum: checksumForAggregate(row),
+    is_active: true,
+    id: 'a-uuid',
+    aggregation_run_id: 'a-uuid',
+    created_at: 'a-timestamp',
+    updated_at: 'a-timestamp',
+  };
+  const published: Record<string, unknown> = {};
+  for (const column of PUBLISHED_VIEW_COLUMNS) published[column] = everything[column];
+  return published;
+}
+
+/**
+ * The attack the checksum column enables: every field of the preimage except
+ * the contributor count is published, so guess the count until the digest
+ * matches. Returns what it recovered, or null.
+ */
+function bruteForceContributorCount(row: ReleasedAggregate, ceiling = 5_000): number | null {
+  const published = asPublished(row);
+  const target = published['checksum'];
+  if (typeof target !== 'string') return null;
+  for (let guess = 1; guess <= ceiling; guess += 1) {
+    if (checksumForAggregate({ ...row, contributorCount: guess }) === target) return guess;
+  }
+  return null;
+}
+
+describe('the checksum is not a published column, because it is an encoding', () => {
+  const roster = Array.from({ length: 9 }, (_, index) => `h-${index}`);
+  const facts = roster.map((person) => presence('p1', 's1', person, 'confirmed'));
+
+  it('leaves no way to recover a contributor count from what is published', () => {
+    const released = releaseAnonymousGroups(calculateMonthly(facts, 1), K);
+    expect(released.length).toBeGreaterThan(0);
+    for (const row of released) {
+      expect(bruteForceContributorCount(row)).toBeNull();
+    }
+  });
+
+  it('is a real attack when the column is published — the guard is load-bearing', () => {
+    // Proves the brute force works, so that the assertion above is passing
+    // because the column is absent and not because the attack is broken.
+    const [row] = releaseAnonymousGroups(calculateMonthly(facts, 1), K);
+    const digest = checksumForAggregate(row!);
+    let recovered: number | null = null;
+    for (let guess = 1; guess <= 5_000; guess += 1) {
+      if (checksumForAggregate({ ...row!, contributorCount: guess }) === digest) { recovered = guess; break; }
+    }
+    expect(recovered).toBe(row!.contributorCount);
+  });
 });
 
 describe('the three channels round 3 reproduced', () => {
