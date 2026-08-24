@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const db = vi.hoisted(() => ({ query: vi.fn(), queryOne: vi.fn(), transaction: vi.fn() }));
 vi.mock('@/lib/db-pool', () => db);
 
+import { PUBLISHED_VIEW_COLUMNS } from '../aggregateSchema';
 import { readPublishedAggregates } from '../operationsAggregateQueries';
 
 const USER = '11111111-1111-4111-8111-111111111111';
@@ -227,5 +228,70 @@ describe('placeholders and binds, for every branch', () => {
     const sql = String(db.query.mock.calls[0]?.[0]);
     expect(sql).not.toContain('project_manager');
     expect(sql).toContain('a.dimension_project_id = $3::uuid');
+  });
+});
+
+describe('the columns this file is allowed to name', () => {
+  /**
+   * Every column the statement asks the view for, from its SELECT list.
+   *
+   * Read from the SQL that is actually sent rather than from the constant that
+   * builds it: a column appended anywhere else in the SELECT would satisfy a
+   * test that only inspected the constant, and Postgres does not care which
+   * half of the string it came from.
+   */
+  function selectedColumns(sql: string): string[] {
+    const select = sql.slice(sql.indexOf('SELECT ') + 'SELECT '.length, sql.indexOf(' FROM '));
+    return select.split(',').map((column) => column.trim()).filter((column) => column.length > 0);
+  }
+
+  /** Every column referenced through the view's own alias, WHERE clause included. */
+  function aliasedColumns(sql: string): string[] {
+    return [...new Set([...sql.matchAll(/\ba\.([a-z_]+)/g)].map((match) => match[1] as string))];
+  }
+
+  const requests: Array<[string, Parameters<typeof readPublishedAggregates>[0]]> = [
+    ['organisation / managed projects', request],
+    ['one project', { ...request, projectId: PROJECT }],
+    ['a manager project list', { ...request, projectIds: [PROJECT, OTHER_PROJECT] }],
+  ];
+
+  for (const [name, dimensions] of requests) {
+    it.each([['unrestricted', unrestricted], ['scoped', restricted]])(
+      `selects only published columns on the %s ${name} statement`,
+      async (_kind, scope) => {
+        // The view is a moving target: it has already lost contributor_count,
+        // the histogram columns, generalized_from_level and checksum. Selecting
+        // a column it no longer has is not a type error and not a review
+        // finding — it is a 500 for whichever viewer reaches that branch.
+        vi.clearAllMocks();
+        db.query.mockResolvedValue([row()]);
+        await readPublishedAggregates(dimensions, scope);
+        const sql = String(db.query.mock.calls[0]?.[0]);
+        for (const column of selectedColumns(sql)) {
+          expect(PUBLISHED_VIEW_COLUMNS).toContain(column);
+        }
+      },
+    );
+
+    it.each([['unrestricted', unrestricted], ['scoped', restricted]])(
+      `filters on only published columns on the %s ${name} statement`,
+      async (_kind, scope) => {
+        vi.clearAllMocks();
+        db.query.mockResolvedValue([row()]);
+        await readPublishedAggregates(dimensions, scope);
+        for (const column of aliasedColumns(String(db.query.mock.calls[0]?.[0]))) {
+          expect(PUBLISHED_VIEW_COLUMNS).toContain(column);
+        }
+      },
+    );
+  }
+
+  it('reads at least the five fields a value is built from', () => {
+    // The other direction: a subset check alone is satisfied by selecting
+    // nothing at all.
+    for (const column of ['month_start', 'dimension_project_id', 'metric_key', 'numerator', 'denominator']) {
+      expect(PUBLISHED_VIEW_COLUMNS).toContain(column);
+    }
   });
 });
