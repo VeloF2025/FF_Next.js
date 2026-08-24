@@ -16,7 +16,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { PUBLIC_AGGREGATE_COLUMNS } from '../aggregateSchema';
+import { PUBLISHED_DIMENSION_LEVELS, PUBLISHED_VIEW_COLUMNS } from '../aggregateSchema';
 
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
 const MIGRATION = join(REPO_ROOT, 'scripts', 'migrations', 'sql', '527_fleet_aggregates_published_view.sql');
@@ -55,6 +55,13 @@ const SKIPPED_DIRECTORIES = new Set(['node_modules', '.next', 'dist', 'build', '
 
 const forward = readFileSync(MIGRATION, 'utf8');
 
+/** The view's SELECT list, as written in the migration. */
+function selectedColumns(): string[] {
+  const body = /AS\s*\nSELECT([\s\S]*?)FROM fleet_operational_monthly_aggregates/.exec(forward);
+  expect(body).not.toBeNull();
+  return body![1]!.split(',').map((line) => line.trim()).filter((line) => line !== '');
+}
+
 /**
  * The table in a SQL position, not in prose — several modules name it in a doc
  * comment to explain what may not reach it, and flagging those would train the
@@ -74,7 +81,8 @@ const forward = readFileSync(MIGRATION, 'utf8');
  */
 function basePattern(): RegExp {
   return new RegExp(
-    `(FROM|JOIN|INTO|UPDATE|TRUNCATE|COPY|MERGE)[\\s("]+(?:"?public"?\\.)?"?${BASE_TABLE}(?!\\w)`,
+    '(FROM|JOIN|INTO|UPDATE|COPY|MERGE|TRUNCATE(\\s+TABLE)?(\\s+ONLY)?)'
+    + `[\\s("]+(?:"?public"?\\s*\\.\\s*)?"?${BASE_TABLE}(?!\\w)`,
     'i',
   );
 }
@@ -92,14 +100,16 @@ function sourceFiles(directory: string): string[] {
 
 /**
  * Tests may name the base table: they are what proves the writer still reaches
- * it. The exemption is narrow on purpose — `__tests__` anywhere in the path used
- * to be enough, which would have excused a `__tests__` directory in any module
- * in the repository. It now has to be this module's own test directory, or a
- * file that is a test by name.
+ * it. The exemption is scoped to files VITEST ACTUALLY RUNS — a module's own
+ * `__tests__` directory, or the repository's `tests/` tree — so a `.test.` file
+ * dropped anywhere else cannot excuse itself. `__tests__` anywhere in the path
+ * used to be enough, which would have excused such a directory in any module in
+ * the repository.
  */
 function exemptFromScan(relativePath: string): boolean {
-  if (relativePath.startsWith('src/modules/fleet/') && relativePath.includes('/__tests__/')) return true;
-  return /(^|\/)[^/]*\.test\.[^/]+$/.test(relativePath);
+  const isTestFile = /(^|\/)[^/]*\.test\.[jt]sx?$/.test(relativePath);
+  if (!isTestFile) return false;
+  return relativePath.startsWith('tests/') || relativePath.includes('/__tests__/');
 }
 
 function scannedFiles(): string[] {
@@ -114,13 +124,32 @@ function scannedFiles(): string[] {
 
 describe('migration 527 publishes exactly the columns the allow-list names', () => {
   it('selects every column the allow-list names, and no other', () => {
-    const body = /AS\s*\nSELECT([\s\S]*?)FROM fleet_operational_monthly_aggregates/.exec(forward);
-    expect(body).not.toBeNull();
-    const selected = body![1]!
-      .split(',')
-      .map((line) => line.trim())
-      .filter((line) => line !== '');
-    expect(selected).toEqual([...PUBLIC_AGGREGATE_COLUMNS]);
+    expect(selectedColumns()).toEqual([...PUBLISHED_VIEW_COLUMNS]);
+  });
+
+  it('publishes neither a contributor count nor any histogram column', () => {
+    // Both were disclosure CHANNELS, not metadata. `cc(scheduled) - cc(confirmed)`
+    // names one person as surely as any numerator difference; `sum_seconds` over
+    // a single sample IS that person's exact duration. They stay in the base
+    // table, where the writer needs them; they are not published.
+    for (const column of ['contributor_count', 'sample_count', 'sum_seconds']) {
+      expect(selectedColumns()).not.toContain(column);
+    }
+    expect(selectedColumns().filter((column) => column.startsWith('bucket_'))).toEqual([]);
+  });
+
+  it('does not publish generalized_from_level, which now says nothing', () => {
+    // Sites are never published, so a project row is always generalized from
+    // site; the organisation takes the minimum tier over its projects, so an
+    // organisation row is never generalized from project. A column whose value
+    // is a function of its level is not information.
+    expect(selectedColumns()).not.toContain('generalized_from_level');
+  });
+
+  it('publishes organisation and project rows only', () => {
+    expect(forward).toMatch(/dimension_level IN \('organisation', 'project'\)/);
+    expect([...PUBLISHED_DIMENSION_LEVELS]).toEqual(['organisation', 'project']);
+    expect([...PUBLISHED_DIMENSION_LEVELS]).not.toContain('site');
   });
 
   it('hard-codes the active predicate', () => {
@@ -175,6 +204,10 @@ describe('nothing reads the base table behind the view', () => {
       'SELECT * FROM public.fleet_operational_monthly_aggregates',
       'SELECT * FROM "public".fleet_operational_monthly_aggregates',
       'TRUNCATE fleet_operational_monthly_aggregates',
+      'TRUNCATE TABLE fleet_operational_monthly_aggregates',
+      'TRUNCATE TABLE ONLY fleet_operational_monthly_aggregates',
+      'SELECT * FROM public . fleet_operational_monthly_aggregates',
+      'SELECT * FROM "public" . "fleet_operational_monthly_aggregates"',
       'COPY fleet_operational_monthly_aggregates TO STDOUT',
       'MERGE INTO fleet_operational_monthly_aggregates AS target',
       'SELECT * FROM "fleet_operational_monthly_aggregates"',

@@ -138,6 +138,31 @@ export const PUBLIC_AGGREGATE_COLUMNS = [
 ] as const;
 
 /**
+ * The columns migration 527's published view exposes — a strict subset of the
+ * table's, and the actual public surface.
+ *
+ * Three kinds of column are missing, for two different reasons.
+ * `contributor_count` and the histogram columns are CHANNELS: a contributor
+ * count differences across metric keys exactly as a numerator does, and
+ * `sum_seconds` over one sample is one person's exact duration. They stay in the
+ * table because the writer needs them and a median has to remain estimable after
+ * the incident is purged; they are not published. `generalized_from_level` is
+ * absent for the opposite reason — under the tier rule its value is a function
+ * of the row's level, so it says nothing.
+ *
+ * The view also restricts ROWS, to organisation and project level. Site
+ * aggregates are computed, stored, and never published.
+ */
+export const PUBLISHED_VIEW_COLUMNS = [
+  'id', 'metric_version', 'month_start', 'dimension_level', 'dimension_project_id',
+  'dimension_site_id', 'metric_key', 'metric_kind', 'numerator', 'denominator',
+  'is_active', 'aggregation_run_id', 'checksum', 'created_at', 'updated_at',
+] as const;
+
+/** The dimension levels the published view exposes. Site is deliberately absent. */
+export const PUBLISHED_DIMENSION_LEVELS = ['organisation', 'project'] as const;
+
+/**
  * The metric kind a row must carry, mirroring the migration's
  * `histogram_pairing` CHECK: it makes `metric_key LIKE 'timing.%'` and
  * `metric_kind = 'duration_histogram'` the same condition, so the kind is a

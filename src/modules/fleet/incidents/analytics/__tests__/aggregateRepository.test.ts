@@ -22,7 +22,6 @@ function row(overrides: Partial<ReleasedAggregate> = {}): ReleasedAggregate {
     dimensionLevel: 'site',
     dimensionProjectId: 'p1',
     dimensionSiteId: 's1',
-    generalizedFromLevel: null,
     metricKey: 'presence.confirmed_days',
     metricKind: 'ratio',
     numerator: 1,

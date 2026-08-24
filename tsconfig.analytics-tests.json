@@ -1,0 +1,10 @@
+{
+  "//": "Typechecks the fleet analytics tests, which the root tsconfig excludes along with every other test file. Run with `npx tsc -p tsconfig.analytics-tests.json`. Kept separate on purpose: widening the root config would pull the whole repository's test tree into a build that has never typechecked it, and that is a different piece of work. The only errors this pass reports are in src/modules/fleet/operations, reached transitively and already part of the root baseline; the analytics tree and its __tests__ are clean.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true },
+  "include": [
+    "src/modules/fleet/incidents/analytics/**/*.ts",
+    "types/**/*.d.ts"
+  ],
+  "exclude": []
+}
