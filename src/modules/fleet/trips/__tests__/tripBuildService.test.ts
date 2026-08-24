@@ -140,20 +140,55 @@ describe('the stall guard', () => {
     mocks.readWatermark.mockResolvedValue('2026-08-01T12:00:00.000Z');
     mocks.loadTripAnchorBefore.mockResolvedValue('2026-08-01T06:00:00.000Z');
 
-    // A full batch that is one unbroken trip beginning exactly at readFrom.
+    // A full batch that is one unbroken trip beginning exactly at readFrom, and STILL OPEN —
+    // `now` sits just past the last fix, so the trip has not timed out. An open trip is the only
+    // one that must be re-read from its start, which is what makes this the genuine no-progress
+    // case. (A closed or timed-out trip is final and the loop correctly advances past it.)
+    const start = Date.parse('2026-08-01T06:00:00.000Z');
     const oneLongTrip = Array.from({ length: POSITION_BATCH_SIZE }, (_, i) => ({
       ...pos('06:00', true),
-      recordedAt: new Date(Date.parse('2026-08-01T06:00:00.000Z') + i * 1000).toISOString(),
+      recordedAt: new Date(start + i * 1000).toISOString(),
     }));
     mocks.loadPositions.mockResolvedValue(oneLongTrip);
+    const justAfterLastFix = new Date(start + POSITION_BATCH_SIZE * 1000 + 60_000).toISOString();
 
-    const result = await buildTripsForVehicle(VEHICLE, OPTS);
+    const result = await buildTripsForVehicle(VEHICLE, { ...OPTS, now: justAfterLastFix });
 
     // One batch, then stop — not MAX_BATCHES_PER_VEHICLE of them.
     expect(mocks.loadPositions).toHaveBeenCalledTimes(1);
     expect(result.batches).toBeLessThan(MAX_BATCHES_PER_VEHICLE);
     // And it must SAY there is more, not report a clean finish over a window it could not advance.
     expect(result.moreRemaining).toBe(true);
+  });
+
+  it('does not stall on a vehicle that drove once and has been parked since', async () => {
+    // A full batch containing exactly ONE closed trip that begins at readFrom, followed by
+    // thousands of parked reports — roughly a fortnight of a stationary vehicle whose tracker is
+    // still reporting. When the next window started at the last trip's start regardless of its
+    // state, nextFrom equalled readFrom, the stall guard fired, and the vehicle never advanced
+    // again. A closed trip is final: the next window starts after the positions consumed.
+    mocks.readWatermark.mockResolvedValue('2026-08-20T12:00:00.000Z');
+    mocks.loadTripAnchorBefore.mockResolvedValue('2026-08-03T06:00:00.000Z');
+
+    const oneOldTripThenParked = [
+      { ...pos('06:00', true), recordedAt: '2026-08-03T06:00:00.000Z' },
+      { ...pos('06:00', false), recordedAt: '2026-08-03T06:20:00.000Z' },
+      ...Array.from({ length: POSITION_BATCH_SIZE - 2 }, (_, i) => ({
+        ...pos('06:00', false),
+        recordedAt: new Date(Date.parse('2026-08-03T07:00:00.000Z') + i * 300_000).toISOString(),
+      })),
+    ];
+    mocks.loadPositions
+      .mockResolvedValueOnce(oneOldTripThenParked)
+      .mockResolvedValue([]);
+
+    const result = await buildTripsForVehicle(VEHICLE, OPTS);
+
+    // It must move past the parked stretch, not re-read it forever.
+    expect(mocks.loadPositions).toHaveBeenCalledTimes(2);
+    const secondFrom = mocks.loadPositions.mock.calls[1]![1];
+    expect(secondFrom).not.toBe('2026-08-03T06:00:00.000Z');
+    expect(result.moreRemaining).toBe(false);
   });
 
   it('reports backlog rather than silence when the batch ceiling is reached', async () => {

@@ -123,11 +123,20 @@ export async function buildTripsForVehicle(
 
     if (positions.length < POSITION_BATCH_SIZE) break;
 
-    // The next batch starts at the last trip this batch produced, so a journey straddling the
-    // batch edge is recomputed whole rather than continued from summarised state. Falling back to
-    // the last position only when the batch produced no trip at all.
+    // Only an OPEN trip needs re-reading from its start: it may continue into the next batch, so
+    // it must be recomputed whole rather than continued from summarised state. A CLOSED trip is
+    // final for this window, so the next batch can begin at the last position consumed.
+    //
+    // Getting this wrong stalls a vehicle permanently and silently. When the next window started
+    // at the last trip's start regardless of state, a vehicle that drove ONCE and has been parked
+    // since -- its tracker still reporting, easily 5,000 parked rows in a fortnight -- produced a
+    // batch containing exactly one closed trip beginning at `readFrom`. `nextFrom` then equalled
+    // `readFrom`, the stall guard fired, and the vehicle made no progress on that run or any
+    // subsequent one, behind a single log.warn.
     const lastTrip = trips[trips.length - 1];
-    const nextFrom = lastTrip ? lastTrip.ignitionOnAt : lastPositionAt;
+    const nextFrom = lastTrip && lastTrip.closeReason === 'open'
+      ? lastTrip.ignitionOnAt
+      : lastPositionAt;
     if (nextFrom === null || (readFrom !== null && nextFrom <= readFrom)) {
       // No forward progress is possible -- a single trip larger than one batch. Stop rather than
       // spin re-reading the same window until the batch budget is gone.
