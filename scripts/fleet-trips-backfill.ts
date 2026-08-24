@@ -83,13 +83,31 @@ async function backfill(): Promise<void> {
       fail('every vehicle failed — stopping rather than looping on a broken state');
       process.exit(1);
     }
-    // Caught up when nothing was consumed and nobody is still holding backlog.
-    if (result.positionsProcessed === 0 && result.vehiclesWithBacklog === 0) break;
+    // Caught up when no vehicle is still holding backlog.
+    //
+    // NOT `positionsProcessed === 0`: once any vehicle has positions, that never comes back true.
+    // (It does for a genuinely empty fleet -- `listVehiclesWithPositions` returns nothing and the
+    // vehicle loop never runs -- but backlog is zero there too, so this condition still breaks on
+    // pass 1.) The reason it cannot go to zero otherwise: `buildTrips` deliberately re-reads
+    // the last 6 hours on every run so late-arriving positions are not stepped over, so each pass
+    // consumes that tail again and rebuilds it -- identically, since a window is replaced rather
+    // than accumulated. Waiting for zero looped until MAX_PASSES and then exited 1 with "re-run
+    // to continue" on a backfill that had actually finished on pass 1: 100x the work and a false
+    // failure signal, while the stored trips were correct the whole time.
+    //
+    // `vehiclesWithBacklog` is the real more-work flag: `buildTrips` loops batches internally per
+    // vehicle until a short batch, so zero backlog means every vehicle reached its newest
+    // position. Further passes are only needed when MAX_BATCHES_PER_VEHICLE capped someone.
+    if (result.vehiclesWithBacklog === 0) break;
   }
 
   const seconds = Math.round((Date.now() - startedAt) / 1000);
-  report(`\ndone: ${totalTrips} trips over ${pass} pass(es) in ${seconds}s`);
-  if (pass > MAX_PASSES) fail('hit the pass ceiling — re-run to continue');
+  report(`\ndone: ${totalTrips} trips over ${Math.min(pass, MAX_PASSES)} pass(es) in ${seconds}s`);
+  if (pass > MAX_PASSES) {
+    // Genuinely incomplete: someone still had backlog when the ceiling hit.
+    fail('hit the pass ceiling with backlog outstanding — re-run to continue');
+    process.exit(1);
+  }
 }
 
 async function main(): Promise<void> {
