@@ -152,6 +152,7 @@ export default function StockTakeDetailPage() {
   const handleAddItem = async (item: { stockItemId: string }) => {
     if (!id) return;
     setShowAddItem(false);
+    setIsActionLoading(true);
     try {
       const res = await fetch(`/api/procurement/stock-takes/${id}/lines`, {
         method: 'POST',
@@ -168,6 +169,8 @@ export default function StockTakeDetailPage() {
     } catch (error) {
       log.error('Error adding stock take line', { error, module: 'stock-takes' });
       notificationService.error('Failed to add item');
+    } finally {
+      setIsActionLoading(false);
     }
   };
 

@@ -53,7 +53,7 @@ async function handler(
 
     // Bulk path: everything still uncounted is counted as 0. The variance
     // trigger fires per row, so variance/value/summary stay correct.
-    if (data.zero_remaining) {
+    if (data.zero_remaining === true) {
       const zeroed = await sql`
         UPDATE stock_take_lines
         SET
