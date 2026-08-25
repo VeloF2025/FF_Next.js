@@ -98,6 +98,31 @@ describe('the re-versioned incident types', () => {
     expect(reversionBlock()).toMatch(/DO \$\$[\s\S]*RAISE EXCEPTION[\s\S]*UPDATE fleet_operational_incident_rules/);
   });
 
+  it('runs before any DDL in the file, so a fired guard leaves nothing behind', () => {
+    // At the foot of the file the table, the column and the permission rows
+    // would already be applied by the time the guard fired.
+    const guardAt = forward.indexOf('DO $$\nBEGIN\n  IF EXISTS (');
+    expect(guardAt).toBeGreaterThan(-1);
+    for (const ddl of [
+      'CREATE EXTENSION IF NOT EXISTS btree_gist',
+      'CREATE TABLE IF NOT EXISTS fleet_vehicle_operational_rules',
+      'ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt',
+      'INSERT INTO access_permissions',
+    ]) {
+      expect(forward.indexOf(ddl), ddl).toBeGreaterThan(guardAt);
+    }
+  });
+
+  it('strips any existing marker before appending a fresh one', () => {
+    // An operator who flips a row back to critical by hand and re-runs the
+    // migration must not accumulate two markers: the rollback matches the LAST
+    // one and the first would be left as litter in the prose.
+    const update = reversionUpdate();
+    const clause = update.slice(update.indexOf('change_reason = CASE'), update.indexOf('updated_at = now()'));
+    expect(clause.match(/regexp_replace\(/g) ?? []).toHaveLength(2);
+    expect(clause).toContain("529:reversioned\\{[^}]*\\}$");
+  });
+
   it('sets high with WhatsApp off and the morning summary on', () => {
     // `requiresMandatoryIncidentWhatsApp` is severity === 'critical' &&
     // producerKind === 'source_event'. 'high' is the whole mechanism.
@@ -200,6 +225,14 @@ describe('the rollback', () => {
     expect(rollback).not.toMatch(/DELETE FROM fleet_operational_incident_rules/i);
     expect(rollback).not.toContain('rb529_authored');
     expect(rollback).not.toMatch(/SET effective_to = NULL/i);
+  });
+
+  it('only touches rows still left `high` by 529', () => {
+    // A row the operator has taken back to critical is theirs, marker or no
+    // marker: rewriting its flags from a stale marker undoes their decision.
+    const from = rollback.indexOf("SET severity = 'critical'");
+    const statement = rollback.slice(from, rollback.indexOf(';', from));
+    expect(statement).toContain("WHERE severity = 'high'");
   });
 
   it('restores from the marker values, not from seed constants', () => {

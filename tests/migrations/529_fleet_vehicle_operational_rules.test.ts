@@ -601,32 +601,60 @@ describe.each(MODES)('applied via $name', ({ apply }) => {
   });
 });
 
-describe('the guard', () => {
+/** Has 529's own DDL landed? Used to prove a fired guard applied nothing at all. */
+async function migrationArtefacts() {
+  const table = await db.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_schema = $1 AND table_name = 'fleet_vehicle_operational_rules'`,
+    [SCHEMA],
+  );
+  const column = await db.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_schema = $1 AND table_name = 'fleet_vehicles' AND column_name = 'after_hours_exempt'`,
+    [SCHEMA],
+  );
+  const permissions = await db.query(
+    `SELECT key FROM access_permissions WHERE key IN ('fleet.vehicle-rules', 'fleet.vehicle-stats')`,
+  );
+  return { tables: table.rows.length, columns: column.rows.length, permissions: permissions.rows.length };
+}
+
+describe.each(MODES)('the guard, applied via $name', ({ apply }) => {
   it('refuses to run when an incident of a telematics type exists', async () => {
     await seedIncident('severe_driving');
-    await expect(db.query(FORWARD)).rejects.toMatchObject({ code: 'P0001' });
+    await expect(apply(FORWARD)).rejects.toMatchObject({ code: 'P0001' });
   });
 
-  it('applies NOTHING when it fires — not even the rules of other types', async () => {
+  it('applies NOTHING when it fires — no rules, no table, no column, no permissions', async () => {
+    // The guard is the FIRST statement in the file, above every CREATE. Under
+    // the runner the transaction rolls back; under statement-at-a-time
+    // application that stops on error, execution never reaches the DDL.
     await seedIncident('lost_contact_moving');
-    await db.query(FORWARD).catch(() => undefined);
+    await apply(FORWARD).catch(() => undefined);
 
     for (const type of REVERSIONED_TELEMATICS_INCIDENT_TYPES) {
       expect(await effectiveRuleFor(type), type).toMatchObject({ severity: 'critical', whatsapp_enabled: true });
     }
     expect(await markedCount()).toBe(0);
+    expect(await migrationArtefacts()).toEqual({ tables: 0, columns: 0, permissions: 0 });
   });
 
-  it('cannot be half-executed under statement-at-a-time application either', async () => {
-    // The guard and the UPDATE are ONE DO block. As two statements the guard
-    // would only stop the UPDATE under ON_ERROR_STOP, which
-    // run-pending-migrations.sh:127 passes but a hand-run `psql -f` does not.
+  it('lets an incident of an UNRELATED type through', async () => {
+    await seedIncident('late');
+    await expect(apply(FORWARD)).resolves.toBeUndefined();
+    expect(await effectiveRuleFor('severe_driving')).toMatchObject({ severity: 'high' });
+  });
+});
+
+describe('the guard under a psql that does not stop on error', () => {
+  it('still leaves every rule untouched, because the guard and the UPDATE are one block', async () => {
+    // A bare `psql -f` carries on past an error. run-pending-migrations.sh:127
+    // passes ON_ERROR_STOP=1 so this is not the deploy path, but the rules must
+    // survive it regardless: as two statements the guard would raise and the
+    // UPDATE would run anyway.
     await seedIncident('dangerous_area_entry');
 
     const client = await db.connect();
     try {
       for (const statement of splitStatements(FORWARD)) {
-        // Keep going after the failure, exactly as bare psql would.
         await client.query(statement).catch(() => undefined);
       }
     } finally {
@@ -637,12 +665,6 @@ describe('the guard', () => {
       expect(await effectiveRuleFor(type), type).toMatchObject({ severity: 'critical' });
     }
     expect(await markedCount()).toBe(0);
-  });
-
-  it('lets an incident of an UNRELATED type through', async () => {
-    await seedIncident('late');
-    await expect(db.query(FORWARD)).resolves.toBeTruthy();
-    expect(await effectiveRuleFor('severe_driving')).toMatchObject({ severity: 'high' });
   });
 });
 
@@ -722,6 +744,82 @@ describe('the marker', () => {
     const row = await ruleRow('prolonged_unauthorized_stop');
     expect(row.severity).toBe('high');
     expect(row.change_reason).toBe(prose);
+  });
+});
+
+describe('a row put back to critical by hand, then re-migrated', () => {
+  /** What an operator does when they disagree: flip severity back, leave the prose alone. */
+  async function manualReCritical(type: string): Promise<void> {
+    await db.query(
+      `UPDATE fleet_operational_incident_rules SET severity = 'critical'
+        WHERE incident_type = $1 AND effective_to IS NULL`,
+      [type],
+    );
+  }
+
+  it('carries ONE marker, not two, and it holds the latest prior flags', async () => {
+    await db.query(
+      `UPDATE fleet_operational_incident_rules SET change_reason = 'Seeded by 510'
+        WHERE incident_type = 'severe_driving' AND effective_to IS NULL`,
+    );
+    await db.query(FORWARD);
+    await manualReCritical('severe_driving');
+
+    await db.query(FORWARD);
+
+    const row = await ruleRow('severe_driving');
+    // The second pass reads the flags the row held on the way IN — which the
+    // first pass had already set to false/false/true.
+    expect(row.change_reason).toBe(`Seeded by 510 | ${telematicsReversionMarker({
+      whatsappEnabled: false, immediateNotification: false, includeInMorningSummary: true,
+    })}`);
+    expect((row.change_reason as string).match(/529:reversioned\{/g)).toHaveLength(1);
+  });
+
+  it('still restores cleanly, leaving no marker litter in the prose', async () => {
+    await db.query(
+      `UPDATE fleet_operational_incident_rules SET change_reason = 'Seeded by 510'
+        WHERE incident_type = 'severe_driving' AND effective_to IS NULL`,
+    );
+    await db.query(FORWARD);
+    await manualReCritical('severe_driving');
+    await db.query(FORWARD);
+
+    await db.query(ROLLBACK);
+
+    expect((await ruleRow('severe_driving')).change_reason).toBe('Seeded by 510');
+    expect(await markedCount()).toBe(0);
+  });
+
+  it('is never restored over by the rollback while the operator holds it critical', async () => {
+    // The rollback matches `severity = 'high'`. A row the operator has taken
+    // back to critical is theirs, marker or no marker: rewriting its flags from
+    // a stale marker would undo their decision.
+    await db.query(FORWARD);
+    await manualReCritical('severe_driving');
+    const before = await ruleRow('severe_driving');
+
+    await db.query(ROLLBACK);
+
+    expect(await ruleRow('severe_driving')).toEqual(before);
+  });
+
+  it('rollback run twice is a no-op the second time', async () => {
+    await db.query(FORWARD);
+    await manualReCritical('severe_driving');
+    await db.query(ROLLBACK);
+    const first = await db.query(
+      `SELECT id, severity, whatsapp_enabled, immediate_notification, include_in_morning_summary, change_reason
+         FROM fleet_operational_incident_rules ORDER BY incident_type, version`,
+    );
+
+    await db.query(ROLLBACK);
+
+    const second = await db.query(
+      `SELECT id, severity, whatsapp_enabled, immediate_notification, include_in_morning_summary, change_reason
+         FROM fleet_operational_incident_rules ORDER BY incident_type, version`,
+    );
+    expect(second.rows).toEqual(first.rows);
   });
 });
 
