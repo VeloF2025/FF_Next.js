@@ -146,6 +146,13 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
       day.largestGapMs = Math.max(day.largestGapMs, ms);
     });
 
+    // Cadence, counted on the day the interval CLOSED. `coverageIgnition` needs to know whether
+    // this day's fixes were close enough together for ignition time to be measurable at all, and
+    // two counters answer that without retaining every gap.
+    const closingDay = dayFor(sastDay(curMs));
+    closingDay.gapCount += 1;
+    if (elapsedMs <= maxAttributableMs) closingDay.gapsWithinCeiling += 1;
+
     if (elapsedMs <= maxAttributableMs) {
       if (cur.isSpeeding === true) {
         splitAcrossDays(from, curMs, (workDate, ms) => { dayFor(workDate).speedingMs += ms; });
@@ -163,11 +170,26 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
     }
 
     // Distance accrues even across an unattributable gap: the kilometres were really covered, and
-    // only the split between moving and idling was unknowable. Apportioned by time so a straddling
-    // interval lands on both days in the same proportion its seconds did.
+    // only the split between moving and idling was unknowable.
     const km = intervalDistanceKm(prev!, cur);
     if (km <= 0) return;
-    if (elapsedMs <= 0) { dayFor(sastDay(curMs)).distanceKm += km; return; }
+
+    // WHERE those kilometres land is the question, and time-proportional apportionment answers it
+    // wrongly across a silence. A 42-hour gap spanning three dates would put ~114 km of an
+    // odometer delta on the middle date -- a date on which we observed NOTHING, with
+    // position_count 0 and no source watermark. That is interpolation presented as measurement,
+    // and it is the number a utilisation report would happily average.
+    //
+    // We know only that the delta accrued somewhere in the interval, and the one date we actually
+    // observed is the one the closing fix fell on. So a gap's distance goes there whole, and that
+    // row gives up its claim to complete coverage.
+    if (elapsedMs > maxAttributableMs || elapsedMs <= 0) {
+      closingDay.distanceKm += km;
+      if (sastDay(from) !== sastDay(curMs)) closingDay.carriedGapDistance = true;
+      return;
+    }
+    // Short enough to attribute honestly: a fix-to-fix interval inside the ceiling really did
+    // happen across the boundary it straddles, so it is apportioned by the seconds on each side.
     splitAcrossDays(from, curMs, (workDate, ms) => { dayFor(workDate).distanceKm += km * (ms / elapsedMs); });
   }
 
@@ -237,6 +259,12 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
 
     result() {
       return [...days.values()]
+        // A date the accumulator only ever touched while apportioning a silence across it is not
+        // a vehicle-day we observed -- it is the shape of a gap. Emitting a row for it would
+        // publish zeroes and an interpolated distance under a null source watermark, which reads
+        // as a parked vehicle rather than a dark tracker. A trip alone still earns a row: that IS
+        // an observation, just one whose positions have aged out.
+        .filter((day) => day.positionCount > 0 || day.tripIgnitionMs > 0)
         .sort((a, b) => a.workDate.localeCompare(b.workDate))
         .map(finaliseDay);
     },

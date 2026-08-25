@@ -25,6 +25,15 @@ export interface DayAcc {
   fromEvents: HarshCounts; fromG: HarshCounts;
   firstIgnitionAt: string | null; lastIgnitionAt: string | null;
   positionCount: number; fixesWithIgnition: number; largestGapMs: number;
+  /** Inter-fix intervals whose CLOSING fix fell in this day, and how many were attributable. */
+  gapCount: number; gapsWithinCeiling: number;
+  /**
+   * This day closed a gap that began on an earlier day, and took the whole distance for it.
+   *
+   * The kilometres were really covered, but not necessarily on this date -- so the day may still
+   * report them and must not also claim to be completely observed.
+   */
+  carriedGapDistance: boolean;
   feeds: Map<string, { provider: string | null; accountRef: string | null; count: number }>;
   gforce: boolean; providerEvents: boolean; sourceWatermark: string | null;
 }
@@ -38,6 +47,7 @@ export function newDay(workDate: string): DayAcc {
     fromEvents: { brake: 0, accel: 0, corner: 0 }, fromG: { brake: 0, accel: 0, corner: 0 },
     firstIgnitionAt: null, lastIgnitionAt: null,
     positionCount: 0, fixesWithIgnition: 0, largestGapMs: 0,
+    gapCount: 0, gapsWithinCeiling: 0, carriedGapDistance: false,
     feeds: new Map(), gforce: false, providerEvents: false, sourceWatermark: null,
   };
 }
@@ -57,7 +67,12 @@ export function finaliseDay(day: DayAcc): VehicleDayStats {
   // A built trip IS an ignition-on period -- it is segmented from ignition transitions -- so its
   // presence is itself evidence the feed asserts ignition, even on a day whose positions were
   // trimmed away by retention.
-  const coverageIgn = coverageIgnition(day.fixesWithIgnition, day.positionCount) || day.tripIgnitionMs > 0;
+  const coverageIgn = coverageIgnition({
+    fixesWithIgnition: day.fixesWithIgnition,
+    positionCount: day.positionCount,
+    gapCount: day.gapCount,
+    gapsWithinCeiling: day.gapsWithinCeiling,
+  }) || day.tripIgnitionMs > 0;
 
   let movingSeconds = seconds(day.movingMs);
   let idleSeconds = seconds(day.idleMs);
@@ -95,6 +110,7 @@ export function finaliseDay(day: DayAcc): VehicleDayStats {
     coverageGforce: day.gforce,
     coverageProviderEvents: day.providerEvents,
     coverageComplete: granularity !== 'none'
+      && !day.carriedGapDistance
       && coverageComplete(day.positionCount, trackerSilenceSeconds, feedProfile(dominant.provider, dominant.accountRef)),
     sourceWatermark: day.sourceWatermark,
   };

@@ -7,6 +7,7 @@
  * answers were computed by hand, not against the fold's own opinion of itself.
  */
 import { describe, expect, it } from 'vitest';
+import { feedProfile } from '../coverage';
 import { foldVehicleDays } from '../dayFold';
 import { fix, ituranDayWithLongSilence, netstarDay, urentDay, velocityRun } from './fixtures';
 
@@ -135,14 +136,80 @@ describe('tracker silence', () => {
     expect(day!.trackerSilenceSeconds).toBe(900);
   });
 
-  it('splits a silence that crosses midnight across both days rather than double-counting it', () => {
+  it('gives each observed day only the portion of a long silence that fell inside it', () => {
     const days = foldVehicleDays(ituranDayWithLongSilence(MORNING));
-    // A 42-hour silence starting at 08:54 SAST spans the rest of that day, all of the next, and
-    // part of the one after. No single day may claim the whole 42 hours.
-    for (const day of days) {
-      expect(day.trackerSilenceSeconds).toBeLessThanOrEqual(86_400);
-    }
-    expect(Math.max(...days.map((d) => d.trackerSilenceSeconds))).toBe(86_400);
+    // The 42-hour silence opens at 08:54:35 SAST on the 10th and closes at 02:54:35 on the 12th.
+    // The 10th was dark for its remaining 54,325 s and the 12th for its first 10,475 s; neither
+    // may claim the whole 42 hours.
+    expect(days.map((d) => [d.workDate, d.trackerSilenceSeconds])).toEqual([
+      ['2026-08-10', 54_325],
+      ['2026-08-12', 10_475],
+    ]);
+  });
+});
+
+describe('a day we did not observe', () => {
+  const days = () => foldVehicleDays(ituranDayWithLongSilence(MORNING));
+
+  it('produces NO row for a date that only ever sat inside a gap', () => {
+    // The 11th has not one fix. A row for it would publish zeroes, an interpolated distance and a
+    // null source watermark -- which reads as a parked vehicle, not a dark tracker, and is
+    // exactly the number a utilisation average would swallow.
+    expect(days().map((d) => d.workDate)).toEqual(['2026-08-10', '2026-08-12']);
+    expect(days().every((d) => d.positionCount > 0)).toBe(true);
+    expect(days().every((d) => d.sourceWatermark !== null)).toBe(true);
+  });
+
+  it('gives the whole gap distance to the day of the CLOSING fix, and no total is lost', () => {
+    // The odometer ran 88,200 -> 88,400 across the silence: 200 km that we know accrued somewhere
+    // in 42 hours and observed on the 12th. Time-proportional apportionment would have put ~114 km
+    // on the 11th, a date with no evidence of anything.
+    const [tenth, twelfth] = days();
+    expect(twelfth!.distanceKm).toBe(200);
+    // The five intervals before the silence are 40 km each, all on the 10th.
+    expect(tenth!.distanceKm).toBe(200);
+    expect(days().reduce((km, d) => km + d.distanceKm, 0)).toBe(400);
+  });
+
+  it('makes the receiving day give up its claim to complete coverage', () => {
+    // This fixture is built so the FLAG is the only thing deciding. The first attempt asserted it
+    // on the ituran day above, where coverage_complete was already false for having 1 fix against
+    // an expected 4 -- it passed with the guard deleted, which is no test at all.
+    //
+    // Here a cartrack/velocity vehicle goes quiet at 23:30 SAST and reappears at 00:30, then runs
+    // normally. The receiving day has 260 fixes (>= 200 expected) and a largest silence of 1,800 s
+    // (<= 3,600 allowed), so both coverage_complete conditions hold — yet it is carrying 100 km
+    // whose date we do not actually know.
+    const beforeMidnight = fix('2026-08-10T21:30:00.000Z', 'cartrack', 'velocity', {
+      offsetSeconds: 0, ignition: true, speedKph: 0, odometerKm: 1_000,
+    });
+    const afterMidnight = velocityRun('2026-08-10T22:30:00.000Z', 260, [50], 1_100);
+    const [, eleventh] = foldVehicleDays([beforeMidnight, ...afterMidnight]);
+
+    expect(eleventh!.workDate).toBe('2026-08-11');
+    expect(eleventh!.positionCount).toBe(260);
+    expect(eleventh!.trackerSilenceSeconds).toBe(1_800);
+    // The 100 km odometer delta across the silence landed here whole.
+    expect(eleventh!.distanceKm).toBeGreaterThan(100);
+    expect(eleventh!.coverageComplete).toBe(false);
+  });
+
+  it('leaves an equivalent day WITHOUT a carried gap complete, so the flag is what differs', () => {
+    // The same shape with the vehicle simply starting at 00:30 and no earlier fix at all: no gap
+    // is carried across midnight, and the day is complete.
+    const [only] = foldVehicleDays(velocityRun('2026-08-10T22:30:00.000Z', 260, [50], 1_100));
+    expect(only!.workDate).toBe('2026-08-11');
+    expect(only!.coverageComplete).toBe(true);
+  });
+
+  it('leaves a straddling interval INSIDE the ceiling apportioned, not lumped', () => {
+    // The rule is about silences, not about midnight. A continuous 8-second feed crossing the
+    // boundary really did cover ground on both dates, and both keep their share.
+    const crossing = foldVehicleDays(velocityRun('2026-08-10T21:59:00.000Z', 30, [90]));
+    expect(crossing.map((d) => d.workDate)).toEqual(['2026-08-10', '2026-08-11']);
+    // Both dates keep a real share -- lumping would have put the whole 5.8 km on the 11th.
+    for (const day of crossing) expect(day.distanceKm).toBeGreaterThan(0);
+    expect(crossing.reduce((km, d) => km + d.distanceKm, 0)).toBeCloseTo(5.8, 1);
   });
 });
 
@@ -272,6 +339,29 @@ describe('the row migration 528 will accept', () => {
     expect(day!.movingSeconds).toBe(0);
   });
 
+  it('refuses to call a coarse feed measurable, so its zeroes are not read as observations', () => {
+    // Each of these three asserts ignition on essentially every fix and measures none of it,
+    // because every interval exceeds the 300 s ceiling. coverage_ignition = false is what makes
+    // the 0 / 0 / 0 honest rather than a claim that the vehicle never ran.
+    for (const [name, positions] of [
+      ['cartrack/urent', urentDay(MORNING)],
+      ['netstar/europcar', netstarDay(MORNING)],
+      ['ituran/avis', ituranDayWithLongSilence(MORNING)],
+    ] as const) {
+      const [day] = foldVehicleDays(positions);
+      expect(day!.coverageIgnition, name).toBe(false);
+      expect([day!.ignitionSeconds, day!.movingSeconds, day!.idleSeconds], name).toEqual([0, 0, 0]);
+    }
+  });
+
+  it('calls cartrack/velocity measurable, because at 8 seconds it genuinely is', () => {
+    const [day] = foldVehicleDays(velocityRun(MORNING, 200, [0, 40, 0, 90]));
+    expect(day!.coverageIgnition).toBe(true);
+    expect(day!.ignitionSeconds).toBeGreaterThan(0);
+    expect(day!.movingSeconds).toBeGreaterThan(0);
+    expect(day!.idleSeconds).toBeGreaterThan(0);
+  });
+
   it('carries a source watermark whenever it folded a fix', () => {
     const [day] = foldVehicleDays(velocityRun(MORNING, 5, [40]));
     expect(day!.positionCount).toBe(5);
@@ -289,6 +379,55 @@ describe('feed attribution', () => {
     expect(day!.provider).toBe('cartrack');
     expect(day!.accountRef).toBe('velocity');
     expect(day!.coverageGranularity).toBe('mixed');
+  });
+});
+
+describe('an exact tie between two feeds', () => {
+  /**
+   * The tie-break in `dominantFeed` is load-bearing and invisible.
+   *
+   * `Array.prototype.sort` is stable, so without the tie-break the winner is simply whichever feed
+   * the accumulator's Map saw FIRST -- and that is decided by which feed's fix happens to carry
+   * the earlier timestamp. The same vehicle-day then yields a different `provider`, `account_ref`
+   * and `coverage_complete` (the two feeds carry different `expected_min_fixes`) depending on an
+   * accident of ordering, and two correct runs produce different row hashes.
+   *
+   * A first version of this test varied the array order but sorted by `recordedAt` afterwards, so
+   * cartrack led in both variants and the map insertion order never actually changed. It passed
+   * with the tie-break deleted. What has to differ is which feed owns the EARLIER instant.
+   */
+  const tied = (leader: 'cartrack' | 'netstar') => {
+    const early = { offsetSeconds: 0, ignition: true, speedKph: 40 } as const;
+    const late = { offsetSeconds: 30, ignition: true, speedKph: 40 } as const;
+    return leader === 'cartrack'
+      ? [fix(MORNING, 'cartrack', 'urent', early), fix(MORNING, 'netstar', 'europcar', late)]
+      : [fix(MORNING, 'netstar', 'europcar', early), fix(MORNING, 'cartrack', 'urent', late)];
+  };
+
+  it('resolves to the same feed whichever one happened to report first', () => {
+    const [cartrackFirst] = foldVehicleDays(tied('cartrack'));
+    const [netstarFirst] = foldVehicleDays(tied('netstar'));
+    expect(cartrackFirst!.provider).toBe(netstarFirst!.provider);
+    expect(cartrackFirst!.accountRef).toBe(netstarFirst!.accountRef);
+    expect(cartrackFirst!.coverageComplete).toBe(netstarFirst!.coverageComplete);
+  });
+
+  it('is a genuine tie, and the two feeds really would disagree about the row', () => {
+    // Both halves guard the case itself. Unequal counts would make the assertion above pass
+    // without exercising the tie-break at all; identical feed profiles would make the
+    // coverage_complete comparison prove nothing.
+    const positions = tied('cartrack');
+    const counts = new Map<string, number>();
+    for (const p of positions) {
+      const key = `${p.provider}/${p.accountRef}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    expect([...counts.values()]).toEqual([1, 1]);
+    // Two fixes clears netstar's expected minimum of 2 and misses urent's of 4, so which feed
+    // wins the tie genuinely changes coverage_complete.
+    expect(feedProfile('cartrack', 'urent').expectedMinFixes).toBeGreaterThan(positions.length);
+    expect(feedProfile('netstar', 'europcar').expectedMinFixes).toBeLessThanOrEqual(positions.length);
+    expect(foldVehicleDays(positions)[0]!.coverageGranularity).toBe('mixed');
   });
 });
 

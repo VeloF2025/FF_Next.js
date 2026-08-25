@@ -70,9 +70,17 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_daily_stats (
   moving_seconds BIGINT NOT NULL DEFAULT 0,
   idle_seconds BIGINT NOT NULL DEFAULT 0,
 
-  -- GENERATED, so it cannot drift from the three columns it derives from, and so no caller can
-  -- assert a confident split of time the feed's cadence does not support. On a two-hour snapshot
-  -- feed almost every second lands here, which is the honest answer.
+  -- Ignition time that could be measured but not classified: the engine was running and the
+  -- interval was short enough to attribute, yet the fix closing it reported no speed and carried
+  -- no motion event.
+  --
+  -- In practice this is a cartrack/velocity-only residual, and small. It is NOT where a coarse
+  -- feed's unknown time goes: a feed whose fixes are hours apart fails coverage_ignition
+  -- entirely, so its ignition_seconds is 0 and this is 0 with it. The row says "we could not see"
+  -- through the coverage flags rather than by parking a large number here.
+  --
+  -- GENERATED, so it cannot drift from the three columns it derives from and no caller can assert
+  -- a split the feed's cadence does not support.
   unattributed_seconds BIGINT GENERATED ALWAYS AS (
     GREATEST(ignition_seconds - moving_seconds - idle_seconds, 0)
   ) STORED,
@@ -102,6 +110,9 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_daily_stats (
   account_ref VARCHAR(50),
 
   coverage_granularity TEXT NOT NULL,
+  -- Ignition seconds are MEASURABLE here: the feed asserts ignition on at least 90% of the day's
+  -- fixes AND the day's median inter-fix gap is inside the attribution ceiling. The second half
+  -- is what stops a two-hour feed publishing 0 / 0 / 0 as though it had observed a parked day.
   coverage_ignition BOOLEAN NOT NULL,
   coverage_gforce BOOLEAN NOT NULL,
   coverage_provider_events BOOLEAN NOT NULL,
@@ -191,7 +202,12 @@ COMMENT ON COLUMN fleet_vehicle_daily_stats.coverage_provider_events IS
   'A fix in this vehicle-day carried provider_event_type. Cartrack firmware fires HARSH_BRAKING '
   'and HARSH_CORNERING on the family whose g columns are structurally zero.';
 COMMENT ON COLUMN fleet_vehicle_daily_stats.unattributed_seconds IS
+  'Measured ignition time that could not be classified as moving or idling. A cartrack/velocity-'
+  'only residual: a feed too coarse to measure ignition fails coverage_ignition and stores 0 here. '
   'GENERATED from ignition/moving/idle and therefore not assignable by a caller.';
+COMMENT ON COLUMN fleet_vehicle_daily_stats.coverage_ignition IS
+  'Ignition seconds are MEASURABLE on this vehicle-day: ignition asserted on >=90% of fixes AND '
+  'the median inter-fix gap within the attribution ceiling. Not merely "the feed sends ignition".';
 
 -- ---------------------------------------------------------------------------
 -- Build watermarks

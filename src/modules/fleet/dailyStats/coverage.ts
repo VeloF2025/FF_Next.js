@@ -80,6 +80,17 @@ const UNMEASURED_PROFILE: FeedProfile = {
  */
 export const IGNITION_COVERAGE_MIN_RATIO = 0.9;
 
+/** What `coverageIgnition` needs to know about one vehicle-day. */
+export interface IgnitionCoverageInput {
+  /** Fixes carrying a non-null `ignition`. */
+  fixesWithIgnition: number;
+  positionCount: number;
+  /** Inter-fix intervals observed in the day — one fewer than the fixes that bound them. */
+  gapCount: number;
+  /** How many of those intervals were short enough to attribute to a bucket. */
+  gapsWithinCeiling: number;
+}
+
 export function feedProfile(provider: string | null, accountRef: string | null): FeedProfile {
   const measured = FEED_PROFILES[`${provider ?? ''}/${accountRef ?? ''}`];
   if (measured) return measured;
@@ -118,13 +129,31 @@ export function coverageProviderEvents(positions: readonly DayPosition[]): boole
 }
 
 /**
- * Does this vehicle-day assert ignition often enough to trust ignition-derived seconds?
+ * Are ignition-derived seconds MEASURABLE on this vehicle-day?
  *
- * A day with no fixes at all cannot: there is nothing to assert it.
+ * Two conditions, and the second is the one that matters. A feed asserting ignition on every fix
+ * still measures no ignition time at all if its fixes are two hours apart: every interval exceeds
+ * the attribution ceiling, so nothing is booked, and the row reports 0 / 0 / 0. Without the gap
+ * condition that zero is published beside `coverage_ignition = true`, which reads as "this vehicle
+ * did not run today" when the truth is "this feed cannot see whether it ran". Three of the four
+ * live feeds are in exactly that position -- `cartrack/urent` at a 1,797 s median gap,
+ * `netstar/europcar` at 637 s, `ituran/avis` at 2,095 s, all against a 300 s ceiling.
+ *
+ * So the flag means measurable, not merely asserted, and when it is false migration 528's
+ * `coverage_ignition OR (ignition_seconds = 0 AND idle_seconds = 0)` CHECK forces the row to say
+ * so rather than presenting an absence as an observation.
+ *
+ * The median is evaluated WITHOUT retaining every gap: a median is at or below a threshold exactly
+ * when at least half the values are, so two counters answer it in O(1) over a month-long backfill.
+ *
+ * A day with no fixes, or with only one, cannot clear either condition -- there is nothing to
+ * assert ignition and no interval to measure across.
  */
-export function coverageIgnition(fixesWithIgnition: number, positionCount: number): boolean {
-  if (positionCount === 0) return false;
-  return fixesWithIgnition / positionCount >= IGNITION_COVERAGE_MIN_RATIO;
+export function coverageIgnition(input: IgnitionCoverageInput): boolean {
+  const { fixesWithIgnition, positionCount, gapCount, gapsWithinCeiling } = input;
+  if (positionCount === 0 || gapCount === 0) return false;
+  if (fixesWithIgnition / positionCount < IGNITION_COVERAGE_MIN_RATIO) return false;
+  return gapsWithinCeiling * 2 >= gapCount;
 }
 
 /**

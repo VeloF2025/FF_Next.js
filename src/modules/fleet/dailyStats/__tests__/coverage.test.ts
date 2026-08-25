@@ -50,24 +50,68 @@ describe('coverageProviderEvents', () => {
   });
 });
 
-describe('coverageIgnition', () => {
-  it('holds for the four live feeds, including ituran at 94.5%', () => {
-    expect(coverageIgnition(1_000, 1_000)).toBe(true);
-    expect(coverageIgnition(945, 1_000)).toBe(true);
+describe('coverageIgnition — measurable, not merely asserted', () => {
+  /** A day of `count` fixes at a fixed cadence, all asserting ignition. */
+  const atCadence = (count: number, gapSeconds: number, ceiling = 300) => ({
+    fixesWithIgnition: count,
+    positionCount: count,
+    gapCount: count - 1,
+    gapsWithinCeiling: gapSeconds <= ceiling ? count - 1 : 0,
   });
 
-  it('fails below the ratio, and on a day with nothing to assert it', () => {
-    expect(coverageIgnition(899, 1_000)).toBe(false);
-    expect(coverageIgnition(0, 0)).toBe(false);
+  it('holds for cartrack/velocity, the one feed whose cadence can measure ignition time', () => {
+    // 8 s median gap against a 300 s ceiling: every interval is attributable.
+    expect(coverageIgnition(atCadence(1_169, 8))).toBe(true);
   });
 
-  it('is true for a SNAPSHOT feed that does assert ignition on every fix', () => {
-    // netstar/europcar is snapshot AND asserts ignition on 100% of fixes, because the live path is
-    // tree.ts's IgnitionOn boolean rather than the backfill CSV's Status column. Granularity and
-    // ignition coverage are independent facts; tying them together would zero six vehicles.
+  it('is FALSE for the three coarse feeds, however faithfully they assert ignition', () => {
+    // This is the whole point of the flag. All three assert ignition on ~100% of fixes, and all
+    // three measure zero ignition seconds because every interval exceeds the ceiling. Reporting
+    // 0 / 0 / 0 beside coverage_ignition = true would read as "this vehicle did not run today"
+    // when the truth is "this feed cannot see whether it ran".
+    expect(coverageIgnition(atCadence(15, 1_797)), 'cartrack/urent').toBe(false);
+    expect(coverageIgnition(atCadence(10, 637)), 'netstar/europcar').toBe(false);
+    expect(coverageIgnition(atCadence(11, 2_095)), 'ituran/avis').toBe(false);
+  });
+
+  it('still fails a day whose fixes are dense but which does not assert ignition', () => {
+    // The ratio condition survives independently: ituran leaves ignition null on 5.5% of fixes,
+    // which passes, and a device fault dropping below 90% does not.
+    expect(coverageIgnition({ ...atCadence(1_000, 8), fixesWithIgnition: 945 })).toBe(true);
+    expect(coverageIgnition({ ...atCadence(1_000, 8), fixesWithIgnition: 899 })).toBe(false);
+  });
+
+  it('reads the MEDIAN gap, so a handful of long silences do not disqualify a dense day', () => {
+    // 600 of 1,000 intervals within the ceiling: the median is inside it, and a vehicle that
+    // parked underground for two hours still measured most of its day.
+    expect(coverageIgnition({
+      fixesWithIgnition: 1_001, positionCount: 1_001, gapCount: 1_000, gapsWithinCeiling: 600,
+    })).toBe(true);
+    // Exactly half is still a median at the ceiling, so it holds.
+    expect(coverageIgnition({
+      fixesWithIgnition: 1_001, positionCount: 1_001, gapCount: 1_000, gapsWithinCeiling: 500,
+    })).toBe(true);
+    // Below half, the typical interval is unattributable and the day cannot measure ignition.
+    expect(coverageIgnition({
+      fixesWithIgnition: 1_001, positionCount: 1_001, gapCount: 1_000, gapsWithinCeiling: 499,
+    })).toBe(false);
+  });
+
+  it('is false for a day with nothing to measure across', () => {
+    expect(coverageIgnition({ fixesWithIgnition: 0, positionCount: 0, gapCount: 0, gapsWithinCeiling: 0 })).toBe(false);
+    // One fix bounds no interval, so it can assert ignition and still measure no seconds of it.
+    expect(coverageIgnition({ fixesWithIgnition: 1, positionCount: 1, gapCount: 0, gapsWithinCeiling: 0 })).toBe(false);
+  });
+
+  it('is independent of granularity — the cadence decides, not the API shape', () => {
+    // netstar/europcar is a SNAPSHOT feed that asserts ignition on 100% of fixes. Its ratio is
+    // perfect and its cadence is not, and it is the cadence that disqualifies it. A snapshot feed
+    // polled every 30 s would qualify; a history feed polled every 2 h would not.
     const day = netstarDay(MORNING);
     expect(feedProfile('netstar', 'europcar').granularity).toBe('snapshot');
-    expect(coverageIgnition(day.filter((p) => p.ignition !== null).length, day.length)).toBe(true);
+    expect(day.every((p) => p.ignition !== null)).toBe(true);
+    expect(coverageIgnition(atCadence(day.length, 637))).toBe(false);
+    expect(coverageIgnition(atCadence(day.length, 30))).toBe(true);
   });
 });
 
