@@ -6,6 +6,17 @@
  * broken in this repo and silently produce a malformed query, so an optional predicate is a whole
  * separate statement here rather than a fragment spliced into a shared one. Every statement opens
  * with a tag comment: it is what shows up in pg_stat_activity when a slow query needs a name.
+ *
+ * ## Every read is bounded at BOTH ends
+ *
+ * The top bound is `windowEnd`, and it is not tidiness. `recorded_at` is the tracker's clock, not
+ * the server's, and the two disagree: a device running ten minutes fast, or a poll that lands
+ * mid-tick, stores a fix stamped after the instant this run believes it read at. The fold rejects
+ * that outright -- `assertWindowCoversLastFix` throws when the last fix is newer than the window
+ * -- so an unbounded read hands the fold a fix it must refuse, the vehicle is caught as failed,
+ * its watermark stays put, and the SAME fix is re-read on the next tick. A skew that persists
+ * therefore disables that vehicle permanently while every run still reports a status. Bounding the
+ * read instead simply leaves the fix for the tick whose window has caught up with it.
  */
 
 export const POSITIONS_ALL = `/* fleet-daily-stats:positions-all */
@@ -13,8 +24,11 @@ export const POSITIONS_ALL = `/* fleet-daily-stats:positions-all */
          speed_kph, is_speeding, odometer_km, linear_g, lateral_g, provider_event_type
   FROM fleet_vehicle_positions
   WHERE vehicle_id = $1
+    -- Bounded at the top even here: a never-built vehicle behind a fast tracker would otherwise
+    -- fail on its very first run and every one after it.
+    AND recorded_at <= $2::timestamptz
   ORDER BY recorded_at, id
-  LIMIT $2`;
+  LIMIT $3`;
 
 export const POSITIONS_FROM_WINDOW = `/* fleet-daily-stats:positions-window */
   SELECT id, recorded_at, provider_event_id, provider, account_ref, ignition, lat, lon,
@@ -22,8 +36,10 @@ export const POSITIONS_FROM_WINDOW = `/* fleet-daily-stats:positions-window */
   FROM fleet_vehicle_positions
   WHERE vehicle_id = $1
     AND recorded_at >= $2::timestamptz
+    -- Inclusive: a fix stamped exactly at the window end belongs to this run.
+    AND recorded_at <= $3::timestamptz
   ORDER BY recorded_at, id
-  LIMIT $3`;
+  LIMIT $4`;
 
 export const POSITIONS_AFTER_CURSOR = `/* fleet-daily-stats:positions-after */
   SELECT id, recorded_at, provider_event_id, provider, account_ref, ignition, lat, lon,
@@ -33,8 +49,11 @@ export const POSITIONS_AFTER_CURSOR = `/* fleet-daily-stats:positions-after */
     -- The PAIR, not recorded_at alone. Same-instant fixes are ordinary on this data, so a bare
     -- recorded_at cursor either drops the second twin (>) or re-feeds the first (>=).
     AND (recorded_at, id) > ($2::timestamptz, $3)
+    -- The pages after the first are where a backlog spends its time, so the top bound has to be
+    -- here as well; on the opening query alone it would protect almost nothing.
+    AND recorded_at <= $4::timestamptz
   ORDER BY recorded_at, id
-  LIMIT $4`;
+  LIMIT $5`;
 
 export const POSITION_BEFORE = `/* fleet-daily-stats:position-before */
   SELECT id, recorded_at, provider_event_id, provider, account_ref, ignition, lat, lon,
@@ -51,6 +70,7 @@ export const TRIPS_ALL = `/* fleet-daily-stats:trips-all */
   FROM fleet_vehicle_trips
   WHERE vehicle_id = $1
     AND ignition_off_at IS NOT NULL
+    AND ignition_off_at <= $2::timestamptz
   ORDER BY ignition_on_at`;
 
 export const TRIPS_FROM_WINDOW = `/* fleet-daily-stats:trips-window */
@@ -61,6 +81,9 @@ export const TRIPS_FROM_WINDOW = `/* fleet-daily-stats:trips-window */
     -- Filtered on the END, so a journey that began before the window but closed inside it still
     -- contributes the share of itself that fell in the window.
     AND ignition_off_at >= $2::timestamptz
+    -- Bounded at the top for the same reason the positions are: a trip closed by a fast tracker
+    -- would otherwise apportion ignition seconds onto a date this run has not reached.
+    AND ignition_off_at <= $3::timestamptz
   ORDER BY ignition_on_at`;
 
 export const UPSERT_SQL = `/* fleet-daily-stats:upsert */

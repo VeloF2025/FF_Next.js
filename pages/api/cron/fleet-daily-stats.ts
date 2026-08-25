@@ -9,6 +9,13 @@
  * deleted, so there is no destructive mode to guard and no flag that could be got wrong. Safe to
  * run often; safe to miss a run.
  *
+ * A tick that leaves backlog still answers `status: 'succeeded'`. The wrapper exits non-zero on
+ * any other status, and backlog is the ordinary state of a vehicle catching up -- every vehicle
+ * holds weeks of it the first time this runs. The count is in `vehiclesWithBacklog`, which the
+ * wrapper echoes with the rest of the body on every tick, and in a warn line from the build
+ * service. Backlog that stops SHRINKING is what deserves an alert, and that comparison needs the
+ * previous tick's number, which a stateless wrapper does not have.
+ *
  * Auth matches this Fleet module's convention -- x-cron-secret, as fleet-build-trips.ts and
  * fleet-operational-monitor.ts -- and fails closed when the secret is unset.
  *

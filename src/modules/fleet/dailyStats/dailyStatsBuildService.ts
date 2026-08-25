@@ -89,7 +89,15 @@ export const DAILY_STATS_LOCK = 'fleet-daily-stats';
  */
 export const POSITION_BATCH_SIZE = DAY_FOLD_POSITION_BATCH_SIZE;
 
-/** Pages per vehicle per tick, before the run yields at the next day boundary. */
+/**
+ * Pages a vehicle is expected to take per tick before the run yields.
+ *
+ * A soft floor, not a hard cap, and the difference matters when reading the loop: reaching it does
+ * not end the vehicle's turn. The run keeps paging until it has CLOSED a day newer than the one
+ * its watermark sat in, because yielding before that reopens the same day next tick and the
+ * backlog never moves. So a tick can exceed this by however many pages the current day still
+ * holds -- bounded, since a day is finite, but not by this number.
+ */
 export const MAX_BATCHES_PER_VEHICLE = 20;
 
 export interface DailyStatsBuildOptions {
@@ -125,7 +133,11 @@ export async function buildStatsForVehicle(
   // The interval that opened the window's first day can only be measured against the fix that
   // closed the previous one. Handed to the fold as its lead-in, never as a position.
   const leadIn = windowStart === null ? null : await loadPositionBefore(vehicleId, windowStart);
-  const fold = createDayFold({ ...options.foldOptions, leadIn, windowEnd: windowEndFor(nowMs) });
+  // One instant, used for three things that must agree: the top bound on every read, the fold's
+  // tail-gap arithmetic, and the assertion inside it that the window covers the last fix. Derived
+  // once so a clock-skewed tracker cannot fall between two slightly different answers.
+  const windowEnd = windowEndFor(nowMs);
+  const fold = createDayFold({ ...options.foldOptions, leadIn, windowEnd });
 
   let cursor: PositionCursor | null = null;
   let positionsProcessed = 0;
@@ -134,7 +146,9 @@ export async function buildStatsForVehicle(
   const daysTouched = new Set<string>();
 
   for (;;) {
-    const page = await loadPositionsForWindow(vehicleId, windowStart, cursor, options.positionBatchSize);
+    const page = await loadPositionsForWindow(
+      vehicleId, windowStart, cursor, windowEnd, options.positionBatchSize,
+    );
     if (page.length === 0) { drained = true; break; }
 
     fold.addPositions(page);
@@ -155,7 +169,7 @@ export async function buildStatsForVehicle(
     if (closed !== null && (watermarkDay === null || closed > watermarkDay)) break;
   }
 
-  fold.addTrips(await loadTripsForWindow(vehicleId, windowStart));
+  fold.addTrips(await loadTripsForWindow(vehicleId, windowStart, windowEnd));
 
   const ready = daysReadyToWrite(fold.result(), drained, firstWindowDay);
   for (const day of ready) {
@@ -232,6 +246,27 @@ export async function buildDailyStats(
   const status = vehiclesFailed === 0
     ? 'succeeded'
     : vehiclesSucceeded === 0 ? 'failed' : 'partial';
+
+  // Backlog is reported, not escalated, and that is a decision rather than an omission.
+  //
+  // `report_run_status` exits non-zero on any status other than `succeeded`, so folding backlog
+  // into the status would make the wrapper log an ERROR on every tick of an ordinary catch-up. A
+  // fresh deployment starts with every vehicle holding weeks of history and drains it over hours;
+  // paging for that whole window trains everyone to ignore the alert, which is how this repo lost
+  // sight of a genuinely failing cron once already.
+  //
+  // Backlog is also self-limiting: the loop guarantees at least one closed day per vehicle per
+  // tick, so it shrinks monotonically. What would deserve an alert is backlog that STOPS
+  // shrinking, and that needs the previous tick's number to notice -- a monitoring question, not
+  // something a stateless wrapper can answer. So the count goes in the response body (which the
+  // wrapper echoes verbatim every tick) and in a warn line here, and nothing exits 1 for it.
+  if (vehiclesWithBacklog > 0) {
+    log.warn(
+      '[fleet-daily-stats] vehicles still holding backlog after this tick; they resume next tick',
+      { vehiclesWithBacklog, vehiclesRequested: vehicles.length },
+      MODULE,
+    );
+  }
 
   return {
     status,

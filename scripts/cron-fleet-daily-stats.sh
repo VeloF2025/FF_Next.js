@@ -8,6 +8,12 @@
 # Incremental: each vehicle resumes from its own watermark, so a tick costs roughly what arrived
 # since the last one. Safe to run often; safe to miss a run.
 #
+# A tick that leaves backlog still reports success, so this exits 0 for it. That is deliberate:
+# backlog is the normal state of a vehicle catching up and it shrinks by at least one day per
+# vehicle per tick, so escalating it would log an ERROR every 15 minutes for hours after a deploy.
+# The count is in the echoed body as "vehiclesWithBacklog" -- grep it here if you want to watch a
+# catch-up drain.
+#
 # Install on velo (SAST -- velo cron runs in local time), every 15 minutes:
 #   */15 * * * * /home/velo/fibreflow-production/scripts/cron-fleet-daily-stats.sh >> /home/velo/logs/fleet-daily-stats.log 2>&1
 #

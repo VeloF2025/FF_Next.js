@@ -125,6 +125,39 @@ describe('daysReadyToWrite', () => {
 });
 
 describe('buildDailyStats', () => {
+  it('skips a registered vehicle that has never reported a position', async () => {
+    // The vehicle query is the register semi-joined to the positions. Driving it from the register
+    // is what keeps the ids inside `fleet_vehicle_daily_stats`'s foreign key; the EXISTS is what
+    // stops the five tracker-less vehicles in the fleet from costing a query each per tick.
+    const fake = useDb(new FakeDb());
+    fake.seedPositions(alphaPositions());
+    fake.registerVehicle('v-no-tracker');
+
+    const result = await buildDailyStats(REQUESTED_AT);
+
+    expect(result.vehiclesRequested).toBe(1);
+    expect(fake.watermarks.has('v-no-tracker')).toBe(false);
+  });
+
+  it('reports backlog without escalating it to a failing run status', async () => {
+    // The wrapper exits non-zero on any status but `succeeded`, and an ordinary catch-up would
+    // then log an ERROR every tick for hours after a deploy. The count is surfaced instead.
+    const fake = useDb(new FakeDb());
+    fake.seedPositions(alphaPositions());
+
+    const result = await buildDailyStats(REQUESTED_AT, {
+      positionBatchSize: 10, maxBatchesPerVehicle: 2,
+    });
+
+    expect(result.vehiclesWithBacklog).toBe(1);
+    expect(result.status).toBe('succeeded');
+    expect(logger.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining('backlog'),
+      expect.objectContaining({ vehiclesWithBacklog: 1 }),
+      expect.any(String),
+    );
+  });
+
   it('pins the production batch constants', () => {
     // 5,000 is ~four cartrack/velocity vehicle-days at the measured 1,169 fixes/day, so an
     // ordinary tick is one page. Changing either is a decision, not a tweak.
@@ -433,5 +466,85 @@ describe('the window edges the fold cannot see', () => {
 
     expect(Number(fake.statsRow(ALPHA, DAYS[0])!.position_count)).toBe(412);
     expect(fake.statsRow(ALPHA, DAYS[1])).toBeDefined();
+  });
+});
+
+describe('a tracker whose clock runs ahead of the server', () => {
+  const at = (day: string, seconds: number) => new Date(dayStart(day) + seconds * 1_000).toISOString();
+
+  const fix = (n: number, recordedAt: string) => ({
+    id: `s-${String(n).padStart(4, '0')}`,
+    vehicle_id: ALPHA,
+    recorded_at: recordedAt,
+    provider_event_id: `ct-s-${n}`,
+    provider: 'cartrack',
+    account_ref: 'velocity',
+    ignition: true,
+    lat: -26.2 + n * 0.0001,
+    lon: 28.0 + n * 0.0001,
+    speed_kph: 40,
+    is_speeding: false,
+    odometer_km: 5_000 + n * 0.2,
+    linear_g: 0,
+    lateral_g: 0,
+    provider_event_type: 'PERIODIC_EVENT',
+  });
+
+  /** A day's worth of ordinary fixes, ending just before `untilSeconds`. */
+  const dayOf = (day: string, untilSeconds: number) => Array.from(
+    { length: Math.floor(untilSeconds / 240) }, (_, k) => fix(k, at(day, k * 240)),
+  );
+
+  it('does not fail the vehicle over a fix stamped after the run started', async () => {
+    // The fold REFUSES a window that does not cover its last fix. Unbounded, the read hands it
+    // one, `buildStatsForVehicle` throws, the vehicle is counted failed and its watermark stays
+    // put — so the next tick reads the same fix and fails again. A poll landing mid-tick is enough
+    // to trigger it once; a device with a fast clock triggers it forever.
+    const fake = useDb(new FakeDb());
+    const now = at(DAYS[2], 12 * 3_600);
+    fake.seedPositions(dayOf(DAYS[2], 12 * 3_600));
+    fake.seedPositions([fix(9_001, at(DAYS[2], 12 * 3_600 + 30))]);
+
+    const result = await buildDailyStats(now);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.vehiclesFailed).toBe(0);
+    expect(logger.log.error).not.toHaveBeenCalled();
+    // The future fix is simply not this tick's business.
+    expect(Number(fake.statsRow(ALPHA, DAYS[2])!.position_count)).toBe(180);
+  });
+
+  it('folds that fix on the tick whose window has caught up with it', async () => {
+    const fake = useDb(new FakeDb());
+    fake.seedPositions(dayOf(DAYS[2], 12 * 3_600));
+    fake.seedPositions([fix(9_001, at(DAYS[2], 12 * 3_600 + 30))]);
+
+    await buildDailyStats(at(DAYS[2], 12 * 3_600));
+    await buildDailyStats(at(DAYS[2], 13 * 3_600));
+
+    expect(Number(fake.statsRow(ALPHA, DAYS[2])!.position_count)).toBe(181);
+  });
+
+  it('keeps succeeding tick after tick against a tracker permanently ten minutes fast', async () => {
+    // The steady state, not a one-off: every tick finds a fix ahead of it, because the device is
+    // always ten minutes ahead. The run must stay clean and the watermark must keep advancing.
+    const fake = useDb(new FakeDb());
+    fake.seedPositions(dayOf(DAYS[2], 6 * 3_600));
+
+    let previousMark = '';
+    for (let hour = 6; hour <= 10; hour += 1) {
+      const now = at(DAYS[2], hour * 3_600);
+      // The device stamps this hour's fix ten minutes into the future.
+      fake.seedPositions([fix(8_000 + hour, at(DAYS[2], hour * 3_600 + 600))]);
+
+      const result = await buildDailyStats(now);
+
+      expect({ hour, status: result.status, failed: result.vehiclesFailed })
+        .toEqual({ hour, status: 'succeeded', failed: 0 });
+      const mark = String(fake.watermarks.get(ALPHA)?.last_position_at ?? '');
+      expect(mark > previousMark).toBe(true);
+      previousMark = mark;
+    }
+    expect(logger.log.error).not.toHaveBeenCalled();
   });
 });

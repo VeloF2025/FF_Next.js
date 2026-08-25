@@ -23,6 +23,20 @@
  * one and `recorded_at >=` re-feeds the first. The pair does neither -- it is exclusive on the
  * fix, which is what the contract was protecting, and it never skips a genuine twin.
  *
+ * ## What this job will never go back for
+ *
+ * A run reads from `min(watermark - 6h, yesterday 00:00 SAST)`, snapped to a day boundary. A fix
+ * that arrives with a `recorded_at` OLDER than that horizon is never refolded, and no amount of
+ * waiting will change that: the horizon only moves forward. Six hours covers a tracker that
+ * buffered through one out-of-coverage stretch, and yesterday covers the ordinary overnight flush.
+ * A device that was dark for days and dumps its buffer on reconnection is outside both, and its
+ * vehicle-days stay as they were computed without it.
+ *
+ * That is a deliberate bound on this job's cost, not an oversight -- widening the window to cover
+ * it would mean every tick rescanning weeks for the benefit of a case that happens rarely. The
+ * repair for it is PR9's backfill, which walks arbitrary older windows through this same code path
+ * and, because the upsert is a full replacement, simply recomputes those days correctly.
+ *
  * ## No conditional SQL fragments
  *
  * Interpolated tagged-template conditionals are broken in this repo and silently produce a
@@ -105,17 +119,28 @@ function toPosition(r: PositionRow): LoadedPosition {
   };
 }
 
-/** Vehicles worth folding: those the position stream has ever mentioned. */
+/**
+ * Vehicles worth folding: those in the register that the position stream has ever mentioned.
+ *
+ * Driven from `fleet_vehicles` with an EXISTS rather than DISTINCT over the positions, for two
+ * reasons. It is the cheaper plan -- a semi-join stops at the first matching position per vehicle,
+ * where DISTINCT sorts or hashes every row in a table that grows by ~1,169 fixes per vehicle per
+ * day. And it returns ids the register vouches for, which is what `fleet_vehicle_daily_stats`'s
+ * own foreign key requires; the two can only ever disagree while a delete is in flight, and on
+ * that tick this reads the safe side of the race.
+ */
 export async function listVehiclesWithPositions(): Promise<string[]> {
-  const rows = await query<{ vehicle_id: string }>(
+  const rows = await query<{ id: string }>(
     `/* fleet-daily-stats:vehicles */
-     SELECT DISTINCT vehicle_id
-     FROM fleet_vehicle_positions
-     WHERE vehicle_id IS NOT NULL
-     ORDER BY vehicle_id`,
+     SELECT v.id
+     FROM fleet_vehicles v
+     WHERE EXISTS (
+       SELECT 1 FROM fleet_vehicle_positions p WHERE p.vehicle_id = v.id
+     )
+     ORDER BY v.id`,
     [],
   );
-  return rows.map((r) => r.vehicle_id);
+  return rows.map((r) => r.id);
 }
 
 /** The newest position already folded into a stats row, or null if this vehicle is untouched. */
@@ -162,17 +187,23 @@ export async function writeWatermark(
  * The cursor subsumes the window bound -- it can only ever point at a fix inside it.
  */
 export async function loadPositionsForWindow(
-  vehicleId: string, windowStart: string | null, after: PositionCursor | null, limit: number,
+  vehicleId: string,
+  windowStart: string | null,
+  after: PositionCursor | null,
+  windowEnd: string,
+  limit: number,
 ): Promise<LoadedPosition[]> {
   if (after !== null) {
-    const rows = await query<PositionRow>(POSITIONS_AFTER_CURSOR, [vehicleId, after.recordedAt, after.id, limit]);
+    const rows = await query<PositionRow>(
+      POSITIONS_AFTER_CURSOR, [vehicleId, after.recordedAt, after.id, windowEnd, limit],
+    );
     return rows.map(toPosition);
   }
   if (windowStart !== null) {
-    const rows = await query<PositionRow>(POSITIONS_FROM_WINDOW, [vehicleId, windowStart, limit]);
+    const rows = await query<PositionRow>(POSITIONS_FROM_WINDOW, [vehicleId, windowStart, windowEnd, limit]);
     return rows.map(toPosition);
   }
-  const rows = await query<PositionRow>(POSITIONS_ALL, [vehicleId, limit]);
+  const rows = await query<PositionRow>(POSITIONS_ALL, [vehicleId, windowEnd, limit]);
   return rows.map(toPosition);
 }
 
@@ -204,12 +235,14 @@ export async function loadPositionBefore(
  * began before the window but ended inside it still contributes its share.
  */
 export async function loadTripsForWindow(
-  vehicleId: string, windowStart: string | null,
+  vehicleId: string, windowStart: string | null, windowEnd: string,
 ): Promise<DayTrip[]> {
   const rows = windowStart === null
-    ? await query<{ ignition_on_at: string | Date; ignition_off_at: string | Date | null }>(TRIPS_ALL, [vehicleId])
+    ? await query<{ ignition_on_at: string | Date; ignition_off_at: string | Date | null }>(
+      TRIPS_ALL, [vehicleId, windowEnd],
+    )
     : await query<{ ignition_on_at: string | Date; ignition_off_at: string | Date | null }>(
-      TRIPS_FROM_WINDOW, [vehicleId, windowStart],
+      TRIPS_FROM_WINDOW, [vehicleId, windowStart, windowEnd],
     );
   return rows.map((r) => ({
     ignitionOnAt: iso(r.ignition_on_at),

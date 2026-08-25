@@ -91,6 +91,15 @@ export interface FakeDbOptions {
 export class FakeDb {
   positions: FakePositionRow[] = [];
 
+  /**
+   * The vehicle register, `fleet_vehicles`.
+   *
+   * Seeding a position registers its vehicle, because production's foreign key means a position
+   * cannot exist without one. Registering a vehicle WITHOUT positions is the case the vehicle
+   * query's EXISTS exists to exclude, and `registerVehicle` is how a test reaches it.
+   */
+  vehicles = new Set<string>();
+
   trips: FakeTripRow[] = [];
 
   dailyStats = new Map<string, Row>();
@@ -102,7 +111,12 @@ export class FakeDb {
 
   constructor(private readonly options: FakeDbOptions = {}) {}
 
+  registerVehicle(vehicleId: string): void {
+    this.vehicles.add(vehicleId);
+  }
+
   seedPositions(rows: FakePositionRow[]): void {
+    for (const row of rows) this.vehicles.add(row.vehicle_id);
     this.positions.push(...rows);
     this.positions.sort((a, b) => tupleKey(a.recorded_at, a.id).localeCompare(tupleKey(b.recorded_at, b.id)));
   }
@@ -127,7 +141,7 @@ export class FakeDb {
     const failure = this.options.failOn?.(name, params);
     if (failure) throw failure;
 
-    if (name === 'fleet-daily-stats:vehicles') return this.selectVehicles() as T[];
+    if (name === 'fleet-daily-stats:vehicles') return this.selectVehicles(text) as T[];
     if (name.startsWith('fleet-daily-stats:positions')) return this.selectPositions(text, params) as T[];
     if (name === 'fleet-daily-stats:position-before') return this.selectPositionBefore(text, params) as T[];
     if (name.startsWith('fleet-daily-stats:trips')) return this.selectTrips(text, params) as T[];
@@ -137,9 +151,14 @@ export class FakeDb {
     throw new Error(`fakeDb: unrecognised statement tag ${name}`);
   }
 
-  private selectVehicles(): Row[] {
-    const ids = [...new Set(this.positions.map((p) => p.vehicle_id))].sort();
-    return ids.map((vehicle_id) => ({ vehicle_id }));
+  private selectVehicles(text: string): Row[] {
+    // The semi-join is applied only if the statement actually asks for it. Hardcoding it here
+    // would make the fake produce the right answer from the wrong query -- the same defect that
+    // let a mutation deleting the EXISTS pass the entire suite.
+    const semiJoined = /EXISTS\s*\(\s*SELECT[\s\S]*?fleet_vehicle_positions[\s\S]*?\)/i.test(text);
+    const withPositions = new Set(this.positions.map((p) => p.vehicle_id));
+    const ids = semiJoined ? [...this.vehicles].filter((id) => withPositions.has(id)) : [...this.vehicles];
+    return ids.sort().map((id) => ({ id }));
   }
 
   private selectPositions(text: string, params: readonly unknown[]): Row[] {
@@ -150,12 +169,19 @@ export class FakeDb {
     let rows = this.positions.filter((p) => p.vehicle_id === vehicleId);
 
     // The operators come out of the statement, so mutating them mutates this engine too.
-    const window = /recorded_at\s*(>=|>)\s*\$(\d+)::timestamptz/i.exec(text);
-    if (window) {
-      const bound = new Date(String(params[Number(window[2]) - 1])).toISOString();
-      rows = rows.filter((p) => (window[1] === '>'
+    const lower = /recorded_at\s*(>=|>)\s*\$(\d+)::timestamptz/i.exec(text);
+    if (lower) {
+      const bound = new Date(String(params[Number(lower[2]) - 1])).toISOString();
+      rows = rows.filter((p) => (lower[1] === '>'
         ? new Date(p.recorded_at).toISOString() > bound
         : new Date(p.recorded_at).toISOString() >= bound));
+    }
+    const upper = /recorded_at\s*(<=|<)\s*\$(\d+)::timestamptz/i.exec(text);
+    if (upper) {
+      const bound = new Date(String(params[Number(upper[2]) - 1])).toISOString();
+      rows = rows.filter((p) => (upper[1] === '<'
+        ? new Date(p.recorded_at).toISOString() < bound
+        : new Date(p.recorded_at).toISOString() <= bound));
     }
     const cursor = /\(recorded_at,\s*id\)\s*(>=|>)\s*\(\s*\$(\d+)::timestamptz,\s*\$(\d+)\s*\)/i.exec(text);
     if (cursor) {
@@ -188,10 +214,23 @@ export class FakeDb {
   private selectTrips(text: string, params: readonly unknown[]): Row[] {
     const vehicleId = params[0];
     let rows = this.trips.filter((t) => t.vehicle_id === vehicleId && t.ignition_off_at !== null);
-    const window = /ignition_off_at\s*(>=|>)\s*\$(\d+)::timestamptz/i.exec(text);
-    if (window) {
-      const bound = new Date(String(params[Number(window[2]) - 1])).toISOString();
-      rows = rows.filter((t) => new Date(t.ignition_off_at!).toISOString() >= bound);
+    // Both operators come out of the statement. An earlier version of this method CAPTURED the
+    // lower one and then compared with a hardcoded `>=` regardless -- so a mutation from `>=` to
+    // `>` changed the SQL, changed nothing here, and survived the whole suite. A double that
+    // parses a rule and then ignores it is worse than one that never looked: it reads as coverage.
+    const lower = /ignition_off_at\s*(>=|>)\s*\$(\d+)::timestamptz/i.exec(text);
+    if (lower) {
+      const bound = new Date(String(params[Number(lower[2]) - 1])).toISOString();
+      rows = rows.filter((t) => (lower[1] === '>'
+        ? new Date(t.ignition_off_at!).toISOString() > bound
+        : new Date(t.ignition_off_at!).toISOString() >= bound));
+    }
+    const upper = /ignition_off_at\s*(<=|<)\s*\$(\d+)::timestamptz/i.exec(text);
+    if (upper) {
+      const bound = new Date(String(params[Number(upper[2]) - 1])).toISOString();
+      rows = rows.filter((t) => (upper[1] === '<'
+        ? new Date(t.ignition_off_at!).toISOString() < bound
+        : new Date(t.ignition_off_at!).toISOString() <= bound));
     }
     return [...rows].sort((a, b) => a.ignition_on_at.localeCompare(b.ignition_on_at))
       .map((t) => ({ ignition_on_at: t.ignition_on_at, ignition_off_at: t.ignition_off_at }));
@@ -222,8 +261,11 @@ export class FakeDb {
     const next = incoming.last_position_at === null || incoming.last_position_at === undefined
       ? null
       : String(incoming.last_position_at);
-    // GREATEST(existing, excluded) — a watermark must never rewind.
-    existing.last_position_at = previous !== null && next !== null
+    // Whether the mark can move BACKWARDS is read out of the statement, not decided here. This
+    // method used to take the max unconditionally, so deleting GREATEST from the SQL changed the
+    // anti-rewind guarantee and changed nothing any test could see.
+    const antiRewind = /last_position_at\s*=\s*GREATEST\s*\(/i.test(text);
+    existing.last_position_at = antiRewind && previous !== null && next !== null
       ? (previous > next ? previous : next)
       : (next ?? previous);
     existing.last_built_at = new Date().toISOString();
