@@ -51,6 +51,25 @@ describe('VehicleRulesDialog', () => {
     expect(screen.getByLabelText('Vehicle rule history')).toHaveTextContent('Version 1');
   });
 
+  it('labels the open version "Current" only while it is actually in force', async () => {
+    render(<VehicleRulesDialog open onClose={vi.fn()} canEdit />);
+    expect(await screen.findByText('Current thresholds')).toBeInTheDocument();
+    expect(screen.getByLabelText('Vehicle rule history')).toHaveTextContent('effective');
+  });
+
+  it('labels a future-dated open version as pending, because it is not in force yet', async () => {
+    // A version created with a future activation is OPEN but PENDING: the
+    // detectors are still reading the previous one. Calling it "Current" tells
+    // an operator a threshold is live when it is not.
+    const scheduled = { ...current, id: 'rule-3', version: 3, effectiveFrom: '2099-01-01T00:00:00.000Z' };
+    fetchMock.mockResolvedValue(response([scheduled, { ...current, effectiveTo: scheduled.effectiveFrom }]));
+    render(<VehicleRulesDialog open onClose={vi.fn()} canEdit />);
+
+    expect(await screen.findByText(/^Pending from /)).toBeInTheDocument();
+    expect(screen.queryByText('Current thresholds')).toBeNull();
+    expect(screen.getByLabelText('Vehicle rule history')).toHaveTextContent('pending from');
+  });
+
   it('states that the after-hours window wraps midnight', async () => {
     render(<VehicleRulesDialog open onClose={vi.fn()} canEdit />);
     expect(await screen.findByText(/wraps midnight/i)).toBeInTheDocument();

@@ -1,36 +1,28 @@
 /**
  * The public-holiday calendar the after-hours rule consults.
  *
- * `public_holidays` (migration 310) is already the authoritative SA calendar,
- * seeded 2026–2028 with the Public Holidays Act s1(3) Sunday→Monday rollover
- * applied. Nothing here re-derives it, and no detector may carry a hand-written
- * list of dates.
+ * There is already exactly one loader for this, and it is not here:
+ * `loadObservedHolidays` in `src/services/attendance/saPublicHolidays.ts`, which
+ * the BCEA overtime engine has read migration 310's `public_holidays` through
+ * since it shipped. This module re-exports it under the name the detector
+ * modules use, and adds nothing.
  *
- * The dates come back as TEXT from `to_char`, not as a DATE. node-postgres
- * parses a DATE (OID 1082) into a JS `Date` at LOCAL midnight, and formatting
- * that through `toISOString()` shifts it a day backwards in SAST — which would
- * mark the day BEFORE Freedom Day as the holiday. Formatting in Postgres skips
- * the round trip entirely.
+ * Why not a second query of its own — it would only be four lines:
+ *
+ *   * `public_holidays.date` is a DATE, and node-postgres parses a DATE
+ *     (OID 1082) into a JS `Date` at LOCAL midnight. Formatting that through
+ *     `toISOString()` shifts it a day backwards in SAST, marking the day BEFORE
+ *     Freedom Day as the holiday. `loadObservedHolidays` formats with `to_char`
+ *     in Postgres and skips the round trip. A copy is a second place for that
+ *     trap to come back.
+ *   * It validates both bounds as `YYYY-MM-DD` and rejects an inverted range,
+ *     and it documents — at length — why it must never swallow a connection
+ *     failure into an empty Set. Under-reporting holidays under-pays staff
+ *     there; here it silently disarms the after-hours detectors. Same rule,
+ *     same reason to keep it in one place.
+ *
+ * The observed date is already the s1(3) Sunday→Monday rollover: no rollover
+ * logic belongs at read time.
  */
 
-import { query } from '@/lib/db-pool';
-
-interface HolidayRow extends Record<string, unknown> {
-  holiday_date: string;
-}
-
-/**
- * Every observed public holiday in `[fromDate, toDate]`, as `YYYY-MM-DD`.
- *
- * Both bounds are inclusive `YYYY-MM-DD` calendar dates.
- */
-export async function loadHolidays(fromDate: string, toDate: string): Promise<Set<string>> {
-  const rows = await query<HolidayRow>(
-    `SELECT to_char(date, 'YYYY-MM-DD') AS holiday_date
-       FROM public_holidays
-      WHERE date >= $1::date AND date <= $2::date
-      ORDER BY date`,
-    [fromDate, toDate],
-  );
-  return new Set(rows.map((row) => row.holiday_date));
-}
+export { loadObservedHolidays as loadHolidays, type HolidayDate } from '@/services/attendance/saPublicHolidays';
