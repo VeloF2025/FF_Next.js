@@ -15,10 +15,26 @@
  * `OPS_REVIEW_WA_GROUP_JID` in `src/lib/group-nonactivation/delivery.ts`) and
  * deliberately has NO hardcoded default: an unset JID takes the DM fallback,
  * which is today's behaviour and therefore the rollback path.
+ *
+ * ACCEPTED CONSEQUENCE, stated rather than buried: on a successful group post
+ * NO DMs are sent, so a resolved recipient who is not a member of the Fleet
+ * Alerts group gets no WhatsApp at all for that incident. They still get the
+ * in-app and email notification `notify()` sent. This is the chosen trade —
+ * one post to the channel the fleet team actually watches beats N DMs — but it
+ * makes group membership an out-of-band delivery dependency that RBAC does not
+ * govern: adding someone to the incident recipients does not add them to the
+ * group, and removing them from FibreFlow does not remove them from it. The
+ * recipients covered by each post are logged so the gap stays auditable.
+ *
+ * Disclosure: the group message is strictly LESS revealing than the DM it
+ * replaces — the DM body already names the staff member (`openedBody`), and
+ * this message names only the vehicle. But it goes to whoever is in the group,
+ * which is a wider and unmanaged audience, so nothing beyond the incident
+ * reference, type, vehicle, project, and time belongs in it.
  */
 import { log } from '@/lib/logger';
 import { claimNotification, releaseNotificationClaim } from '@/modules/notifications/services/notificationIdempotency';
-import { sendWhatsAppGroup } from '@/modules/notifications/services/whatsappDelivery';
+import { logDelivery, sendWhatsAppGroup } from '@/modules/notifications/services/whatsappDelivery';
 import type { IncidentType } from './types';
 
 const MODULE = 'FleetIncidentGroupDelivery';
@@ -125,7 +141,12 @@ export async function postToFleetAlertsGroup(
 
   try {
     await sendWhatsAppGroup(groupJid, message);
-    log.info('[fleet-incident-group] posted to the Fleet Alerts group', logContext, MODULE);
+    // F3's audit trail: who this one post stood in for. Without it, "was this
+    // person told?" is unanswerable for anybody outside the group.
+    log.info('[fleet-incident-group] posted to the Fleet Alerts group', {
+      ...logContext, coveredByGroupPost: [...incident.recipientUserIds],
+    }, MODULE);
+    await recordGroupDelivery(holder, groupJid, 'sent', null, logContext);
     return 0;
   } catch (error) {
     log.error('[fleet-incident-group] group post failed; falling back to individual delivery', {
@@ -140,7 +161,34 @@ export async function postToFleetAlertsGroup(
         }, MODULE);
       }
     }
+    await recordGroupDelivery(holder, groupJid, 'failed', sanitizedMessage(error), logContext);
     return 1 + await incident.deliverToRecipients();
+  }
+}
+
+/**
+ * One `notification_delivery_log` row per group post, so "did the SOS alert go
+ * out?" is answerable from the database and not only from the application log.
+ * The row is attributed to the claim anchor because `user_id` is NOT NULL
+ * (migration 192); `recipient_address` carries the group JID, which is what
+ * distinguishes a group post from a DM in that table — the same convention
+ * `deliverWhatsApp` already uses for its own group sends.
+ *
+ * Bookkeeping must never change the delivery outcome, so a failure here is
+ * logged and swallowed: the message was still sent (or still failed) either way.
+ */
+async function recordGroupDelivery(
+  holder: string | null, groupJid: string, status: 'sent' | 'failed',
+  errorMessage: string | null, logContext: Record<string, unknown>,
+): Promise<void> {
+  if (!holder) return;
+  try {
+    await logDelivery(null, holder, 'whatsapp', status, groupJid,
+      errorMessage === null ? null : `fleet alerts group post: ${errorMessage}`);
+  } catch (logError) {
+    log.error('[fleet-incident-group] could not record the group post in the delivery log', {
+      ...logContext, status, error: sanitizedMessage(logError),
+    }, MODULE);
   }
 }
 

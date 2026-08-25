@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const logger = vi.hoisted(() => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 vi.mock('@/lib/logger', () => logger);
 
-const wa = vi.hoisted(() => ({ sendWhatsAppGroup: vi.fn(), deliverWhatsApp: vi.fn() }));
+const wa = vi.hoisted(() => ({ sendWhatsAppGroup: vi.fn(), deliverWhatsApp: vi.fn(), logDelivery: vi.fn() }));
 vi.mock('@/modules/notifications/services/whatsappDelivery', () => wa);
 
 const idem = vi.hoisted(() => ({ claimNotification: vi.fn(), releaseNotificationClaim: vi.fn() }));
@@ -29,6 +29,7 @@ const EVENT = 'fleet.operational_incident_escalated';
 const KEY = `fleet-incident-escalated:${INCIDENT}:1`;
 
 let dmFailures: number;
+const originalJid = process.env.FLEET_ALERTS_WA_GROUP_JID;
 
 function incident(overrides: Partial<FleetAlertsGroupIncident> = {}): FleetAlertsGroupIncident {
   return {
@@ -56,11 +57,19 @@ beforeEach(() => {
   dmFailures = 0;
   process.env.FLEET_ALERTS_WA_GROUP_JID = JID;
   wa.sendWhatsAppGroup.mockResolvedValue(undefined);
+  wa.logDelivery.mockResolvedValue(undefined);
   wa.deliverWhatsApp.mockResolvedValue(undefined);
   idem.claimNotification.mockResolvedValue(true);
   idem.releaseNotificationClaim.mockResolvedValue(undefined);
   bus.notify.mockResolvedValue({ delivered: 2, suppressed: 0, failed: 0 });
   recipients.resolveIncidentRecipients.mockResolvedValue({ userIds: [PM, OVERSIGHT], failed: false });
+});
+
+// This file sets the env var; leaving it set would leak into any suite sharing
+// the process and flip its DM assertions to the group path.
+afterEach(() => {
+  if (originalJid === undefined) delete process.env.FLEET_ALERTS_WA_GROUP_JID;
+  else process.env.FLEET_ALERTS_WA_GROUP_JID = originalJid;
 });
 
 describe('buildFleetAlertsMessage', () => {
@@ -101,6 +110,38 @@ describe('postToFleetAlertsGroup', () => {
     expect(wa.sendWhatsAppGroup).toHaveBeenCalledWith(JID, expect.stringContaining('INC-ACCSOS-20260818-ABC123'));
     expect(wa.deliverWhatsApp).not.toHaveBeenCalled();
     expect(failed).toBe(0);
+  });
+
+  it('records the post in the delivery log against the claim anchor, addressed to the group', async () => {
+    await post();
+
+    expect(wa.logDelivery).toHaveBeenCalledWith(null, OVERSIGHT, 'whatsapp', 'sent', JID, null);
+  });
+
+  it('records a failed post in the delivery log too', async () => {
+    wa.sendWhatsAppGroup.mockRejectedValue(new Error('HTTP 502'));
+
+    await post();
+
+    expect(wa.logDelivery).toHaveBeenCalledWith(
+      null, OVERSIGHT, 'whatsapp', 'failed', JID, expect.stringContaining('fleet alerts group post'));
+  });
+
+  it('still reports the post as delivered when the delivery-log write fails', async () => {
+    wa.logDelivery.mockRejectedValue(new Error('delivery log unavailable'));
+
+    await expect(post()).resolves.toBe(0);
+    expect(logger.log.error).toHaveBeenCalled();
+  });
+
+  it('logs which recipients the single post stood in for', async () => {
+    await post();
+
+    expect(logger.log.info).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ coveredByGroupPost: [PM, OVERSIGHT] }),
+      expect.any(String),
+    );
   });
 
   it('claims in its own `:wa_group` namespace, never the per-user `:whatsapp` one', async () => {

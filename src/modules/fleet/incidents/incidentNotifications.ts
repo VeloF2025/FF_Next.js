@@ -86,8 +86,8 @@ export interface OpenedNotificationInput {
   producerKind: IncidentProducerKind; rule: IncidentRule; projectId: string | null;
   staffName: string | null; projectName: string | null; operationalSiteName: string | null;
   detectedAt: string; reasonCodes: readonly string[];
-  /** Vehicle registration snapshot for the Fleet Alerts group message (PR5). Scheduled detections have none and never reach the group. */
-  vehicleRegistration?: string | null;
+  /** Vehicle registration snapshot for the Fleet Alerts group message (PR5). Required, not optional: an optional field lets a source-event caller forget it and silently ship "not recorded" into an accident alert. Scheduled detections pass null. */
+  vehicleRegistration: string | null;
   /** Optional: `produceIncident` (Task 3) does not return this on its result, so a caller resolving straight off that result has none to pass. Included in metadata only when known. */
   incidentReference?: string;
 }
@@ -213,7 +213,7 @@ export async function sendIncidentOpenedNotification(input: OpenedNotificationIn
   if (plan.mandatoryChannels.includes('whatsapp')) {
     result.failed += await deliverMandatoryWhatsApp({
       incidentId: input.incidentId, incidentReference: input.incidentReference ?? null,
-      incidentType: input.incidentType, vehicleRegistration: input.vehicleRegistration ?? null,
+      incidentType: input.incidentType, vehicleRegistration: input.vehicleRegistration,
       projectName: input.projectName, detectedAt: input.detectedAt,
       payload, userIds: recipients.userIds, idempotencyKey: openedIdempotencyKey,
     });
