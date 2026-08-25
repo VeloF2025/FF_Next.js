@@ -1413,6 +1413,37 @@ behaviour is **undocumented** — those numbers became their default without bei
 them. Better than the unbounded retries they had before, but it is an assumption: if either
 starts throttling unexpectedly, check that tuning first. See the breaker section above.
 
+## Driver Oversight is switched on and producing nothing
+
+Checked against the shared database 2026-08-25. `fleet_operational_incidents` holds **zero rows,
+all time**, and so does every table downstream of it — observations, aggregates, retention items.
+
+Nothing is broken. `fleet_operational_monitor_runs` has 2153 rows and is still running every few
+minutes, with `roster_evaluated_count = 0` on **every** successful one. The detector evaluates the
+operational roster; the roster comes from assignments; an assignment needs an operational site; and
+`fleet_project_operational_sites`, `fleet_operational_assignments` and `fleet_authorized_locations`
+are all empty. The feature has never been configured.
+
+The path exists and works: `/fleet/assignments` → select a project → the **Operational sites** row
+appears (it is gated on a project being selected, which is why the page looks like a dead end until
+one is) → pick a reviewed source from the already-populated AOI list → **Add site**. Then assign
+staff or a team.
+
+**Check this before trusting any oversight number, or before building more read path over it:**
+
+```sql
+SELECT count(*) FROM fleet_operational_assignments;
+SELECT sum(roster_evaluated_count) FROM fleet_operational_monitor_runs;
+```
+
+Creating the first roster is not a neutral act — ten enabled rules begin evaluating named staff and
+notifying four oversight members within minutes. Same family as the geofence buttons with no
+`onClick` and the reminder cron nobody registered: built, merged, never switched on.
+
+Operational procedures for the analytics and retention half — schedules, the coverage gate, going
+live with deletion, readback queries and rollback — are in
+[`docs/operations/fleet-analytics-retention-runbook.md`](../../docs/operations/fleet-analytics-retention-runbook.md).
+
 ## Operational analytics aggregates
 
 `fleet_operational_monthly_aggregates` is **internal** and is NOT a publishable anonymous dataset,
