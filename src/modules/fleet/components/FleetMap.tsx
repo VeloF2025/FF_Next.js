@@ -34,6 +34,8 @@ import {
   statusFor,
 } from '../utils/liveMapHelpers';
 import type { PlottedVehicle } from '../utils/liveMapHelpers';
+import FleetMapDayRoute from './FleetMapDayRoute';
+import type { RouteLeg } from './FleetMapDayRoute';
 import { OperationalMapLayers } from './OperationalMapLayers';
 
 export type { LiveVehicle };
@@ -194,6 +196,11 @@ export interface FleetMapProps {
   showVehicleMarkers?: boolean;
   focusStaffId?: string | null;
   focusRequestId?: number;
+  /**
+   * One vehicle-day's historical route. Additive and optional: an omitted value draws nothing and
+   * leaves the live-marker grammar (fill = movement, ring = freshness) exactly as it was.
+   */
+  dayRoute?: RouteLeg[];
 }
 
 export default function FleetMap({
@@ -204,6 +211,7 @@ export default function FleetMap({
   showVehicleMarkers = true,
   focusStaffId,
   focusRequestId = 0,
+  dayRoute,
 }: FleetMapProps) {
   const { plotted } = partitionVehicles(vehicles);
   return (
@@ -216,6 +224,7 @@ export default function FleetMap({
         detectRetina
       />
       {showVehicleMarkers && <VehicleMarkers plotted={plotted} />}
+      {dayRoute && dayRoute.length > 0 && <FleetMapDayRoute legs={dayRoute} />}
       {operationalOverlay && (
         <OperationalMapLayers
           onStaffSelect={onStaffSelect}
