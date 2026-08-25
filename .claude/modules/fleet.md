@@ -411,7 +411,17 @@ being reported as a silent success.
 (a `gist` EXCLUDE constraint plus a partial unique index enforcing exactly one open
 version per `incident_type`); `versionIncidentRule` locks the current stream,
 closes it at the new effective timestamp, and inserts `version + 1` in one
-transaction — never overwrites history. `fleet_operational_oversight_members` is
+transaction — never overwrites history. **One documented exception:** migration
+529 re-versions the four non-emergency telematics rules (`severe_driving`,
+`prolonged_unauthorized_stop`, `lost_contact_moving`, `dangerous_area_entry`)
+from `critical` to `high` **in place**, with no close and no insert. It is
+allowed to because those rules have never judged anything — nothing calls the
+telematics detectors before PR4 — and a guard at the head of the file `RAISE`s
+if any `fleet_operational_incidents` row carries one of those four types, so the
+claim is proved at apply time rather than asserted. The rows it edits carry a
+`529:reversioned{wa=..,imm=..,morn=..}` marker holding their prior flags, which
+is how the rollback restores them. Any OTHER in-place rewrite of a rule row is
+still a bug. `fleet_operational_oversight_members` is
 the same effective-dated shape: `addOversightMember` requires an active FibreFlow
 user (`isActiveFibreFlowUser`, checked before insert), and ending membership
 (`endOversightMembership`) requires a reason and only ever sets `effective_to` —
@@ -1616,7 +1626,21 @@ does not go through `cadence.ts`, which is why its lag is 1.4 min against a "120
 ### U4 — restated (verified independently before this spike)
 
 Migration **510 is applied**. `fleet_operational_incident_rules` holds **14 open rows** (one per type,
-all `version 1`). All six telematics types — `accident_sos`, `theft_after_hours_movement`,
-`severe_driving`, `prolonged_unauthorized_stop`, `lost_contact_moving`, `dangerous_area_entry` — are
-`severity='critical'`, `whatsapp_enabled=true`, `immediate_notification=true`. Max migration on
-`origin/master` is **527**, so 528/529 are free. Plan risk R5 stands: PR3 must precede PR4.
+all `version 1`). As 510 seeds them, all six telematics types — `accident_sos`,
+`theft_after_hours_movement`, `severe_driving`, `prolonged_unauthorized_stop`, `lost_contact_moving`,
+`dangerous_area_entry` — are `severity='critical'`, `whatsapp_enabled=true`,
+`immediate_notification=true`. Plan risk R5 stands: PR3 must precede PR4.
+
+**Superseded by migration 529 (PR3).** After 529 the four non-emergency types — `severe_driving`,
+`prolonged_unauthorized_stop`, `lost_contact_moving`, `dangerous_area_entry` — are `severity='high'`,
+`whatsapp_enabled=false`, `immediate_notification=false`, `include_in_morning_summary=true`. Only
+`accident_sos` and `theft_after_hours_movement` remain `critical` + WhatsApp, deliberately:
+`requiresMandatoryIncidentWhatsApp` is `severity === 'critical' && producerKind === 'source_event'`
+and ignores `whatsapp_enabled`, so severity is the only lever that stops a detector blasting
+WhatsApp. The count stays at 14 open rows — 529 rewrites in place and inserts nothing. See the
+in-place exception noted under "Rule and oversight configuration".
+
+Migration numbering: at spike time max on `origin/master` was **527**. **528** is now taken by
+`528_fleet_vehicle_daily_stats.sql` (PR #2617, merged) and **529** by
+`529_fleet_vehicle_operational_rules.sql` (this PR3). Next free is **530** — re-check
+`git ls-tree -r --name-only origin/master scripts/migrations/sql` before claiming one.

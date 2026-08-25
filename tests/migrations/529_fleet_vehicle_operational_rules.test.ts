@@ -729,6 +729,30 @@ describe('the marker', () => {
     expect((await ruleRow('lost_contact_moving')).change_reason).toBeNull();
   });
 
+  it('the FORWARD strip is anchored too — prose quoting the marker survives 529', async () => {
+    // The strip that stops a re-run doubling the marker is `$`-anchored for the
+    // same reason the rollback's match is. Unanchored, regexp_replace takes the
+    // FIRST match, so an operator who quoted the marker mid-sentence would have
+    // it cut out of their prose and the sentence silently mangled.
+    const quoted = `Saw ${telematicsReversionMarker({
+      whatsappEnabled: true, immediateNotification: true, includeInMorningSummary: false,
+    })} in the log, investigating`;
+    await db.query(
+      `UPDATE fleet_operational_incident_rules SET change_reason = $1
+        WHERE incident_type = 'severe_driving' AND effective_to IS NULL`,
+      [quoted],
+    );
+
+    await db.query(FORWARD);
+
+    const row = await ruleRow('severe_driving');
+    // The prose is untouched; exactly one marker was APPENDED to it.
+    expect(row.change_reason).toBe(`${quoted} | ${telematicsReversionMarker({
+      whatsappEnabled: true, immediateNotification: true, includeInMorningSummary: false,
+    })}`);
+    expect((row.change_reason as string).startsWith(quoted)).toBe(true);
+  });
+
   it('is anchored to the END — prose containing it mid-string is not restored', async () => {
     // The rollback matches with `$`. An operator quoting the marker in the
     // middle of their own note must not have their row rewritten.
