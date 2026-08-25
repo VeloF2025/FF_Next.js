@@ -134,6 +134,33 @@ export async function replaceMonth(
        WHERE month_start = $1::date AND metric_version <> $2 AND is_active = true`,
       [monthStart, metricVersion],
     );
+
+    // Coverage is recorded HERE, in the same transaction as the rows it
+    // attests to (migration 528). A separate write after the fact could commit
+    // while the rows did not, and the consequence of that particular lie is
+    // retention deleting identifiable detail against an aggregate that was
+    // never written.
+    //
+    // Written on every path, exactly like the retirement above: a month that
+    // publishes NOTHING is still a month that was aggregated. That is the whole
+    // defect this closes — the old gate counted published rows, so a month
+    // whose every group fell below the anonymity threshold, or in which nothing
+    // qualifying happened, reported no coverage forever and was never purged.
+    //
+    // Upserted because the nightly job re-aggregates the whole recalculation
+    // window, so this key is rewritten every night; the run and timestamp name
+    // the LATEST run to have covered the month, not the first.
+    await client.query(
+      `/* fleet-analytics-aggregates:record-coverage */
+       INSERT INTO fleet_operational_aggregate_month_coverage
+         (metric_version, month_start, aggregation_run_id, row_count, completed_at)
+       VALUES ($1, $2::date, $3, $4, now())
+       ON CONFLICT (metric_version, month_start) DO UPDATE
+         SET aggregation_run_id = EXCLUDED.aggregation_run_id,
+             row_count = EXCLUDED.row_count,
+             completed_at = EXCLUDED.completed_at`,
+      [metricVersion, monthStart, runId, rows.length],
+    );
   });
 
   return { changed, rowsWritten: changed ? rows.length : 0 };

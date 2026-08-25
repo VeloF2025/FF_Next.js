@@ -107,7 +107,7 @@ describe('replaceMonth', () => {
     expect(result.rowsWritten).toBe(1);
   });
 
-  it('clears the month, inserts the new rows, then retires other versions - in that order', async () => {
+  it('clears the month, inserts the new rows, retires other versions, then records coverage - in that order', async () => {
     mocks.query.mockResolvedValue([]);
     const { calls } = captureTransaction();
 
@@ -116,8 +116,11 @@ describe('replaceMonth', () => {
     const kinds = calls.map((c) =>
       c.sql.includes('aggregates:clear') ? 'clear'
         : c.sql.includes('aggregates:insert') ? 'insert'
-        : c.sql.includes('retire-other-versions') ? 'retire' : 'other');
-    expect(kinds).toEqual(['clear', 'insert', 'retire']);
+        : c.sql.includes('retire-other-versions') ? 'retire'
+        : c.sql.includes('record-coverage') ? 'coverage' : 'other');
+    // Coverage last (migration 528): it asserts the rows above exist, so
+    // anything that throws before it must leave no coverage row behind.
+    expect(kinds).toEqual(['clear', 'insert', 'retire', 'coverage']);
     expect(calls[2]?.params).toEqual(['2026-07-01', 2]);
     // Scoped to OTHER versions of this month. Without the exclusion the
     // statement would deactivate the rows the INSERT above just wrote, leaving

@@ -37,10 +37,12 @@ const RETENTION = readFileSync(join(SQL_DIR, '518_fleet_operational_analytics_re
 // 521 is what makes the purge executable as the application role at all; the
 // grant contract itself lives in 521_fleet_retention_delete_grants.test.ts.
 const DELETE_GRANTS = readFileSync(join(SQL_DIR, '521_fleet_retention_delete_grants.sql'), 'utf8');
-// 527 creates the published view. `hasCompleteAggregateCoverage` reads it
-// rather than the base table, so the coverage gate cannot be exercised without
-// it — the view is part of this fixture's schema, not an optional extra.
+// 527 creates the published view, which the analytics read path uses.
 const PUBLISHED_VIEW = readFileSync(join(SQL_DIR, '527_fleet_aggregates_published_view.sql'), 'utf8');
+// 528 creates the coverage table. `hasCompleteAggregateCoverage` reads it
+// rather than counting aggregate rows, so the gate cannot be exercised without
+// it — the table is part of this fixture's schema, not an optional extra.
+const COVERAGE = readFileSync(join(SQL_DIR, '528_fleet_aggregate_month_coverage.sql'), 'utf8');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
@@ -211,12 +213,35 @@ async function seedActiveHold(incidentId: string): Promise<void> {
   );
 }
 
-async function seedAggregateCoverage(monthStart: string): Promise<void> {
+/** One published aggregate row, as a month with something to publish would have. */
+async function seedAggregateRow(monthStart: string): Promise<void> {
   await db.query(
     `INSERT INTO fleet_operational_monthly_aggregates
        (metric_version, month_start, dimension_level, metric_key, metric_kind, numerator, contributor_count)
      VALUES (1, $1::date, 'organisation', 'incident.late', 'count', 4, 6)`,
     [monthStart],
+  );
+}
+
+/**
+ * The recorded fact that a month was aggregated (migration 528) — what the gate
+ * actually reads. `rowCount` is deliberately a parameter: zero is a complete,
+ * valid answer and is the case the old row-counting gate got wrong.
+ */
+async function seedAggregateCoverage(monthStart: string, rowCount = 1, metricVersion = 1): Promise<void> {
+  // `finished_at` is not optional here: the runs table's `finish_pairing` CHECK
+  // makes `status = 'running'` and `finished_at IS NULL` the same condition, so
+  // a succeeded run without a finish time is rejected.
+  const { rows } = await db.query<{ id: string }>(
+    `INSERT INTO fleet_operational_aggregation_runs (status, metric_version, months_requested, finished_at)
+     VALUES ('succeeded', $1, 1, now()) RETURNING id`,
+    [metricVersion],
+  );
+  await db.query(
+    `INSERT INTO fleet_operational_aggregate_month_coverage
+       (metric_version, month_start, aggregation_run_id, row_count)
+     VALUES ($1, $2::date, $3, $4)`,
+    [metricVersion, monthStart, rows[0]!.id, rowCount],
   );
 }
 
@@ -246,6 +271,7 @@ beforeAll(async () => {
   await db.query(RETENTION);
   await db.query(DELETE_GRANTS);
   await db.query(PUBLISHED_VIEW);
+  await db.query(COVERAGE);
   // The purge also removes this module's bell notifications; the real table
   // already grants the application DELETE, and the scratch copy mirrors that.
   await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ${SCHEMA}.user_notifications TO fibreflow_user`);
@@ -511,7 +537,7 @@ describe('aggregate coverage gate', () => {
     expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(false);
   });
 
-  it('reports coverage once an active aggregate exists for that month and metric version', async () => {
+  it('reports coverage once the month has been recorded for that metric version', async () => {
     await seedAggregateCoverage('2025-01-01');
     expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(true);
   });
@@ -522,9 +548,29 @@ describe('aggregate coverage gate', () => {
     expect(await repo.hasCompleteAggregateCoverage('2025-02-01', 2)).toBe(false);
   });
 
-  it('does not accept a superseded (inactive) aggregate as coverage', async () => {
-    await seedAggregateCoverage('2025-01-01');
-    await db.query(`UPDATE fleet_operational_monthly_aggregates SET is_active = false`);
+  /**
+   * The defect migration 528 closes, against a real database.
+   *
+   * A month can be aggregated fully and correctly and publish NOTHING — the
+   * release rule withholds a metric whose support is empty rather than storing
+   * a roster-sized zero. The previous gate counted published rows, so this
+   * month reported no coverage forever and its identifiable detail could never
+   * be purged. Re-running the job changed nothing, because the correct answer
+   * was still zero rows.
+   */
+  it('reports coverage for a month that was aggregated but published nothing', async () => {
+    await seedAggregateCoverage('2025-01-01', 0);
+    expect(await count('fleet_operational_monthly_aggregates', 'month_start = $1::date', ['2025-01-01'])).toBe(0);
+    expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(true);
+  });
+
+  /**
+   * And the converse, which the row-counting gate got right by accident and
+   * this one gets right on purpose: aggregate rows are not themselves a claim
+   * that the month was aggregated under the version being asked about.
+   */
+  it('does not accept published rows alone as coverage', async () => {
+    await seedAggregateRow('2025-01-01');
     expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(false);
   });
 });
