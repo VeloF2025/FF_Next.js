@@ -389,6 +389,66 @@ describe('the unobserved edges of the window', () => {
     expect(soFar[0]!.coverageComplete).toBe(true);
   });
 
+  it('refuses a windowEnd it cannot parse, rather than silently producing NaN silence', () => {
+    // NaN propagates through Math.min straight into tracker_silence_seconds, and NaN is not
+    // storable in a BIGINT NOT NULL column -- so the fold would hand the build service a row that
+    // fails on INSERT, one window after the mistake and nowhere near it.
+    for (const bad of ['not-a-date', 'yesterday', '2026-13-45T99:00:00Z']) {
+      expect(() => foldVehicleDays(diesAtNoon(), [], { windowEnd: bad }), bad)
+        .toThrow(/unparseable windowEnd/);
+    }
+  });
+
+  it('treats an EMPTY windowEnd as an error, not as "no window end"', () => {
+    // The field is declared `string | null`. Only null means the default; '' is a caller that
+    // failed to build its value, and accepting it would quietly re-enable the over-rating this
+    // whole section exists to stop.
+    expect(() => foldVehicleDays(diesAtNoon(), [], { windowEnd: '' }))
+      .toThrow(/unparseable windowEnd/);
+    // null and undefined remain the documented default.
+    expect(() => foldVehicleDays(diesAtNoon(), [], { windowEnd: null })).not.toThrow();
+    expect(() => foldVehicleDays(diesAtNoon(), [], {})).not.toThrow();
+  });
+
+  it('refuses a windowEnd that closes BEFORE its own last fix', () => {
+    // A caller error, not a zero-length tail. Clamping it to zero would hide a mis-built window in
+    // exactly the case where the tail gap matters most.
+    expect(() => foldVehicleDays(diesAtNoon(), [], { windowEnd: '2026-08-09T23:00:00.000Z' }))
+      .toThrow(/windowEnd .* is before the last fix/);
+  });
+
+  it('clamps the tail to the end of the day, however far past it the window runs', () => {
+    // The tracker dies on day D and the window closes three days later. The tail is the rest of
+    // D -- not the 285,608 s to windowEnd, which would be a silence charged to a day that had
+    // already ended.
+    const days = foldVehicleDays(diesAtNoon(), [], { windowEnd: '2026-08-12T22:00:00.000Z' });
+    expect(days).toHaveLength(1);
+    expect(days[0]!.workDate).toBe('2026-08-10');
+    expect(days[0]!.trackerSilenceSeconds).toBe(86_400 - 199 * 216);
+    expect(days[0]!.trackerSilenceSeconds).toBeLessThanOrEqual(86_400);
+  });
+
+  it('folds the interval out of the lead-in, not just its timestamp', () => {
+    // The lead-in is seeded as the PREVIOUS position, so the stretch between it and the first fix
+    // is attributed and its distance accrues like any other interval. Seeding only the instant
+    // would leave that minute — and its ten kilometres — unfolded.
+    const run = Array.from({ length: 40 }, (_, i) => fix(MORNING, 'cartrack', 'velocity', {
+      offsetSeconds: i * 60, providerEventId: `run-${i}`, ignition: true, speedKph: 80,
+      odometerKm: 10_010 + i * 0.85,
+    }));
+    const leadIn = fix(MORNING, 'cartrack', 'velocity', {
+      offsetSeconds: -60, providerEventId: 'lead', ignition: true, speedKph: 80, odometerKm: 10_000,
+    });
+
+    const without = foldVehicleDays(run)[0]!;
+    const withLead = foldVehicleDays(run, [], { leadIn })[0]!;
+
+    // One more 60 s interval of ignition, and the 10 km the odometer moved across it.
+    expect(withLead.ignitionSeconds - without.ignitionSeconds).toBe(60);
+    expect(Number((withLead.distanceKm - without.distanceKm).toFixed(2))).toBe(10);
+    expect(withLead.positionCount).toBe(without.positionCount);
+  });
+
   it('claims no tail at all when the caller names no window end', () => {
     // The documented default: "the window ended when observation ended".
     const [day] = foldVehicleDays(diesAtNoon());
@@ -571,6 +631,22 @@ describe('the row migration 528 will accept', () => {
       expect(day!.coverageIgnition, name).toBe(false);
       expect([day!.ignitionSeconds, day!.movingSeconds, day!.idleSeconds], name).toEqual([0, 0, 0]);
     }
+  });
+
+  it('KEEPS first/last ignition instants on a coarse day, even with the seconds zeroed', () => {
+    // The decision is enforced here, not just argued in a comment. ignition_seconds is a
+    // MEASUREMENT a two-hour feed cannot make; these two are OBSERVATIONS -- a fix asserted
+    // ignition at this instant -- and they are exactly as true on urent as on velocity. Nulling
+    // them would discard the only usable answer to "when did this vehicle first move today".
+    const positions = urentDay(MORNING);
+    const [day] = foldVehicleDays(positions);
+    expect(day!.coverageIgnition).toBe(false);
+    expect(day!.ignitionSeconds).toBe(0);
+    expect(day!.firstIgnitionAt).not.toBeNull();
+    expect(day!.lastIgnitionAt).not.toBeNull();
+    const asserted = positions.filter((p) => p.ignition === true);
+    expect(day!.firstIgnitionAt).toBe(asserted[0]!.recordedAt);
+    expect(day!.lastIgnitionAt).toBe(asserted[asserted.length - 1]!.recordedAt);
   });
 
   it('calls cartrack/velocity measurable, because at 8 seconds it genuinely is', () => {

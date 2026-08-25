@@ -53,14 +53,15 @@
  */
 import { coverageGforce, coverageProviderEvents } from './coverage';
 import {
-  dayStartMs, hasImplausibleOdometerJump, intervalDistanceKm, intervalLabel, MS_PER_DAY,
-  nextEventState, sastDay, splitAcrossDays,
+  hasImplausibleOdometerJump, intervalDistanceKm, intervalLabel, nextEventState, sastDay,
+  splitAcrossDays,
 } from './dayIntervals';
-import { headGapMs, tailGapMs } from './dayWindow';
+import { assertWindowCoversLastFix, parseWindowEnd, windowEdges } from './dayWindow';
 import type { EventState } from './dayIntervals';
 import { finaliseDay, newDay } from './dayRow';
 import type { DayAcc } from './dayRow';
 import { countHarsh } from './harshEvents';
+import { createInstantDeduper } from './inputOrder';
 import {
   DEFAULT_DAY_FOLD_OPTIONS,
 } from './dayFoldOptions';
@@ -82,7 +83,7 @@ export function createDayFold(
   const maxAttributableMs = opts.maxAttributableIntervalSeconds * 1_000;
   const days = new Map<string, DayAcc>();
   const leadIn = options.leadIn ?? null;
-  const windowEndMs = options.windowEnd ? Date.parse(options.windowEnd) : null;
+  const windowEndMs = parseWindowEnd(options.windowEnd);
   let prev: DayPosition | null = null;
   let prevMs = 0;
   // The first and last fix actually folded, for the window edges. Tracked here rather than derived
@@ -91,13 +92,7 @@ export function createDayFold(
   let lastFixMs: number | null = null;
   let eventState: EventState = null;
   let prevIsSpeeding: boolean | null = null;
-  /**
-   * The ids already folded at exactly `prevMs`, cleared the moment the clock moves on.
-   *
-   * Bounded by the number of fixes sharing one instant -- two or three in the observed data --
-   * rather than by the window, so this stays O(1) over a month-long backfill.
-   */
-  let idsAtPrevMs = new Set<string>();
+  const deduper = createInstantDeduper();
 
   if (leadIn !== null) {
     // Seeded as the previous position WITHOUT being counted as one. Its own day may end up in the
@@ -110,7 +105,7 @@ export function createDayFold(
     }
     prev = leadIn;
     prevMs = leadInMs;
-    idsAtPrevMs = new Set([leadIn.providerEventId ?? '']);
+    deduper.seed(leadIn);
     eventState = nextEventState(null, leadIn);
     prevIsSpeeding = leadIn.isSpeeding;
   }
@@ -195,25 +190,7 @@ export function createDayFold(
 
   function addPosition(p: DayPosition): void {
     const curMs = Date.parse(p.recordedAt);
-    if (!Number.isFinite(curMs)) throw new Error(`dayFold: unparseable recordedAt ${p.recordedAt}`);
-    if (prev !== null && curMs < prevMs) {
-      throw new Error('dayFold: positions must be supplied in ascending recordedAt order');
-    }
-    if (prev !== null && curMs === prevMs) {
-      // A genuine tie carries a different id and folds normally; the same id at the same instant
-      // is the same fix arriving twice, and folding it again would inflate position_count.
-      const key = p.providerEventId ?? '';
-      if (idsAtPrevMs.has(key)) {
-        throw new Error(
-          'dayFold: the same fix was supplied twice -- batches must not overlap, and a watermark '
-          + `must be exclusive (recorded_at > watermark). Repeated at ${p.recordedAt}.`,
-        );
-      }
-      idsAtPrevMs.add(key);
-    } else {
-      // The clock moved on, so nothing seen before can be a duplicate of anything to come.
-      idsAtPrevMs = new Set([p.providerEventId ?? '']);
-    }
+    deduper.admit(p, curMs, prevMs, prev !== null);
     if (prev !== null) foldInterval(p, curMs);
 
     if (firstFixMs === null) firstFixMs = curMs;
@@ -247,29 +224,17 @@ export function createDayFold(
     prevMs = curMs;
   }
 
-  /**
-   * Charges the two unobserved edges of the window to silence.
-   *
-   * Anchored on the first and last POSITION, never on the first and last emitted day: a day that
-   * exists only because a trip crossed into it was not observed by this fold at all, and giving it
-   * a head gap would be inventing a measurement about a date the positions never reached.
-   */
+  /** Charges the two unobserved edges of the window to silence. See `dayWindow.ts`. */
   function applyWindowEdges(): void {
     if (firstFixMs === null || lastFixMs === null) return;
-
-    const firstDay = sastDay(firstFixMs);
-    const head = headGapMs(
-      firstFixMs,
-      dayStartMs(firstDay),
-      leadIn === null ? null : Date.parse(leadIn.recordedAt),
+    assertWindowCoversLastFix(windowEndMs, lastFixMs);
+    const edges = windowEdges(
+      firstFixMs, lastFixMs, leadIn === null ? null : Date.parse(leadIn.recordedAt), windowEndMs,
     );
-    const firstAcc = dayFor(firstDay);
-    firstAcc.largestGapMs = Math.max(firstAcc.largestGapMs, head);
-
-    const lastDay = sastDay(lastFixMs);
-    const tail = tailGapMs(lastFixMs, dayStartMs(lastDay) + MS_PER_DAY, windowEndMs ?? lastFixMs);
-    const lastAcc = dayFor(lastDay);
-    lastAcc.largestGapMs = Math.max(lastAcc.largestGapMs, tail);
+    const firstAcc = dayFor(edges.firstDay);
+    firstAcc.largestGapMs = Math.max(firstAcc.largestGapMs, edges.headMs);
+    const lastAcc = dayFor(edges.lastDay);
+    lastAcc.largestGapMs = Math.max(lastAcc.largestGapMs, edges.tailMs);
   }
 
   return {

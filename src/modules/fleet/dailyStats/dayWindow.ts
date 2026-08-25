@@ -23,7 +23,75 @@
  *   day.
  *
  * Both are pure arithmetic over instants supplied by the caller. Nothing here reads a clock.
+ *
+ * The caller's `windowEnd` is VALIDATED here rather than coerced. An unparseable string silently
+ * becoming NaN would propagate through `Math.min` into `tracker_silence_seconds`, and NaN is not
+ * storable in a `BIGINT NOT NULL` column -- so the fold would hand the build service a row that
+ * fails on INSERT, one window after the mistake was made and nowhere near it. Failing at the
+ * boundary names the caller's error instead.
  */
+import { dayStartMs, MS_PER_DAY, sastDay } from './dayIntervals';
+
+/**
+ * The caller's window end as epoch ms, or null for "no claim about the tail".
+ *
+ * Only `null` and `undefined` mean the default. An empty string does NOT: the field is declared
+ * `string | null`, so `''` is a caller passing a value it failed to build, and treating it as
+ * "no window end" would quietly re-enable the over-rating this module exists to stop.
+ */
+export function parseWindowEnd(value: string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`dayFold: unparseable windowEnd ${JSON.stringify(value)}`);
+  }
+  return parsed;
+}
+
+/**
+ * A window that closes before its own last fix is a caller error, not a zero-length tail.
+ *
+ * Clamping it to zero would hide a mis-built window -- the exact case where the tail gap is most
+ * needed -- so it is refused with the two instants named.
+ */
+export function assertWindowCoversLastFix(windowEndMs: number | null, lastFixMs: number): void {
+  if (windowEndMs === null || windowEndMs >= lastFixMs) return;
+  throw new Error(
+    `dayFold: windowEnd ${new Date(windowEndMs).toISOString()} is before the last fix `
+    + `${new Date(lastFixMs).toISOString()}`,
+  );
+}
+
+/** The head and tail gaps for a window, with the days they belong to. */
+export interface WindowEdges {
+  firstDay: string;
+  headMs: number;
+  lastDay: string;
+  tailMs: number;
+}
+
+/**
+ * Both edges at once, anchored on the first and last POSITION.
+ *
+ * Never on the first and last emitted day: a day that exists only because a trip crossed into it
+ * was not observed by this fold at all, and giving it a head gap would be inventing a measurement
+ * about a date the positions never reached.
+ */
+export function windowEdges(
+  firstFixMs: number,
+  lastFixMs: number,
+  leadInMs: number | null,
+  windowEndMs: number | null,
+): WindowEdges {
+  const firstDay = sastDay(firstFixMs);
+  const lastDay = sastDay(lastFixMs);
+  return {
+    firstDay,
+    headMs: headGapMs(firstFixMs, dayStartMs(firstDay), leadInMs),
+    lastDay,
+    tailMs: tailGapMs(lastFixMs, dayStartMs(lastDay) + MS_PER_DAY, windowEndMs ?? lastFixMs),
+  };
+}
 
 /** Milliseconds of the first emitted day that nobody observed before its first fix. */
 export function headGapMs(
