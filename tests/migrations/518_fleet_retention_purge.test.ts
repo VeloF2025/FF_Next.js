@@ -296,8 +296,15 @@ afterAll(async () => {
 beforeEach(async () => {
   delete process.env.FLEET_RETENTION_DATABASE_URL;
   retentionDb.__resetRetentionPoolForTests();
+  // The coverage table and the aggregation runs it references belong here for
+  // the same reason every other table does: the scratch schema outlives the
+  // test, so a coverage row seeded by one case answers the next one's question.
+  // Leaving them out made three cases pass locally against a mocked pool and
+  // fail against real Postgres — one on a duplicate key, two on coverage the
+  // previous test had recorded.
   await db.query(`TRUNCATE fleet_operational_retention_items, fleet_operational_retention_runs,
     fleet_incident_retention_hold_actions, fleet_incident_retention_holds,
+    fleet_operational_aggregate_month_coverage, fleet_operational_aggregation_runs,
     fleet_operational_monthly_aggregates RESTART IDENTITY CASCADE`);
   await db.query(`DELETE FROM fleet_incident_attendance_correction_links`);
   await db.query(`DELETE FROM fleet_incident_driver_submissions`);
