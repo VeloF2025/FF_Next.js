@@ -45,7 +45,9 @@ async function handleGet(id: string, res: NextApiResponse) {
   // Get stock take with summary
   /* TODO: specify columns — v_stock_takes_summary is a view, result is spread to response */
   const stockTake = await sql`
-    SELECT * FROM v_stock_takes_summary WHERE id = ${id}
+    SELECT st.*, TRIM(CONCAT(u.first_name, ' ', u.last_name)) AS created_by_name
+    FROM v_stock_takes_summary st LEFT JOIN users u ON u.id = st.created_by
+    WHERE st.id = ${id}
   `;
 
   if (stockTake.length === 0) {

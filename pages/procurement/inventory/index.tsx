@@ -104,6 +104,9 @@ interface StockTake {
   stock_take_type: string;
   started_at?: string;
   completed_at?: string;
+  location_name?: string;
+  project_name?: string;
+  created_by_name?: string;
   line_count?: number;
   calc_variance_value?: number;
   total_variance_value?: number;
@@ -983,6 +986,11 @@ function StockTakesTabContent() {
                   </p>
                   <p className="text-sm text-[var(--ff-text-secondary)]">
                     {take.reference_number} · {take.stock_take_type}
+                  </p>
+                  <p className="text-xs text-[var(--ff-text-tertiary)]">
+                    {[take.location_name, take.project_name].filter(Boolean).join(' · ') || 'No site'}
+                    {' · '}
+                    {take.created_by_name ? `Started by ${take.created_by_name}` : 'Started by unknown'}
                   </p>
                 </div>
               </div>

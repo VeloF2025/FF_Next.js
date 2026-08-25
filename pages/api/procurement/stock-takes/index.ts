@@ -9,7 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { StockTake, StockTakeFormData } from '@/types/procurement/stockTake.types';
-import { withAuth } from '@/lib/auth';
+import { withAuth, AuthenticatedRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -34,8 +34,10 @@ async function handler(
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const { search, status, location_id, warehouse_id, category_id, project_id, stock_take_type } = req.query;
 
-  /* TODO: specify columns — v_stock_takes_summary is a view, result returned directly */
-  let query = `SELECT * FROM v_stock_takes_summary WHERE 1=1`;
+  /* v_stock_takes_summary is a view; created_by_name is resolved from users here
+     rather than in the view to avoid a migration. */
+  let query = `SELECT st.*, TRIM(CONCAT(u.first_name, ' ', u.last_name)) AS created_by_name
+    FROM v_stock_takes_summary st LEFT JOIN users u ON u.id = st.created_by WHERE 1=1`;
   const params: (string | boolean)[] = [];
   let paramIndex = 1;
 
@@ -101,6 +103,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'A location is required to create a stock take');
   }
 
+  // Attribution comes from the authenticated session, not the request body.
+  const createdBy = (req as unknown as AuthenticatedRequest).user?.id || null;
+
   // Generate reference number
   const refResult = await sql`SELECT generate_stock_take_reference() as ref`;
   const referenceNumber = refResult[0]!.ref;
@@ -120,7 +125,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       scheduled_date,
       status,
       notes,
-      tags
+      tags,
+      created_by
     ) VALUES (
       ${referenceNumber},
       ${data.name},
@@ -134,7 +140,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${data.scheduled_date || null},
       'draft',
       ${data.notes || null},
-      ${data.tags || null}
+      ${data.tags || null},
+      ${createdBy}
     )
     RETURNING
       id, reference_number, name, description, status,
