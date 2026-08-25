@@ -41,11 +41,15 @@ const fetchMock = vi.fn<typeof fetch>();
  */
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('fetch', (url: RequestInfo | URL, init?: RequestInit) => (
-    String(url).includes('/timeline')
-      ? Promise.resolve(ok({ entries: [], nextCursor: null }))
-      : fetchMock(url as RequestInfo, init)
-  ));
+  vi.stubGlobal('fetch', (url: RequestInfo | URL, init?: RequestInit) => {
+    // Same reasoning as the chronology above: the drawer now also mounts the
+    // retention-hold panel, which loads on its own request. Answered with an
+    // unheld incident here so it never consumes a test's own
+    // `mockResolvedValue`; `RetentionHoldPanel.test.tsx` tests the panel.
+    if (String(url).includes('/timeline')) return Promise.resolve(ok({ entries: [], nextCursor: null }));
+    if (String(url).includes('/retention-holds')) return Promise.resolve(ok({ holds: [], actions: [], canManage: false }));
+    return fetchMock(url as RequestInfo, init);
+  });
 });
 
 describe('IncidentReviewDrawer', () => {

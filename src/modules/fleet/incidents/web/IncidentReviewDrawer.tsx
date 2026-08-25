@@ -22,6 +22,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { incidentApi, IncidentApiError, type EvidenceUploadBody } from './incidentApi';
 import { IncidentActionPanel } from './IncidentActionPanel';
 import { IncidentTimeline } from './IncidentTimeline';
+import { RetentionHoldPanel } from './RetentionHoldPanel';
 import type { IncidentAction, IncidentDetail, IncidentVisibility } from '../types';
 import type { AttendanceCorrectionState, DriverInputState } from '../driver/types';
 
@@ -249,6 +250,11 @@ export function IncidentReviewDrawer({ incidentId, canEdit, returnFocus, onClose
               the chronology carries no bodies, so the activity and attachment lists above
               remain the only place a manager reads a comment or opens evidence. */}
           <IncidentTimeline incidentId={detail.id} refreshKey={chronologyVersion} />
+          {/* Whether this incident survives the retention window is part of
+              its state, so it sits with the rest of it. The panel decides for
+              itself what to show — a viewer without hold authority gets the
+              state and none of the controls. */}
+          <RetentionHoldPanel incidentId={detail.id} refreshKey={chronologyVersion} />
           <IncidentActionPanel incident={detail} canEdit={canEdit} onSubmitted={refreshAfterChange} />
           <EvidenceUploadForm incidentId={detail.id} canEdit={canEdit} onUploaded={refreshAfterChange} />
         </div>}
