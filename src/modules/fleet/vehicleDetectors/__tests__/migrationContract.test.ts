@@ -13,8 +13,10 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   REVERSIONED_TELEMATICS_INCIDENT_TYPES,
-  TELEMATICS_PENDING_REVERSION_MARKER,
+  TELEMATICS_PENDING_REVERSION_MARKER_PATTERN,
+  TELEMATICS_PENDING_REVERSION_MARKER_PREFIX,
   TELEMATICS_REVERSION_CHANGE_REASON,
+  VEHICLE_RULE_TIMEZONE,
 } from '../types';
 
 const SQL_DIR = resolve(process.cwd(), 'scripts/migrations/sql');
@@ -45,7 +47,7 @@ function reversionStatement(): string {
 
 /** Branch B: the in-place update of PENDING rules. */
 function pendingStatement(): string {
-  const from = forward.indexOf('UPDATE fleet_operational_incident_rules\n   SET severity =');
+  const from = forward.indexOf("UPDATE fleet_operational_incident_rules\n   SET severity = 'high'");
   if (from < 0) throw new Error('529 no longer updates pending rows in place');
   return forward.slice(from, forward.indexOf(';', from));
 }
@@ -105,27 +107,37 @@ describe('the re-versioned incident types', () => {
     expect(reversionStatement()).toContain('effective_from < now()');
   });
 
-  it('edits PENDING open rows in place, marker and all', () => {
+  it('edits whatever branch A left open, in place', () => {
     const statement = pendingStatement();
-    // `>=`, not `>`: a row activating at exactly this transaction's now() would
-    // otherwise be closed with effective_to = effective_from and fail the CHECK.
-    expect(statement).toContain('effective_from >= now()');
     expect(statement).toContain('effective_to IS NULL');
     expect(statement).toContain("severity = 'critical'");
     expect(statement).toContain("severity = 'high'");
     expect(statement).toContain('whatsapp_enabled = false');
     expect(statement).toContain('immediate_notification = false');
     expect(statement).toContain('include_in_morning_summary = true');
-    expect(statement).toContain(TELEMATICS_PENDING_REVERSION_MARKER);
     // In place: no new version, no range touched.
     expect(statement).not.toMatch(/INSERT INTO/i);
     expect(statement).not.toMatch(/effective_to\s*=\s*now\(\)/);
   });
 
-  it('covers every open row exactly once between the two branches', () => {
-    // `< now()` and `>= now()` are disjoint and total.
+  it('reads the clock ONCE — branch B carries no effective_from predicate', () => {
+    // A mirror-image `effective_from >= now()` reads the clock a second time,
+    // and under `psql -f` the two statements are two transactions: a row whose
+    // effective_from falls between them is pending to A and active to B, and
+    // neither matches it. It would stay critical with WhatsApp armed.
     expect(reversionStatement()).toContain('effective_from < now()');
-    expect(pendingStatement()).toContain('effective_from >= now()');
+    expect(pendingStatement()).not.toContain('effective_from');
+  });
+
+  it('carries the prior flag values in the marker, not just a note', () => {
+    // The severity filter constrains severity and NOTHING else. An operator may
+    // hold a critical row with whatsapp_enabled false; restoring 510's seed
+    // shape on rollback would silently re-arm their WhatsApp.
+    const statement = pendingStatement();
+    expect(statement).toContain(TELEMATICS_PENDING_REVERSION_MARKER_PREFIX);
+    expect(statement).toContain("'529:pending{wa=' || whatsapp_enabled");
+    expect(statement).toContain("',imm=' || immediate_notification");
+    expect(statement).toContain("',morn=' || include_in_morning_summary");
   });
 
   it('insert at max(version) + 1 per type, and never swallow a collision', () => {
@@ -208,6 +220,10 @@ describe('the versioned rule table', () => {
     expect(grants).not.toMatch(/'(manager|project_manager|viewer)', 'fleet\.vehicle-rules'/);
   });
 
+  it('seeds version 1 in the timezone the API validates against', () => {
+    expect(forward).toContain(`VALUES (1, '${VEHICLE_RULE_TIMEZONE}', now())`);
+  });
+
   it('adds after_hours_exempt additively and defaulted', () => {
     expect(forward).toContain('ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN NOT NULL DEFAULT false');
   });
@@ -260,18 +276,32 @@ describe('the rollback', () => {
     for (const list of reversionedTypeLists(rollback)) expect(list.sort()).toEqual(expectedTypes);
   });
 
-  it('restores pending rows by the marker alone, and strips it', () => {
+  it('restores pending rows from the marker values, not from seed constants', () => {
     const from = rollback.indexOf("SET severity = 'critical'");
     expect(from).toBeGreaterThan(-1);
     const statement = rollback.slice(from, rollback.indexOf(';', from));
-    expect(statement).toContain(TELEMATICS_PENDING_REVERSION_MARKER);
-    expect(statement).toContain('whatsapp_enabled = true');
-    expect(statement).toContain('immediate_notification = true');
-    expect(statement).toContain('include_in_morning_summary = false');
+    // Parsed back out of the marker. Restoring 510's seed flags would re-arm an
+    // operator's deliberately-disabled WhatsApp.
+    expect(statement).toContain('regexp_match(');
+    expect(statement).toContain('[1]::boolean');
+    expect(statement).toContain('[2]::boolean');
+    expect(statement).toContain('[3]::boolean');
+    expect(statement).not.toContain('whatsapp_enabled = true');
+    expect(statement).not.toContain('immediate_notification = true');
+    expect(statement).not.toContain('include_in_morning_summary = false');
+    // Severity is the one value the filter pins, so it alone comes from a constant.
+    expect(statement).toContain("severity = 'critical'");
     // Stripping the marker is what makes a second run a no-op.
     expect(statement).toContain('regexp_replace(change_reason');
     // An operator's own pending `high` row carries no marker and is untouched.
-    expect(statement).toContain("change_reason LIKE '%529: re-versioned pending row to high'");
+    expect(statement).toContain(TELEMATICS_PENDING_REVERSION_MARKER_PATTERN.replace(/\$$/, ''));
+  });
+
+  it('agrees with the TS marker pattern exactly', () => {
+    // The forward writes the marker literally; the rollback matches it as a
+    // regex, so its braces are escaped. Both are pinned to the same constants.
+    expect(forward).toContain(TELEMATICS_PENDING_REVERSION_MARKER_PREFIX);
+    expect(rollback).toContain(TELEMATICS_PENDING_REVERSION_MARKER_PATTERN);
   });
 
   it('removes the table, the column, the permission rows and the migration record', () => {

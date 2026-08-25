@@ -143,24 +143,30 @@ ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN N
 -- effective one.
 --
 -- `fleet_operational_incident_rules_range_order` is
--- `CHECK (effective_to IS NULL OR effective_to > effective_from)`, and the
--- incident-settings dialog only ever creates versions that activate in the
--- FUTURE (its minimum is now + 5 minutes). So an open row with
--- `effective_from > now()` is the normal product of using the UI, and closing
--- it at `now()` violates that CHECK: the runner aborts the whole deploy, and a
--- hand-run `psql -f` half-applies and exits 0 with all four types still
--- critical and still on WhatsApp.
+-- `CHECK (effective_to IS NULL OR effective_to > effective_from)`, so closing an
+-- open row whose `effective_from` is in the future is earlier than its own start
+-- and fails: the runner aborts the whole deploy, and a hand-run `psql -f`
+-- half-applies and exits 0 with all four types still critical and still on
+-- WhatsApp.
+--
+-- How a pending row gets there matters for judging the risk, so be precise:
+-- `IncidentSettingsDialog.tsx`'s RULED_TYPES is ['late', 'wrong_site',
+-- 'evidence_mismatch', 'left_early'], so the settings UI cannot author a version
+-- for ANY of the four telematics types. `versionIncidentRule` in
+-- settingsRepository.ts accepts any IncidentType, though, and every version it
+-- writes is future-dated. A pending critical row for these four is therefore
+-- API- or SQL-authored, not clicked — reachable, and not something a migration
+-- may assume away.
 --
 -- Branch A — ACTIVE open rows (`effective_from < now()`): close and open a
 -- successor, which is the ordinary versioning move and preserves the history of
 -- a rule that has actually been in force.
 --
--- Branch B — PENDING open rows (`effective_from >= now()`): update IN PLACE. A
--- pending row has never judged an incident, so there is no history to preserve,
--- no successor to open, and no range to touch. `>=` rather than `>` so a row
--- activating at exactly this transaction's `now()` takes the in-place path —
--- closing it would produce `effective_to = effective_from` and fail the same
--- CHECK.
+-- Branch B — WHATEVER BRANCH A LEFT OPEN: update IN PLACE. A pending row has
+-- never judged an incident, so there is no history to preserve, no successor to
+-- open, and no range to touch. Branch B carries NO `effective_from` predicate of
+-- its own — reading the clock a second time opens a gap between the two
+-- statements under `psql -f`; see the note on the statement itself.
 --
 -- Both branches filter on `severity = 'critical'`, which is what makes them
 -- idempotent and what leaves an operator's deliberate non-critical version
@@ -215,10 +221,28 @@ SELECT closed.incident_type,
        'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast'
   FROM closed;
 
--- Branch B. A pending row is edited where it stands; its version, its
--- effective_from and its place in the history are all left exactly as the
--- operator set them. The marker appended to change_reason is the ONLY record
--- that 529 touched the row, and the rollback restores by that marker alone.
+-- Branch B. Whatever branch A left open.
+--
+-- No `effective_from` predicate, deliberately. Branch A already took every
+-- ACTIVE row, so any open `critical` row of these four types that survives it is
+-- pending by construction. A mirror-image `effective_from >= now()` here would
+-- read the clock a SECOND time, and under `psql -f` the two statements are two
+-- transactions: a row whose effective_from falls between branch A's now() and
+-- branch B's now() is pending to A and active to B, and neither matches it. It
+-- would stay critical with WhatsApp armed, silently.
+--
+-- A pending row is edited where it stands; its version, its effective_from and
+-- its place in the history are all left exactly as the operator set them. That
+-- is the only option available: `effective_to = now()` on a row whose
+-- effective_from is in the future is earlier than its own start and fails
+-- fleet_operational_incident_rules_range_order.
+--
+-- The marker appended to change_reason CARRIES THE PRIOR FLAG VALUES, because
+-- the `severity = 'critical'` filter constrains severity and nothing else. An
+-- operator may perfectly well hold a critical row with whatsapp_enabled false;
+-- restoring 510's seed shape on rollback would silently turn their WhatsApp
+-- back on. The three booleans are read from the row being updated — a SET
+-- expression sees the OLD values — and the rollback parses them back out.
 UPDATE fleet_operational_incident_rules
    SET severity = 'high',
        whatsapp_enabled = false,
@@ -226,12 +250,15 @@ UPDATE fleet_operational_incident_rules
        include_in_morning_summary = true,
        change_reason = CASE
          WHEN NULLIF(btrim(COALESCE(change_reason, '')), '') IS NULL
-           THEN '529: re-versioned pending row to high'
-         ELSE btrim(change_reason) || ' | 529: re-versioned pending row to high'
+           THEN '529:pending{wa=' || whatsapp_enabled
+                || ',imm=' || immediate_notification
+                || ',morn=' || include_in_morning_summary || '}'
+         ELSE btrim(change_reason) || ' | 529:pending{wa=' || whatsapp_enabled
+                || ',imm=' || immediate_notification
+                || ',morn=' || include_in_morning_summary || '}'
        END,
        updated_at = now()
  WHERE effective_to IS NULL
-   AND effective_from >= now()
    AND severity = 'critical'
    AND incident_type = ANY(ARRAY[
      'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'

@@ -20,10 +20,11 @@ vi.mock('@/modules/fleet/vehicleDetectors/vehicleRuleQueries', async () => {
 
 import handler from '@/pages/api/fleet/vehicle-rules/index';
 import { VehicleRuleValidationError } from '@/modules/fleet/vehicleDetectors/vehicleRuleQueries';
+import { VEHICLE_RULE_TIMEZONE } from '@/modules/fleet/vehicleDetectors/types';
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const body = {
-  timezone: 'Africa/Johannesburg', effectiveFrom: '2099-01-01T00:00:00.000Z',
+  timezone: VEHICLE_RULE_TIMEZONE, effectiveFrom: '2099-01-01T00:00:00.000Z',
   afterHoursStartTime: '18:00', afterHoursEndTime: '06:00',
   weekendsAreAfterHours: true, publicHolidaysAreAfterHours: true,
   theftDisplacementMeters: 500, theftMinPositions: 2,
@@ -96,6 +97,27 @@ describe('vehicle rules API validation', () => {
     const result = await call('POST', { ...body, ...override });
     expect(result.status).toBe(400);
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('names the timezone it requires, and takes it from the shared constant', async () => {
+    // A generic "all fields are required" tells the caller nothing, and a
+    // second hard-coded literal would drift from what 529 seeds.
+    const result = await call('POST', { ...body, timezone: 'UTC' });
+    expect(result.status).toBe(400);
+    expect(JSON.stringify(result.body)).toContain(`timezone must be ${VEHICLE_RULE_TIMEZONE}`);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['effectiveFrom', { effectiveFrom: 'nonsense' }, 'effectiveFrom must be a valid ISO instant'],
+    ['changeReason', { changeReason: '  ' }, 'changeReason is required'],
+    ['afterHoursStartTime', { afterHoursStartTime: '6pm' }, 'After-hours times must be HH:MM'],
+    ['weekendsAreAfterHours', { weekendsAreAfterHours: 'yes' }, 'must be booleans'],
+    ['knownSiteRadiusMeters', { knownSiteRadiusMeters: 'wide' }, 'knownSiteRadiusMeters'],
+  ])('says which field it refused for %s', async (_label, override, expected) => {
+    const result = await call('POST', { ...body, ...override });
+    expect(result.status).toBe(400);
+    expect(JSON.stringify(result.body)).toContain(expected);
   });
 
   it.each([[null], ['a string'], [[]], [42]])('rejects the non-object body %s', async (requestBody) => {

@@ -27,8 +27,8 @@ import { join } from 'node:path';
 import { Pool } from 'pg';
 import {
   REVERSIONED_TELEMATICS_INCIDENT_TYPES,
-  TELEMATICS_PENDING_REVERSION_MARKER,
   TELEMATICS_REVERSION_CHANGE_REASON,
+  telematicsPendingMarker,
 } from '@/modules/fleet/vehicleDetectors/types';
 
 const SCHEMA = 'mig529_fleet_vehicle_operational_rules_scratch';
@@ -195,22 +195,35 @@ async function operatorVersion(type: string, version: number, severity: string):
  * activation is now + 5 minutes. Closing whatever was open first, exactly as the
  * dialog's own transaction does.
  */
-async function pendingOperatorVersion(type: string, version: number, severity: string, reason: string | null = 'Operator edit'): Promise<void> {
+interface RuleFlags { whatsappEnabled: boolean; immediateNotification: boolean; includeInMorningSummary: boolean }
+
+/** 510's shape for the four telematics types. A fixture that only ever uses THIS cannot catch a seed-constant restore. */
+const SEED_FLAGS: RuleFlags = { whatsappEnabled: true, immediateNotification: true, includeInMorningSummary: false };
+
+async function pendingOperatorVersion(
+  type: string,
+  version: number,
+  severity: string,
+  reason: string | null = 'Operator edit',
+  flags: RuleFlags = SEED_FLAGS,
+  activateIn = '30 minutes',
+): Promise<void> {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
     await client.query(
-      `UPDATE fleet_operational_incident_rules SET effective_to = now() + interval '30 minutes'
+      `UPDATE fleet_operational_incident_rules SET effective_to = now() + $2::interval
         WHERE incident_type = $1 AND effective_to IS NULL`,
-      [type],
+      [type, activateIn],
     );
     await client.query(
       `INSERT INTO fleet_operational_incident_rules
          (incident_type, version, effective_from, creates_incident, severity, immediate_notification,
           in_app_enabled, email_enabled, whatsapp_enabled, include_in_morning_summary,
           acknowledgement_target_minutes, change_reason)
-       VALUES ($1, $2, now() + interval '30 minutes', true, $3, true, true, true, true, false, 5, $4)`,
-      [type, version, severity, reason],
+       VALUES ($1, $2, now() + $8::interval, true, $3, $5, true, true, $6, $7, 5, $4)`,
+      [type, version, severity, reason,
+        flags.immediateNotification, flags.whatsappEnabled, flags.includeInMorningSummary, activateIn],
     );
     await client.query('COMMIT');
   } finally {
@@ -529,7 +542,7 @@ describe('a type whose open rule is PENDING, not yet effective', () => {
       pending: true, effective_to: null,
     });
     // Edited where it stood: no successor row was opened for it.
-    expect(row.change_reason).toBe(`Operator edit | ${TELEMATICS_PENDING_REVERSION_MARKER}`);
+    expect(row.change_reason).toBe(`Operator edit | ${telematicsPendingMarker(SEED_FLAGS)}`);
     const versions = await db.query<{ count: number }>(
       `SELECT count(*)::int AS count FROM fleet_operational_incident_rules WHERE incident_type = 'severe_driving'`,
     );
@@ -610,6 +623,113 @@ describe('a type whose open rule is PENDING, not yet effective', () => {
 
     expect(await ruleRow('severe_driving')).toEqual(afterFirst);
     expect(await ruleRow('lost_contact_moving')).toMatchObject({ severity: 'high', change_reason: 'Operator lowered it first' });
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+});
+
+describe('a pending row whose flags are NOT 510 seed shape', () => {
+  // The seed-shaped fixture above cannot catch a rollback that restores
+  // constants: every value it asserts happens to equal the constant. This one
+  // holds a critical rule with WhatsApp deliberately OFF.
+  const OPERATOR_FLAGS = {
+    whatsappEnabled: false, immediateNotification: false, includeInMorningSummary: true,
+  };
+
+  async function applyForwardSplit(): Promise<void> {
+    const client = await db.connect();
+    try {
+      for (const statement of forwardStatements()) await client.query(statement);
+    } finally {
+      client.release();
+    }
+  }
+
+  async function rollbackSplit(): Promise<void> {
+    const client = await db.connect();
+    try {
+      for (const statement of rollbackStatements({ withTransaction: true })) await client.query(statement);
+    } finally {
+      client.release();
+    }
+  }
+
+  it('records the prior flags in the marker', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical', 'WhatsApp deliberately off', OPERATOR_FLAGS);
+    await db.query(FORWARD);
+
+    const row = await ruleRow('severe_driving');
+    expect(row).toMatchObject({ severity: 'high', whatsapp_enabled: false, include_in_morning_summary: true });
+    expect(row.change_reason).toBe(`WhatsApp deliberately off | ${telematicsPendingMarker(OPERATOR_FLAGS)}`);
+  });
+
+  it('restores exactly those flags, not the seed shape', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical', 'WhatsApp deliberately off', OPERATOR_FLAGS);
+    await db.query(FORWARD);
+    await db.query(ROLLBACK);
+
+    const row = await ruleRow('severe_driving');
+    // Restoring 510's seed shape here would turn this operator's WhatsApp back
+    // on — a widening the rollback has no business performing.
+    expect(row).toMatchObject({
+      severity: 'critical',
+      whatsapp_enabled: false,
+      immediate_notification: false,
+      include_in_morning_summary: true,
+    });
+    expect(row.change_reason).toBe('WhatsApp deliberately off');
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('does the same under split execution, both ways', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical', 'WhatsApp deliberately off', OPERATOR_FLAGS);
+    await applyForwardSplit();
+    expect(await ruleRow('severe_driving')).toMatchObject({ severity: 'high', whatsapp_enabled: false });
+
+    await rollbackSplit();
+
+    expect(await ruleRow('severe_driving')).toMatchObject({
+      severity: 'critical', whatsapp_enabled: false,
+      immediate_notification: false, include_in_morning_summary: true,
+    });
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('survives a marker with no preceding reason', async () => {
+    await pendingOperatorVersion('lost_contact_moving', 2, 'critical', null, OPERATOR_FLAGS);
+    await db.query(FORWARD);
+    expect((await ruleRow('lost_contact_moving')).change_reason).toBe(telematicsPendingMarker(OPERATOR_FLAGS));
+
+    await db.query(ROLLBACK);
+
+    const row = await ruleRow('lost_contact_moving');
+    expect(row.change_reason).toBeNull();
+    expect(row).toMatchObject({ severity: 'critical', whatsapp_enabled: false });
+  });
+});
+
+describe('a row that activates BETWEEN the two branches under split execution', () => {
+  it('is still caught, because branch B reads no clock of its own', async () => {
+    // Branch A runs, sees effective_from in the future, and skips the row.
+    // By the time branch B runs the row has become active. A mirror-image
+    // `effective_from >= now()` on B would skip it too, and it would stay
+    // critical with WhatsApp armed — silently, at rc=0.
+    await pendingOperatorVersion('severe_driving', 2, 'critical', 'Operator edit', SEED_FLAGS, '400 milliseconds');
+
+    const client = await db.connect();
+    try {
+      for (const statement of forwardStatements()) {
+        await client.query(statement);
+        // Let the row cross from pending to active between the two branches.
+        if (statement.includes('529:pending{wa=')) continue;
+        if (statement.includes('WITH closed AS (')) await client.query("SELECT pg_sleep(1)");
+      }
+    } finally {
+      client.release();
+    }
+
+    expect(await ruleRow('severe_driving')).toMatchObject({
+      version: 2, severity: 'high', whatsapp_enabled: false,
+    });
     expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
   });
 });

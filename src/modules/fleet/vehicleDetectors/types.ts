@@ -74,17 +74,42 @@ export type ReversionedTelematicsIncidentType = (typeof REVERSIONED_TELEMATICS_I
  * 2 of any of these types through the incident-settings UI. Pinned against both
  * SQL files by `__tests__/migrationContract.test.ts`.
  */
+export const TELEMATICS_REVERSION_CHANGE_REASON =
+  'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast';
+
 /**
  * The marker migration 529 appends to a PENDING rule's `change_reason`.
  *
- * A pending row (`effective_from` in the future — the only kind the
- * incident-settings dialog creates) cannot be closed: `effective_to = now()`
- * would be earlier than its `effective_from` and violate the range-order CHECK.
- * 529 edits it in place instead, and this marker is the only record that it did
- * — the rollback restores by the marker alone, so an operator's own pending
- * `high` row is never touched.
+ * A pending row (`effective_from` in the future) cannot be closed:
+ * `effective_to = now()` would be earlier than its own `effective_from` and
+ * violate the range-order CHECK. 529 edits it in place instead, and this marker
+ * is the only record that it did — the rollback restores by the marker alone,
+ * so an operator's own pending `high` row is never touched.
+ *
+ * The marker CARRIES the prior flag values, e.g.
+ * `529:pending{wa=false,imm=false,morn=true}`. 529's filter constrains severity
+ * and nothing else, so restoring 510's seed flags on rollback would silently
+ * re-arm an operator's deliberately-disabled WhatsApp.
  */
-export const TELEMATICS_PENDING_REVERSION_MARKER = '529: re-versioned pending row to high';
+export const TELEMATICS_PENDING_REVERSION_MARKER_PREFIX = '529:pending{';
 
-export const TELEMATICS_REVERSION_CHANGE_REASON =
-  'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast';
+/** The exact marker shape both 529 and its rollback must agree on. */
+export const TELEMATICS_PENDING_REVERSION_MARKER_PATTERN =
+  String.raw`529:pending\{wa=(true|false),imm=(true|false),morn=(true|false)\}$`;
+
+/** The marker 529 writes for a row that held `flags` before it was re-versioned. */
+export function telematicsPendingMarker(flags: {
+  whatsappEnabled: boolean; immediateNotification: boolean; includeInMorningSummary: boolean;
+}): string {
+  return `529:pending{wa=${flags.whatsappEnabled},imm=${flags.immediateNotification},morn=${flags.includeInMorningSummary}}`;
+}
+
+/**
+ * The one timezone a vehicle operational rule may be versioned in.
+ *
+ * Migration 529 seeds version 1 with this value and every detector reads the
+ * rule's own `timezone` column, so a second value would silently split the fleet
+ * across two after-hours calendars. Shared by the API validator and pinned
+ * against the migration's seed by `__tests__/migrationContract.test.ts`.
+ */
+export const VEHICLE_RULE_TIMEZONE = 'Africa/Johannesburg';
