@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { log } from '@/lib/logger';
 import type { CreateVehicleRuleVersionInput, VehicleOperationalRule } from '../../vehicleDetectors/types';
 import {
   VEHICLE_RULE_FIELDS, VEHICLE_RULE_UNIT_LABELS, vehicleRulesApi, type VehicleRuleField,
@@ -83,6 +84,7 @@ export function VehicleRulesDialog({ open, onClose, canEdit }: { open: boolean; 
       if (next[0]) setDraft(draftFrom(next[0]));
       setError(null);
     } catch (caught) {
+      log.error('Failed to load Fleet vehicle operational rules', { error: caught }, 'fleet');
       setError(caught instanceof Error ? caught.message : 'Could not load vehicle rules');
     } finally {
       setLoading(false);
@@ -113,6 +115,7 @@ export function VehicleRulesDialog({ open, onClose, canEdit }: { open: boolean; 
       await vehicleRulesApi.createRule(toInput(current, draft));
       await load();
     } catch (caught) {
+      log.error('Failed to create a Fleet vehicle rule version', { error: caught }, 'fleet');
       setError(caught instanceof Error ? caught.message : 'Could not create vehicle rule version');
     } finally {
       setSaving(false);
