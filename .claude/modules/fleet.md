@@ -1459,3 +1459,164 @@ have none.
 Where a filter makes a fact kind inapplicable, the metrics that kind feeds are **omitted** from
 cards and series rather than reported as zero: under `op_type=late`, `presence.scheduled_days: 0` is
 a fact about the filter, and a card cannot say which.
+
+---
+
+## Vehicle-first spike findings (PR0, 2026-08-25)
+
+Read-only spike answering U1–U4 of
+`docs/superpowers/plans/2026-08-25-fleet-vehicle-day-stats-and-telematics-detectors.md`.
+Measured against the live Cartrack REST API (one 15-min page + a paginated 7-day walk,
+55,009 events) and the shared Supabase DB (`fleet_vehicle_positions`, last 30 days).
+No plates, VINs or credentials reproduced here.
+
+### U1 — SOS / panic / impact: not present on any feed. `accident_sos` stays a stub.
+
+**Cartrack `GET /vehicles/events` returns 57 fields, not 44.** `cartrack/provider.ts` keeps 14.
+The 43 discarded ones were enumerated in full on 2026-08-25. No panic, SOS, impact, crash, tow
+or jam field exists. Fields specifically checked and cleared:
+
+| Discarded field | What it actually carries |
+|---|---|
+| `event_description` | **Event-type vocabulary — decision-grade, see below** |
+| `terminal_event_type_id` | Numeric code for the same vocabulary |
+| `x_accel` / `y_accel` / `z_accel` | Raw 3-axis accelerometer, populated on the firmware family where `linear_g`/`lateral_g` are constant zero |
+| `input_state` / `input_state2` / `input_state3` | Signed bitfields, 24 distinct values over 24 h. **The one place a panic button could still hide** — the bit map is undocumented on our side; resolving it is a question for Cartrack, not a guess |
+| `output_state` | Bitfield, 4 distinct values |
+| `driver_id`, `battery_percentage_left`, `manifold_pressure`, `oil_pressure`, `oil_temp`, `water_temp`, `dynamic2-4` | Always `null` on this tenant |
+| `adc0-2`, `analog_0-2`, `temp1-4`, `rpm`, `dynamic1` | Constant (0 or 1) |
+| `vext`, `vgsm`, `unit_temp`, `clock`, `terminal_id`, `user_id` | Device telemetry, no fleet-safety meaning |
+| `chassis_number`, `registration`, `position_description(_id)`, `received_ts` | Identity / reverse-geocode / ingest metadata |
+
+**`event_description` vocabulary — 55,009 events, 8 vehicles, 7 days (2026-08-18 → 08-25):**
+
+| `event_description` | `terminal_event_type_id` | Count |
+|---|---|---|
+| `PERIODIC_EVENT` | 2 | 48,679 |
+| `IDLING_CONTINUE` | 46 | 2,209 |
+| `MOTION_START` / `MOTION_END` | 43 / 44 | 940 / 940 |
+| `IGNITION_OFF` / `IGNITION_ON` | 27 / 28 | 680 / 679 |
+| `IDLING_START` / `IDLING_END` | 33 / 34 | 274 / 274 |
+| `GPS_LOCK` / `GPS_LOST` | 38 / 39 | 149 / 119 |
+| `SPEEDING_START` / `SPEEDING_END` | 31 / 42 | 26 / 11 |
+| `HARSH_CORNERING` | 35 | 19 |
+| `HARSH_BRAKING` | 30 | 10 |
+
+Fourteen values, no alarm class. **Cartrack's device already computes harshness itself** — this is
+the single most useful thing the spike found, and it is thrown away on every ingest.
+
+**Netstar.** The live 2-hourly path is `netstar/tree.ts` (`GetVehicleTreeDataPaging`), which carries
+**no status/alarm field at all** — only an `IgnitionOn` boolean. `netstar/parse.ts`'s `Status` column
+belongs to the CSV "All Activity" export, reached only by `scripts/backfill-tracking.ts` through the
+`UNVERIFIED` `history.ts` path. Raw exports are **not retained** (no raw-payload table, no on-disk
+dump, nothing in the ingest). The vocabulary is therefore only what the captured fixture and its
+README record (968-row capture, 2026-08-05): `Timed Event`, `Stopped`, `Moving`, `Ignition on`,
+`Ignition off`, `Speeding`, `Idling`, `HeadingChange`. No impact/panic/SOS value. `parse.ts` maps two
+of the eight (`Ignition on/off` → `ignition`, `Speeding` → `isSpeeding`) and discards the rest.
+
+**Ituran.** `Statuses[].StatName` is read only by `readIgnition`. Raw payloads are not retained
+("nothing portal-shaped ever lands in the database"). Names observed in the live captures behind the
+committed tests: `Ignition On`, `Ignition Off`, `Engine On`, `Engine Off`, `Vehicle Stopped`. No
+panic/SOS value. Everything but the two `Ignition *` names is discarded.
+
+**Decision: `accident_sos` ships as a documented stub** (plan §4, `accidentSosDetector.ts`). The
+header must name the fields above and this date. The one open lead is Cartrack's `input_state`
+bitfield — ask the vendor for the bit map before concluding the fleet has no panic button.
+
+### U2 — g-force: units are **g**, but only **1 of 7** Cartrack vehicles reports it
+
+`linear_g` is signed (negative = braking); `lateral_g` is already an unsigned magnitude
+(`min = 0.000` over 237,419 rows, so `abs()` is a no-op). Magnitudes 0–0.74 are g, not m/s² or centi-g.
+
+Distribution, `cartrack/velocity`, 30 days, n=237,419 — the only feed populating these columns:
+
+| p50 | p99 | p99.9 | min | max |
+|---|---|---|---|---|
+| `linear_g` | 0.000 | 0.060 | 0.110 | -0.740 | 0.340 |
+| `-linear_g` (braking) | 0.000 | 0.060 | 0.140 | | |
+| `abs(lateral_g)` | 0.000 | 0.110 | 0.220 | 0.000 | 0.510 |
+
+**🚨 `linear_g IS NOT NULL` is a worthless coverage test.** Six of the seven `cartrack/velocity`
+vehicles report **constant zero**, not null — one distinct value across 200k+ rows:
+
+| vehicle (first 8 of uuid) | fixes | distinct `linear_g` | non-zero `linear_g` | non-zero `lateral_g` |
+|---|---|---|---|---|
+| `af119f11` | 31,192 | 32 | 15,283 | 21,875 |
+| `805037da`, `8c8e1824`, `0a70ca7c`, `d9af42eb`, `e6232221`, `a01270cc` | 22k–60k each | **1** | **0** | **0** |
+
+A `coverage_gforce` flag derived from `provider = 'cartrack'` would be wrong for six of seven
+vehicles. It must be derived **per vehicle-day from observed non-zero values**, never from the provider.
+
+**🚨 And the one vehicle that does report g reports it wrong.** All 10 of the largest-magnitude rows
+belong to `af119f11` at 6–7 km/h; 19 of its 20 braking events ≥ 0.35 g are at ≤ 10 km/h, one at 70+ km/h.
+The live API confirms it: every `HARSH_BRAKING` sample carries `speed=6` and `lin≈-0.42..-0.68`. That
+is a device artefact, not driving. A g threshold with no speed gate would report one vehicle
+almost exclusively.
+
+Meanwhile `HARSH_CORNERING` fires on the *other* firmware family with `linear_g=0, lateral_g=0` and
+populated `x/y/z_accel` at 95–129 km/h — real events our g columns cannot see at all.
+
+Hit rates, 30 days, 7 vehicles (fleet-wide events per day):
+
+| threshold (g) | braking/day | accel/day | cornering/day |
+|---|---|---|---|
+| 0.25 | 1.07 | 0.13 | 4.67 |
+| 0.30 | 0.70 | 0.03 | 1.83 |
+| **0.35** | **0.67** | **0.00** | **0.77** |
+| 0.42 | 0.67 | 0.00 | 0.37 |
+| 0.50 | 0.40 | 0.00 | 0.07 |
+
+### U3 — cadence: the plan's coverage matrix is wrong in three places
+
+Per (provider, account_ref), last 30 days, SAST days:
+
+| feed | vehicles | fixes/day p10 | fixes/day median | gap median | gap p90 | gap p99 | largest gap | ignition non-null | speed non-null | odometer non-null | real (non-zero) g |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `cartrack/velocity` | 7 | 386 | **1,169** | **8 s** | 30 s | 298 s | 84.6 h | 100 % | 100 % | 100 % | 6.4 % |
+| `cartrack/urent` | 3 | 5 | 15 | 1,797 s | 7,581 s | 64,431 s | 91.3 h | 100 % | 100 % | 100 % | 0 % |
+| `netstar/europcar` | 6 | 2 | 10 | 637 s | 9,618 s | 61,398 s | 25.4 h | **100 %** | 100 % | **0 %** | 0 % |
+| `ituran/avis` | 2 | 6 | 11 | 2,095 s | 7,472 s | 47,896 s | 27.1 h | **94.5 %** | 100 % | 100 % | 0 % |
+
+Corrections to the plan's §2 U3 table:
+1. `cartrack/velocity` is **not** a 2-minute feed. It is event-driven with a **median 8-second** gap
+   and ~1,169 fixes per vehicle-day (max 3,047). Any per-fix loop sized for "2 min" is off by ~15×.
+2. `netstar/europcar` asserts ignition on **100 %** of fixes, not "only on transition rows" — because
+   the live path is `tree.ts`'s `IgnitionOn` boolean, not the CSV `Status`. It supplies **no odometer**,
+   so its distance must come from haversine, never an odometer delta.
+3. `ituran/avis` asserts ignition on **94.5 %** of fixes, not "only on literal status".
+
+So **idle is computable on all four feeds**, just at wildly different resolution — `ignition=true AND
+speed_kph=0` fires on 12–23 % of fixes everywhere:
+
+| feed | idle-feasible fixes/day (median) | share of fixes |
+|---|---|---|
+| `cartrack/velocity` | 1,872 | 23.2 % |
+| `netstar/europcar` | 11 | 15.6 % |
+| `cartrack/urent` | 6 | 17.6 % |
+| `ituran/avis` | 3 | 12.1 % |
+
+Days with ≥1 fix out of 30: all seven `cartrack/velocity` vehicles 23–31; every `netstar`, `ituran`
+and two `urent` vehicles exactly **19** (13 for one), because those feeds only went live 2026-08-06/07.
+Coverage denominators must start at the vehicle's first position, never at 30.
+
+Ingest lag (`received_at - recorded_at`) — what a "now minus last fix" detector actually races:
+
+| feed | median | p90 | p99 | max |
+|---|---|---|---|---|
+| `cartrack/velocity` | 1.4 min | 2.4 min | 7.0 min | 34.6 min |
+| `netstar/europcar` | 1.2 min | 10.9 min | 89.7 min | 307 min |
+| `ituran/avis` | 4.1 min | 9.2 min | 90.6 min | 309 min |
+| `cartrack/urent` | 1.4 min | 22.9 min | 99.1 min | 1,261 min |
+
+Live `fleet_tracking_watermarks.poll_interval_minutes` on 2026-08-25: `netstar/europcar` 10,
+`cartrack/urent` 30, `cartrack/velocity` 120, `ituran/avis` 120 (demoted, see the Ituran section).
+Note `cartrack/velocity`'s 120 is not its ingest rate — the REST poll in `/api/cron/poll-tracking`
+does not go through `cadence.ts`, which is why its lag is 1.4 min against a "120-minute" interval.
+
+### U4 — restated (verified independently before this spike)
+
+Migration **510 is applied**. `fleet_operational_incident_rules` holds **14 open rows** (one per type,
+all `version 1`). All six telematics types — `accident_sos`, `theft_after_hours_movement`,
+`severe_driving`, `prolonged_unauthorized_stop`, `lost_contact_moving`, `dangerous_area_entry` — are
+`severity='critical'`, `whatsapp_enabled=true`, `immediate_notification=true`. Max migration on
+`origin/master` is **527**, so 528/529 are free. Plan risk R5 stands: PR3 must precede PR4.
