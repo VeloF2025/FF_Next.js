@@ -9,7 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { StockTake, StockTakeFormData } from '@/types/procurement/stockTake.types';
-import { withAuth, AuthenticatedRequest } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -104,7 +104,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // Attribution comes from the authenticated session, not the request body.
-  const createdBy = (req as unknown as AuthenticatedRequest).user?.id || null;
+  const createdBy = (req as AuthenticatedNextApiRequest).user?.id || null;
 
   // Generate reference number
   const refResult = await sql`SELECT generate_stock_take_reference() as ref`;
