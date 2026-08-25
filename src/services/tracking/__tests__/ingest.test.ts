@@ -19,14 +19,31 @@ const ACCOUNT = 'default';
 function pos(
   externalId: string,
   iso: string,
-  providerEventId: string | null = `e-${externalId}-${iso}`
+  providerEventId: string | null = `e-${externalId}-${iso}`,
+  providerEventType: string | null = null
 ): ProviderPosition {
   return {
     externalId, providerEventId, recordedAt: new Date(iso),
     lat: -26.2, lon: 28.04, speedKph: 50, roadSpeedKph: 60, isSpeeding: false,
     ignition: true, odometerKm: 1000, linearG: 0, lateralG: 0, bearing: 90,
-    altitudeM: 1600, gpsFixType: 3,
+    altitudeM: 1600, gpsFixType: 3, providerEventType,
   };
+}
+
+/**
+ * Where a column's value landed in the parameter list of the INSERT that was built.
+ *
+ * Read out of the query's own column list rather than hardcoded, so inserting a column in the
+ * middle of COLUMNS cannot silently shift what a positional assertion below is looking at.
+ */
+function paramFor(callIndex: number, column: string): unknown {
+  const text = queryMock.mock.calls[callIndex][0] as string;
+  const params = queryMock.mock.calls[callIndex][1] as unknown[];
+  const columns = /INSERT INTO fleet_vehicle_positions \(([^)]*)\)/
+    .exec(text)![1]!.split(',').map((c) => c.trim());
+  const at = columns.indexOf(column);
+  expect(at, `${column} is not in the INSERT column list`).toBeGreaterThanOrEqual(0);
+  return params[at];
 }
 
 function trackerRow(externalId: string, vehicleId = 'v-1', trackerId = 't-1') {
@@ -205,6 +222,50 @@ describe('ingestPositions', () => {
     await ingestPositions('cartrack', 'urent', [pos('ct-1', '2026-07-15T08:00:00Z')]);
     const params = queryMock.mock.calls[0][1] as unknown[];
     expect(params[3]).toBe('urent'); // account_ref is the 4th insert column
+    // Same assertion through the helper the provider_event_type cases use, against a column
+    // whose position is already known good. If paramFor is broken, it fails here rather than
+    // quietly passing everything below it.
+    expect(paramFor(0, 'account_ref')).toBe('urent');
+  });
+
+  describe('provider_event_type — the column the fold and the detectors read', () => {
+    /**
+     * Written, not merely mapped. The parsers put `providerEventType` on the position and every
+     * test upstream of here passes whether or not the insert carries it -- so mutating the value
+     * to null in ingest.ts left the whole suite green. These two cases are what close that.
+     */
+    it('writes the Cartrack event vocabulary through to the insert, verbatim', async () => {
+      sqlMock.mockResolvedValueOnce([trackerRow('ct-1')]);
+      queryMock.mockResolvedValueOnce([{ id: 'a' }]);
+      await ingestPositions('cartrack', 'velocity', [
+        pos('ct-1', '2026-07-15T08:00:00Z', 'evt-1', 'HARSH_BRAKING'),
+      ]);
+      expect(paramFor(0, 'provider_event_type')).toBe('HARSH_BRAKING');
+    });
+
+    it('writes null for a feed that has no event vocabulary', async () => {
+      sqlMock.mockResolvedValueOnce([trackerRow('ns-1')]);
+      queryMock.mockResolvedValueOnce([{ id: 'a' }]);
+      await ingestPositions('netstar', 'europcar', [pos('ns-1', '2026-07-15T08:00:00Z')]);
+      expect(paramFor(0, 'provider_event_type')).toBeNull();
+    });
+
+    it('keeps each row aligned with its own event type across a mixed batch', async () => {
+      // A shifted parameter list is the failure this catches: every row would still carry A
+      // value, just the neighbour's.
+      sqlMock.mockResolvedValueOnce([trackerRow('ct-1'), trackerRow('ct-2', 'v-2', 't-2')]);
+      queryMock.mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }]);
+      await ingestPositions('cartrack', 'velocity', [
+        pos('ct-1', '2026-07-15T08:00:00Z', 'evt-1', 'IDLING_START'),
+        pos('ct-2', '2026-07-15T08:00:01Z', 'evt-2', 'MOTION_END'),
+      ]);
+      const text = queryMock.mock.calls[0][0] as string;
+      const params = queryMock.mock.calls[0][1] as unknown[];
+      const columns = /INSERT INTO fleet_vehicle_positions \(([^)]*)\)/
+        .exec(text)![1]!.split(',').map((c) => c.trim());
+      const at = columns.indexOf('provider_event_type');
+      expect([params[at], params[at + columns.length]]).toEqual(['IDLING_START', 'MOTION_END']);
+    });
   });
 
   describe('maxIngestedAt — the watermark input', () => {

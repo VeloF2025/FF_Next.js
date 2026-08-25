@@ -245,6 +245,21 @@ describe('the row migration 528 will accept', () => {
     }
   });
 
+  it('keeps ignition above moving + idle when sub-second intervals round in opposite directions', () => {
+    // The floor in finaliseDay is `Math.max(..., movingSeconds + idleSeconds)`, and without that
+    // last term this row is REJECTED by the parts-within-whole CHECK. Three fixes 500 ms apart:
+    // both intervals are 500 ms, so ignition holds 1,000 ms and the moving and idle buckets hold
+    // 500 ms each. Rounded independently that is 1 s of ignition against 1 s + 1 s -- each
+    // bucket rounds UP while their sum rounds to the same second.
+    const positions = [0, 500, 1_000].map((offsetMs, i) => ({
+      ...fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 0, ignition: true, speedKph: i === 1 ? 60 : 0 }),
+      recordedAt: new Date(Date.parse(MORNING) + offsetMs).toISOString(),
+    }));
+    const [day] = foldVehicleDays(positions);
+    expect([day!.ignitionSeconds, day!.movingSeconds, day!.idleSeconds]).toEqual([2, 1, 1]);
+    expect(day!.movingSeconds + day!.idleSeconds).toBeLessThanOrEqual(day!.ignitionSeconds);
+  });
+
   it('zeroes every ignition-derived second on a day that does not assert ignition', () => {
     // Below the 90% ratio: three of five fixes leave ignition null.
     const positions = [true, null, null, null, true].map((ignition, i) => fix(
@@ -278,6 +293,51 @@ describe('feed attribution', () => {
 });
 
 describe('input contract', () => {
+  it('accepts two DIFFERENT fixes sharing one instant, because production is full of them', () => {
+    // 164 (vehicle, recorded_at) groups over 7 days of production hold more than one row, on all
+    // seven cartrack/velocity vehicles -- distinct provider_event_ids at the same instant, and in
+    // one sampled pair disagreeing about ignition. A guard that refused an equal timestamp would
+    // throw on ordinary data every day.
+    const positions = [
+      fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 0, providerEventId: '2772573715', ignition: true, speedKph: 0 }),
+      fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 0, providerEventId: '2772574862', ignition: false, speedKph: 0 }),
+      fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 8, providerEventId: '2772574900', ignition: true, speedKph: 0 }),
+    ];
+    const [day] = foldVehicleDays(positions);
+    expect(day!.positionCount).toBe(3);
+  });
+
+  it('refuses the SAME fix supplied twice, which is what an inclusive watermark would do', () => {
+    // PR2 reads its window from a watermark. If that read is `recorded_at >= watermark` rather
+    // than `>`, the boundary fix is re-fed and counted twice. The timestamp cannot catch it; the
+    // id can.
+    const duplicated = [
+      fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 0, providerEventId: 'evt-1', ignition: true, speedKph: 0 }),
+      fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 0, providerEventId: 'evt-1', ignition: true, speedKph: 0 }),
+    ];
+    expect(() => foldVehicleDays(duplicated)).toThrow(/exclusive/i);
+  });
+
+  it('refuses a snapshot feed repeating an instant with no id, which can only be a duplicate', () => {
+    // netstar and ituran supply no per-fix id. Two fixes at the identical instant from a feed
+    // that returns one point per vehicle per poll is a re-fetch, not a tie.
+    const repeated = [
+      fix(MORNING, 'netstar', 'europcar', { offsetSeconds: 0, providerEventId: null, ignition: true, speedKph: 0 }),
+      fix(MORNING, 'netstar', 'europcar', { offsetSeconds: 0, providerEventId: null, ignition: true, speedKph: 0 }),
+    ];
+    expect(() => foldVehicleDays(repeated)).toThrow(/supplied twice/i);
+  });
+
+  it('does not confuse an id reused at a LATER instant with a duplicate', () => {
+    // The seen-id set is scoped to one instant, so it cannot grow without bound over a backfill
+    // -- and cannot reject a feed that recycles ids across time.
+    const positions = [
+      fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 0, providerEventId: 'evt-1', ignition: true, speedKph: 0 }),
+      fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 8, providerEventId: 'evt-1', ignition: true, speedKph: 0 }),
+    ];
+    expect(foldVehicleDays(positions)[0]!.positionCount).toBe(2);
+  });
+
   it('refuses positions that arrive out of order rather than mis-measuring the gaps', () => {
     const positions = [
       fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 60, ignition: true, speedKph: 0 }),

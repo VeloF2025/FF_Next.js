@@ -40,6 +40,20 @@ export const COVERAGE_GRANULARITIES: readonly CoverageGranularity[] = [
  */
 export interface DayPosition {
   recordedAt: string;
+  /**
+   * The fix's identity within its feed, from `fleet_vehicle_positions.provider_event_id`.
+   *
+   * Load-bearing, not decorative: `recordedAt` alone does NOT identify a fix. Measured against
+   * production on 2026-08-25, 164 (vehicle, recorded_at) groups over 7 days hold more than one
+   * row, on all seven `cartrack/velocity` vehicles -- distinct `provider_event_id`s at the same
+   * instant, sometimes disagreeing about ignition. They are real, separate events.
+   *
+   * So the fold cannot reject an equal timestamp, and needs this to tell a genuine tie from the
+   * same fix arriving twice. Null where the feed supplies none; ingest synthesises one from
+   * (account, external id, recordedAt) for those, so a null here at a repeated instant IS a
+   * duplicate.
+   */
+  providerEventId: string | null;
   provider: string | null;
   accountRef: string | null;
   ignition: boolean | null;

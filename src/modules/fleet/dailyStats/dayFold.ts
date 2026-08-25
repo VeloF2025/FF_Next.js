@@ -13,8 +13,17 @@
  * `addPositions` may be called with any partition of the vehicle's positions, in order, with no
  * overlap. The accumulator holds the previous position itself, so the interval spanning a batch
  * boundary is folded exactly once and exactly as it would have been in a single call. A caller
- * that overlaps its batches would double-count; a caller that gaps them would lose an interval.
- * Out-of-order input throws rather than mis-measuring the gaps.
+ * that gaps its batches would lose an interval, and out-of-order input throws rather than
+ * mis-measuring the gaps.
+ *
+ * An OVERLAP is the harder half, because the ordering guard cannot be tightened to catch it. A
+ * fix is not identified by its timestamp: 164 (vehicle, recorded_at) groups over 7 days of
+ * production hold more than one row, on all seven `cartrack/velocity` vehicles, with distinct
+ * `provider_event_id`s at the same instant -- sometimes disagreeing about ignition. Refusing an
+ * equal timestamp would therefore throw on ordinary data. Refusing a repeated `providerEventId`
+ * AT that timestamp catches the real hazard instead: a watermark that reads `recorded_at >=`
+ * rather than `>` re-feeds the boundary fix, which would otherwise be counted twice in
+ * `position_count` and contribute a zero-length interval to nothing at all.
  *
  * ## The SAST boundary
  *
@@ -92,6 +101,13 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
   let prevMs = 0;
   let eventState: EventState = null;
   let prevIsSpeeding: boolean | null = null;
+  /**
+   * The ids already folded at exactly `prevMs`, cleared the moment the clock moves on.
+   *
+   * Bounded by the number of fixes sharing one instant -- two or three in the observed data --
+   * rather than by the window, so this stays O(1) over a month-long backfill.
+   */
+  let idsAtPrevMs = new Set<string>();
 
   function dayFor(workDate: string): DayAcc {
     const existing = days.get(workDate);
@@ -160,6 +176,21 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
     if (!Number.isFinite(curMs)) throw new Error(`dayFold: unparseable recordedAt ${p.recordedAt}`);
     if (prev !== null && curMs < prevMs) {
       throw new Error('dayFold: positions must be supplied in ascending recordedAt order');
+    }
+    if (prev !== null && curMs === prevMs) {
+      // A genuine tie carries a different id and folds normally; the same id at the same instant
+      // is the same fix arriving twice, and folding it again would inflate position_count.
+      const key = p.providerEventId ?? '';
+      if (idsAtPrevMs.has(key)) {
+        throw new Error(
+          'dayFold: the same fix was supplied twice -- batches must not overlap, and a watermark '
+          + `must be exclusive (recorded_at > watermark). Repeated at ${p.recordedAt}.`,
+        );
+      }
+      idsAtPrevMs.add(key);
+    } else {
+      // The clock moved on, so nothing seen before can be a duplicate of anything to come.
+      idsAtPrevMs = new Set([p.providerEventId ?? '']);
     }
     if (prev !== null) foldInterval(p, curMs);
 

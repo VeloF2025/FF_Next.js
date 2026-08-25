@@ -14,6 +14,7 @@ import type { DayPosition } from '../types';
 
 export interface FixSpec {
   offsetSeconds: number;
+  providerEventId?: string | null;
   ignition?: boolean | null;
   speedKph?: number | null;
   isSpeeding?: boolean | null;
@@ -32,8 +33,14 @@ export function fix(
   accountRef: string,
   spec: FixSpec,
 ): DayPosition {
+  const recordedAt = new Date(Date.parse(startIso) + spec.offsetSeconds * 1000).toISOString();
   return {
-    recordedAt: new Date(Date.parse(startIso) + spec.offsetSeconds * 1000).toISOString(),
+    recordedAt,
+    // Distinct per fix by default. Two fixes may legitimately share an instant, so the id is what
+    // separates a real tie from the same fix arriving twice.
+    providerEventId: spec.providerEventId === undefined
+      ? `${provider}:${accountRef}:${recordedAt}`
+      : spec.providerEventId,
     provider,
     accountRef,
     ignition: spec.ignition ?? null,

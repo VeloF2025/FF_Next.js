@@ -9,6 +9,17 @@
 -- re-running the poller over the same range. Rolling forward again gives an all-NULL column for
 -- every fix that was ingested in between.
 --
+-- ORDER MATTERS, and it is the opposite of the usual one: REVERT THE CODE FIRST, THEN RUN THIS.
+--
+-- The deployed ingest names provider_event_type in its INSERT column list. Dropping the column
+-- underneath a running deploy makes every position insert fail with 42703 (undefined column), so
+-- the tracking poller stops storing fixes entirely -- silently, from the outside, because the
+-- cron keeps running and the endpoint keeps answering. Recovery then needs a code revert AND a
+-- re-poll of the window that was lost, and the providers only serve a limited history.
+--
+-- So: deploy the reverted application first, confirm the poller is writing, and only then apply
+-- this file. The two DROP TABLEs above are safe in either order -- nothing reads them yet.
+--
 -- The two tables are pure derived state and can be rebuilt from fleet_vehicle_positions by
 -- re-running the fold over the full range.
 --
