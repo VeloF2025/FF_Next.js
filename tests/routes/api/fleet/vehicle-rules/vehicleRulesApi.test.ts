@@ -25,7 +25,7 @@ import { VEHICLE_RULE_TIMEZONE } from '@/modules/fleet/vehicleDetectors/types';
 const USER = '11111111-1111-4111-8111-111111111111';
 const body = {
   timezone: VEHICLE_RULE_TIMEZONE, effectiveFrom: '2099-01-01T00:00:00.000Z',
-  afterHoursStartTime: '18:00', afterHoursEndTime: '06:00',
+  afterHoursStartTime: '21:00', afterHoursEndTime: '05:00',
   weekendsAreAfterHours: true, publicHolidaysAreAfterHours: true,
   theftDisplacementMeters: 500, theftMinPositions: 2,
   harshLinearG: 0.35, harshLateralG: 0.35, harshMinSpeedKph: 20, speedOverLimitKph: 15,

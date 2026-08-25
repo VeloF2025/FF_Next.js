@@ -113,7 +113,7 @@ export function VehicleRulesDialog({
           </p>
         )}
         <p className="rounded border p-3">
-          <strong>The after-hours window wraps midnight.</strong> 18:00 → 06:00 is one window
+          <strong>The after-hours window wraps midnight.</strong> 21:00 → 05:00 is one window
           spanning two calendar days. Weekends and public holidays are counted separately.
         </p>
         {current && draft && canEdit && (

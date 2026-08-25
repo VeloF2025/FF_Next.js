@@ -177,8 +177,8 @@ describe('the versioned rule table', () => {
     ['lost_contact_minutes', 'INTEGER NOT NULL DEFAULT 30'],
     ['idle_alert_minutes', 'INTEGER NOT NULL DEFAULT 20'],
     ['known_site_radius_meters', 'INTEGER NOT NULL DEFAULT 500'],
-    ['after_hours_start_time', "TIME NOT NULL DEFAULT '18:00'"],
-    ['after_hours_end_time', "TIME NOT NULL DEFAULT '06:00'"],
+    ['after_hours_start_time', "TIME NOT NULL DEFAULT '21:00'"],
+    ['after_hours_end_time', "TIME NOT NULL DEFAULT '05:00'"],
     ['weekends_are_after_hours', 'BOOLEAN NOT NULL DEFAULT true'],
     ['public_holidays_are_after_hours', 'BOOLEAN NOT NULL DEFAULT true'],
   ])('seeds %s as %s — the PR0-measured default, not a guess', (column, definition) => {

@@ -407,7 +407,7 @@ describe('what else the forward migration ships', () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      version: 1, timezone: 'Africa/Johannesburg', start_time: '18:00:00', end_time: '06:00:00',
+      version: 1, timezone: 'Africa/Johannesburg', start_time: '21:00:00', end_time: '05:00:00',
       weekends_are_after_hours: true, public_holidays_are_after_hours: true,
       theft_displacement_meters: 500, theft_min_positions: 2,
       linear_g: '0.350', lateral_g: '0.350', min_speed: '20.00', over_limit: '15.00',

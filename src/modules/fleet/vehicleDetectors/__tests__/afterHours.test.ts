@@ -30,7 +30,7 @@ const HOLIDAYS = seededHolidays();
 const rule: VehicleOperationalRule = {
   id: 'rule-1', version: 1, timezone: 'Africa/Johannesburg',
   effectiveFrom: '2026-08-01T00:00:00.000Z', effectiveTo: null,
-  afterHoursStartTime: '18:00:00', afterHoursEndTime: '06:00:00',
+  afterHoursStartTime: '21:00:00', afterHoursEndTime: '05:00:00',
   weekendsAreAfterHours: true, publicHolidaysAreAfterHours: true,
   theftDisplacementMeters: 500, theftMinPositions: 2,
   harshLinearG: 0.35, harshLateralG: 0.35, harshMinSpeedKph: 20, speedOverLimitKph: 15,
@@ -45,12 +45,16 @@ const sast = (local: string): string => `${local}:00+02:00`;
 describe('the after-hours window boundaries', () => {
   // 2026-08-26 is a Wednesday, so nothing here can pass by way of the weekend rule.
   it.each([
-    ['17:59', false],
-    ['18:00', true],
+    ['20:59', false],
+    ['21:00', true],
     ['23:59', true],
-    ['05:59', true],
-    ['06:00', false],
+    ['04:59', true],
+    ['05:00', false],
     ['12:00', false],
+    // The window PR4's dry run retired. Both were after-hours under 18:00-06:00
+    // and are ordinary hours now, so these two rows fail if the seed drifts back.
+    ['18:00', false],
+    ['05:30', false],
   ])('a Wednesday at %s SAST is after-hours: %s', (time, expected) => {
     expect(isAfterHours(sast(`2026-08-26T${time}`), rule, HOLIDAYS)).toBe(expected);
   });

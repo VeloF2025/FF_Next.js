@@ -5,10 +5,10 @@
  * an argument, which is what lets the tests run identically under
  * TZ=Africa/Johannesburg and TZ=UTC.
  *
- * The trap this file exists to contain: the seeded window is 18:00 → 06:00,
+ * The trap this file exists to contain: the seeded window is 21:00 → 05:00,
  * which **wraps midnight**. The obvious comparison —
  *
- *     start <= time && time < end        // 18:00 <= t && t < 06:00
+ *     start <= time && time < end        // 21:00 <= t && t < 05:00
  *
  * is false for every instant of every day, so a detector gated on it never
  * fires and looks merely quiet rather than broken. A wrapping window is the

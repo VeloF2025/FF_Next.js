@@ -20,7 +20,7 @@ const USER = '11111111-1111-4111-8111-111111111111';
 const row = {
   id: '22222222-2222-4222-8222-222222222222', version: 1, timezone: 'Africa/Johannesburg',
   effective_from: '2026-08-25T08:00:00.000Z', effective_to: null,
-  after_hours_start_time: '18:00:00', after_hours_end_time: '06:00:00',
+  after_hours_start_time: '21:00:00', after_hours_end_time: '05:00:00',
   weekends_are_after_hours: true, public_holidays_are_after_hours: true,
   theft_displacement_meters: 500, theft_min_positions: 2,
   // NUMERIC columns arrive as strings from node-postgres. Modelled as strings

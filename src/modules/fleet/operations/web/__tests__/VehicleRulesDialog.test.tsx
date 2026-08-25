@@ -6,7 +6,7 @@ import type { VehicleOperationalRule } from '../../../vehicleDetectors/types';
 const current: VehicleOperationalRule = {
   id: 'rule-2', version: 2, timezone: 'Africa/Johannesburg',
   effectiveFrom: '2026-08-01T00:00:00.000Z', effectiveTo: null,
-  afterHoursStartTime: '18:00:00', afterHoursEndTime: '06:00:00',
+  afterHoursStartTime: '21:00:00', afterHoursEndTime: '05:00:00',
   weekendsAreAfterHours: true, publicHolidaysAreAfterHours: true,
   theftDisplacementMeters: 500, theftMinPositions: 2,
   harshLinearG: 0.35, harshLateralG: 0.35, harshMinSpeedKph: 20, speedOverLimitKph: 15,
@@ -44,8 +44,8 @@ describe('VehicleRulesDialog', () => {
     expect(screen.getByLabelText('Theft minimum positions (fixes)')).toHaveValue(2);
     expect(screen.getByLabelText('Harsh braking threshold (g)')).toHaveValue(0.35);
     expect(screen.getByLabelText('Lost contact floor (minutes)')).toHaveValue(30);
-    expect(screen.getByLabelText('After-hours start')).toHaveValue('18:00');
-    expect(screen.getByLabelText('After-hours end')).toHaveValue('06:00');
+    expect(screen.getByLabelText('After-hours start')).toHaveValue('21:00');
+    expect(screen.getByLabelText('After-hours end')).toHaveValue('05:00');
     expect(screen.getByLabelText('Weekends are after-hours')).toBeChecked();
     expect(screen.getByLabelText('Vehicle rule history')).toHaveTextContent('Version 2');
     expect(screen.getByLabelText('Vehicle rule history')).toHaveTextContent('Version 1');
@@ -102,7 +102,7 @@ describe('VehicleRulesDialog', () => {
     expect(JSON.parse(String(post.body))).toMatchObject({
       timezone: 'Africa/Johannesburg', theftDisplacementMeters: 750, harshLinearG: 0.4,
       theftMinPositions: 2, lostContactMinutes: 30, knownSiteRadiusMeters: 500,
-      afterHoursStartTime: '18:00', afterHoursEndTime: '06:00',
+      afterHoursStartTime: '21:00', afterHoursEndTime: '05:00',
       weekendsAreAfterHours: true, publicHolidaysAreAfterHours: false,
       changeReason: 'Tighter theft threshold',
     });

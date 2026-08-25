@@ -208,8 +208,8 @@ Rollback: `DROP TABLE IF EXISTS` both, `ALTER TABLE fleet_vehicle_positions DROP
 fleet_vehicle_operational_rules            -- modelled 1:1 on fleet_operational_status_rules
   id UUID PK, version INTEGER NOT NULL UNIQUE, timezone TEXT NOT NULL,
   effective_from TIMESTAMPTZ NOT NULL, effective_to TIMESTAMPTZ,
-  after_hours_start_time TIME NOT NULL DEFAULT '18:00',
-  after_hours_end_time   TIME NOT NULL DEFAULT '06:00',
+  after_hours_start_time TIME NOT NULL DEFAULT '21:00',
+  after_hours_end_time   TIME NOT NULL DEFAULT '05:00',
   weekends_are_after_hours BOOLEAN NOT NULL DEFAULT true,
   public_holidays_are_after_hours BOOLEAN NOT NULL DEFAULT true,
   theft_displacement_meters INTEGER NOT NULL DEFAULT 500,
@@ -224,6 +224,13 @@ fleet_vehicle_operational_rules            -- modelled 1:1 on fleet_operational_
   known_site_radius_meters INTEGER NOT NULL DEFAULT 500,
   change_reason TEXT, created_by UUID REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
+**After-hours window retuned 2026-08-26 (PR4 dry run).** The original 18:00–06:00 seed fired
+`theft_after_hours_movement` **9.1 times a day** against real position history — an alert volume
+nobody would read, and far outside acceptance criterion 3's ≤5/day. Hein's decision: seed
+**21:00–05:00**, weekends and public holidays still counted. The column DEFAULTs carry it, so the
+seed row and the defaults cannot drift; changing it later is a new rule version through the dialog,
+not a migration.
+
 Plus, copied from 498: `version > 0`; `btrim(timezone) <> ''`; `effective_to IS NULL OR effective_to > effective_from`; all thresholds non-negative; `change_reason IS NULL OR btrim(change_reason) <> ''`; `EXCLUDE USING gist (tstzrange(effective_from, COALESCE(effective_to,'infinity'),'[)') WITH &&)`; `CREATE UNIQUE INDEX … ON (( true )) WHERE effective_to IS NULL`. Seed `version 1` with `now()`.
 
 Also in 529:
@@ -416,7 +423,7 @@ Each must fail at least one named test. Mutate the **new guard**, never the test
 
 **Tests:**
 1. `vehicleRuleQueries.test.ts` — a new version closes the current one in the same transaction; `effectiveFrom` in the past is refused; the next version number comes from the open row (v1→v2, v2→v3, v7→v8), not a constant; two concurrent version creations do not both succeed (the one-open partial unique index and the gist exclusion are the enforcement, not the code).
-2. `afterHours.test.ts` — 17:59/18:00/05:59/06:00 SAST boundaries; a Saturday 10:00 is after-hours; 2026-04-27 (Freedom Day) from `public_holidays` is after-hours; the window **wraps midnight** (18:00→06:00 is one window spanning two calendar days, not two windows). Fixture holidays come from the real seeded table, not a hand-written list.
+2. `afterHours.test.ts` — 20:59/21:00/04:59/05:00 SAST boundaries; a Saturday 10:00 is after-hours; 2026-04-27 (Freedom Day) from `public_holidays` is after-hours; the window **wraps midnight** (21:00→05:00 is one window spanning two calendar days, not two windows). Fixture holidays come from the real seeded table, not a hand-written list.
 3. `tests/migrations/529_*.test.ts` — real Postgres, as a **7-state × 2-mode matrix**. States: the 510 seed; an operator's active version 2 still critical; an operator's active version 2 deliberately not critical; a closed version 2 in the history; a pending open version 2 still critical; a pending open version 2 already lowered; a closed-but-still-effective predecessor with a future successor. Modes: the runner (one query, `psql -1`) and `psql -f` statement by statement.
 
    Every assertion goes through the predicate `loadEffectiveIncidentRule` actually uses — `effective_from <= now() AND (effective_to IS NULL OR effective_to > now())` — **not** "the open row". Those differ, and the difference is the state that survived five rounds. Per state and mode: all four types end effectively `high`; the two emergency types stay `critical` + WA; exactly 14 open rules with no type at zero or two; a second run is a no-op; the rollback puts everything back `critical`.
@@ -558,7 +565,7 @@ Registering any crontab line is a deployment action requiring separate approval.
 
 **R1 — Pipeline/loop bugs are invisible to reading.** The trips builder shipped a straddler bug that six reviewers read past; it understated fleet distance 1.6% at one batch size and 4.4% at another, with every row passing every constraint. The same shape is present here: a batched fold with a watermark and a lookback. **Mitigation is mechanical, not editorial** — every batch-processing PR (PR1, PR2, PR9) carries a batch-size-variation test that compares row hashes across at least four batch sizes including 1 and the production constant, plus an idempotence test over an overlapping window. A PR in this set without that test does not merge.
 
-**R2 — DATE / timezone.** node-postgres parses a `DATE` (OID 1082) into a JS `Date` at *local* midnight; `toISOString()` on it shifts backwards across the date line in SAST and reports the 1st as the last day of the previous month. `work_date` is a `DATE`, so every read path must go through `toWorkDate`. Every write path must derive the day through `sastDateString`/`toWorkDate`, never `date_trunc` (which uses the session timezone) and never UTC arithmetic. The 18:00→06:00 after-hours window **wraps midnight** and spans two `work_date` values — the naive `start <= t && t <= end` comparison is always false and would silently disable the theft detector entirely.
+**R2 — DATE / timezone.** node-postgres parses a `DATE` (OID 1082) into a JS `Date` at *local* midnight; `toISOString()` on it shifts backwards across the date line in SAST and reports the 1st as the last day of the previous month. `work_date` is a `DATE`, so every read path must go through `toWorkDate`. Every write path must derive the day through `sastDateString`/`toWorkDate`, never `date_trunc` (which uses the session timezone) and never UTC arithmetic. The 21:00→05:00 after-hours window **wraps midnight** and spans two `work_date` values — the naive `start <= t && t <= end` comparison is always false and would silently disable the theft detector entirely.
 
 **R3 — Conditional tagged-template SQL is broken in this repo.** `${cond ? sql\`AND x\` : sql\`\`}` produces a malformed query through both the webpack shim and the `@/lib/db-pool` tag. Every optional filter is two whole explicit query branches (`loadPositions` in `tripRepository.ts` is the reference). Pinned by a `sqlLiterals.test.ts` copied from `trips/__tests__/`.
 
@@ -577,7 +584,7 @@ Registering any crontab line is a deployment action requiring separate approval.
 ## 8. Acceptance (restated as verifiable steps)
 
 1. `/fleet/vehicles/<id>/stats` renders for all 18 tracked vehicles; for one Cartrack vehicle, one day's `distance_km` is within 5% of the Cartrack portal's own figure for that vehicle/day. Verified in browser, both themes, with the portal figure recorded in the PR description.
-2. A staged after-hours drive (>500 m, ≥2 fixes, after 18:00 SAST, on a non-exempt vehicle) opens a `theft_after_hours_movement` incident and posts to the Fleet Alerts group within 10 minutes (two 5-minute ticks). Verified end to end on production after the cron is approved.
+2. A staged after-hours drive (>500 m, ≥2 fixes, after 21:00 SAST, on a non-exempt vehicle) opens a `theft_after_hours_movement` incident and posts to the Fleet Alerts group within 10 minutes (two 5-minute ticks). Verified end to end on production after the cron is approved.
 3. After one week of tuning, ≤5 non-critical vehicle incidents per day fleet-wide, and the 08:15 summary appears in the group every day including days with zero incidents.
 
 ---
