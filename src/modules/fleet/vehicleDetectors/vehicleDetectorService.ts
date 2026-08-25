@@ -75,7 +75,8 @@ export const CADENCE_SAMPLE_HOURS = 24;
  */
 export const MAX_POSITIONS_PER_VEHICLE = 6_000;
 
-interface RegisteredDetector {
+/** One detector as the phase registers it: its id, the incident type it opens, and the run. */
+export interface RegisteredDetector {
   id: string;
   incidentType: IncidentType;
   run: VehicleDetector;
