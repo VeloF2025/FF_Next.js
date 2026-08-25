@@ -25,7 +25,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool } from 'pg';
-import { REVERSIONED_TELEMATICS_INCIDENT_TYPES, TELEMATICS_REVERSION_CHANGE_REASON } from '@/modules/fleet/vehicleDetectors/types';
+import {
+  REVERSIONED_TELEMATICS_INCIDENT_TYPES,
+  TELEMATICS_PENDING_REVERSION_MARKER,
+  TELEMATICS_REVERSION_CHANGE_REASON,
+} from '@/modules/fleet/vehicleDetectors/types';
 
 const SCHEMA = 'mig529_fleet_vehicle_operational_rules_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
@@ -182,6 +186,47 @@ async function operatorVersion(type: string, version: number, severity: string):
   } finally {
     client.release();
   }
+}
+
+/**
+ * A PENDING open version — activation in the future.
+ *
+ * This is the ONLY kind the incident-settings dialog can create: its minimum
+ * activation is now + 5 minutes. Closing whatever was open first, exactly as the
+ * dialog's own transaction does.
+ */
+async function pendingOperatorVersion(type: string, version: number, severity: string, reason: string | null = 'Operator edit'): Promise<void> {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE fleet_operational_incident_rules SET effective_to = now() + interval '30 minutes'
+        WHERE incident_type = $1 AND effective_to IS NULL`,
+      [type],
+    );
+    await client.query(
+      `INSERT INTO fleet_operational_incident_rules
+         (incident_type, version, effective_from, creates_incident, severity, immediate_notification,
+          in_app_enabled, email_enabled, whatsapp_enabled, include_in_morning_summary,
+          acknowledgement_target_minutes, change_reason)
+       VALUES ($1, $2, now() + interval '30 minutes', true, $3, true, true, true, true, false, 5, $4)`,
+      [type, version, severity, reason],
+    );
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+}
+
+async function ruleRow(type: string) {
+  const { rows } = await db.query(
+    `SELECT version, severity, whatsapp_enabled, immediate_notification, include_in_morning_summary,
+            change_reason, effective_to, effective_from > now() AS pending
+       FROM fleet_operational_incident_rules
+      WHERE incident_type = $1 AND effective_to IS NULL`,
+    [type],
+  );
+  return rows[0];
 }
 
 /** A closed version that sits entirely BEFORE the open one — history, not a conflict. */
@@ -449,6 +494,138 @@ describe('a database an operator has already edited', () => {
     );
     expect(counts.rows).toHaveLength(SEEDED_OPEN_RULE_COUNT);
     for (const row of counts.rows) expect(row.count, row.incident_type).toBe(1);
+  });
+});
+
+describe('a type whose open rule is PENDING, not yet effective', () => {
+  // The incident-settings dialog cannot create anything else: its minimum
+  // activation is now + 5 minutes. `SET effective_to = now()` on such a row is
+  // earlier than its own effective_from and violates
+  // fleet_operational_incident_rules_range_order — which aborts the deploy
+  // under the runner, and half-applies at rc=0 under `psql -f`.
+
+  async function applyForwardSplit(): Promise<void> {
+    const client = await db.connect();
+    try {
+      for (const statement of forwardStatements()) await client.query(statement);
+    } finally {
+      client.release();
+    }
+  }
+
+  it('applies at all — the runner path does not abort', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical');
+    await expect(db.query(FORWARD)).resolves.toBeTruthy();
+  });
+
+  it('re-versions the pending row in place, leaving it pending and still the only open row', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical');
+    await db.query(FORWARD);
+
+    const row = await ruleRow('severe_driving');
+    expect(row).toMatchObject({
+      version: 2, severity: 'high', whatsapp_enabled: false,
+      immediate_notification: false, include_in_morning_summary: true,
+      pending: true, effective_to: null,
+    });
+    // Edited where it stood: no successor row was opened for it.
+    expect(row.change_reason).toBe(`Operator edit | ${TELEMATICS_PENDING_REVERSION_MARKER}`);
+    const versions = await db.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM fleet_operational_incident_rules WHERE incident_type = 'severe_driving'`,
+    );
+    expect(versions.rows[0]!.count).toBe(2);
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('leaves an operator PENDING high row completely alone', async () => {
+    // Not critical, so branch B's severity filter skips it — and it carries no
+    // 529 marker, so the rollback will not touch it either.
+    await pendingOperatorVersion('lost_contact_moving', 2, 'high', 'Operator lowered it first');
+    await db.query(FORWARD);
+
+    const row = await ruleRow('lost_contact_moving');
+    expect(row).toMatchObject({ version: 2, severity: 'high', pending: true });
+    expect(row.change_reason).toBe('Operator lowered it first');
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('is a no-op on a second run', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical');
+    await db.query(FORWARD);
+    const afterFirst = await ruleRow('severe_driving');
+
+    await db.query(FORWARD);
+
+    expect(await ruleRow('severe_driving')).toEqual(afterFirst);
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('applies and re-versions the same way statement by statement', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical');
+    await applyForwardSplit();
+
+    expect(await ruleRow('severe_driving')).toMatchObject({
+      version: 2, severity: 'high', whatsapp_enabled: false, pending: true, effective_to: null,
+    });
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('is restored by the rollback, marker stripped', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical');
+    await db.query(FORWARD);
+    await db.query(ROLLBACK);
+
+    const row = await ruleRow('severe_driving');
+    expect(row).toMatchObject({
+      version: 2, severity: 'critical', whatsapp_enabled: true,
+      immediate_notification: true, include_in_morning_summary: false, pending: true,
+    });
+    expect(row.change_reason).toBe('Operator edit');
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('is restored the same way by a statement-by-statement rollback', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical');
+    await applyForwardSplit();
+
+    const client = await db.connect();
+    try {
+      for (const statement of rollbackStatements({ withTransaction: true })) await client.query(statement);
+    } finally {
+      client.release();
+    }
+
+    expect(await ruleRow('severe_driving')).toMatchObject({ version: 2, severity: 'critical', whatsapp_enabled: true });
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('rollback is a no-op on a second run, and never touches the operator pending high row', async () => {
+    await pendingOperatorVersion('severe_driving', 2, 'critical');
+    await pendingOperatorVersion('lost_contact_moving', 2, 'high', 'Operator lowered it first');
+    await db.query(FORWARD);
+    await db.query(ROLLBACK);
+    const afterFirst = await ruleRow('severe_driving');
+
+    await db.query(ROLLBACK);
+
+    expect(await ruleRow('severe_driving')).toEqual(afterFirst);
+    expect(await ruleRow('lost_contact_moving')).toMatchObject({ severity: 'high', change_reason: 'Operator lowered it first' });
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+});
+
+describe('the version the active branch assigns', () => {
+  it('is that type own max + 1, not the fleet-wide max', async () => {
+    // One type far ahead of the others. A global max(version) would push all
+    // four to v8 and break the per-type (incident_type, version) sequence.
+    await operatorVersion('severe_driving', 7, 'critical');
+    await db.query(FORWARD);
+
+    const open = await openIncidentRules();
+    expect(open.find((row) => row.incident_type === 'severe_driving')).toMatchObject({ version: 8 });
+    for (const type of ['prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry']) {
+      expect(open.find((row) => row.incident_type === type), type).toMatchObject({ version: 2, severity: 'high' });
+    }
   });
 });
 

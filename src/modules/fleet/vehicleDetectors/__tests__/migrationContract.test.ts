@@ -11,7 +11,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { REVERSIONED_TELEMATICS_INCIDENT_TYPES, TELEMATICS_REVERSION_CHANGE_REASON } from '../types';
+import {
+  REVERSIONED_TELEMATICS_INCIDENT_TYPES,
+  TELEMATICS_PENDING_REVERSION_MARKER,
+  TELEMATICS_REVERSION_CHANGE_REASON,
+} from '../types';
 
 const SQL_DIR = resolve(process.cwd(), 'scripts/migrations/sql');
 const forward = readFileSync(resolve(SQL_DIR, '529_fleet_vehicle_operational_rules.sql'), 'utf8');
@@ -32,10 +36,17 @@ function reversionedTypeLists(sql: string): string[][] {
 
 const expectedTypes = [...REVERSIONED_TELEMATICS_INCIDENT_TYPES].sort();
 
-/** The single statement that closes the four rules and opens their replacements. */
+/** Branch A: the single statement that closes ACTIVE rules and opens their replacements. */
 function reversionStatement(): string {
   const from = forward.indexOf('WITH closed AS (');
-  if (from < 0) throw new Error('529 no longer re-versions in one statement');
+  if (from < 0) throw new Error('529 no longer re-versions active rows in one statement');
+  return forward.slice(from, forward.indexOf(';', from));
+}
+
+/** Branch B: the in-place update of PENDING rules. */
+function pendingStatement(): string {
+  const from = forward.indexOf('UPDATE fleet_operational_incident_rules\n   SET severity =');
+  if (from < 0) throw new Error('529 no longer updates pending rows in place');
   return forward.slice(from, forward.indexOf(';', from));
 }
 
@@ -86,9 +97,43 @@ describe('the re-versioned incident types', () => {
     expect(statement).not.toMatch(/\n\s+now\(\),\n\s+true, 'high'/);
   });
 
+  it('closes only ACTIVE open rows, never a pending one', () => {
+    // range_order is CHECK (effective_to IS NULL OR effective_to > effective_from).
+    // The incident-settings dialog only ever creates FUTURE activations, so an
+    // open row with effective_from > now() is the normal product of using the
+    // UI — and closing it at now() aborts the deploy.
+    expect(reversionStatement()).toContain('effective_from < now()');
+  });
+
+  it('edits PENDING open rows in place, marker and all', () => {
+    const statement = pendingStatement();
+    // `>=`, not `>`: a row activating at exactly this transaction's now() would
+    // otherwise be closed with effective_to = effective_from and fail the CHECK.
+    expect(statement).toContain('effective_from >= now()');
+    expect(statement).toContain('effective_to IS NULL');
+    expect(statement).toContain("severity = 'critical'");
+    expect(statement).toContain("severity = 'high'");
+    expect(statement).toContain('whatsapp_enabled = false');
+    expect(statement).toContain('immediate_notification = false');
+    expect(statement).toContain('include_in_morning_summary = true');
+    expect(statement).toContain(TELEMATICS_PENDING_REVERSION_MARKER);
+    // In place: no new version, no range touched.
+    expect(statement).not.toMatch(/INSERT INTO/i);
+    expect(statement).not.toMatch(/effective_to\s*=\s*now\(\)/);
+  });
+
+  it('covers every open row exactly once between the two branches', () => {
+    // `< now()` and `>= now()` are disjoint and total.
+    expect(reversionStatement()).toContain('effective_from < now()');
+    expect(pendingStatement()).toContain('effective_from >= now()');
+  });
+
   it('insert at max(version) + 1 per type, and never swallow a collision', () => {
     const statement = reversionStatement();
     expect(statement).toContain('max(existing.version) + 1');
+    // Per type. A global max hands a type a version unrelated to its own
+    // history and breaks the (incident_type, version) sequence the audit reads.
+    expect(statement).toContain('WHERE existing.incident_type = closed.incident_type');
     // A hard-coded 2 collides with an operator's own version 2, and
     // ON CONFLICT DO NOTHING would make that collision silent — leaving the
     // type critical with WhatsApp armed and the migration exiting 0.
@@ -199,7 +244,7 @@ describe('the rollback', () => {
     // half-open ranges meet: closed.effective_to === authored.effective_from.
     // A "newest closed critical row" selection extends an older row to
     // 'infinity' straight through a later one and raises 23P01.
-    const restore = rollback.slice(rollback.lastIndexOf('UPDATE fleet_operational_incident_rules'));
+    const restore = rollback.slice(rollback.indexOf('UPDATE fleet_operational_incident_rules target'));
     const statement = restore.slice(0, restore.indexOf(';'));
     expect(statement).toContain('target.effective_to = authored.effective_from');
     expect(statement).toContain('target.incident_type = authored.incident_type');
@@ -211,8 +256,22 @@ describe('the rollback', () => {
 
   it('deletes before it reopens — the open-per-type index forbids the other order', () => {
     expect(rollback.indexOf('DELETE FROM fleet_operational_incident_rules'))
-      .toBeLessThan(rollback.lastIndexOf('UPDATE fleet_operational_incident_rules'));
+      .toBeLessThan(rollback.indexOf('UPDATE fleet_operational_incident_rules target'));
     for (const list of reversionedTypeLists(rollback)) expect(list.sort()).toEqual(expectedTypes);
+  });
+
+  it('restores pending rows by the marker alone, and strips it', () => {
+    const from = rollback.indexOf("SET severity = 'critical'");
+    expect(from).toBeGreaterThan(-1);
+    const statement = rollback.slice(from, rollback.indexOf(';', from));
+    expect(statement).toContain(TELEMATICS_PENDING_REVERSION_MARKER);
+    expect(statement).toContain('whatsapp_enabled = true');
+    expect(statement).toContain('immediate_notification = true');
+    expect(statement).toContain('include_in_morning_summary = false');
+    // Stripping the marker is what makes a second run a no-op.
+    expect(statement).toContain('regexp_replace(change_reason');
+    // An operator's own pending `high` row carries no marker and is untouched.
+    expect(statement).toContain("change_reason LIKE '%529: re-versioned pending row to high'");
   });
 
   it('removes the table, the column, the permission rows and the migration record', () => {

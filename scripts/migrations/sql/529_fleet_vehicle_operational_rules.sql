@@ -34,9 +34,16 @@
 --
 -- The one place a file genuinely needs its own atomicity is the incident-rule
 -- re-versioning at the foot of this file, because closing a row and opening its
--- replacement are only correct together. That is solved by making them a single
--- statement, which is atomic in every execution mode without any transaction
--- control at all — including a hand-run `psql -f`, which autocommits.
+-- replacement are only correct together. That is solved by making THAT pair a
+-- single statement, which is atomic in every execution mode without any
+-- transaction control at all — including a hand-run `psql -f`, which
+-- autocommits.
+--
+-- The re-versioning is two statements overall (active rows, then pending rows),
+-- but they touch DISJOINT sets of rows, neither leaves a type without an open
+-- rule on its own, and both are idempotent under their `severity = 'critical'`
+-- filter. A `psql -f` run that dies between them is repaired by re-running the
+-- file; there is no state in which one has run and the other must not.
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
@@ -132,7 +139,34 @@ ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN N
 --     exiting 0. There is deliberately no ON CONFLICT clause here: a collision
 --     must fail the migration loudly.
 --
--- ONE statement, for two independent reasons.
+-- The re-versioning splits by STATE, because an open row is not necessarily an
+-- effective one.
+--
+-- `fleet_operational_incident_rules_range_order` is
+-- `CHECK (effective_to IS NULL OR effective_to > effective_from)`, and the
+-- incident-settings dialog only ever creates versions that activate in the
+-- FUTURE (its minimum is now + 5 minutes). So an open row with
+-- `effective_from > now()` is the normal product of using the UI, and closing
+-- it at `now()` violates that CHECK: the runner aborts the whole deploy, and a
+-- hand-run `psql -f` half-applies and exits 0 with all four types still
+-- critical and still on WhatsApp.
+--
+-- Branch A — ACTIVE open rows (`effective_from < now()`): close and open a
+-- successor, which is the ordinary versioning move and preserves the history of
+-- a rule that has actually been in force.
+--
+-- Branch B — PENDING open rows (`effective_from >= now()`): update IN PLACE. A
+-- pending row has never judged an incident, so there is no history to preserve,
+-- no successor to open, and no range to touch. `>=` rather than `>` so a row
+-- activating at exactly this transaction's `now()` takes the in-place path —
+-- closing it would produce `effective_to = effective_from` and fail the same
+-- CHECK.
+--
+-- Both branches filter on `severity = 'critical'`, which is what makes them
+-- idempotent and what leaves an operator's deliberate non-critical version
+-- alone. The two sets are disjoint and together cover every open row.
+
+-- Branch A. ONE statement, for two independent reasons.
 --
 --   * Atomicity in every mode. Closing a row and opening its replacement are
 --     only correct together: the close alone leaves four incident types with NO
@@ -140,15 +174,19 @@ ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN N
 --     row — taking the whole operational monitor down. As two statements this
 --     holds only where something supplies a transaction; as one statement it
 --     holds under `psql -f` autocommit too.
---   * `c.effective_to` is carried out of the UPDATE by RETURNING and used as the
---     new row's `effective_from`. Adjacency is then a DATA DEPENDENCY, not a
---     coincidence of two statements happening to observe the same `now()`. The
---     rollback identifies what to reopen by exactly this equality, so if the two
---     instants could ever differ — by a millisecond, under any execution mode —
---     the rollback would silently reopen nothing and exit 0.
+--   * `closed.effective_to` is carried out of the UPDATE by RETURNING and used
+--     as the new row's `effective_from`. Adjacency is then a DATA DEPENDENCY,
+--     not a coincidence of two statements happening to observe the same
+--     `now()`. The rollback identifies what to reopen by exactly this equality,
+--     so if the two instants could ever differ — by a millisecond, under any
+--     execution mode — the rollback would silently reopen nothing and exit 0.
 --
 -- The half-open '[)' ranges therefore MEET rather than overlap, which is what
 -- the gist exclusion constraint requires.
+--
+-- The version is `max(version) + 1` FOR THAT TYPE. A global max would hand a
+-- type a version number unrelated to its own history and break the per-type
+-- `(incident_type, version)` sequence the audit trail reads.
 --
 -- No ON CONFLICT clause: hard-coding a version collides with an operator's
 -- existing one, and ON CONFLICT DO NOTHING would make that collision silent —
@@ -157,6 +195,7 @@ WITH closed AS (
   UPDATE fleet_operational_incident_rules
      SET effective_to = now(), updated_at = now()
    WHERE effective_to IS NULL
+     AND effective_from < now()
      AND severity = 'critical'
      AND incident_type = ANY(ARRAY[
        'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
@@ -175,6 +214,28 @@ SELECT closed.incident_type,
        true, 'high', false, true, true, false, true, 5,
        'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast'
   FROM closed;
+
+-- Branch B. A pending row is edited where it stands; its version, its
+-- effective_from and its place in the history are all left exactly as the
+-- operator set them. The marker appended to change_reason is the ONLY record
+-- that 529 touched the row, and the rollback restores by that marker alone.
+UPDATE fleet_operational_incident_rules
+   SET severity = 'high',
+       whatsapp_enabled = false,
+       immediate_notification = false,
+       include_in_morning_summary = true,
+       change_reason = CASE
+         WHEN NULLIF(btrim(COALESCE(change_reason, '')), '') IS NULL
+           THEN '529: re-versioned pending row to high'
+         ELSE btrim(change_reason) || ' | 529: re-versioned pending row to high'
+       END,
+       updated_at = now()
+ WHERE effective_to IS NULL
+   AND effective_from >= now()
+   AND severity = 'critical'
+   AND incident_type = ANY(ARRAY[
+     'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
+   ]::text[]);
 
 INSERT INTO access_permissions (type, key, parent_key, label, description, route, sort_order, is_active)
 VALUES

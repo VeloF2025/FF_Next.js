@@ -82,6 +82,38 @@ UPDATE fleet_operational_incident_rules target
 
 DROP TABLE rb529_authored;
 
+-- 4. Restore the PENDING rows 529 edited in place.
+--
+--    529 could not close these — a pending row's effective_from is in the
+--    future, so effective_to = now() would fail the range-order CHECK — so it
+--    changed them where they stood and appended a marker to change_reason. That
+--    marker is the ONLY handle on them: an operator's own pending `high` row
+--    carries no marker and is left alone.
+--
+--    The restored values are 510's seed shape for these four types. They are
+--    the only state 529 can have overwritten, because branch B fires solely on
+--    rows that were `severity = 'critical'`. (Restoring whatsapp_enabled is
+--    cosmetic in any case: `requiresMandatoryIncidentWhatsApp` reads severity
+--    and producer kind, never the flag.)
+--
+--    Stripping the marker is what makes this idempotent — a second run no
+--    longer matches.
+UPDATE fleet_operational_incident_rules
+   SET severity = 'critical',
+       whatsapp_enabled = true,
+       immediate_notification = true,
+       include_in_morning_summary = false,
+       change_reason = NULLIF(
+         btrim(regexp_replace(change_reason, '( \| )?529: re-versioned pending row to high$', '')),
+         ''
+       ),
+       updated_at = now()
+ WHERE severity = 'high'
+   AND change_reason LIKE '%529: re-versioned pending row to high'
+   AND incident_type = ANY(ARRAY[
+     'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
+   ]::text[]);
+
 DELETE FROM user_permission_overrides
  WHERE permission_key IN ('fleet.vehicle-rules', 'fleet.vehicle-stats');
 DELETE FROM role_permissions

@@ -74,5 +74,17 @@ export type ReversionedTelematicsIncidentType = (typeof REVERSIONED_TELEMATICS_I
  * 2 of any of these types through the incident-settings UI. Pinned against both
  * SQL files by `__tests__/migrationContract.test.ts`.
  */
+/**
+ * The marker migration 529 appends to a PENDING rule's `change_reason`.
+ *
+ * A pending row (`effective_from` in the future — the only kind the
+ * incident-settings dialog creates) cannot be closed: `effective_to = now()`
+ * would be earlier than its `effective_from` and violate the range-order CHECK.
+ * 529 edits it in place instead, and this marker is the only record that it did
+ * — the rollback restores by the marker alone, so an operator's own pending
+ * `high` row is never touched.
+ */
+export const TELEMATICS_PENDING_REVERSION_MARKER = '529: re-versioned pending row to high';
+
 export const TELEMATICS_REVERSION_CHANGE_REASON =
   'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast';
