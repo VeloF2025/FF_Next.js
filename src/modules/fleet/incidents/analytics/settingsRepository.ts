@@ -2,19 +2,25 @@
  * Effective-dated PR8 analytics/retention configuration
  * (`fleet_operational_analytics_settings`, migration 518).
  *
- * Only the READ half lives here. The plan's Task 3 owns
- * `versionAnalyticsRetentionSettings`, which is not built yet; the hold and
- * purge services need the effective row today, so this file exists early with
- * exactly that one function rather than with a stub of the other. Mirrors
- * `../driver/settingsRepository.ts#getEffectiveDriverInputSettings`.
+ * Reading the effective version and opening the next one. Mirrors
+ * `../driver/settingsRepository.ts`, including where the rules live: shape
+ * validation belongs to the route, every semantic bound to
+ * `./retentionSettingsValidation`, and persistence to this file.
  *
- * It throws when no interval covers the instant instead of returning a
+ * The read throws when no interval covers the instant instead of returning a
  * default. A default here would be a retention policy nobody configured, and
  * the caller most likely to hit it is the one that deletes things.
  */
-import { queryOne } from '@/lib/db-pool';
+import { queryOne, transaction } from '@/lib/db-pool';
 import type { RetentionHoldCategory } from './aggregateSchema';
 import type { RetentionPolicy } from './types';
+import {
+  RetentionSettingsValidationError, assertShorteningIsAcknowledged, validateRetentionSettingsChange,
+} from './retentionSettingsValidation';
+import type { AnalyticsRetentionSettingsChangeRequest } from './retentionSettingsValidation';
+
+export { RetentionSettingsValidationError } from './retentionSettingsValidation';
+export type { AnalyticsRetentionSettingsChangeRequest } from './retentionSettingsValidation';
 
 const SETTINGS_COLUMNS = `version, effective_from, retention_months, anonymity_min_contributors,
   recalculation_window_months, retention_batch_size, maximum_hold_review_days,
@@ -57,6 +63,10 @@ export async function getEffectiveAnalyticsRetentionSettings(at: string): Promis
     [at],
   );
   if (!row) throw new Error(`No Fleet analytics/retention settings interval covers ${at}`);
+  return mapSettings(row);
+}
+
+function mapSettings(row: SettingsRow): RetentionPolicy {
   return {
     version: row.version,
     effectiveFrom: iso(row.effective_from),
@@ -76,4 +86,91 @@ export async function getEffectiveAnalyticsRetentionSettings(at: string): Promis
     metricVersion: row.metric_version,
     liveRetentionEnabled: row.live_retention_enabled,
   };
+}
+
+const INSERT_COLUMNS = `version, effective_from, retention_months, anonymity_min_contributors,
+  recalculation_window_months, retention_batch_size, maximum_hold_review_days,
+  hold_review_reminder_lead_days, aggregation_run_hour_sast, aggregation_run_minute_sast,
+  retention_run_hour_sast, retention_run_minute_sast, aggregate_freshness_warning_hours,
+  retention_freshness_warning_hours, permitted_hold_categories, metric_version,
+  live_retention_enabled, created_by, change_reason`;
+
+/**
+ * Opens the next settings version and closes the one it replaces.
+ *
+ * Effective-dated rather than updated in place, exactly like the driver-input
+ * and rule surfaces: a purge that ran last week must remain explicable by the
+ * policy that was in force when it ran, and an UPDATE would erase the only
+ * record of what that policy was.
+ *
+ * The open row is locked with `FOR UPDATE` before it is read. Two operators
+ * saving at once would otherwise both read version N, both write N+1, and the
+ * unique index on `version` would fail the second one — after it had already
+ * closed the first one's row.
+ */
+export async function versionAnalyticsRetentionSettings(
+  request: AnalyticsRetentionSettingsChangeRequest, actorUserId: string,
+): Promise<RetentionPolicy> {
+  const normalized = validateRetentionSettingsChange(request);
+
+  return transaction(async (txn) => {
+    const current = await txn.queryOne<SettingsRow>(
+      `/* fleet-analytics-settings:lock-open */
+       SELECT ${SETTINGS_COLUMNS} FROM fleet_operational_analytics_settings
+        WHERE effective_to IS NULL ORDER BY version DESC LIMIT 1 FOR UPDATE`,
+    );
+    if (!current) {
+      throw new RetentionSettingsValidationError('No open Fleet analytics/retention settings version exists');
+    }
+    if (Date.parse(normalized.effectiveFrom) <= Date.parse(iso(current.effective_from))) {
+      throw new RetentionSettingsValidationError(
+        'effectiveFrom must be after the version it replaces',
+      );
+    }
+
+    const dryRunId = assertShorteningIsAcknowledged(
+      current.retention_months, request.retentionMonths, request.acknowledgedDryRunId,
+    );
+    if (dryRunId !== null) {
+      // Scoped to `dry_run = true`. A LIVE run is not an acknowledgement of a
+      // shortening — it is deletion that has already happened.
+      const reviewed = await txn.queryOne<{ id: string }>(
+        `/* fleet-analytics-settings:acknowledged-dry-run */
+         SELECT id FROM fleet_operational_retention_runs WHERE id = $1::uuid AND dry_run = true`,
+        [dryRunId],
+      );
+      if (!reviewed) {
+        throw new RetentionSettingsValidationError(
+          `acknowledgedDryRunId ${dryRunId} does not name a dry retention run`,
+        );
+      }
+    }
+
+    await txn.query(
+      `/* fleet-analytics-settings:close-open */
+       UPDATE fleet_operational_analytics_settings SET effective_to = $1::timestamptz, updated_at = now()
+        WHERE version = $2`,
+      [normalized.effectiveFrom, current.version],
+    );
+
+    const created = await txn.queryOne<SettingsRow>(
+      `/* fleet-analytics-settings:insert */
+       INSERT INTO fleet_operational_analytics_settings (${INSERT_COLUMNS})
+       VALUES ($1,$2::timestamptz,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::text[],$16,$17,$18::uuid,$19)
+       RETURNING ${SETTINGS_COLUMNS}`,
+      [
+        current.version + 1, normalized.effectiveFrom, request.retentionMonths,
+        request.anonymityMinContributors, request.recalculationWindowMonths, request.retentionBatchSize,
+        request.maximumHoldReviewDays, request.holdReviewReminderLeadDays,
+        request.aggregationRunHourSast, request.aggregationRunMinuteSast,
+        request.retentionRunHourSast, request.retentionRunMinuteSast,
+        request.aggregateFreshnessWarningHours, request.retentionFreshnessWarningHours,
+        request.permittedHoldCategories, request.metricVersion, request.liveRetentionEnabled,
+        // The session actor, always. Never an actor named in the request body.
+        actorUserId, normalized.reason,
+      ],
+    );
+    if (!created) throw new Error('Fleet analytics/retention settings insert returned no row');
+    return mapSettings(created);
+  });
 }
