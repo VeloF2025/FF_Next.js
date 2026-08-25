@@ -746,6 +746,15 @@ budget is reported as a partial fetch, which holds the watermark so the next tic
 | `/api/fleet/fuel/anomalies` | GET | Fuel anomaly detection |
 | `/api/fleet/fuel/summary` | GET | Fuel usage summary |
 
+### Operations analytics (PR 8 task 7)
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/fleet/analytics/operations` | GET | Cards, monthly series, suppression notices, pipeline freshness |
+| `/api/fleet/analytics/operations/drill-down` | GET | The incident ids behind a number, cursor-paged |
+
+Both gate on `fleet.incidents:view`. See "Operations analytics read path" below
+before adding a third caller.
+
 ## VLM Processing Modes
 
 **CRITICAL**: The `process-vlm` endpoint runs in three modes:
@@ -1319,6 +1328,16 @@ channels that per-key suppression does not close. Read
 [`fleet-analytics-disclosure.md`](./fleet-analytics-disclosure.md) before exposing it through any
 API, export, report, or UI.
 
+Every read goes through `fleet_operational_monthly_aggregates_published` (migration 527), never the
+base table: the view hard-codes `is_active = true`, and a superseded generation is the disclosive
+one. `aggregateViewContract.test.ts` fails the build if any file outside the writer reaches past it.
+
+The view is narrower than the table in two ways every reader must account for: it publishes
+**organisation and project rows only** — no site rows — and it carries **no `contributor_count`, no
+histogram columns and no `generalized_from_level`**. Release is per-component and tiered
+(FULL / TOTAL_ONLY / NONE); a TOTAL_ONLY component publishes its root total with a NULL denominator
+and none of its members.
+
 ## Incident chronology (`GET /api/fleet/incidents/[incidentId]/timeline`)
 
 | Method | Endpoint | Gate |
@@ -1356,3 +1375,87 @@ Four things to know before changing it:
   what lets the in-memory merge use it directly. Displayed `occurredAt` stays the `Date`.
 - **Scope failures answer 403, missing incidents 404** — the same pair, in the same order, as
   `GET /api/fleet/incidents/[incidentId]`. `limit` above 200 is a 400, never a silent clamp.
+
+## Operations analytics read path (PR 8 task 7)
+
+### APIs and scope
+
+`fleet.incidents` (view) gates both endpoints — the same permission as the review queue, because
+there is no separate audience. The retained half of a response is derived from incidents the caller
+can already open in that queue, and the historic half is read from the released aggregates. An
+out-of-scope `op_project` or `op_site` is a **403**, not an empty chart: "nothing happened there"
+and "not yours" are different answers and only one of them is true. A site is scope-checked through
+its project, by the same `isProjectOwnedByScope` rule.
+
+| Endpoint | Answers |
+|---|---|
+| `GET /api/fleet/analytics/operations` | Cards, a monthly series, suppression notices, and pipeline freshness scoped to the metric version the numbers were built under |
+| `GET /api/fleet/analytics/operations/drill-down` | The incident ids behind a number, cursor-paged; `mode` is `retained_detail` or `aggregate_only` |
+
+Filters are parsed once, by `operationsFilters.ts`, for both endpoints and (task 8) the export. They
+carry an `op_` prefix so a deep link from the incident queue cannot silently pre-filter analytics.
+A bad value is refused, never dropped — dropping one WIDENS the answer.
+
+### Where a month's figures come from
+
+A month whose identifiable detail still exists is derived **live**, from the same four fact kinds
+and the same `calculateMonthlyMetrics` the nightly job uses. A month whose detail has been purged is
+read from the aggregates. A month belongs to exactly one set, so a range spanning the boundary
+counts nothing twice.
+
+**The boundary is the purge's, and the purge works by DAY.** `retentionService` deletes every
+incident with `work_date` strictly older than `resolveCutoffWorkDate`, so on the 24th the month
+containing the cutoff is HALF gone. A month is retained only when its FIRST day is at or after that
+cutoff; a half-purged month is read from the aggregates instead. `operationsScope.ts` imports
+`resolveCutoffWorkDate` rather than restating it — two definitions of one boundary agree until one
+of them changes. It is deliberately conservative while `live_retention_enabled` is off, so the
+answer does not change on the day an operator turns deletion on.
+
+### The live half carries no anonymity claim, by design
+
+The retained half is deliberately NOT read from the aggregates, even though the aggregates cover
+recent months too. Those rows are k-anonymised, and a manager of a three-person site would find
+their own current numbers withheld from them by machinery meant to protect data that outlives the
+retention window. The live half needs no k-anonymity because access is already confined to the
+projects the viewer manages under `fleet.incidents:view`, and every incident behind a number is one
+they can open in their own queue. **This is a property of that gate.** Any future caller reaching
+this code with a wider audience — an export to a client, a public dashboard, a broader permission —
+invalidates the reasoning, not just the numbers.
+
+The historic half reports what was published and says what is missing, per month and per component:
+
+- **TOTAL_ONLY** comes back as a root total with a NULL denominator; the members are **omitted, never
+  rendered as zero**, and a notice names the group and the months.
+- **NONE** comes back as no rows at all, and is the ONLY tier a component rooted on an internal tally
+  can reach besides FULL — `incident.total` is no metric key, so incidents are all-or-nothing. A
+  notice names those months too: nothing in the figures distinguishes "withheld" from "no incidents".
+- Every card and every series value carries `coverage: { months, of }` — how many months of the range
+  reported that key. A two-month range can hand back a two-month presence total beside a one-month
+  incident total, and without this the incident figure reads as a fall that did not happen.
+
+A purged month reports `histogram: null` — the view has no bucket columns — rather than an empty
+histogram that would read as "no durations were recorded". The managed-projects coverage notice is
+counted **per month**: over the union, a project that published in June and nothing in July looks
+fully covered while July's total is quietly short one project.
+
+### What the API refuses, and why
+
+`op_driver`, `op_vehicle`, `op_type`, `op_severity`, `op_outcome` and `op_evidence` each name an
+attribute of an individual incident, and none survives into a monthly count. **`op_site` is refused
+too**, for a different reason: the published view has organisation and project rows only, so there is
+no site row to read and answering from the project's row would widen the answer to every other site
+in it. A range reaching past the boundary with any of them set is **refused with a 400** naming the
+filters given, rather than answered by silently dropping them.
+
+Two predicates, not one: `hasRetainedOnlyFilter` is the set an aggregate cannot honour (the six plus
+`op_site`), and `hasIncidentShapedFilter` is the subset that decides which live fact kinds can
+contribute. They were briefly the same definition; `op_site` is what separated them, because every
+fact carries a site and a site filter narrows presence rather than making it inapplicable.
+
+A drill-down over a range that STRADDLES the boundary is refused too. Analytics can merge two
+sources because it answers in totals; a drill-down answers in incident ids and the purged months
+have none.
+
+Where a filter makes a fact kind inapplicable, the metrics that kind feeds are **omitted** from
+cards and series rather than reported as zero: under `op_type=late`, `presence.scheduled_days: 0` is
+a fact about the filter, and a card cannot say which.

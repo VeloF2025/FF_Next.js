@@ -46,6 +46,8 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 | POST | `/api/my/fleet/incidents/[incidentId]/attendance-correction-link` | Link an existing Attendance correction |
 | POST | `/api/fleet/incidents/[incidentId]/request-driver-input` | Manager requests optional driver input |
 | GET | `/api/fleet/incidents/[incidentId]/timeline` | Scoped incident chronology, keyset-paged on a µs `sort_at` (`cursor`, `limit`≤200) |
+| GET | `/api/fleet/analytics/operations` | Operations analytics cards + monthly series (PR 8 task 7) |
+| GET | `/api/fleet/analytics/operations/drill-down` | The incident ids behind a number, cursor-paged |
 
 ## Database Tables
 - `fleet_vehicles` — vehicle registry
@@ -83,6 +85,11 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - A driver's explanation is stored twice on purpose: `fleet_incident_driver_submissions.explanation` (driver-scoped) and verbatim in the `driver_response_received` action's `note` (manager-visible audit timeline) — do not deduplicate
 - New evidence MIME types need a registered byte signature in `MIME_SIGNATURES` (`src/lib/vfStorageUpload.ts`) BEFORE they can be enabled in driver-input settings — `versionDriverInputSettings` fails closed otherwise
 - Manager queue does NOT filter by `driverInputState`/`attendanceCorrectionState` — dead client plumbing for this was deliberately removed; land server + client together if built
+- Operations analytics (`src/modules/fleet/incidents/analytics/`, PR 8 task 7) reads a month from ONE source: live facts if its first day is at or after the purge cutoff, released aggregates otherwise — never both, and never the base aggregate table (use the `_published` view)
+- The live half has NO k-anonymity on purpose; it is safe only because `fleet.incidents:view` already confines the viewer to their own projects. Widening the audience (export, dashboard, broader permission) invalidates that reasoning — see `.claude/modules/fleet-analytics-disclosure.md`
+- `op_driver`/`op_vehicle`/`op_type`/`op_severity`/`op_outcome`/`op_evidence` AND `op_site` are refused (400) over any purged month, never silently dropped — dropping a filter WIDENS the answer. `op_site` is refused because migration 527's view publishes organisation and project rows only
+- A TOTAL_ONLY aggregate publishes a component's root total with a NULL denominator and none of its members; a NONE component publishes nothing at all (incidents are all-or-nothing — `incident.total` is no metric key). Omit the missing keys, notice them per month + component, and never render them as 0. A purged month has no histogram at all (no bucket columns in the view)
+- Every card/series value carries `coverage: { months, of }` — months of the range that reported the key. A card summing fewer months than the range is a partial total and must say so; project-coverage notices are counted PER MONTH, never over the union
 - Migration 511 and its number are unapplied; migration numbering churned (490→496→499→503→506→507→510→511) as master advanced — always re-check the free number before adding a new Fleet migration
 
 ## Common Issues

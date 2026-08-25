@@ -13,8 +13,22 @@
  * when the transition never happened. A null is not a zero: an incident nobody
  * acknowledged has no acknowledgement time, and averaging it in as instant
  * would make the slowest incidents look like the fastest.
+ *
+ * ## The optional scope
+ *
+ * The nightly job wants every incident in a month and passes no scope, which is
+ * why the parameter is optional and absent by default — its behaviour is
+ * unchanged. An interactive reader wants one manager's projects and one
+ * incident type, and pushing those into the WHERE clause is the difference
+ * between scanning a company-wide month and reading the rows that will survive.
+ *
+ * The narrowing itself lives in `factNarrowing.ts`, shared with the monitor-run
+ * loader so a filter cannot be applied to one table and forgotten on another.
  */
 import { query } from '@/lib/db-pool';
+import type { IncidentSeverity } from '../types';
+import type { FactQueryScope } from './factNarrowing';
+import { INCIDENT_FIELDS, narrowingFor } from './factNarrowing';
 import type { IncidentFact, NotificationFact } from './facts';
 import { toWorkDate } from './sastDates';
 
@@ -22,10 +36,13 @@ import { toWorkDate } from './sastDates';
 export const RECURRENCE_WINDOW_DAYS = 90;
 
 interface IncidentRow extends Record<string, unknown> {
+  id: string;
   work_date: string | Date;
   project_id: string;
   operational_site_id: string;
   staff_id: string;
+  severity: IncidentSeverity;
+  vehicle_id: string | null;
   incident_type: string;
   outcome: string | null;
   acknowledgement_seconds: string | number | null;
@@ -46,12 +63,16 @@ function toSeconds(value: string | number | null): number | null {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
 }
 
-const INCIDENT_FACT_SQL = `/* fleet-analytics-facts:incidents */
+
+const INCIDENT_FACT_SELECT = `/* fleet-analytics-facts:incidents */
   SELECT
+    i.id,
     i.work_date,
     i.project_id,
     i.operational_site_id,
     i.staff_id,
+    i.severity,
+    i.vehicle_id,
     i.incident_type,
     i.outcome,
     EXTRACT(EPOCH FROM (i.acknowledged_at - i.opened_at))::bigint  AS acknowledgement_seconds,
@@ -104,23 +125,34 @@ const INCIDENT_FACT_SQL = `/* fleet-analytics-facts:incidents */
     AND i.work_date < $2::date
     -- Site-less incidents have no dimension to belong to; see the file header.
     AND i.operational_site_id IS NOT NULL
-    AND i.project_id IS NOT NULL
+    AND i.project_id IS NOT NULL`;
+
+const INCIDENT_FACT_ORDER = `
   ORDER BY i.work_date, i.id`;
 
-/** Every incident fact for the month starting at `monthStart` (`YYYY-MM-01`). */
+/**
+ * Every incident fact for the month starting at `monthStart` (`YYYY-MM-01`),
+ * optionally narrowed to what the caller will keep.
+ */
 export async function loadIncidentFacts(
   monthStart: string,
   nextMonthStart: string,
+  scope?: FactQueryScope,
 ): Promise<IncidentFact[]> {
-  const rows = await query<IncidentRow>(INCIDENT_FACT_SQL, [
-    monthStart, nextMonthStart, RECURRENCE_WINDOW_DAYS,
-  ]);
+  const params: unknown[] = [monthStart, nextMonthStart, RECURRENCE_WINDOW_DAYS];
+  const rows = await query<IncidentRow>(
+    `${INCIDENT_FACT_SELECT}${narrowingFor(scope, params, 'i', INCIDENT_FIELDS)}${INCIDENT_FACT_ORDER}`,
+    params,
+  );
 
   return rows.map((row) => ({
     kind: 'incident' as const,
     workDate: toWorkDate(row.work_date),
     dimension: { projectId: row.project_id, operationalSiteId: row.operational_site_id },
     contributorKey: row.staff_id,
+    incidentId: row.id,
+    severity: row.severity,
+    vehicleId: row.vehicle_id,
     incidentType: row.incident_type,
     outcome: row.outcome,
     acknowledgementSeconds: toSeconds(row.acknowledgement_seconds),
@@ -152,7 +184,7 @@ interface NotificationRow extends Record<string, unknown> {
  * that. `user_notifications.source_id` carries the incident id, which is the
  * only link between the notification bus and this module.
  */
-const NOTIFICATION_FACT_SQL = `/* fleet-analytics-facts:notifications */
+const NOTIFICATION_FACT_SELECT = `/* fleet-analytics-facts:notifications */
   SELECT
     i.work_date,
     i.project_id,
@@ -170,15 +202,22 @@ const NOTIFICATION_FACT_SQL = `/* fleet-analytics-facts:notifications */
     AND i.work_date >= $1::date
     AND i.work_date < $2::date
     AND i.operational_site_id IS NOT NULL
-    AND i.project_id IS NOT NULL
+    AND i.project_id IS NOT NULL`;
+
+const NOTIFICATION_FACT_ORDER = `
   ORDER BY i.work_date, n.id`;
 
 /** Every notification fact for the month, one row per recipient notification. */
 export async function loadNotificationFacts(
   monthStart: string,
   nextMonthStart: string,
+  scope?: FactQueryScope,
 ): Promise<NotificationFact[]> {
-  const rows = await query<NotificationRow>(NOTIFICATION_FACT_SQL, [monthStart, nextMonthStart]);
+  const params: unknown[] = [monthStart, nextMonthStart];
+  const rows = await query<NotificationRow>(
+    `${NOTIFICATION_FACT_SELECT}${narrowingFor(scope, params, 'i', INCIDENT_FIELDS)}${NOTIFICATION_FACT_ORDER}`,
+    params,
+  );
   return rows.map((row) => ({
     kind: 'notification' as const,
     workDate: toWorkDate(row.work_date),

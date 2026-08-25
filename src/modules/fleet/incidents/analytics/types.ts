@@ -175,13 +175,34 @@ export interface IncidentTimelinePage {
   nextCursor: string | null;
 }
 
+/**
+ * How much of the range a figure actually covers.
+ *
+ * A card sums the months that reported a key, and months do not all report the
+ * same keys: a component released at NONE contributes no row at all, so a
+ * two-month range can hand back a two-month presence total beside a one-month
+ * incident total. Without this the two look equally complete, and the incident
+ * figure reads as a fall that did not happen.
+ */
+export interface MetricCoverage {
+  /** Months in the range that reported this key. */
+  months: number;
+  /** Months in the range. */
+  of: number;
+}
+
 export interface OperationsMetricValue {
   metricKey: OperationsMetricKey;
   numerator: number;
   denominator: number | null;
+  coverage: MetricCoverage;
+  /**
+   * Live months only. A published aggregate carries no histogram columns at
+   * all — they were removed from the view because a bucket count is a
+   * differencing channel — so a purged month reports null here rather than a
+   * shape that would read as "no durations were recorded".
+   */
   histogram: DurationHistogram | null;
-  /** True when this value came from a generalized (suppressed) group. */
-  generalized: boolean;
 }
 
 export interface OperationsAnalyticsResponse {

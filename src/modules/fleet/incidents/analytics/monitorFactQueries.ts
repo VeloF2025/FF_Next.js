@@ -18,6 +18,8 @@
  * expected-run count with runs that were never meant to evaluate a roster.
  */
 import { query } from '@/lib/db-pool';
+import type { FactQueryScope } from './factNarrowing';
+import { DIMENSION_FIELDS, narrowingFor } from './factNarrowing';
 import type { MonitorRunFact } from './facts';
 import { toWorkDate } from './sastDates';
 
@@ -60,18 +62,31 @@ const MONITOR_FACT_SQL = `/* fleet-analytics-facts:monitor-runs */
     ON a.status = 'active'
    AND runs.work_date BETWEEN a.start_date AND a.end_date
   WHERE a.project_id IS NOT NULL
-    AND a.operational_site_id IS NOT NULL
+    AND a.operational_site_id IS NOT NULL`;
+
+const MONITOR_FACT_TAIL = `
   GROUP BY runs.id, runs.work_date, runs.completed, a.project_id, a.operational_site_id
   ORDER BY runs.work_date, a.project_id, a.operational_site_id`;
 
-/** One fact per (run, site) pair for the month starting at `monthStart`. */
+/**
+ * One fact per (run, site) pair for the month starting at `monthStart`.
+ *
+ * The nightly job passes no scope and is unchanged. Only the two dimension
+ * fields narrow a run: a run sweeps the whole roster, so it carries no incident
+ * type, severity or driver of its own to filter on — an incident-shaped filter
+ * makes monitor runs inapplicable entirely, and the caller drops them rather
+ * than asking a question this table cannot answer.
+ */
 export async function loadMonitorRunFacts(
   monthStart: string,
   nextMonthStart: string,
+  scope?: FactQueryScope,
 ): Promise<MonitorRunFact[]> {
-  const rows = await query<MonitorRunRow>(MONITOR_FACT_SQL, [
-    monthStart, nextMonthStart, ROSTER_MONITOR_RUN_KIND,
-  ]);
+  const params: unknown[] = [monthStart, nextMonthStart, ROSTER_MONITOR_RUN_KIND];
+  const rows = await query<MonitorRunRow>(
+    `${MONITOR_FACT_SQL}${narrowingFor(scope, params, 'a', DIMENSION_FIELDS)}${MONITOR_FACT_TAIL}`,
+    params,
+  );
 
   return rows.map((row) => ({
     kind: 'monitor_run' as const,

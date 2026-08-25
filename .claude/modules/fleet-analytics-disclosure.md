@@ -239,12 +239,54 @@ would mean fixing those first. The analytics tree and its `__tests__` are clean 
 | `aggregateSchema.ts` | the table's column allow-list and the view's, which is smaller |
 | `scripts/migrations/sql/527_…` | the view |
 | `__tests__/releaseOracle.ts` | the independent check, exact integer arithmetic |
+| `operationsAggregateQueries.ts` | the only reader of the view: project and organisation branches, no site |
+| `operationsScope.ts` | the retention boundary, and which filters are refused over a purged month |
 
 The base table's application grant is unchanged, so the database would still permit a direct read of
 it. `__tests__/aggregateViewContract.test.ts` is what stops one: it fails the build if any file
 outside the writer names the base table in a SQL position, across `app`, `pages`, `src`, `scripts`
 and `lib`, in `.ts`, `.tsx`, `.js`, `.mjs` and `.sql`. Splitting the writer onto its own role is what
 would let the grant be withdrawn; that remains open.
+
+## The read path that consumes this (PR 8 task 7)
+
+`GET /api/fleet/analytics/operations` and `GET /api/fleet/analytics/operations/drill-down`, both
+gated on `fleet.incidents:view`. What they do with this table, and why it is consistent with the
+rule above:
+
+- **They read the published view only, and only for purged months.** A month whose identifiable
+  detail still exists is derived LIVE from facts. The boundary is the purge's own and the purge
+  works by DAY, so a month counts as retained only when its FIRST day is at or after
+  `resolveCutoffWorkDate`; a half-purged month is read from the aggregates, which were written while
+  all of its detail existed, rather than derived from the days that happened to survive.
+- **They never ask for a site.** The view publishes organisation and project rows only, so `op_site`
+  is refused with a 400 over any purged month rather than answered from the site's project row —
+  which would widen the answer to every other site in that project. It is answered normally over
+  retained months, where the facts still carry a site.
+- **They never ask for an incident attribute either.** `op_driver`, `op_vehicle`, `op_type`,
+  `op_severity`, `op_outcome` and `op_evidence` name attributes of one incident, and none survives
+  into a monthly count. Same 400, same reason: dropping a filter WIDENS the answer without saying so.
+- **A TOTAL_ONLY component renders as a total with nothing under it.** The members are omitted from
+  the response — never rendered as zero, which would say the opposite of what happened — and a notice
+  names the group and the months. The total's denominator stays null for the same reason.
+- **A NONE component renders as nothing, and is named too.** A component rooted on an internal tally
+  reaches only FULL or NONE, so a purged month can carry a full presence component and no incident
+  row whatever. Every card and series value therefore carries `coverage: { months, of }`, counting the
+  months of the range that reported that key: a total short a month is marked as such rather than
+  presented beside a complete one.
+- **No histogram is reported for a purged month.** The view has no bucket columns; null says "we no
+  longer hold the durations" where an empty bucket array would say "none were recorded".
+
+**The live half carries no k-anonymity, deliberately.** It is not read from the aggregates even
+though they cover recent months, because those rows are k-anonymised and a manager of a three-person
+site would find their own current numbers withheld from them by machinery meant to protect data that
+outlives the retention window. The live half needs none: access is already confined to the projects
+the viewer manages under `fleet.incidents:view`, and every incident behind a number is one they can
+open in their own queue.
+
+**That is a property of the gate, not of the numbers.** A caller reaching this code with a wider
+audience — an export handed to a client, a public dashboard, a broader permission — invalidates the
+reasoning above rather than merely changing the figures. Re-derive it before widening the audience.
 
 ## Consequences of withholding zero-support metrics
 
