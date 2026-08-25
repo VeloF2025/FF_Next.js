@@ -27,29 +27,67 @@
 
 ## 2. Slice 0 — unknowns to investigate BEFORE writing code
 
-These change the schema and the detector set. Time-box to one session; record answers in `.claude/modules/fleet.md`, not in a plan doc.
+**RESOLVED by PR0 on 2026-08-25.** These no longer gate the work. Full evidence — every query,
+distribution and field enumeration — lives in `.claude/modules/fleet.md` §"Vehicle-first spike
+findings (PR0, 2026-08-25)". The seeded numbers are in §"Threshold defaults from PR0" at the foot of
+this document. Summaries below; do not re-litigate them from the pre-spike text, which was wrong in
+several places.
 
-**U1 — Provider SOS / impact / panic fields.** `ProviderPosition` (`src/services/tracking/types.ts`) has **no** event-kind, alarm, SOS or impact field, and none of the three parsers extract one:
-- Cartrack `GET /vehicles/events` returns 44 fields; `cartrack/provider.ts` keeps 14 (comment says so explicitly). **Dump one raw page and enumerate the other 30** — this is the single most likely place a panic/impact flag already arrives and is discarded.
-- Netstar `parse.ts` has a `Status` column that is an *event type* (`Ignition On`, `Ignition Off`, `Moving`, `Speeding`). Enumerate the full distinct `Status` vocabulary from a real export — an `Impact` / `Panic` value may exist.
-- Ituran `parse.ts` reads `row.Statuses[]` (a list) for ignition only. Enumerate the distinct status names actually seen.
+**U1 — Provider SOS / impact / panic fields. → RESOLVED: none exist. `accident_sos` ships as a
+documented stub.** Cartrack `GET /vehicles/events` returns **57** fields, not 44; all 43 discarded
+ones were enumerated and cleared (`event_description`, `terminal_event_type_id`, `input_state{,2,3}`,
+`output_state`, `dynamic1-4`, `driver_id`, `x/y/z_accel` among them). Netstar's *live* path
+(`netstar/tree.ts`) carries no status field at all — only `IgnitionOn`; the `Status` column in
+`netstar/parse.ts` belongs to the backfill-only CSV path and its 8 observed values are alarm-free.
+Ituran's `Statuses[].StatName` set is alarm-free. Neither portal's raw payload is retained anywhere.
+The one open lead is Cartrack's undocumented `input_state` bitfield — a vendor question, recorded in
+the CHANGELOG as the reopening condition. Do not synthesise SOS from g-force.
 
-**Outcome:** if a field exists → one additive column on `fleet_vehicle_positions` + parser change, and `accident_sos` ships. If none → `accident_sos` ships as a **documented stub**: the detector module exists, is registered, always returns zero events, and carries a header naming exactly which provider fields were checked and on what date. Do not synthesise SOS from g-force — that is a different incident (`severe_driving`).
+**But U1 did find something that changes the schema:** `event_description` carries a 14-value event
+vocabulary — including `HARSH_BRAKING`, `HARSH_CORNERING`, `IDLING_START/END` and `MOTION_START/END` —
+and `provider.ts` throws it away on every ingest. **528 therefore adds
+`fleet_vehicle_positions.provider_event_type TEXT` (nullable, additive) plus the Cartrack mapper**
+(§3.1, PR1 scope). `HARSH_ACCELERATION` was **not** observed in 55,009 events over 7 days; the
+detector accepts it if it ever appears but nothing may assume it exists.
 
-**U2 — g-force units and availability.** `linear_g`/`lateral_g` are `NUMERIC(5,3)`. Only `cartrack/provider.ts` populates them (`num(r.linear_g)`, `num(r.lateral_g)`); `netstar/parse.ts` and `ituran/parse.ts` hardcode `linearG: null, lateralG: null`. So `severe_driving` is **Cartrack-only, 7 vehicles (`account_ref='velocity'`)**. Query the live distribution (`percentile_cont(0.99)` over 30 days, split by sign of `linear_g`) to learn whether the values are g, m/s², or centi-g, and whether braking is negative `linear_g` or a separate magnitude. Threshold defaults are meaningless until this is answered.
+**U2 — g-force units and availability. → RESOLVED: units are g; the feed is far narrower than
+assumed.** `linear_g` is signed (negative = braking, min −0.74); `lateral_g` is already an unsigned
+magnitude (min 0.000 over 237,419 rows), so `abs()` on it is a no-op. Two findings bind the design:
 
-**U3 — what "idle" looks like per feed.** This is the constraint that shapes the whole stats table:
+1. **Six of the seven `cartrack/velocity` vehicles report constant zero, not null** — one distinct
+   value across 22k–60k rows each. `linear_g IS NOT NULL` passes for all seven, so `coverage_gforce`
+   **must** be `EXISTS(linear_g <> 0 OR lateral_g <> 0)` per vehicle-day, never per provider.
+2. **The one vehicle that does report g reports it wrong** — 19 of its 20 braking events ≥ 0.35 g are
+   at ≤ 10 km/h, and every live `HARSH_BRAKING` sample carries `speed=6`. A device artefact, which is
+   why 529 gains `harsh_min_speed_kph`.
 
-| account | vehicles | granularity | cadence | ignition | idle computable? |
-|---|---|---|---|---|---|
-| `cartrack/velocity` | 7 | history | 2 min | per-fix | **yes** |
-| `cartrack/urent` | 3 | history | 2 h | per-fix | partially |
-| `netstar/europcar` | 6 | **snapshot** | 2 h | only on `Ignition On`/`Ignition Off` rows | **no** |
-| `ituran/avis` | 2 | snapshot | 2 h (:30) | only on literal status | **no** |
+So the g path is a fallback, not the primary: Cartrack's own firmware already computes harshness and
+fires it on the vehicles whose g columns are structurally zero, including `HARSH_CORNERING` at
+95–129 km/h with `lin=0, lat=0`.
 
-A snapshot provider returns **one point per vehicle per poll however wide the window** (`ProviderGranularity` doc comment). Eleven of the eighteen vehicles produce roughly a dozen fixes a day. `idle_seconds` from "ignition on & speed 0" is honest for `cartrack/velocity` and a fabrication everywhere else. Confirm actual fix counts per vehicle per day for 30 days before setting the coverage-flag thresholds in §3.1.
+**U3 — what "idle" looks like per feed. → RESOLVED, and the pre-spike table below was wrong in three
+places.** Measured over 30 days:
 
-**U4 — is migration 510 applied?** The fleet CHANGELOG says 510 and 511 were "unapplied pending deployment approval". `produceSourceEventIncident` **throws `IncidentProducerConfigurationError` if no effective rule row exists** for the type. Check `SELECT incident_type, version FROM fleet_operational_incident_rules;` on the shared DB first. If 510 is unapplied, that is a prerequisite deployment, not a task in this plan.
+| account | vehicles | granularity | measured cadence | ignition non-null | odometer | idle computable? |
+|---|---|---|---|---|---|---|
+| `cartrack/velocity` | 7 | history | **8 s median gap, ~1,169 fixes/day** | 100 % | yes | **yes** |
+| `cartrack/urent` | 3 | history | 1,797 s median gap, 15 fixes/day | 100 % | yes | coarsely |
+| `netstar/europcar` | 6 | snapshot | 637 s median gap, 10 fixes/day | **100 %** | **none** | coarsely |
+| `ituran/avis` | 2 | snapshot | 2,095 s median gap, 11 fixes/day | **94.5 %** | yes | coarsely |
+
+Corrections: `cartrack/velocity` is **event-driven at a median 8-second gap**, not a 2-minute feed —
+size every batch constant and fixture for ~1,200 fixes/vehicle/day. Netstar asserts ignition on
+**100 %** of fixes (the live `tree.ts` `IgnitionOn` boolean, not the CSV `Status`) and supplies **no
+odometer at all**, so its distance must be haversine. Ituran asserts ignition on **94.5 %**. Idle is
+therefore computable on all four feeds (`ignition=true AND speed_kph=0` fires on 12–23 % of fixes
+everywhere) — just at wildly different resolution, which the `coverage_*` flags carry. Coverage
+denominators start at each vehicle's **first position**, never at 30 days: every `netstar`, `ituran`
+and two `urent` vehicles have exactly 19 of 30 possible days because those feeds went live
+2026-08-06/07.
+
+**U4 — is migration 510 applied? → RESOLVED: yes.** `fleet_operational_incident_rules` holds 14 open
+rows, all `version 1`; all six telematics types are `severity='critical'`, `whatsapp_enabled=true`,
+`immediate_notification=true`. Risk R5 stands in full: PR3 strictly precedes PR4.
 
 ---
 
@@ -87,8 +125,8 @@ fleet_vehicle_daily_stats
   account_ref VARCHAR(50)
   coverage_granularity TEXT NOT NULL                  -- 'history' | 'snapshot' | 'mixed' | 'none'
   coverage_ignition BOOLEAN NOT NULL                  -- feed asserts ignition per fix
-  coverage_gforce   BOOLEAN NOT NULL                  -- feed reports linear/lateral g
-  coverage_complete BOOLEAN NOT NULL                  -- position_count >= expected for granularity
+  coverage_gforce   BOOLEAN NOT NULL                  -- THIS vehicle-day carried a non-zero g reading
+  coverage_complete BOOLEAN NOT NULL                  -- count AND largest-gap both within the feed's budget
   source_watermark TIMESTAMPTZ                        -- newest recorded_at folded into this row
   computed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
@@ -103,6 +141,28 @@ Constraints, all of them stating a fact the code must not be able to violate:
 - Likewise `CHECK (coverage_ignition OR (ignition_seconds = 0 AND idle_seconds = 0))` — a snapshot feed cannot claim ignition or idle time. `distance_km` and `max_speed_kph` remain allowed, because those come from odometer/speed which snapshot feeds do supply.
 - `CHECK (position_count = 0 OR source_watermark IS NOT NULL)`.
 
+**`coverage_gforce` is per vehicle-day and observation-derived (PR0/U2):**
+
+```
+coverage_gforce = EXISTS (a fix in this vehicle-day with linear_g <> 0 OR lateral_g <> 0)
+```
+
+Not `provider = 'cartrack'`, and not a null check. Six of the seven `cartrack/velocity` vehicles report
+`linear_g`/`lateral_g` as **constant zero, not null**, so both of those tests pass for a vehicle whose
+harsh counts are structurally zero. A test must assert that an all-zero-g vehicle-day yields
+`coverage_gforce = false`.
+
+**`coverage_complete` is a count AND a gap** — a count alone marks a legitimately parked snapshot day
+incomplete:
+
+```
+coverage_complete = position_count >= expected_min_fixes
+                 AND tracker_silence_seconds <= max_allowed_gap_seconds
+```
+
+Per-feed thresholds are seeded from PR0's measured distributions; the table is in
+§"Threshold defaults from PR0" and the evidence in `.claude/modules/fleet.md`.
+
 Indexes: `(work_date DESC)` for the fleet overview; `(vehicle_id, work_date DESC)` is the PK order already.
 
 ```
@@ -116,7 +176,31 @@ Separate from `fleet_trip_build_watermarks` — sharing it would couple two jobs
 
 Grants: `GRANT SELECT, INSERT, UPDATE, DELETE ON <both> TO fibreflow_user;` (mirrors 518/526). **Migration tests run as superuser and hide a missing grant** — assert the grants explicitly in the migration test by `SET ROLE fibreflow_user`.
 
-Rollback: `DROP TABLE IF EXISTS` both, plus the permission rows added below if they land here.
+**Also in 528 — one additive column on the position store (decided by PR0/U1):**
+
+```sql
+ALTER TABLE fleet_vehicle_positions ADD COLUMN IF NOT EXISTS provider_event_type TEXT;
+```
+
+Nullable, no default, no backfill — additive and safe against the running production code, which never
+names its columns exhaustively. It carries Cartrack's `event_description` verbatim
+(`HARSH_BRAKING`, `HARSH_CORNERING`, `IDLING_START/END`, `MOTION_START/END`, `IGNITION_ON/OFF`,
+`SPEEDING_START/END`, `GPS_LOCK/LOST`, `PERIODIC_EVENT`, `IDLING_CONTINUE`); Netstar and Ituran map
+`null` today. Two reasons it lands now rather than churning a later migration number:
+
+1. **Cartrack's firmware already computes harshness**, and it fires on the six vehicles whose
+   `linear_g`/`lateral_g` are structurally zero — including `HARSH_CORNERING` at 95–129 km/h with
+   `lin=0, lat=0`. Those are real events the g columns **cannot see at all**.
+2. `IDLING_START/END` and `MOTION_START/END` are exact boundary events, which makes `idle_seconds`
+   and `moving_seconds` measured rather than inferred from sampled speed.
+
+**No index yet.** The only reader is `severeDrivingDetector` (PR4), which already scans a bounded
+per-vehicle time window that `fleet_vehicle_positions`'s existing `(vehicle_id, recorded_at)` ordering
+serves. Add `(vehicle_id, recorded_at) WHERE provider_event_type IS NOT NULL` **only if** PR4's dry run
+shows the detector's scan is the hot path — a partial index on a column with one non-null provider is
+otherwise dead weight on every ingest write. State the decision either way in PR4.
+
+Rollback: `DROP TABLE IF EXISTS` both, `ALTER TABLE fleet_vehicle_positions DROP COLUMN IF EXISTS provider_event_type;`, plus the permission rows added below if they land here.
 
 ### 3.2 `529_fleet_vehicle_operational_rules.sql`
 
@@ -130,11 +214,12 @@ fleet_vehicle_operational_rules            -- modelled 1:1 on fleet_operational_
   public_holidays_are_after_hours BOOLEAN NOT NULL DEFAULT true,
   theft_displacement_meters INTEGER NOT NULL DEFAULT 500,
   theft_min_positions INTEGER NOT NULL DEFAULT 2,          -- "a single blip never fires"
-  harsh_linear_g NUMERIC(5,3) NOT NULL,                    -- default set by U2, not guessed
-  harsh_lateral_g NUMERIC(5,3) NOT NULL,
+  harsh_linear_g NUMERIC(5,3) NOT NULL DEFAULT 0.350,      -- PR0/U2 measured, not guessed
+  harsh_lateral_g NUMERIC(5,3) NOT NULL DEFAULT 0.350,     -- lateral_g is already unsigned; abs() is a no-op
+  harsh_min_speed_kph NUMERIC(6,2) NOT NULL DEFAULT 20,    -- without it the detector reports one broken device
   speed_over_limit_kph NUMERIC(6,2) NOT NULL DEFAULT 15,
   unauthorized_stop_minutes INTEGER NOT NULL DEFAULT 45,
-  lost_contact_minutes INTEGER NOT NULL DEFAULT 30,
+  lost_contact_minutes INTEGER NOT NULL DEFAULT 30,        -- a FLOOR; scaled per feed by cadence, see PR4
   idle_alert_minutes INTEGER NOT NULL DEFAULT 20,
   known_site_radius_meters INTEGER NOT NULL DEFAULT 500,
   change_reason TEXT, created_by UUID REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -154,11 +239,24 @@ Rollback 529: drop the table, drop the column, delete the two permission keys an
 
 All new files ≤300 lines; components ≤200. Two new subtrees, both siblings of `trips/` and `incidents/`.
 
+**Two fold rules settled by PR0, both of which the pure fold must encode:**
+- **Prefer the provider's boundary events over sampled speed.** Where the day carries
+  `IDLING_START`/`IDLING_END` and `MOTION_START`/`MOTION_END` in `provider_event_type`, derive
+  `idle_seconds` and `moving_seconds` from those instants. Fall back to the sampled predicate
+  (`ignition===true && speed_kph===0` for idle) only for the fixes not covered by a boundary pair, and
+  for feeds that carry no events at all. A vehicle-day must record which rule produced its seconds so a
+  reader can tell measured from inferred.
+- **`netstar/europcar` supplies no odometer.** Its `distance_km` is haversine over consecutive fixes,
+  full stop — an odometer-delta path that silently yields 0 for six vehicles is the failure mode here.
+  The other three feeds use odometer deltas with haversine as the fallback.
+
 ```
 src/modules/fleet/dailyStats/
   types.ts                    ~90   VehicleDayStats, CoverageFlags, DayFold, DailyStatsBuildResult
-  dayFold.ts                  ~220  PURE. positions[] (+ trips[]) → VehicleDayStats. No DB import.
-  coverage.ts                 ~90   PURE. provider/account → granularity + coverage_* flags, expected fix count
+  dayFold.ts                  ~260  PURE. positions[] (+ trips[]) → VehicleDayStats. No DB import.
+                                    Prefers IDLING_/MOTION_ boundary events over sampled speed; haversine when odometer absent.
+  coverage.ts                 ~110  PURE. provider/account + the day's fixes → granularity, coverage_* flags,
+                                    expected_min_fixes / max_allowed_gap_seconds. coverage_gforce is observed, not assumed.
   dailyStatsRepository.ts     ~230  loadPositionsForDays, loadTripsForDays, upsertDayStats, read/writeWatermark
   dailyStatsBuildService.ts   ~260  watermark → batch loop → fold → upsert → advance. Mirrors tripBuildService.
   statsQueries.ts             ~180  read path: last-30-day series per vehicle, fleet overview for a date
@@ -170,7 +268,7 @@ src/modules/fleet/vehicleDetectors/
   afterHours.ts               ~130  PURE. isAfterHours(instant, rule, holidaySet) — SAST, weekends, holidays
   holidayQueries.ts           ~60   loadHolidays(fromDate, toDate) → Set<'YYYY-MM-DD'>
   theftDetector.ts            ~150  ignition-on + cumulative displacement > rule.theft_displacement_meters
-  severeDrivingDetector.ts    ~130  |linear_g| / |lateral_g| over threshold; gated on coverage_gforce
+  severeDrivingDetector.ts    ~160  provider_event_type HARSH_* primary; signed-g + speed-gate fallback under coverage_gforce
   unauthorizedStopDetector.ts ~150  ignition on, stationary > N min, findNearestPlace() > radius
   lostContactDetector.ts      ~130  last fix was moving, no fix for > N min
   accidentSosDetector.ts      ~70   STUB until U1 resolves; documents exactly what was checked and when
@@ -232,14 +330,20 @@ Answers U1/U2/U3/U4. Deliverable is a section appended to `.claude/modules/fleet
 ---
 
 ### PR1 — Migration 528 + the pure day-fold
-**Ships:** `528_*.sql` + rollback, `dailyStats/types.ts`, `coverage.ts`, `dayFold.ts`, tests. No cron, no DB writes, no UI.
+**Ships:** `528_*.sql` + rollback (both tables **and** `fleet_vehicle_positions.provider_event_type`), the Cartrack mapper line, `dailyStats/types.ts`, `coverage.ts`, `dayFold.ts`, tests. No cron, no DB writes, no UI.
 
-**TDD order:** write `dayFold.test.ts` first, from a fixture built out of real position shapes (2-min Cartrack, 2-hour Netstar snapshot, an Ituran day with a 42-hour silence — that gap exists in production data).
+The mapper is two lines, not a refactor: `providerEventType` added to `ProviderPosition`
+(`src/services/tracking/types.ts`), `providerEventType: typeof r.event_description === 'string' ? r.event_description : null`
+in `cartrack/provider.ts`'s row mapping, `null` in `netstar/parse.ts`, `netstar/tree.ts` and
+`ituran/parse.ts`, and the column carried through `ingest.ts`'s insert.
+
+**TDD order:** write `dayFold.test.ts` first, from a fixture built out of **measured** position shapes (PR0/U3): a `cartrack/velocity` day at ~1,200 fixes with a median 8-second gap, a `netstar/europcar` day at ~10 fixes with **no odometer**, an `ituran/avis` day with a 27-hour silence — all three exist in production data. Do **not** build the Cartrack fixture at a 2-minute cadence; that was the pre-spike assumption and is off by ~15×.
 
 **Tests that prove it:**
 1. `dayFold.test.ts` — fold correctness: distance from odometer deltas with a fallback to haversine; `idle_seconds` only when `ignition===true && speed_kph===0`; `tracker_silence_seconds` is the **largest** gap, not the sum; `max_speed_kph` null when no fix carries a speed.
 2. **`batchInvariance.test.ts` (mandatory, not optional).** Fold the *same* day's positions at batch sizes 1, 2, 3, 7, 100, 5000 and assert every produced `VehicleDayStats` is **byte-identical by row hash** (`sha256` of the canonically-ordered field tuple). This is the exact class of bug that six code reviewers read past on the trips builder and only a run caught (`feedback_reading_code_cannot_find_loop_and_pipeline_bugs`). Also assert idempotence: folding twice over an overlapping window yields the same hash.
-3. `coverage.test.ts` — a `snapshot` feed can never yield `coverage_ignition=true`; a non-Cartrack account can never yield `coverage_gforce=true`.
+3. `coverage.test.ts` — a non-Cartrack account can never yield `coverage_gforce=true`; **a `cartrack/velocity` vehicle-day whose every fix carries `linear_g = 0` and `lateral_g = 0` also yields `coverage_gforce=false`** (this is the six-of-seven case, and a null check passes it); `coverage_ignition=true` is legal for `netstar` and `ituran` because both assert ignition per fix (100 % / 94.5 % of fixes measured); `coverage_complete` is false when the count clears but the largest gap does not, and vice versa.
+   `parse.test.ts` additions (Cartrack + Netstar + Ituran) — `event_description` maps to `providerEventType` verbatim on Cartrack, including `HARSH_BRAKING`; an absent or non-string `event_description` maps to `null`, never `String(undefined)`; Netstar and Ituran map `null`.
 4. `dayEdges.test.ts` — a position at `2026-08-01T21:59:59Z` belongs to `2026-08-01`, one at `22:00:00Z` to `2026-08-02`. A trip that straddles midnight SAST splits its seconds across two rows and the two rows sum to the trip. `toWorkDate` is used; `toISOString().slice(0,10)` appears nowhere.
 5. `tests/migrations/528_fleet_vehicle_daily_stats.test.ts` — real Postgres, disposable schema, apply forward, exercise every CHECK (including `coverage_gforce=false` + harsh count > 0 rejected, and `moving+idle > ignition` rejected), `SET ROLE fibreflow_user` and prove the grants, then apply rollback and assert the tables are gone. Mirrors `tests/migrations/518_*.test.ts`.
 6. `migrationContract.test.ts` (no DB) — the `coverage_granularity` CHECK list and the TS union are the same closed set.
@@ -249,6 +353,8 @@ Answers U1/U2/U3/U4. Deliverable is a section appended to `.claude/modules/fleet
 - replace `Math.max` with `+=` in the silence-gap accumulator;
 - swap `toWorkDate` for `toISOString().slice(0,10)`;
 - drop the `coverage_gforce` gate in `coverage.ts`;
+- change `coverage_gforce` from `EXISTS(g <> 0)` back to `linear_g IS NOT NULL` (test 3 must catch it);
+- drop the `event_description` mapper line (the parser test must catch it);
 - change one batch-size constant in the fold loop.
 Each must fail at least one named test. Mutate the **new guard**, never the test's own copy of the rule.
 
@@ -261,7 +367,7 @@ Each must fail at least one named test. Mutate the **new guard**, never the test
 ### PR2 — Incremental build service + 15-min cron
 **Ships:** `dailyStatsRepository.ts`, `dailyStatsBuildService.ts`, `pages/api/cron/fleet-daily-stats.ts`, `scripts/cron-fleet-daily-stats.sh`, tests.
 
-**Shape (copy `tripBuildService.ts` exactly):** per-vehicle watermark; `POSITION_BATCH_SIZE` / `MAX_BATCHES_PER_VEHICLE`; a lookback floor (`LATE_ARRIVAL_LOOKBACK_MINUTES`, 6 h — trackers buffer and flush late, and `received_at` can trail `recorded_at`); **windows always open at a SAST day boundary**, which is this job's analogue of the trip-boundary anchor — a window that opens mid-day would rewrite a partial day over a complete one; per-vehicle try/catch so one bad tracker cannot freeze the fleet, run reported `partial`; watermark untouched on failure. Each tick recomputes **today and yesterday** unconditionally, then walks any backlog.
+**Shape (copy `tripBuildService.ts` exactly):** per-vehicle watermark; `POSITION_BATCH_SIZE` / `MAX_BATCHES_PER_VEHICLE` **sized against the measured ~1,200 fixes/vehicle/day on `cartrack/velocity` (max 3,047), not the pre-spike 2-minute assumption** — a batch under ~1,500 splits a single vehicle-day, which is exactly where the trips builder's straddler bug lived; a lookback floor (`LATE_ARRIVAL_LOOKBACK_MINUTES`, 6 h — trackers buffer and flush late, and `received_at` can trail `recorded_at`); **windows always open at a SAST day boundary**, which is this job's analogue of the trip-boundary anchor — a window that opens mid-day would rewrite a partial day over a complete one; per-vehicle try/catch so one bad tracker cannot freeze the fleet, run reported `partial`; watermark untouched on failure. Each tick recomputes **today and yesterday** unconditionally, then walks any backlog.
 
 `upsertDayStats` is `INSERT … ON CONFLICT (vehicle_id, work_date) DO UPDATE SET <every metric column> = EXCLUDED.…` — a full row replacement, never an accumulate. `ON CONFLICT DO NOTHING` would silently freeze the first partial day computed and is wrong for a mutable row.
 
@@ -307,9 +413,16 @@ Each must fail at least one named test. Mutate the **new guard**, never the test
 
 **Detector rules:**
 - `theft_after_hours_movement` — `isAfterHours(t)` AND vehicle not `after_hours_exempt` AND cumulative displacement from the window's first fix `> rule.theft_displacement_meters` AND at least `theft_min_positions` fixes. The min-positions clause is what makes a single GPS blip unable to fire it.
-- `severe_driving` — `|linear_g| > harsh_linear_g` or `|lateral_g| > harsh_lateral_g`, **gated on `coverage_gforce`** for that vehicle-day. Cartrack-only until another provider reports g.
+- `severe_driving` — **primary path is the provider's own event**: `provider_event_type IN ('HARSH_BRAKING', 'HARSH_CORNERING')`. `HARSH_ACCELERATION` was **not** observed in 55,009 events over 7 days — accept it in the set if it ever appears, but nothing may assume it exists, and no test may assert it does.
+  **Fallback path, only where `coverage_gforce` is true for that vehicle-day**: `-linear_g > harsh_linear_g` (braking; `linear_g` is signed, negative = braking) or `lateral_g > harsh_lateral_g` (`lateral_g` is already unsigned — `abs()` is a no-op, and treating a negative as possible is a bug), **and** `speed_kph >= harsh_min_speed_kph`. Without that speed gate the detector is a report on one broken device: 19 of 20 braking events ≥ 0.35 g are at ≤ 10 km/h on a single vehicle.
+  The two paths are a union, not an either/or: the firmware fires `HARSH_CORNERING` at 95–129 km/h on vehicles whose `linear_g`/`lateral_g` are structurally zero, which the g path cannot see, and the g path covers the one vehicle whose device reports g but whose `event_description` may lag. Dedup is free — `sourceEventId` buckets on the fix's `provider_event_id`.
 - `prolonged_unauthorized_stop` — `ignition===true`, displacement under 50 m for `> unauthorized_stop_minutes`, and `findNearestPlace(lat, lon)` returns null or `distanceM > known_site_radius_meters`. Requires `coverage_ignition`, so it will not fire for the 8 snapshot vehicles — state that in the module header rather than letting it look broken.
-- `lost_contact_moving` — the last fix had `speed_kph > 0` (or `ignition===true`) and `now - recorded_at > lost_contact_minutes`. **Must be scaled per provider**: a 30-minute threshold against a 2-hour snapshot feed fires on all eight of those vehicles every single tick. Either derive the threshold from the feed's expected cadence (preferred) or restrict the detector to `coverage_granularity='history'`. Decide with U3's measured cadence.
+- `lost_contact_moving` — the last fix had `speed_kph > 0` (or `ignition===true`) and `now - recorded_at > effective_lost_contact_minutes`. **Scaled per feed from measured cadence** (PR0/U3 settled this):
+  ```
+  effective_lost_contact_minutes(provider, account_ref) =
+      max(rule.lost_contact_minutes, 3 × observed_p90_gap_minutes)
+  ```
+  With `lost_contact_minutes = 30` that resolves to 30 min for `cartrack/velocity` (p90 gap 30 s) and 374–481 min for the other three feeds, where it is not a useful signal. **In practice this is a 7-vehicle detector** — say so in the module header rather than letting the other eleven look broken. Do **not** restrict it to `coverage_granularity='history'`: `cartrack/urent` is `history` and is one of the eleven. The per-feed p90 gap table is in `.claude/modules/fleet.md`.
 - `dangerous_area_entry` — **deferred, not stubbed.** There is no dangerous-area geofence table and authoring one is explicitly out of scope. Its `fleet_operational_incident_rules` row stays present and enabled=false is *not* set (leave it as 529 leaves it); no code path references it. Record the deferral in the CHANGELOG.
 - `accident_sos` — stub or live per U1.
 
@@ -556,7 +669,7 @@ undocumented on our side) — a panic button is normally a digital input. That i
 Cartrack, not something to infer. Record it in the CHANGELOG as the reopening condition; do not
 synthesise SOS from g-force.
 
-### Consequence for PR1's scope: add one column to 528
+### Consequence for PR1's scope: one column added to 528 — DECIDED 2026-08-25
 
 `event_description` is decision-grade and currently discarded, and it is the forward-compatible
 landing spot if the `input_state` question ever yields a panic bit. Two independent reasons to
@@ -570,7 +683,7 @@ capture it now rather than churn the migration number later:
 2. `IDLING_START` / `IDLING_END` / `MOTION_START` / `MOTION_END` are exact boundary events, which
    makes `idle_seconds` and `moving_seconds` measured rather than inferred from sampled speed.
 
-**Add to 528:** `ALTER TABLE fleet_vehicle_positions ADD COLUMN provider_event_type TEXT;` (nullable,
+**Decision (coordinator, 2026-08-25): yes.** 528 adds `ALTER TABLE fleet_vehicle_positions ADD COLUMN IF NOT EXISTS provider_event_type TEXT;` (nullable,
 additive, safe against running prod code), plus `providerEventType` on `ProviderPosition` and
 `event_description` in `cartrack/provider.ts`'s row mapping. Netstar and Ituran map their own
 vocabulary or `null`. `severe_driving` then reads `provider_event_type IN ('HARSH_BRAKING',
