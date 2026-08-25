@@ -32,14 +32,23 @@
  * end of the last COMPLETE day, so forward progress is guaranteed at any batch size -- which is
  * what makes the batch-invariance sweep meaningful rather than merely green.
  *
- * ## One fix from BEFORE the window is folded, and never written
+ * ## The window's two edges are the caller's job
  *
- * A day's first interval spans midnight, so it can only be measured with the fix that closed the
- * previous day. Without it the same date folds differently depending on how far back the run
- * happened to open: no leading silence, no carried distance, and a `coverage_complete` it did not
- * earn. That is the batch-invariance defect arriving through the WINDOW instead of through the
- * batch, and it is why `loadPositionBefore` exists. Its own day is excluded from the upsert -- the
- * window does not cover it and its real row is already stored.
+ * The fold measures silence BETWEEN fixes, so it cannot see the hours before the first or after
+ * the last. It takes both from the caller.
+ *
+ * `leadIn` is the last fix before the window opened, read once by `loadPositionBefore` and handed
+ * to `createDayFold`. It is NOT fed through `addPositions`: the fold seeds it as the previous
+ * position without counting it, so the interval crossing into the window's first day is measured
+ * -- its silence, its distance, and whether that distance was CARRIED across an unattributable
+ * gap. Without it the same date folds differently depending on how far back the run happened to
+ * open, which is the batch-invariance defect arriving through the window instead of through the
+ * batch.
+ *
+ * `windowEnd` is the instant the run reads at. It stops a day still in progress from being judged
+ * on hours that have not happened yet and -- because `tailGapMs` clamps it to the day's own end --
+ * still judges a CLOSED day on its full 24, so a tracker that died at noon cannot be reported as
+ * a complete day.
  *
  * ## Failure is per vehicle
  *
@@ -50,16 +59,17 @@
 import { log } from '@/lib/logger';
 import {
   listVehiclesWithPositions, loadPositionBefore, loadPositionsForWindow, loadTripsForWindow,
-  readWatermark, upsertDayStats, writeWatermark, LATE_ARRIVAL_LOOKBACK_MINUTES,
-  type PositionCursor,
+  readWatermark, upsertDayStats, writeWatermark, type PositionCursor,
 } from './dailyStatsRepository';
-import { createDayFold, DAY_FOLD_POSITION_BATCH_SIZE, type DayFoldOptions } from './dayFold';
-import { dayStartMs, sastDay } from './dayIntervals';
-import type { VehicleDayStats } from './types';
+import {
+  daysReadyToWrite, lastClosedDay, windowEndFor, windowStartFor,
+} from './dailyStatsWindow';
+import { createDayFold } from './dayFold';
+import { DAY_FOLD_POSITION_BATCH_SIZE } from './dayFoldOptions';
+import type { DayFoldOptions } from './dayFoldOptions';
+import { sastDay } from './dayIntervals';
 
 const MODULE = 'FleetDailyStatsBuild';
-
-const MS_PER_DAY = 86_400_000;
 
 /**
  * The advisory lock this job takes, cron and any future backfill alike.
@@ -94,21 +104,6 @@ export const DEFAULT_BUILD_OPTIONS: DailyStatsBuildOptions = {
   foldOptions: {},
 };
 
-/**
- * Where this vehicle's window opens: the earlier of the lookback floor and yesterday's midnight,
- * each snapped to a SAST day boundary. Null means the vehicle has never been built -- read
- * everything.
- */
-export function windowStartFor(watermark: string | null, nowMs: number): string | null {
-  if (watermark === null) return null;
-  const parsed = Date.parse(watermark);
-  if (!Number.isFinite(parsed)) return null;
-  const floorMs = parsed - LATE_ARRIVAL_LOOKBACK_MINUTES * 60_000;
-  const fromWatermarkMs = dayStartMs(sastDay(floorMs));
-  const yesterdayMs = dayStartMs(sastDay(nowMs - MS_PER_DAY));
-  return new Date(Math.min(fromWatermarkMs, yesterdayMs)).toISOString();
-}
-
 export interface VehicleStatsBuildResult {
   vehicleId: string;
   daysWritten: number;
@@ -118,55 +113,19 @@ export interface VehicleStatsBuildResult {
   moreRemaining: boolean;
 }
 
-/**
- * Which of the folded days are finished enough to store.
- *
- * When the read drained, every day the window covered is as complete as it will get and all of
- * them are written. When the ceiling stopped us, the last day with positions is still open: it is
- * withheld along with anything after it, so no complete row is ever overwritten by a partial one.
- */
-export function daysReadyToWrite(
-  days: readonly VehicleDayStats[], drained: boolean, firstWindowDay: string | null,
-): VehicleDayStats[] {
-  // Anything before the window opened is the primer fix's own day, folded only so the first real
-  // day has a previous interval. Writing it would replace a complete row with a one-fix stub.
-  const inWindow = firstWindowDay === null
-    ? [...days]
-    : days.filter((d) => d.workDate >= firstWindowDay);
-  if (drained) return inWindow;
-  const positionDays = inWindow.filter((d) => d.positionCount > 0).map((d) => d.workDate);
-  const cutoff = positionDays[positionDays.length - 2];
-  if (cutoff === undefined) return [];
-  return inWindow.filter((d) => d.workDate <= cutoff);
-}
-
-/**
- * The newest day this run has definitely finished folding: every day it has touched except the
- * one it is still inside.
- *
- * Reads from the days seen at page edges, which can miss a day that never bounded a page. That
- * understates rather than overstates -- it returns an older day and the run keeps reading -- so
- * the ceiling stays conservative and the loop still terminates on the drain.
- */
-export function lastClosedDay(daysTouched: ReadonlySet<string>): string | null {
-  const sorted = [...daysTouched].sort();
-  return sorted[sorted.length - 2] ?? null;
-}
-
 /** Folds one vehicle from its day-aligned window and persists whatever is complete. */
 export async function buildStatsForVehicle(
   vehicleId: string, nowMs: number, options: DailyStatsBuildOptions,
 ): Promise<VehicleStatsBuildResult> {
   const watermark = await readWatermark(vehicleId);
   const windowStart = windowStartFor(watermark, nowMs);
-  const fold = createDayFold(options.foldOptions);
   const watermarkDay = watermark === null ? null : sastDay(Date.parse(watermark));
   const firstWindowDay = windowStart === null ? null : sastDay(Date.parse(windowStart));
 
   // The interval that opened the window's first day can only be measured against the fix that
-  // closed the previous one. Folded first so the ordering guard is satisfied; never written.
-  const primer = windowStart === null ? null : await loadPositionBefore(vehicleId, windowStart);
-  if (primer !== null) fold.addPositions([primer]);
+  // closed the previous one. Handed to the fold as its lead-in, never as a position.
+  const leadIn = windowStart === null ? null : await loadPositionBefore(vehicleId, windowStart);
+  const fold = createDayFold({ ...options.foldOptions, leadIn, windowEnd: windowEndFor(nowMs) });
 
   let cursor: PositionCursor | null = null;
   let positionsProcessed = 0;

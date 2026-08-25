@@ -28,8 +28,9 @@ import {
   ALPHA, BETA, DAYS, REQUESTED_AT, allPositions, alphaPositions, dayStart,
 } from './statsFixtures';
 import {
-  buildDailyStats, daysReadyToWrite, MAX_BATCHES_PER_VEHICLE, POSITION_BATCH_SIZE, windowStartFor,
+  buildDailyStats, MAX_BATCHES_PER_VEHICLE, POSITION_BATCH_SIZE,
 } from '../dailyStatsBuildService';
+import { daysReadyToWrite, windowStartFor } from '../dailyStatsWindow';
 import { LATE_ARRIVAL_LOOKBACK_MINUTES } from '../dailyStatsRepository';
 
 const NOW_MS = Date.parse(REQUESTED_AT);
@@ -292,5 +293,145 @@ describe('buildDailyStats', () => {
 
     expect(ticks).toBeGreaterThan(1);
     for (const workDate of DAYS) expect(fake.statsRow(ALPHA, workDate)).toBeDefined();
+  });
+});
+
+describe('the window edges the fold cannot see', () => {
+  const at = (day: string, seconds: number) => new Date(dayStart(day) + seconds * 1_000).toISOString();
+
+  /** A cartrack/velocity fix: dense, odometer-bearing, ignition asserted. */
+  const dense = (n: number, recordedAt: string) => ({
+    id: `w-${String(n).padStart(4, '0')}`,
+    vehicle_id: ALPHA,
+    recorded_at: recordedAt,
+    provider_event_id: `ct-w-${n}`,
+    provider: 'cartrack',
+    account_ref: 'velocity',
+    ignition: true,
+    lat: -26.2 + n * 0.0001,
+    lon: 28.0 + n * 0.0001,
+    speed_kph: 40,
+    is_speeding: false,
+    odometer_km: 5_000 + n * 0.2,
+    linear_g: 0,
+    lateral_g: 0,
+    provider_event_type: 'PERIODIC_EVENT',
+  });
+
+  /** A netstar/europcar fix: a handful a day, no odometer at all. */
+  const coarse = (n: number, recordedAt: string) => ({
+    id: `c-${String(n).padStart(4, '0')}`,
+    vehicle_id: BETA,
+    recorded_at: recordedAt,
+    provider_event_id: `ns-c-${n}`,
+    provider: 'netstar',
+    account_ref: 'europcar',
+    ignition: true,
+    lat: -25.7 + n * 0.05,
+    lon: 28.2 + n * 0.05,
+    speed_kph: 50,
+    is_speeding: false,
+    odometer_km: null,
+    linear_g: null,
+    lateral_g: null,
+    provider_event_type: null,
+  });
+
+  function seedWatermark(fake: FakeDb, vehicleId: string, lastPositionAt: string): void {
+    fake.watermarks.set(vehicleId, {
+      vehicle_id: vehicleId, last_position_at: lastPositionAt, positions_processed: 0,
+    });
+  }
+
+  it('judges a CLOSED past day on its full 24 hours, and calls a well-covered one complete', async () => {
+    // 360 fixes at a 240 s cadence across the whole of DAYS[1], the lead-in two minutes before
+    // midnight. Head 120 s, largest inter-fix gap 240 s, tail 120 s — every edge accounted for,
+    // so the day is complete on its own terms.
+    const fake = useDb(new FakeDb());
+    fake.seedPositions([dense(0, at(DAYS[0], 86_280))]);
+    fake.seedPositions(
+      Array.from({ length: 360 }, (_, k) => dense(k + 1, at(DAYS[1], 120 + k * 240))),
+    );
+    seedWatermark(fake, ALPHA, at(DAYS[1], 6 * 3_600));
+
+    await buildDailyStats(at(DAYS[2], 18 * 3_600));
+
+    const row = fake.statsRow(ALPHA, DAYS[1])!;
+    expect(Number(row.position_count)).toBe(360);
+    expect(Number(row.tracker_silence_seconds)).toBe(240);
+    expect(row.coverage_complete).toBe(true);
+  });
+
+  it('judges TODAY only up to the moment the run read, not to midnight', async () => {
+    // The tracker last reported at noon and the run is at 18:00. Six hours are unobserved; the
+    // twelve after 18:00 have not happened. Charging those too would report every vehicle as
+    // half-dark all morning — and `windowEnd` left unbounded does exactly that, which is why the
+    // assertion is the NUMBER rather than the flag: both values fail `coverage_complete`, so a
+    // flag alone cannot tell the correct answer from the wrong one.
+    const fake = useDb(new FakeDb());
+    fake.seedPositions(
+      Array.from({ length: 217 }, (_, k) => dense(k, at(DAYS[2], k * 200))),
+    );
+
+    await buildDailyStats(at(DAYS[2], 18 * 3_600));
+
+    const row = fake.statsRow(ALPHA, DAYS[2])!;
+    expect(Number(row.position_count)).toBe(217);
+    expect(Number(row.tracker_silence_seconds)).toBe(6 * 3_600);
+    // What an unbounded window would have charged: noon to midnight.
+    expect(Number(row.tracker_silence_seconds)).not.toBe(12 * 3_600);
+    expect(row.coverage_complete).toBe(false);
+  });
+
+  it('makes the first window day OWN the distance carried in from before it', async () => {
+    // A coarse feed whose last fix before midnight is six hours before its first fix after it.
+    // That interval is past the attribution ceiling, so its distance goes whole to the day of the
+    // CLOSING fix — and that day gives up its claim to complete coverage, because the kilometres
+    // were real but not necessarily its own.
+    //
+    // Drop the lead-in and the interval does not exist: the day keeps a `coverage_complete` it
+    // has not earned, with every other column identical. This is the flip the lead-in exists for,
+    // and it is invisible to `tracker_silence_seconds`, which is 14,400 either way.
+    const fake = useDb(new FakeDb());
+    fake.seedPositions([coarse(0, at(DAYS[0], 20 * 3_600))]);
+    fake.seedPositions(
+      [2, 6, 10, 14, 18, 22].map((hour, k) => coarse(k + 1, at(DAYS[1], hour * 3_600))),
+    );
+    seedWatermark(fake, BETA, at(DAYS[1], 6 * 3_600));
+
+    await buildDailyStats(at(DAYS[2], 18 * 3_600));
+
+    const row = fake.statsRow(BETA, DAYS[1])!;
+    expect(Number(row.position_count)).toBe(6);
+    expect(Number(row.tracker_silence_seconds)).toBe(14_400);
+    expect(Number(row.distance_km)).toBeGreaterThan(0);
+    expect(row.coverage_complete).toBe(false);
+  });
+
+  it('never lets a trip that began BEFORE the window rewrite the day it began on', async () => {
+    // The lead-in earns no row of its own — the fold does not count it as a position. A TRIP is
+    // different: it apportions its ignition time across every day it spans, and PR1's fold emits
+    // a row for a trip-only day deliberately, because positions age out and a trip is still an
+    // observation. Both are right, and together they are the hazard: a journey that began the day
+    // BEFORE the window gives that day a sliver of ignition time and no fixes, and writing it
+    // would replace a complete row — 412 positions, a full day's distance — with one reporting
+    // none. The window opens at DAYS[1], so DAYS[0] is out of this run's reach and must be left
+    // exactly as an earlier run left it.
+    const fake = useDb(new FakeDb());
+    fake.seedPositions(
+      Array.from({ length: 20 }, (_, k) => dense(k, at(DAYS[1], 7_200 + k * 240))),
+    );
+    seedWatermark(fake, ALPHA, at(DAYS[2], 6 * 3_600));
+    fake.trips.push({
+      vehicle_id: ALPHA,
+      ignition_on_at: at(DAYS[0], 22 * 3_600),
+      ignition_off_at: at(DAYS[1], 2 * 3_600),
+    });
+    fake.dailyStats.set(`${ALPHA}|${DAYS[0]}`, { vehicle_id: ALPHA, work_date: DAYS[0], position_count: 412 });
+
+    await buildDailyStats(at(DAYS[2], 18 * 3_600));
+
+    expect(Number(fake.statsRow(ALPHA, DAYS[0])!.position_count)).toBe(412);
+    expect(fake.statsRow(ALPHA, DAYS[1])).toBeDefined();
   });
 });
