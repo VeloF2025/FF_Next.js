@@ -68,7 +68,15 @@ which is exactly what it is for) and a rule version moving
 `after_hours_start_time` later. **Neither the crontab entry nor WhatsApp delivery
 (PR5) may be enabled until one of them is applied.** `scripts/fleet-detectors-dryrun.ts`
 takes `DRYRUN_AFTER_HOURS_START` and `DRYRUN_ONLY` so the effect of a proposed
-window can be measured before it is versioned.
+window can be measured before it is versioned. **Measured, not guessed:** the
+same 7 days replayed with `after_hours_start_time = 21:00` give **27 events,
+3.86/day across 13 vehicles** — but 19 of those 27 fall on the Saturday and
+Sunday (11 and 8), because `weekends_are_after_hours` makes all weekend daytime
+work after-hours. Weekday nights past 21:00 are 8 events over 5 days, 1.6/day.
+So a later window alone lands inside the ceiling on weekdays and the WEEKEND is
+the residual: whichever crews work Saturdays need `after_hours_exempt`, or the
+weekend flag needs rethinking. Both are rule/data decisions for the operator,
+not code.
 
 **Caveat on the dry run's `severe_driving` figure:** migrations 528 and 529 are
 not applied to the shared database yet, so the run used 529's seeded defaults,
