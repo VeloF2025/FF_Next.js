@@ -497,7 +497,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           const total = qty * price;
           await sql`
             UPDATE purchase_order_items
-            SET quantity_ordered = ${qty}, unit_price = ${price}, total_price = ${total}, updated_at = NOW()
+            SET quantity_ordered = ${qty}, unit_price = ${price}, total_price = ${total}
             WHERE id = ${item.id} AND purchase_order_id = ${id}
           `;
         }
@@ -509,7 +509,9 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
         `;
         const subtotal = parseFloat(totalsResult[0]?.subtotal) || 0;
         const poTax = await sql`SELECT tax_rate FROM purchase_orders WHERE id = ${id}`;
-        const taxRate = parseFloat(poTax[0]?.tax_rate) || 15;
+        // A stored 0% must stay 0% — `|| 15` re-taxed zero-rated POs on every edit.
+        const storedTaxRate = parseFloat(poTax[0]?.tax_rate);
+        const taxRate = Number.isFinite(storedTaxRate) ? storedTaxRate : 15;
         const taxAmount = subtotal * (taxRate / 100);
         const totalAmount = subtotal + taxAmount;
 
