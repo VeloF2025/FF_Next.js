@@ -119,9 +119,18 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
 
   function countHarsh(day: DayAcc, p: DayPosition): void {
     if (p.speedKph === null || p.speedKph < opts.harshMinSpeedKph) return;
-    const named = p.providerEventType === null
-      ? undefined
-      : (HARSH_EVENT_TYPES as Record<string, HarshKind | undefined>)[p.providerEventType];
+    // `Object.hasOwn`, not a bare index. providerEventType is a provider's string held verbatim,
+    // so it can be anything, and `HARSH_EVENT_TYPES['constructor']` is a truthy FUNCTION rather
+    // than undefined.
+    //
+    // Defensive rather than a fix for a live defect, and the difference was measured rather than
+    // asserted: that stray lookup writes to a key named by the stringified function, so the three
+    // real counters are untouched and `finaliseDay` reads them by name. Hardened anyway, because
+    // the next reader of this lookup should not have to redo that reasoning to know it is safe.
+    const event = p.providerEventType;
+    const named = event !== null && Object.hasOwn(HARSH_EVENT_TYPES, event)
+      ? (HARSH_EVENT_TYPES as Record<string, HarshKind>)[event]
+      : undefined;
     if (named) {
       // The firmware computed this itself, on the vehicles whose g columns are structurally zero.
       // It beats our own threshold for the same fix, so the g branch is not also consulted.
@@ -146,12 +155,20 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
       day.largestGapMs = Math.max(day.largestGapMs, ms);
     });
 
-    // Cadence, counted on the day the interval CLOSED. `coverageIgnition` needs to know whether
-    // this day's fixes were close enough together for ignition time to be measurable at all, and
-    // two counters answer that without retaining every gap.
+    // Cadence, counted on the day the interval CLOSED -- not the day it opened. `coverageIgnition`
+    // needs to know whether THIS day's fixes were close enough together for ignition time to be
+    // measurable, and the silence a day opens with is that day's problem, not the previous day's.
+    // Two counters answer the median without retaining every gap.
+    //
+    // A zero-length interval is not evidence of cadence. Two fixes can share an instant -- 164
+    // such groups exist in 7 days of production -- and each twin would otherwise contribute a
+    // free "0 ms, well within the ceiling" vote. Enough of them drag the median under the ceiling
+    // and hand a two-hour feed a coverage_ignition it did not earn.
     const closingDay = dayFor(sastDay(curMs));
-    closingDay.gapCount += 1;
-    if (elapsedMs <= maxAttributableMs) closingDay.gapsWithinCeiling += 1;
+    if (elapsedMs > 0) {
+      closingDay.gapCount += 1;
+      if (elapsedMs <= maxAttributableMs) closingDay.gapsWithinCeiling += 1;
+    }
 
     if (elapsedMs <= maxAttributableMs) {
       if (cur.isSpeeding === true) {

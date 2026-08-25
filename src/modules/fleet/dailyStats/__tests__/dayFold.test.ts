@@ -287,6 +287,28 @@ describe('harsh events', () => {
     expect(day!.harshCornerEvents).toBe(1);
   });
 
+  it('ignores an event name that is only an inherited property of the lookup', () => {
+    // providerEventType is a provider's string held verbatim, so it can be anything, and a bare
+    // index makes HARSH_EVENT_TYPES['constructor'] a truthy FUNCTION rather than undefined.
+    //
+    // HONEST NOTE ON WHAT THIS TEST IS WORTH: it passes with the Object.hasOwn hardening removed,
+    // and that was checked rather than assumed. The stray lookup writes to a key named by the
+    // stringified function, so the three real counters are never touched and finaliseDay reads
+    // them by name. The hardening is therefore DEFENSIVE, not a fix for a live defect, and this
+    // case pins the contract (integer zeroes out) rather than guarding the implementation. Do not
+    // read it as mutation-covered.
+    const positions = ['constructor', 'toString', '__proto__', 'hasOwnProperty'].map(
+      (providerEventType, i) => fix(MORNING, 'cartrack', 'velocity', {
+        offsetSeconds: i * 8, providerEventId: `proto-${i}`, ignition: true, speedKph: 90, providerEventType,
+      }),
+    );
+    const [day] = foldVehicleDays(positions);
+    for (const count of [day!.harshBrakeEvents, day!.harshAccelEvents, day!.harshCornerEvents]) {
+      expect(Number.isInteger(count)).toBe(true);
+      expect(count).toBe(0);
+    }
+  });
+
   it('stores no harsh count at all on a vehicle-day whose g columns are constant zero', () => {
     // The six-of-seven firmware family. Nothing here may reach the harsh counters, or migration
     // 528's harsh-requires-coverage CHECK would be satisfied by a fabrication.
@@ -360,6 +382,59 @@ describe('the row migration 528 will accept', () => {
     expect(day!.ignitionSeconds).toBeGreaterThan(0);
     expect(day!.movingSeconds).toBeGreaterThan(0);
     expect(day!.idleSeconds).toBeGreaterThan(0);
+  });
+
+  it('credits a gap to the day it CLOSED, so a dense day cannot vouch for the next one', () => {
+    // The silence opens on a day whose cadence was perfect and closes on one that saw three
+    // fixes. Crediting it to the OPENING day would leave the second day holding only its own two
+    // short gaps -- one of them within the ceiling -- and hand it a coverage_ignition it did not
+    // earn. The day that woke up into a silence is the day that could not measure through it.
+    const dense = velocityRun(MORNING, 400, [0, 45, 70]);
+    const lastDense = Date.parse(dense[dense.length - 1]!.recordedAt);
+    // Next day, 09:00 SAST, after a silence of roughly nineteen hours.
+    const nextDayStart = '2026-08-11T07:00:00.000Z';
+    const nextDay = [0, 8, 416].map((offsetSeconds, i) => fix(nextDayStart, 'cartrack', 'velocity', {
+      offsetSeconds, providerEventId: `next-${i}`, ignition: true, speedKph: 0, odometerKm: 90_000 + i,
+    }));
+    expect(Date.parse(nextDayStart)).toBeGreaterThan(lastDense);
+
+    const days = foldVehicleDays([...dense, ...nextDay]);
+    expect(days.map((d) => d.workDate)).toEqual(['2026-08-10', '2026-08-11']);
+    // Three gaps close on the 11th: the silence, 8 s, and 408 s. Only one is inside the ceiling,
+    // and one of three is below the median.
+    expect(days[1]!.coverageIgnition).toBe(false);
+    expect(days[1]!.ignitionSeconds).toBe(0);
+    // The dense day is unaffected: its own gaps are all 8 s.
+    expect(days[0]!.coverageIgnition).toBe(true);
+  });
+
+  it('treats a gap of exactly the ceiling as attributable, on both sides of the boundary', () => {
+    // Five fixes exactly 300 s apart. The ceiling is inclusive, so all four intervals are booked
+    // and all four count as cadence evidence. Turning either `<=` into `<` empties both.
+    const onTheLine = [0, 300, 600, 900, 1_200].map((offsetSeconds, i) => fix(
+      MORNING, 'cartrack', 'velocity',
+      { offsetSeconds, providerEventId: `line-${i}`, ignition: true, speedKph: 0, odometerKm: 500 + i },
+    ));
+    const [day] = foldVehicleDays(onTheLine);
+    expect(day!.coverageIgnition).toBe(true);
+    expect(day!.ignitionSeconds).toBe(1_200);
+    expect(day!.idleSeconds).toBe(1_200);
+  });
+
+  it('does not let same-instant twins vote on cadence', () => {
+    // Four twin pairs on a five-fix urent day. A zero-length interval is not evidence that the
+    // feed reports often -- but counted, four of them are "0 ms, inside the ceiling" votes against
+    // four real 1,797 s gaps, which is exactly the majority needed to flip a two-hour feed to
+    // coverage_ignition = true.
+    const base = urentDay(MORNING, 5);
+    const twins = base.slice(0, 4).map((p, i) => ({ ...p, providerEventId: `twin-${i}` }));
+    const withTwins = [...base, ...twins]
+      .sort((a, b) => (a.recordedAt < b.recordedAt ? -1 : a.recordedAt > b.recordedAt ? 1 : 0));
+
+    expect(withTwins).toHaveLength(9);
+    const [day] = foldVehicleDays(withTwins);
+    expect(day!.coverageIgnition).toBe(false);
+    expect([day!.ignitionSeconds, day!.movingSeconds, day!.idleSeconds]).toEqual([0, 0, 0]);
   });
 
   it('carries a source watermark whenever it folded a fix', () => {
