@@ -15,7 +15,7 @@ import { haversineDistance } from '../utils/geoUtils';
 import { IDLE_END_EVENTS, IDLE_START_EVENTS, MOTION_END_EVENTS, MOTION_START_EVENTS } from './types';
 import type { DayPosition } from './types';
 
-const MS_PER_DAY = 86_400_000;
+export const MS_PER_DAY = 86_400_000;
 
 /** Above this speed an interval is moving; at it, the vehicle is idling. */
 export const IDLE_SPEED_KPH = 0;
@@ -56,9 +56,25 @@ export function splitAcrossDays(fromMs: number, toMs: number, apply: (workDate: 
   }
 }
 
-/** The distance covered between two fixes: odometer when it is present and monotonic, else GPS. */
+/**
+ * The largest forward odometer jump one interval may claim, in km.
+ *
+ * A backwards reading is obviously a fault and already falls through to GPS. A forward one is the
+ * dangerous case: it is monotonic, so it passes every check, and it lands in `distance_km` as a
+ * plausible-looking number. 1,000 km is roughly eleven hours at the national limit — far beyond
+ * anything this fleet does between two fixes, and well clear of a legitimate multi-day silence on
+ * a snapshot feed. A unit swap (metres read as km) or a device reset clears it by orders of
+ * magnitude, which is exactly what should be refused.
+ */
+export const MAX_ODOMETER_JUMP_KM = 1_000;
+
+/** The distance covered between two fixes: odometer when it is present and credible, else GPS. */
 export function intervalDistanceKm(prev: DayPosition, cur: DayPosition): number {
-  if (prev.odometerKm !== null && cur.odometerKm !== null && cur.odometerKm >= prev.odometerKm) {
+  if (
+    prev.odometerKm !== null && cur.odometerKm !== null
+    && cur.odometerKm >= prev.odometerKm
+    && cur.odometerKm - prev.odometerKm <= MAX_ODOMETER_JUMP_KM
+  ) {
     return cur.odometerKm - prev.odometerKm;
   }
   // netstar/europcar supplies no odometer at all, and a reading that ran backwards is a fault
@@ -67,6 +83,18 @@ export function intervalDistanceKm(prev: DayPosition, cur: DayPosition): number 
     return haversineDistance({ lat: prev.lat, lon: prev.lon }, { lat: cur.lat, lon: cur.lon });
   }
   return 0;
+}
+
+/**
+ * Did this interval's odometer make a forward jump too large to believe?
+ *
+ * Reported separately from the distance so the day can give up its `coverage_complete` claim: the
+ * haversine fallback measures the straight line between two fixes, which on a feed that jumped is
+ * the one number we are least sure of.
+ */
+export function hasImplausibleOdometerJump(prev: DayPosition, cur: DayPosition): boolean {
+  if (prev.odometerKm === null || cur.odometerKm === null) return false;
+  return cur.odometerKm - prev.odometerKm > MAX_ODOMETER_JUMP_KM;
 }
 
 /**

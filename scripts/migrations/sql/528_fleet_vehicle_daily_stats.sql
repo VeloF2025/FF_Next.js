@@ -116,6 +116,11 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_daily_stats (
   coverage_ignition BOOLEAN NOT NULL,
   coverage_gforce BOOLEAN NOT NULL,
   coverage_provider_events BOOLEAN NOT NULL,
+  -- Observed as well as this feed can manage: enough fixes for its cadence, and no silence beyond
+  -- its allowance -- where "silence" includes the hours at each END of the window, not just the
+  -- gaps between fixes. A day whose first fix lands at 23:00 has 23 unobserved hours and an
+  -- eight-second largest gap, and without the edges it would report complete off forty minutes of
+  -- evidence.
   coverage_complete BOOLEAN NOT NULL,
 
   -- The newest recorded_at folded into this row. Its absence is what makes a zero-position row
@@ -205,6 +210,10 @@ COMMENT ON COLUMN fleet_vehicle_daily_stats.unattributed_seconds IS
   'Measured ignition time that could not be classified as moving or idling. A cartrack/velocity-'
   'only residual: a feed too coarse to measure ignition fails coverage_ignition and stores 0 here. '
   'GENERATED from ignition/moving/idle and therefore not assignable by a caller.';
+COMMENT ON COLUMN fleet_vehicle_daily_stats.first_ignition_at IS
+  'An OBSERVATION -- a fix asserted ignition at this instant -- not a measurement, so it survives '
+  'coverage_ignition = false. A two-hour feed can say when the vehicle first moved even though it '
+  'cannot say for how long.';
 COMMENT ON COLUMN fleet_vehicle_daily_stats.coverage_ignition IS
   'Ignition seconds are MEASURABLE on this vehicle-day: ignition asserted on >=90% of fixes AND '
   'the median inter-fix gap within the attribution ceiling. Not merely "the feed sends ignition".';

@@ -123,6 +123,95 @@ describe('idle and moving', () => {
   });
 });
 
+describe('what may be called ignition-on', () => {
+  it('does not let a NULL ignition inside a dense run count as ignition-on', () => {
+    // A null is missing information, not "off" and certainly not "on". The interval closing on it
+    // is attributable by cadence -- eight seconds -- so nothing but the explicit `=== true` test
+    // keeps it out of ignition_seconds, and a `!== false` would silently book it.
+    // Forty fixes so ONE null stays inside the 90% ignition-coverage ratio — a four-fix fixture
+    // fails that ratio instead and zeroes the row, proving nothing about this rule.
+    const positions = Array.from({ length: 40 }, (_, i) => fix(
+      MORNING, 'cartrack', 'velocity',
+      { offsetSeconds: i * 8, providerEventId: `ign-${i}`, ignition: i === 20 ? null : true, speedKph: 0 },
+    ));
+    const [day] = foldVehicleDays(positions);
+    expect(day!.coverageIgnition).toBe(true);
+    // 39 intervals of 8 s = 312 s, less the one closing on the null fix.
+    expect(day!.ignitionSeconds).toBe(304);
+    expect(day!.idleSeconds).toBe(304);
+  });
+
+  it('clears a stale IDLING state on IGNITION_OFF, so a restart does not inherit it', () => {
+    // IDLING_START, then the engine stops. Without IGNITION_OFF clearing the state, the first
+    // stretch after the restart is labelled idling from an event two events ago -- and the vehicle
+    // is doing 70 km/h.
+    const positions = [
+      { off: 0, event: 'IDLING_START', speed: 0 },
+      { off: 8, event: 'IGNITION_OFF', speed: 0 },
+      { off: 16, event: 'IGNITION_ON', speed: 0 },
+      { off: 24, event: 'PERIODIC_EVENT', speed: 70 },
+      { off: 32, event: 'PERIODIC_EVENT', speed: 70 },
+    ].map((spec, i) => fix(MORNING, 'cartrack', 'velocity', {
+      offsetSeconds: spec.off, providerEventId: `state-${i}`, ignition: true,
+      speedKph: spec.speed, providerEventType: spec.event,
+    }));
+    const [day] = foldVehicleDays(positions);
+    // Interval 1 (into IGNITION_OFF) is still idling; intervals 2 onward fall back to the sampled
+    // speed, so the two 70 km/h stretches are moving.
+    expect(day!.movingSeconds).toBe(16);
+    expect(day!.idleSeconds).toBe(16);
+  });
+});
+
+describe('an odometer that leapt', () => {
+  /**
+   * A day that is complete in every other respect: 300 fixes from midnight at an 8 s cadence, so
+   * the count clears 200, the largest gap is 8 s, and both window edges are zero.
+   *
+   * Built this way deliberately. A two-fix fixture is already incomplete for having two fixes, so
+   * it asserts `coverageComplete === false` for the wrong reason and passes with the guard
+   * deleted — which is exactly what the first version of this test did.
+   */
+  const denseDay = (jumpAt: number | null) => Array.from({ length: 300 }, (_, i) => fix(
+    '2026-08-09T22:00:00.000Z', 'cartrack', 'velocity', {
+      offsetSeconds: i * 8,
+      providerEventId: `j-${i}`,
+      ignition: true,
+      speedKph: 60,
+      // Monotonic, so every other check passes it: a 50,000 km step between two fixes eight
+      // seconds apart. A unit swap or a device reset looks exactly like this.
+      odometerKm: jumpAt !== null && i >= jumpAt ? 60_000 + i * 0.13 : 10_000 + i * 0.13,
+      lat: -26.2,
+      lon: 28.0 + i * 0.0001,
+    },
+  ));
+
+  it('is complete when no reading leapt — the control for the case below', () => {
+    const [day] = foldVehicleDays(denseDay(null));
+    expect(day!.positionCount).toBe(300);
+    expect(day!.trackerSilenceSeconds).toBe(8);
+    expect(day!.coverageComplete).toBe(true);
+  });
+
+  it('falls back to the straight line and drops the completeness claim', () => {
+    const [day] = foldVehicleDays(denseDay(150));
+    // The 50,000 km step is refused; that interval contributes its GPS distance instead, which is
+    // metres. So the day's total stays in the tens of km rather than jumping by 50,000.
+    expect(day!.distanceKm).toBeLessThan(100);
+    expect(day!.coverageComplete).toBe(false);
+  });
+
+  it('still trusts a large but believable forward reading', () => {
+    // 900 km is under the ceiling. A snapshot feed can legitimately go quiet across a long haul,
+    // and refusing that would throw away the only distance those feeds supply.
+    const positions = [
+      fix(MORNING, 'ituran', 'avis', { offsetSeconds: 0, providerEventId: 'b-0', ignition: true, speedKph: 100, odometerKm: 10_000 }),
+      fix(MORNING, 'ituran', 'avis', { offsetSeconds: 36_000, providerEventId: 'b-1', ignition: true, speedKph: 100, odometerKm: 10_900 }),
+    ];
+    expect(foldVehicleDays(positions)[0]!.distanceKm).toBe(900);
+  });
+});
+
 describe('tracker silence', () => {
   it('reports the LARGEST gap, never the sum of gaps', () => {
     const positions = [
@@ -131,8 +220,15 @@ describe('tracker silence', () => {
       fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 1_500, ignition: true, speedKph: 0 }),
       fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: 1_800, ignition: true, speedKph: 0 }),
     ];
-    const [day] = foldVehicleDays(positions);
-    // Gaps are 600, 900, 300. The sum is 1,800 -- which is what a `+=` would report.
+    // A lead-in immediately before the first fix and a window closing on the last one, so the
+    // day's unobserved edges contribute nothing and this isolates the between-fix gaps. Without
+    // them the six hours before 06:00 SAST would dominate -- correctly, but not what is under
+    // test here.
+    const [day] = foldVehicleDays(positions, [], {
+      leadIn: fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: -8, providerEventId: 'lead', ignition: true, speedKph: 0 }),
+      windowEnd: positions[positions.length - 1]!.recordedAt,
+    });
+    // Gaps are 8, 600, 900, 300. The sum is 1,808 -- which is what a `+=` would report.
     expect(day!.trackerSilenceSeconds).toBe(900);
   });
 
@@ -210,6 +306,93 @@ describe('a day we did not observe', () => {
     // Both dates keep a real share -- lumping would have put the whole 5.8 km on the 11th.
     for (const day of crossing) expect(day.distanceKm).toBeGreaterThan(0);
     expect(crossing.reduce((km, d) => km + d.distanceKm, 0)).toBeCloseTo(5.8, 1);
+  });
+});
+
+describe('the unobserved edges of the window', () => {
+  /** 23:00 SAST, then 300 fixes 8 s apart — forty minutes of dense observation, and nothing else. */
+  const lateStart = () => velocityRun('2026-08-10T21:00:00.000Z', 300, [45]);
+
+  it('charges the whole head to silence when nothing was seen before the first fix', () => {
+    // Twenty-three hours nobody looked at, and every gap the fold can SEE is eight seconds. This
+    // is the row that used to report a complete day off forty minutes of evidence.
+    const [day] = foldVehicleDays(lateStart());
+    expect(day!.workDate).toBe('2026-08-10');
+    expect(day!.positionCount).toBe(300);
+    expect(day!.trackerSilenceSeconds).toBe(23 * 3_600);
+    expect(day!.coverageComplete).toBe(false);
+  });
+
+  it('measures the head from a lead-in when the caller supplies one', () => {
+    // The lead-in is the last position before the window opened: ten minutes earlier. The head is
+    // then a measured ten-minute gap and the day is judged on it like any other.
+    const leadIn = fix('2026-08-10T20:50:00.000Z', 'cartrack', 'velocity', {
+      offsetSeconds: 0, providerEventId: 'lead-in', ignition: true, speedKph: 45, odometerKm: 9_990,
+    });
+    const [day] = foldVehicleDays(lateStart(), [], { leadIn });
+    expect(day!.trackerSilenceSeconds).toBe(600);
+    expect(day!.coverageComplete).toBe(true);
+  });
+
+  it('ignores a lead-in from an earlier day for the head, because it says nothing about this one', () => {
+    // Midnight still bounds the claim: a fix at 18:00 the previous day is no evidence about the
+    // hours after 00:00.
+    const leadIn = fix('2026-08-09T16:00:00.000Z', 'cartrack', 'velocity', {
+      offsetSeconds: 0, providerEventId: 'far-lead-in', ignition: true, speedKph: 45,
+    });
+    const [day] = foldVehicleDays(lateStart(), [], { leadIn });
+    expect(day!.workDate).toBe('2026-08-10');
+    expect(day!.trackerSilenceSeconds).toBe(23 * 3_600);
+    expect(day!.coverageComplete).toBe(false);
+  });
+
+  it('emits no row for the lead-in day — it informs the window, it is not part of it', () => {
+    const leadIn = fix('2026-08-09T16:00:00.000Z', 'cartrack', 'velocity', {
+      offsetSeconds: 0, providerEventId: 'far-lead-in', ignition: true, speedKph: 45,
+    });
+    expect(foldVehicleDays(lateStart(), [], { leadIn }).map((d) => d.workDate)).toEqual(['2026-08-10']);
+  });
+
+  /**
+   * A whole SAST day: 400 fixes at a 216 s cadence, 00:00:00 through 23:56:24.
+   *
+   * 400 rather than 300 so the truncated half below still clears cartrack/velocity's expected
+   * minimum of 200 — otherwise the fix COUNT decides completeness and the tail gap under test
+   * proves nothing.
+   */
+  const DAY_START = '2026-08-09T22:00:00.000Z';
+  const wholeDay = () => velocityRun(DAY_START, 400, [45])
+    .map((p, i) => ({ ...p, recordedAt: new Date(Date.parse(DAY_START) + i * 216_000).toISOString() }));
+  /** The same day's tracker dying just before noon: 200 fixes, then nothing. */
+  const diesAtNoon = () => wholeDay().slice(0, 200);
+
+  it('judges a CLOSED day on its full 24 hours', () => {
+    const complete = foldVehicleDays(wholeDay(), [], { windowEnd: '2026-08-10T22:00:00.000Z' });
+    expect(complete[0]!.workDate).toBe('2026-08-10');
+    // 23:56:24 to midnight is one more cadence interval.
+    expect(complete[0]!.trackerSilenceSeconds).toBe(216);
+    expect(complete[0]!.coverageComplete).toBe(true);
+
+    const died = foldVehicleDays(diesAtNoon(), [], { windowEnd: '2026-08-10T22:00:00.000Z' });
+    // The last fix is at 11:56:24; everything after it is unobserved, so the closed day cannot
+    // be called complete.
+    expect(died[0]!.trackerSilenceSeconds).toBe(86_400 - 199 * 216);
+    expect(died[0]!.coverageComplete).toBe(false);
+  });
+
+  it('judges a day still IN PROGRESS only as far as the window has got', () => {
+    // The same truncated fixture, but the fold ran at noon rather than after midnight. The
+    // afternoon has not happened yet, so it is not held against the day.
+    const soFar = foldVehicleDays(diesAtNoon(), [], { windowEnd: '2026-08-10T10:00:00.000Z' });
+    expect(soFar[0]!.positionCount).toBe(200);
+    expect(soFar[0]!.trackerSilenceSeconds).toBe(216);
+    expect(soFar[0]!.coverageComplete).toBe(true);
+  });
+
+  it('claims no tail at all when the caller names no window end', () => {
+    // The documented default: "the window ended when observation ended".
+    const [day] = foldVehicleDays(diesAtNoon());
+    expect(day!.trackerSilenceSeconds).toBe(216);
   });
 });
 
@@ -307,6 +490,20 @@ describe('harsh events', () => {
       expect(Number.isInteger(count)).toBe(true);
       expect(count).toBe(0);
     }
+  });
+
+  it('counts a fix carrying BOTH a HARSH_ event and a g spike exactly once', () => {
+    // The firmware's own verdict wins. Consulting the g branch as well would double-count the one
+    // event — and it is the same event, not two.
+    const positions = [
+      fix(MORNING, 'cartrack', 'velocity', {
+        offsetSeconds: 0, providerEventId: 'both-0', ignition: true, speedKph: 95,
+        providerEventType: 'HARSH_BRAKING', linearG: -0.61, lateralG: 0.02,
+      }),
+    ];
+    const [day] = foldVehicleDays(positions);
+    expect(day!.harshBrakeEvents).toBe(1);
+    expect(day!.harshAccelEvents + day!.harshCornerEvents).toBe(0);
   });
 
   it('stores no harsh count at all on a vehicle-day whose g columns are constant zero', () => {

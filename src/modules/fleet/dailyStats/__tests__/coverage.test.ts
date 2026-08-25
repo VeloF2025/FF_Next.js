@@ -166,6 +166,47 @@ describe('coverageComplete', () => {
   });
 });
 
+describe('the coverage_complete boundaries, at the exact value', () => {
+  /**
+   * Both conditions are inclusive, and both are one character from being wrong. A `>` instead of
+   * `>=` marks a feed's typical day incomplete; a `<` instead of `<=` does the same for a silence
+   * sitting exactly on its allowance. Neither is visible in a fixture chosen a comfortable
+   * distance from the line, so every threshold is driven to its own value here.
+   */
+  const EXPECTED_MIN_FIXES: ReadonlyArray<readonly [string, string, number]> = [
+    ['cartrack', 'velocity', 200],
+    ['cartrack', 'urent', 4],
+    ['netstar', 'europcar', 2],
+    ['cartrack', 'a-new-unmeasured-account', 1],
+  ];
+
+  for (const [provider, account, minimum] of EXPECTED_MIN_FIXES) {
+    it(`accepts exactly ${minimum} fixes for ${provider}/${account}, and refuses one fewer`, () => {
+      const profile = feedProfile(provider, account);
+      expect(profile.expectedMinFixes).toBe(minimum);
+      expect(coverageComplete(minimum, 0, profile)).toBe(true);
+      expect(coverageComplete(minimum - 1, 0, profile)).toBe(false);
+    });
+  }
+
+  const MAX_GAPS: ReadonlyArray<readonly [string, string, number]> = [
+    ['cartrack', 'velocity', 3_600],
+    ['cartrack', 'urent', 14_400],
+    ['netstar', 'europcar', 14_400],
+    ['ituran', 'avis', 14_400],
+  ];
+
+  for (const [provider, account, allowance] of MAX_GAPS) {
+    it(`accepts a silence of exactly ${allowance} s for ${provider}/${account}, and refuses one more`, () => {
+      const profile = feedProfile(provider, account);
+      expect(profile.maxAllowedGapSeconds).toBe(allowance);
+      const fixes = profile.expectedMinFixes;
+      expect(coverageComplete(fixes, allowance, profile)).toBe(true);
+      expect(coverageComplete(fixes, allowance + 1, profile)).toBe(false);
+    });
+  }
+});
+
 describe('a fix with no feed', () => {
   it('still resolves a profile rather than throwing', () => {
     const orphan = fix(MORNING, '', '', { offsetSeconds: 0 });

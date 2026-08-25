@@ -25,6 +25,16 @@
  * rather than `>` re-feeds the boundary fix, which would otherwise be counted twice in
  * `position_count` and contribute a zero-length interval to nothing at all.
  *
+ * ## The window has two unobserved edges, and the caller owns them
+ *
+ * Silence is measured between fixes, so it cannot see the hours before the first or after the
+ * last. The caller therefore supplies `leadIn` (the last position BEFORE the window, whatever day
+ * it falls on) and `windowEnd`. `leadIn` is passed ONCE and never derived from the first batch --
+ * deriving it would make the result depend on how the input was paged, which is what the
+ * batch-invariance sweep forbids. `foldVehicleDays` defaults `windowEnd` to the last fix, which
+ * asserts "the window ended when observation ended"; the build service passes the real one. The
+ * arithmetic and its reasoning live in `dayWindow.ts`.
+ *
  * ## The SAST boundary
  *
  * SAST is UTC+2 with no DST, so 21:59:59Z is still today in Johannesburg and 22:00:00Z is already
@@ -43,47 +53,19 @@
  */
 import { coverageGforce, coverageProviderEvents } from './coverage';
 import {
-  intervalDistanceKm, intervalLabel, nextEventState, sastDay, splitAcrossDays,
+  dayStartMs, hasImplausibleOdometerJump, intervalDistanceKm, intervalLabel, MS_PER_DAY,
+  nextEventState, sastDay, splitAcrossDays,
 } from './dayIntervals';
+import { headGapMs, tailGapMs } from './dayWindow';
 import type { EventState } from './dayIntervals';
 import { finaliseDay, newDay } from './dayRow';
-import type { DayAcc, HarshKind } from './dayRow';
-import { HARSH_EVENT_TYPES } from './types';
+import type { DayAcc } from './dayRow';
+import { countHarsh } from './harshEvents';
+import {
+  DEFAULT_DAY_FOLD_OPTIONS,
+} from './dayFoldOptions';
+import type { DayFoldOptions, DayFoldWindow } from './dayFoldOptions';
 import type { DayPosition, DayTrip, VehicleDayStats } from './types';
-
-/**
- * Positions per page for the incremental build.
- *
- * 5,000 is roughly four `cartrack/velocity` vehicle-days at that feed's measured 1,169 fixes/day:
- * large enough that an ordinary rebuild is one page, small enough to stay well inside one query's
- * memory. Exported because the batch-invariance sweep must include the production value, or it
- * proves nothing about production.
- */
-export const DAY_FOLD_POSITION_BATCH_SIZE = 5_000;
-
-export interface DayFoldOptions {
-  /** Longer than this and the interval is counted toward duration but attributed to nothing. */
-  maxAttributableIntervalSeconds: number;
-  /**
-   * Harsh events below this speed are discarded.
-   *
-   * Not optional tuning: every live `HARSH_BRAKING` sample carried speed = 6 km/h, and 19 of the
-   * 20 g-derived braking events on the only vehicle reporting g were at <= 10 km/h. Without the
-   * gate this counter is a report on one broken device.
-   */
-  harshMinSpeedKph: number;
-  /** p99.9 of abs(linear_g) is 0.140; Cartrack's own firmware fires at 0.42-0.68. */
-  harshLinearG: number;
-  /** lateral_g is already an unsigned magnitude (min 0.000 over 237,419 rows). */
-  harshLateralG: number;
-}
-
-export const DEFAULT_DAY_FOLD_OPTIONS: DayFoldOptions = {
-  maxAttributableIntervalSeconds: 300,
-  harshMinSpeedKph: 20,
-  harshLinearG: 0.35,
-  harshLateralG: 0.35,
-};
 
 export interface DayFoldAccumulator {
   /** One page of this vehicle's positions, ascending, disjoint from every previous page. */
@@ -93,12 +75,20 @@ export interface DayFoldAccumulator {
   result(): VehicleDayStats[];
 }
 
-export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAccumulator {
+export function createDayFold(
+  options: Partial<DayFoldOptions> & DayFoldWindow = {},
+): DayFoldAccumulator {
   const opts: DayFoldOptions = { ...DEFAULT_DAY_FOLD_OPTIONS, ...options };
   const maxAttributableMs = opts.maxAttributableIntervalSeconds * 1_000;
   const days = new Map<string, DayAcc>();
+  const leadIn = options.leadIn ?? null;
+  const windowEndMs = options.windowEnd ? Date.parse(options.windowEnd) : null;
   let prev: DayPosition | null = null;
   let prevMs = 0;
+  // The first and last fix actually folded, for the window edges. Tracked here rather than derived
+  // in `result()` so they cannot be confused with a day the trips alone created.
+  let firstFixMs: number | null = null;
+  let lastFixMs: number | null = null;
   let eventState: EventState = null;
   let prevIsSpeeding: boolean | null = null;
   /**
@@ -109,40 +99,28 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
    */
   let idsAtPrevMs = new Set<string>();
 
+  if (leadIn !== null) {
+    // Seeded as the previous position WITHOUT being counted as one. Its own day may end up in the
+    // map because the interval out of it is apportioned across dates, but with no positions and no
+    // trips that day is dropped by `result()` -- the lead-in informs the window, it is not part
+    // of it.
+    const leadInMs = Date.parse(leadIn.recordedAt);
+    if (!Number.isFinite(leadInMs)) {
+      throw new Error(`dayFold: unparseable lead-in recordedAt ${leadIn.recordedAt}`);
+    }
+    prev = leadIn;
+    prevMs = leadInMs;
+    idsAtPrevMs = new Set([leadIn.providerEventId ?? '']);
+    eventState = nextEventState(null, leadIn);
+    prevIsSpeeding = leadIn.isSpeeding;
+  }
+
   function dayFor(workDate: string): DayAcc {
     const existing = days.get(workDate);
     if (existing) return existing;
     const created = newDay(workDate);
     days.set(workDate, created);
     return created;
-  }
-
-  function countHarsh(day: DayAcc, p: DayPosition): void {
-    if (p.speedKph === null || p.speedKph < opts.harshMinSpeedKph) return;
-    // `Object.hasOwn`, not a bare index. providerEventType is a provider's string held verbatim,
-    // so it can be anything, and `HARSH_EVENT_TYPES['constructor']` is a truthy FUNCTION rather
-    // than undefined.
-    //
-    // Defensive rather than a fix for a live defect, and the difference was measured rather than
-    // asserted: that stray lookup writes to a key named by the stringified function, so the three
-    // real counters are untouched and `finaliseDay` reads them by name. Hardened anyway, because
-    // the next reader of this lookup should not have to redo that reasoning to know it is safe.
-    const event = p.providerEventType;
-    const named = event !== null && Object.hasOwn(HARSH_EVENT_TYPES, event)
-      ? (HARSH_EVENT_TYPES as Record<string, HarshKind>)[event]
-      : undefined;
-    if (named) {
-      // The firmware computed this itself, on the vehicles whose g columns are structurally zero.
-      // It beats our own threshold for the same fix, so the g branch is not also consulted.
-      day.fromEvents[named] += 1;
-      return;
-    }
-    if (p.linearG !== null) {
-      if (p.linearG <= -opts.harshLinearG) day.fromG.brake += 1;
-      else if (p.linearG >= opts.harshLinearG) day.fromG.accel += 1;
-    }
-    // No abs(): lateral_g is already reported as an unsigned magnitude.
-    if (p.lateralG !== null && p.lateralG >= opts.harshLateralG) day.fromG.corner += 1;
   }
 
   function foldInterval(cur: DayPosition, curMs: number): void {
@@ -188,6 +166,11 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
 
     // Distance accrues even across an unattributable gap: the kilometres were really covered, and
     // only the split between moving and idling was unknowable.
+    // An odometer that leapt forward beyond belief is refused by intervalDistanceKm, which falls
+    // back to the straight line between the two fixes. That fallback is a guess about a feed we
+    // have just caught misreporting, so the day stops claiming complete coverage as well.
+    if (hasImplausibleOdometerJump(prev!, cur)) closingDay.carriedGapDistance = true;
+
     const km = intervalDistanceKm(prev!, cur);
     if (km <= 0) return;
 
@@ -233,6 +216,9 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
     }
     if (prev !== null) foldInterval(p, curMs);
 
+    if (firstFixMs === null) firstFixMs = curMs;
+    lastFixMs = curMs;
+
     const day = dayFor(sastDay(curMs));
     day.positionCount += 1;
     if (p.ignition !== null) day.fixesWithIgnition += 1;
@@ -253,12 +239,37 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
     const feed = day.feeds.get(key) ?? { provider: p.provider, accountRef: p.accountRef, count: 0 };
     feed.count += 1;
     day.feeds.set(key, feed);
-    countHarsh(day, p);
+    countHarsh(day, p, opts);
 
     eventState = nextEventState(eventState, p);
     prevIsSpeeding = p.isSpeeding;
     prev = p;
     prevMs = curMs;
+  }
+
+  /**
+   * Charges the two unobserved edges of the window to silence.
+   *
+   * Anchored on the first and last POSITION, never on the first and last emitted day: a day that
+   * exists only because a trip crossed into it was not observed by this fold at all, and giving it
+   * a head gap would be inventing a measurement about a date the positions never reached.
+   */
+  function applyWindowEdges(): void {
+    if (firstFixMs === null || lastFixMs === null) return;
+
+    const firstDay = sastDay(firstFixMs);
+    const head = headGapMs(
+      firstFixMs,
+      dayStartMs(firstDay),
+      leadIn === null ? null : Date.parse(leadIn.recordedAt),
+    );
+    const firstAcc = dayFor(firstDay);
+    firstAcc.largestGapMs = Math.max(firstAcc.largestGapMs, head);
+
+    const lastDay = sastDay(lastFixMs);
+    const tail = tailGapMs(lastFixMs, dayStartMs(lastDay) + MS_PER_DAY, windowEndMs ?? lastFixMs);
+    const lastAcc = dayFor(lastDay);
+    lastAcc.largestGapMs = Math.max(lastAcc.largestGapMs, tail);
   }
 
   return {
@@ -275,6 +286,7 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
     },
 
     result() {
+      applyWindowEdges();
       return [...days.values()]
         // A date the accumulator only ever touched while apportioning a silence across it is not
         // a vehicle-day we observed -- it is the shape of a gap. Emitting a row for it would
@@ -291,7 +303,7 @@ export function createDayFold(options: Partial<DayFoldOptions> = {}): DayFoldAcc
 export function foldVehicleDays(
   positions: readonly DayPosition[],
   trips: readonly DayTrip[] = [],
-  options: Partial<DayFoldOptions> = {},
+  options: Partial<DayFoldOptions> & DayFoldWindow = {},
 ): VehicleDayStats[] {
   const fold = createDayFold(options);
   fold.addPositions(positions);

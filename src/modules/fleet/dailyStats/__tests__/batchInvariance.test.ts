@@ -13,7 +13,8 @@
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { createDayFold, DAY_FOLD_POSITION_BATCH_SIZE, foldVehicleDays } from '../dayFold';
+import { createDayFold, foldVehicleDays } from '../dayFold';
+import { DAY_FOLD_POSITION_BATCH_SIZE } from '../dayFoldOptions';
 import type { DayPosition, VehicleDayStats } from '../types';
 import { ituranDayWithLongSilence, netstarDay, urentDay, velocityRun } from './fixtures';
 

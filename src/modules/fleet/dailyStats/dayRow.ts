@@ -99,6 +99,14 @@ export function finaliseDay(day: DayAcc): VehicleDayStats {
     harshBrakeEvents: (day.providerEvents ? day.fromEvents.brake : 0) + (day.gforce ? day.fromG.brake : 0),
     harshAccelEvents: (day.providerEvents ? day.fromEvents.accel : 0) + (day.gforce ? day.fromG.accel : 0),
     harshCornerEvents: (day.providerEvents ? day.fromEvents.corner : 0) + (day.gforce ? day.fromG.corner : 0),
+    // DELIBERATELY NOT nulled when coverageIgn is false, though the seconds beside them are.
+    //
+    // The two are different kinds of claim. `ignition_seconds` is a MEASUREMENT, and a feed whose
+    // fixes are hours apart cannot make it — hence the zeroing above. These two are OBSERVATIONS:
+    // a fix said `ignition = true` at this instant, and that is exactly as true on a two-hour feed
+    // as on an eight-second one. Nulling them would throw away the only usable answer a snapshot
+    // feed can give to "when did this vehicle first move today", and would do it in the name of
+    // honesty while actually discarding evidence.
     firstIgnitionAt: day.firstIgnitionAt,
     lastIgnitionAt: day.lastIgnitionAt,
     positionCount: day.positionCount,
