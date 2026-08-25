@@ -5,9 +5,12 @@
  * point-in-time fetchPositionAt and is live. This adds the window fetch the
  * poller needs without disturbing it.
  *
- * The events endpoint returns 44 fields; we keep the 14 that carry meaning.
+ * The events endpoint returns 57 fields; we keep the 15 that carry meaning.
  * The rest (temp1-4, analog_*, adc*, dynamic1-4, vext, vgsm, rpm) are
- * constant-zero or irrelevant to fleet safety.
+ * constant-zero or irrelevant to fleet safety. All 43 discarded fields were enumerated on
+ * 2026-08-25; the only one that carried a decision-grade signal was `event_description`, which is
+ * now kept. `input_state` remains the one unresolved lead -- an undocumented signed bitfield where
+ * a panic button would normally live. That is a question for Cartrack, not something to infer.
  *
  * Timestamp parsing reuses `parseSampleTs` from `./client` rather than
  * duplicating it — it already handles Cartrack's two-digit UTC offset
@@ -119,6 +122,9 @@ export function cartrackProvider(opts: CartrackProviderOptions): TrackingProvide
             bearing: num(r.bearing),
             altitudeM: num(r.altitude),
             gpsFixType: num(r.gps_fix_type),
+            providerEventType: typeof r.event_description === 'string' && r.event_description !== ''
+              ? r.event_description
+              : null,
           });
         }
         const lastPage = body.meta?.last_page ?? 1;

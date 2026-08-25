@@ -128,6 +128,8 @@ export function parseVehicleTree(body: unknown): NetstarTreeNode[] {
         odometerKm: null,
         linearG: null,
         lateralG: null,
+        // This feed exposes no event vocabulary of its own. Null, never a synthesised value.
+        providerEventType: null,
         bearing: num(r.Dir),
         altitudeM: null,
         gpsFixType: null,
