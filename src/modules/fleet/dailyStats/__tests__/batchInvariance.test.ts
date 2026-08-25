@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { createDayFold, foldVehicleDays } from '../dayFold';
 import { DAY_FOLD_POSITION_BATCH_SIZE } from '../dayFoldOptions';
 import type { DayPosition, VehicleDayStats } from '../types';
-import { ituranDayWithLongSilence, netstarDay, urentDay, velocityRun } from './fixtures';
+import { fix, ituranDayWithLongSilence, netstarDay, urentDay, velocityRun } from './fixtures';
 
 /**
  * A canonical hash of one row: every key, sorted, with its value.
@@ -76,6 +76,34 @@ describe('batch-size invariance', () => {
       }
     });
   }
+
+  it('stays invariant when the caller supplies a lead-in and a window end', () => {
+    // The window edges are the one thing in the fold that is NOT derived from the positions, so
+    // they are the obvious way to reintroduce batch dependence: derive the lead-in from the first
+    // batch instead of taking it from the caller, and batch size 1 sees a different lead-in from
+    // batch size 5,000. Supplied once, they cannot.
+    const positions = velocityRun('2026-08-10T21:00:00.000Z', 1_500, [55]);
+    const window = {
+      leadIn: fix('2026-08-10T20:50:00.000Z', 'cartrack', 'velocity', {
+        offsetSeconds: 0, providerEventId: 'invariance-lead-in', ignition: true, speedKph: 55,
+      }),
+      windowEnd: '2026-08-11T06:00:00.000Z',
+    };
+
+    const foldWindowed = (batchSize: number) => {
+      const fold = createDayFold(window);
+      for (let i = 0; i < positions.length; i += batchSize) {
+        fold.addPositions(positions.slice(i, i + batchSize));
+      }
+      return fold.result().map(rowHash);
+    };
+
+    const reference = foldWindowed(positions.length);
+    expect(reference.length).toBeGreaterThan(0);
+    for (const size of BATCH_SIZES) {
+      expect(foldWindowed(size), `batch size ${size}`).toEqual(reference);
+    }
+  });
 
   it('is not vacuous — the hash does distinguish two different rows', () => {
     const a = foldVehicleDays(velocityRun(MORNING, 20, [40]));
