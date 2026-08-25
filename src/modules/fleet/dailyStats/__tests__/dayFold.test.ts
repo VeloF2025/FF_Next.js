@@ -456,6 +456,90 @@ describe('the unobserved edges of the window', () => {
   });
 });
 
+/**
+ * The lead-in is seeded as the previous position, and "previous position" is four separate pieces
+ * of state, not one.
+ *
+ * Each is asserted on its own here because each fails INVISIBLY on its own: drop the event-state
+ * seed and measured idling silently becomes inferred moving; drop the speeding seed and one
+ * ongoing overspeed is re-counted as a fresh event on every window; drop the deduper seed and an
+ * inclusive watermark re-feeds the boundary fix with nothing to refuse it. The rows all still
+ * pass migration 528. `folds the interval out of the lead-in` above covers the fourth piece --
+ * the position itself -- and these cover the rest.
+ */
+describe('what a lead-in seeds', () => {
+  it('carries the provider IDLING state across the window edge, rather than re-inferring it', () => {
+    // Cartrack states IDLING_START exactly, and the sampled speed on an idling fix is not zero --
+    // the engine is running and the GPS is drifting. So the event decides, and it has to survive
+    // the window boundary: without the seed the state restarts as null, the closing fix's 30 km/h
+    // decides instead, and a measured minute of idling is booked as moving.
+    const leadIn = fix(MORNING, 'cartrack', 'velocity', {
+      offsetSeconds: -60, providerEventId: 'lead-idling', ignition: true, speedKph: 30,
+      providerEventType: 'IDLING_START',
+    });
+    const [day] = foldVehicleDays([
+      fix(MORNING, 'cartrack', 'velocity', {
+        offsetSeconds: 0, providerEventId: 'after-idling', ignition: true, speedKph: 30,
+      }),
+    ], [], { leadIn });
+
+    expect(day!.idleSeconds).toBe(60);
+    expect(day!.movingSeconds).toBe(0);
+    expect(day!.ignitionSeconds).toBe(60);
+  });
+
+  it('carries the speeding state, so an overspeed already under way is not re-counted', () => {
+    // speeding_events is a RISING EDGE count. A vehicle that was already speeding when the window
+    // opened has no rising edge inside it -- and an incremental build that re-counted one would
+    // add a fresh event on every window boundary, for as long as the overspeed lasted.
+    const leadIn = fix(MORNING, 'cartrack', 'velocity', {
+      offsetSeconds: -8, providerEventId: 'lead-speeding', ignition: true, speedKph: 130,
+      isSpeeding: true,
+    });
+    const stillSpeeding = [0, 8].map((offsetSeconds) => fix(MORNING, 'cartrack', 'velocity', {
+      offsetSeconds, providerEventId: `speeding-${offsetSeconds}`, ignition: true, speedKph: 130,
+      isSpeeding: true,
+    }));
+    const [day] = foldVehicleDays(stillSpeeding, [], { leadIn });
+
+    expect(day!.speedingEvents).toBe(0);
+    // The seconds are still measured -- it is only the EDGE that belongs to the earlier window.
+    expect(day!.speedingSeconds).toBe(16);
+  });
+
+  it('occupies its own instant in the deduper, so an inclusive watermark is still refused', () => {
+    // The lead-in IS the fix a `recorded_at >= watermark` read would hand back as the first row of
+    // the next window. Unseeded, the deduper has never seen it, the fold accepts it as an ordinary
+    // position, and it is counted twice across the two windows -- position_count inflated by a
+    // zero-length interval that contributes to nothing.
+    const leadIn = fix(MORNING, 'cartrack', 'velocity', {
+      offsetSeconds: 0, providerEventId: 'boundary-evt', ignition: true, speedKph: 0,
+    });
+    expect(() => foldVehicleDays([leadIn], [], { leadIn })).toThrow(/supplied twice/i);
+
+    // And it refuses that fix, not that instant: a genuine same-instant twin with its own id is
+    // ordinary production data and is still admitted.
+    const twin = fix(MORNING, 'cartrack', 'velocity', {
+      offsetSeconds: 0, providerEventId: 'twin-evt', ignition: false, speedKph: 0,
+    });
+    expect(foldVehicleDays([twin], [], { leadIn })[0]!.positionCount).toBe(1);
+  });
+
+  it('refuses a lead-in whose recordedAt cannot be parsed, rather than folding from NaN', () => {
+    // The lead-in is the fold's opening `prevMs`. An unparseable one makes every interval out of
+    // it NaN, which spreads into the day's silence and distance and lands in a BIGINT NOT NULL
+    // column one window after the caller's mistake. Named at the boundary instead.
+    for (const bad of ['not-a-date', '', '2026-13-45T99:00:00Z']) {
+      const leadIn = {
+        ...fix(MORNING, 'cartrack', 'velocity', { offsetSeconds: -60, ignition: true, speedKph: 0 }),
+        recordedAt: bad,
+      };
+      expect(() => foldVehicleDays(velocityRun(MORNING, 10, [45]), [], { leadIn }), bad)
+        .toThrow(/unparseable lead-in/);
+    }
+  });
+});
+
 describe('max speed', () => {
   it('is null when no fix in the day carried a speed', () => {
     const positions = [

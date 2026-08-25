@@ -82,13 +82,25 @@ describe('batch-size invariance', () => {
     // they are the obvious way to reintroduce batch dependence: derive the lead-in from the first
     // batch instead of taking it from the caller, and batch size 1 sees a different lead-in from
     // batch size 5,000. Supplied once, they cannot.
-    const positions = velocityRun('2026-08-10T21:00:00.000Z', 1_500, [55]);
+    //
+    // The fixture also has to EXERCISE the seeded state, or the sweep agrees at every batch size
+    // over a lead-in that changes nothing. So it opens already speeding, stops, and starts again:
+    // the resumption is a rising edge and the opening fix is not, which is only true if the
+    // lead-in's `isSpeeding` was seeded as the previous value.
+    const positions = velocityRun('2026-08-10T21:00:00.000Z', 1_500, [55])
+      .map((p, i) => ({ ...p, isSpeeding: i < 200 || (i >= 400 && i < 600) }));
     const window = {
       leadIn: fix('2026-08-10T20:50:00.000Z', 'cartrack', 'velocity', {
         offsetSeconds: 0, providerEventId: 'invariance-lead-in', ignition: true, speedKph: 55,
+        isSpeeding: true,
       }),
       windowEnd: '2026-08-11T06:00:00.000Z',
     };
+    // One edge, not two: the run resumes speeding at fix 400, and the fix it OPENS on continues
+    // an overspeed the lead-in was already in.
+    const totalSpeedingEvents = foldVehicleDays(positions, [], window)
+      .reduce((n, row) => n + row.speedingEvents, 0);
+    expect(totalSpeedingEvents).toBe(1);
 
     const foldWindowed = (batchSize: number) => {
       const fold = createDayFold(window);

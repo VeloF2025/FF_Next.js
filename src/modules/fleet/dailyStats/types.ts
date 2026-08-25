@@ -88,7 +88,29 @@ export interface VehicleDayStats {
   idleSeconds: number;
   distanceKm: number;
   maxSpeedKph: number | null;
+  /**
+   * Rising edges of the provider's `is_speeding` flag -- one per stretch, not one per fix.
+   *
+   * The edge is FOLD-GLOBAL, not per-day. A stretch of speeding that crosses SAST midnight is
+   * therefore counted once, on the day it began, and the second day reports
+   * `speedingSeconds > 0` with `speedingEvents === 0`. Measured: a run from 23:50 SAST at the
+   * cartrack/velocity cadence yields (1 event, 600 s) then (0 events, 1,792 s).
+   *
+   * So these sum correctly across days, and a single day's count does NOT answer "did this
+   * vehicle speed on this date". The same holds at a window boundary: a `leadIn` already
+   * speeding suppresses an edge on the first fix, which is what stops an incremental build
+   * re-counting one ongoing overspeed on every window.
+   */
   speedingEvents: number;
+  /**
+   * Seconds of speeding, subject to the fold's attribution ceiling like ignition time.
+   *
+   * `coverageIgnition === false` is a strong signal that this duration is unmeasurable, but not a
+   * guarantee that it is zero: that flag judges the day's MEDIAN gap while these seconds accrue
+   * per interval. Measured: an ituran/avis-shaped day of ~35-minute gaps with one 60 s pair
+   * closing on a speeding fix reports 60 here beside `coverageIgnition === false` and
+   * `ignitionSeconds === 0`.
+   */
   speedingSeconds: number;
   harshBrakeEvents: number;
   harshAccelEvents: number;

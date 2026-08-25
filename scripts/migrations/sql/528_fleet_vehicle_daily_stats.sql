@@ -92,7 +92,9 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_daily_stats (
   -- Duration, and it shares the fold's attribution ceiling with ignition time: only an interval
   -- short enough to attribute honestly contributes. So 0 seconds beside a non-zero
   -- speeding_events is not "a speeding event of no duration" -- it is a feed too coarse to
-  -- measure one, and coverage_ignition = false is the signal that says so.
+  -- measure one, and coverage_ignition = false is the signal that says so. A signal, not a
+  -- guarantee, and the reverse pairing is normal across a midnight straddle -- see the
+  -- COMMENT ON COLUMN below for both.
   speeding_seconds BIGINT NOT NULL DEFAULT 0,
   harsh_brake_events INTEGER NOT NULL DEFAULT 0,
   harsh_accel_events INTEGER NOT NULL DEFAULT 0,
@@ -213,7 +215,18 @@ COMMENT ON COLUMN fleet_vehicle_daily_stats.tracker_silence_seconds IS
   'hours before the first fix and after the last -- not only the gaps between fixes.';
 COMMENT ON COLUMN fleet_vehicle_daily_stats.speeding_seconds IS
   'Shares the fold''s attribution ceiling with ignition time. 0 beside a non-zero speeding_events '
-  'means the feed was too coarse to measure the duration, not that the event had none.';
+  'means the feed was too coarse to measure the duration, not that the event had none. '
+  'coverage_ignition = false is the STRONG SIGNAL for that case, not a guarantee of it: that flag '
+  'judges the day''s MEDIAN gap, while these seconds accrue per interval. An ituran/avis day of '
+  '~35-minute gaps carrying one 60 s pair whose closing fix was speeding stores 60 here with '
+  'coverage_ignition = false and ignition_seconds 0. Read the flag as "do not trust the duration", '
+  'never as "the duration is zero". '
+  'The converse is also normal: speeding_seconds > 0 beside speeding_events = 0 on the SECOND day '
+  'of an overspeed that crossed SAST midnight. speeding_events counts rising edges of the '
+  'provider''s is_speeding flag, and that edge is fold-global rather than per-day, so the stretch '
+  'is counted once -- on the day it began -- while both days carry the seconds that fell in them. '
+  'Summing events across days is therefore correct. Reading ONE day''s events as "did this '
+  'vehicle speed on this date" is not.';
 COMMENT ON COLUMN fleet_vehicle_daily_stats.coverage_gforce IS
   'A fix in THIS vehicle-day carried a non-zero linear_g or lateral_g. Never derived from the '
   'provider: six of seven cartrack/velocity vehicles report constant zero rather than null.';
