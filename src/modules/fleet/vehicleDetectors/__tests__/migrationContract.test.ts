@@ -32,6 +32,13 @@ function reversionedTypeLists(sql: string): string[][] {
 
 const expectedTypes = [...REVERSIONED_TELEMATICS_INCIDENT_TYPES].sort();
 
+/** The single statement that closes the four rules and opens their replacements. */
+function reversionStatement(): string {
+  const from = forward.indexOf('WITH closed AS (');
+  if (from < 0) throw new Error('529 no longer re-versions in one statement');
+  return forward.slice(from, forward.indexOf(';', from));
+}
+
 describe('the re-versioned incident types', () => {
   it('are exactly the four the TS constant names, in every list', () => {
     for (const list of reversionedTypeLists(forward)) expect(list.sort()).toEqual(expectedTypes);
@@ -51,16 +58,37 @@ describe('the re-versioned incident types', () => {
     // to `severity = 'critical'` is self-limiting instead — after the migration
     // no open row among the four is critical.
     const close = forward.slice(forward.indexOf('UPDATE fleet_operational_incident_rules'));
-    const statement = close.slice(0, close.indexOf(';'));
+    const statement = close.slice(0, close.indexOf('RETURNING'));
     expect(statement).toContain("severity = 'critical'");
     expect(statement).toContain('effective_to IS NULL');
     expect(statement).not.toMatch(/\bversion = \d/);
   });
 
+  it('closes and opens in ONE statement, so no execution mode can split the pair', () => {
+    // As two statements this is atomic only where something supplies a
+    // transaction. `psql -f` autocommits, and a failure between them leaves four
+    // incident types with no open rule at all.
+    const statement = reversionStatement();
+    expect(statement).toContain('UPDATE fleet_operational_incident_rules');
+    expect(statement).toContain('INSERT INTO fleet_operational_incident_rules');
+    expect(forward).not.toContain('CREATE TEMP TABLE');
+  });
+
+  it('carries the closed row effective_to into the new row effective_from', () => {
+    // Adjacency must be a DATA dependency, not two statements coincidentally
+    // observing the same now(). The rollback finds what to reopen by exactly
+    // this equality; if the instants could differ by a millisecond it would
+    // silently reopen nothing and exit 0.
+    const statement = reversionStatement();
+    expect(statement).toContain('RETURNING incident_type, effective_to');
+    expect(statement).toContain('closed.effective_to,');
+    // The new row's effective_from is the carried value, never a fresh read.
+    expect(statement).not.toMatch(/\n\s+now\(\),\n\s+true, 'high'/);
+  });
+
   it('insert at max(version) + 1 per type, and never swallow a collision', () => {
-    const insert = forward.slice(forward.indexOf('INSERT INTO fleet_operational_incident_rules'));
-    const statement = insert.slice(0, insert.indexOf(';'));
-    expect(statement).toContain('max(r.version) + 1');
+    const statement = reversionStatement();
+    expect(statement).toContain('max(existing.version) + 1');
     // A hard-coded 2 collides with an operator's own version 2, and
     // ON CONFLICT DO NOTHING would make that collision silent — leaving the
     // type critical with WhatsApp armed and the migration exiting 0.
@@ -70,27 +98,27 @@ describe('the re-versioned incident types', () => {
   it('insert at severity high with WhatsApp off and the morning summary on', () => {
     // `requiresMandatoryIncidentWhatsApp` is severity === 'critical' &&
     // producerKind === 'source_event'. 'high' is the whole mechanism.
-    const insert = forward.slice(forward.indexOf('INSERT INTO fleet_operational_incident_rules'));
-    const statement = insert.slice(0, insert.indexOf(';'));
+    const statement = reversionStatement();
     expect(statement).toContain("'high'");
-    expect(statement).not.toContain("'critical'");
+    expect(statement).not.toContain("'critical', false");
     expect(statement).toContain('whatsapp_enabled, include_in_morning_summary');
     expect(statement).toContain(TELEMATICS_REVERSION_CHANGE_REASON);
   });
 
-  it('close before opening, so the gist exclusion holds', () => {
-    const updateAt = forward.indexOf('UPDATE fleet_operational_incident_rules');
-    const insertAt = forward.indexOf('INSERT INTO fleet_operational_incident_rules');
-    expect(updateAt).toBeGreaterThan(-1);
-    expect(insertAt).toBeGreaterThan(updateAt);
+  it('closes before it opens, so the gist exclusion holds', () => {
+    const statement = reversionStatement();
+    expect(statement.indexOf('UPDATE fleet_operational_incident_rules'))
+      .toBeLessThan(statement.indexOf('INSERT INTO fleet_operational_incident_rules'));
   });
 
-  it('carry no explicit BEGIN, because the runner already opens the transaction', () => {
-    // scripts/migrations/run.ts wraps every forward file in BEGIN/COMMIT. An
-    // explicit BEGIN here nests and the COMMIT would end the runner's
-    // transaction early, splitting the close and the insert into two commits.
+  it('carry no explicit BEGIN — psql -1 already wraps the file AND its record', () => {
+    // Measured on PostgreSQL 15: with an inner BEGIN/COMMIT, a failure in the
+    // trailing `-c "INSERT INTO schema_migrations ..."` leaves the migration
+    // APPLIED and UNRECORDED, and an unrecorded migration re-runs next deploy.
+    // Atomicity for the one pair that needs it comes from being one statement.
     expect(forward).not.toMatch(/^\s*BEGIN\s*;/mi);
     expect(forward).not.toMatch(/^\s*COMMIT\s*;/mi);
+    expect(forward).toContain('run-pending-migrations.sh:127');
   });
 });
 

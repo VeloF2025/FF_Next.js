@@ -198,20 +198,44 @@ async function closedHistoricVersion(type: string, version: number): Promise<voi
 }
 
 /**
- * The rollback's statements, one per array entry.
+ * Split a migration file into its statements, respecting `$$` dollar-quoting.
  *
  * Sent SEPARATELY, which is the whole point: a multi-statement simple query is
- * wrapped in an implicit transaction by Postgres, so running the file as one
+ * wrapped in an implicit transaction by Postgres, so running a file as one
  * `query()` is atomic whether or not it contains a BEGIN — and a test that does
  * that cannot tell the two apart. `psql -f` sends them one at a time.
  */
+function splitStatements(sql: string): string[] {
+  const body = sql.split('\n').filter((line) => !line.trim().startsWith('--')).join('\n');
+  const statements: string[] = [];
+  let current = '';
+  let inDollarQuote = false;
+  for (let index = 0; index < body.length; index += 1) {
+    if (body.startsWith('$$', index)) {
+      inDollarQuote = !inDollarQuote;
+      current += '$$';
+      index += 1;
+      continue;
+    }
+    const character = body[index]!;
+    if (character === ';' && !inDollarQuote) {
+      statements.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += character;
+  }
+  if (current.trim()) statements.push(current.trim());
+  return statements.filter((statement) => statement.length > 0);
+}
+
+/** The forward migration as psql -f would send it. */
+function forwardStatements(): string[] {
+  return splitStatements(FORWARD);
+}
+
 function rollbackStatements({ withTransaction }: { withTransaction: boolean }): string[] {
-  const statements = ROLLBACK.split('\n')
-    .filter((line) => !line.trim().startsWith('--'))
-    .join('\n')
-    .split(';')
-    .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0);
+  const statements = splitStatements(ROLLBACK);
   return withTransaction ? statements : statements.filter((s) => !/^(BEGIN|COMMIT)$/i.test(s));
 }
 
@@ -425,6 +449,87 @@ describe('a database an operator has already edited', () => {
     );
     expect(counts.rows).toHaveLength(SEEDED_OPEN_RULE_COUNT);
     for (const row of counts.rows) expect(row.count, row.incident_type).toBe(1);
+  });
+});
+
+describe('applied one statement at a time, the way psql -f sends them', () => {
+  // The deploy path is scripts/run-pending-migrations.sh:127, which uses
+  // `psql -1` and so supplies a transaction. A hand-run `psql -f` does not, and
+  // the plan's own rollback instructions show exactly that invocation. Nothing
+  // in this file may depend on an ambient transaction.
+
+  async function applyForwardSplit(): Promise<void> {
+    const client = await db.connect();
+    try {
+      for (const statement of forwardStatements()) await client.query(statement);
+    } finally {
+      client.release();
+    }
+  }
+
+  it('leaves exactly 14 open rules with the four at high', async () => {
+    await applyForwardSplit();
+
+    const open = await openIncidentRules();
+    expect(open).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+    for (const type of REVERSIONED_TELEMATICS_INCIDENT_TYPES) {
+      expect(open.find((row) => row.incident_type === type), type).toMatchObject({
+        version: 2, severity: 'high', whatsapp_enabled: false,
+      });
+    }
+  });
+
+  it('leaves each closed row exactly adjacent to its replacement', async () => {
+    // This is the property the rollback identifies its target by. Two separate
+    // statements observing `now()` independently differ by milliseconds, and
+    // the rollback would then match nothing, delete 529's rows, reopen none,
+    // and exit 0 — four incident types stranded with no effective rule.
+    await applyForwardSplit();
+
+    const rows = await db.query<{ incident_type: string; adjacent: boolean }>(
+      `SELECT authored.incident_type,
+              EXISTS (
+                SELECT 1 FROM fleet_operational_incident_rules closed
+                 WHERE closed.incident_type = authored.incident_type
+                   AND closed.effective_to = authored.effective_from
+              ) AS adjacent
+         FROM fleet_operational_incident_rules authored
+        WHERE authored.change_reason = $1 AND authored.effective_to IS NULL
+        ORDER BY authored.incident_type`,
+      [TELEMATICS_REVERSION_CHANGE_REASON],
+    );
+
+    expect(rows.rows).toHaveLength(REVERSIONED_TELEMATICS_INCIDENT_TYPES.length);
+    for (const row of rows.rows) expect(row.adjacent, row.incident_type).toBe(true);
+  });
+
+  it('and a statement-by-statement rollback puts all 14 back', async () => {
+    await applyForwardSplit();
+
+    const client = await db.connect();
+    try {
+      for (const statement of rollbackStatements({ withTransaction: true })) await client.query(statement);
+    } finally {
+      client.release();
+    }
+
+    const open = await openIncidentRules();
+    expect(open).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+    for (const type of REVERSIONED_TELEMATICS_INCIDENT_TYPES) {
+      expect(open.find((row) => row.incident_type === type), type).toMatchObject({
+        version: 1, severity: 'critical', whatsapp_enabled: true,
+      });
+    }
+    expect(await authoredCount()).toBe(0);
+  });
+
+  it('is still a no-op on a second split run', async () => {
+    await applyForwardSplit();
+    const afterFirst = await openIncidentRules();
+
+    await applyForwardSplit();
+
+    expect(await openIncidentRules()).toEqual(afterFirst);
   });
 });
 

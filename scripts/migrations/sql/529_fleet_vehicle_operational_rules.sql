@@ -15,13 +15,28 @@
 -- lever, so the four non-emergency types drop to 'high'. `accident_sos` and
 -- `theft_after_hours_movement` stay critical and stay on WhatsApp — deliberately.
 --
--- NO explicit BEGIN/COMMIT here. scripts/migrations/run.ts:151 already wraps the whole
--- file in one transaction, and tests/migrations apply it as a single simple query, which
--- Postgres also wraps implicitly. An explicit BEGIN would nest (a warning) and the
--- COMMIT would end the runner's transaction early. The close-then-insert below is
--- therefore atomic, which is what the gist exclusion constraint needs: both statements
--- see the same transaction `now()`, and the '[)' range is half-open, so version 1's
--- effective_to and version 2's effective_from meeting at that instant do not overlap.
+-- NO explicit BEGIN/COMMIT here, and that is load-bearing.
+--
+-- Forward migrations are applied by scripts/run-pending-migrations.sh:127 as
+--
+--     psql -v ON_ERROR_STOP=1 -q -1 -c '\i <file>' -c 'INSERT INTO schema_migrations ...'
+--
+-- `-1` already wraps BOTH the file and the schema_migrations record in ONE
+-- transaction. An explicit BEGIN inside the file nests (a warning) and the
+-- COMMIT ends that transaction early, so the record insert then autocommits
+-- separately. Measured on PostgreSQL 15: with an inner BEGIN/COMMIT, a failure
+-- in the trailing -c leaves the migration APPLIED and UNRECORDED — and an
+-- unrecorded migration re-runs on the next deploy. Without it, `-1` rolls
+-- everything back correctly.
+--
+-- (run.ts:151 wraps a transaction too, but that is the ROLLBACK path —
+-- `npm run db:migrate rollback <n>` — not this one.)
+--
+-- The one place a file genuinely needs its own atomicity is the incident-rule
+-- re-versioning at the foot of this file, because closing a row and opening its
+-- replacement are only correct together. That is solved by making them a single
+-- statement, which is atomic in every execution mode without any transaction
+-- control at all — including a hand-run `psql -f`, which autocommits.
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
@@ -117,15 +132,27 @@ ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN N
 --     exiting 0. There is deliberately no ON CONFLICT clause here: a collision
 --     must fail the migration loudly.
 --
--- Split into a close and an insert over a temporary table rather than one
--- data-modifying CTE. That is a CLARITY choice, not a correctness one: the
--- single-statement CTE form was tested on PostgreSQL 15 and the exclusion
--- constraint accepts it, because the meeting endpoints of two half-open ranges
--- do not overlap however the rows are written. The temp table is kept because
--- it names the set the insert operates on — the types just closed — instead of
--- burying it in a CTE whose UPDATE and INSERT have to be read together.
-DROP TABLE IF EXISTS mig529_reversioned;
-CREATE TEMP TABLE mig529_reversioned AS
+-- ONE statement, for two independent reasons.
+--
+--   * Atomicity in every mode. Closing a row and opening its replacement are
+--     only correct together: the close alone leaves four incident types with NO
+--     open rule, and `loadEffectiveIncidentRule` throws for a type with no open
+--     row — taking the whole operational monitor down. As two statements this
+--     holds only where something supplies a transaction; as one statement it
+--     holds under `psql -f` autocommit too.
+--   * `c.effective_to` is carried out of the UPDATE by RETURNING and used as the
+--     new row's `effective_from`. Adjacency is then a DATA DEPENDENCY, not a
+--     coincidence of two statements happening to observe the same `now()`. The
+--     rollback identifies what to reopen by exactly this equality, so if the two
+--     instants could ever differ — by a millisecond, under any execution mode —
+--     the rollback would silently reopen nothing and exit 0.
+--
+-- The half-open '[)' ranges therefore MEET rather than overlap, which is what
+-- the gist exclusion constraint requires.
+--
+-- No ON CONFLICT clause: hard-coding a version collides with an operator's
+-- existing one, and ON CONFLICT DO NOTHING would make that collision silent —
+-- leaving the type critical with WhatsApp armed and the migration exiting 0.
 WITH closed AS (
   UPDATE fleet_operational_incident_rules
      SET effective_to = now(), updated_at = now()
@@ -134,28 +161,21 @@ WITH closed AS (
      AND incident_type = ANY(ARRAY[
        'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
      ]::text[])
-  RETURNING incident_type
+  RETURNING incident_type, effective_to
 )
-SELECT incident_type FROM closed;
-
 INSERT INTO fleet_operational_incident_rules (
   incident_type, version, effective_from, creates_incident, severity, immediate_notification,
   in_app_enabled, email_enabled, whatsapp_enabled, include_in_morning_summary,
   acknowledgement_target_minutes, change_reason
 )
-SELECT c.incident_type,
-       (SELECT max(r.version) + 1 FROM fleet_operational_incident_rules r WHERE r.incident_type = c.incident_type),
-       now(), true, 'high', false, true, true, false, true, 5,
+SELECT closed.incident_type,
+       (SELECT max(existing.version) + 1 FROM fleet_operational_incident_rules existing
+         WHERE existing.incident_type = closed.incident_type),
+       closed.effective_to,
+       true, 'high', false, true, true, false, true, 5,
        'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast'
-  FROM mig529_reversioned c;
+  FROM closed;
 
-DROP TABLE mig529_reversioned;
-
--- Two keys, deliberately split by audience (plan §3.2). `fleet.vehicle-stats`
--- is read-only and wide — PR6's per-vehicle stats API and page gate on it.
--- `fleet.vehicle-rules` edits thresholds that arm and disarm detectors, so it
--- stays with admins. Seeding vehicle-stats here rather than in PR6 keeps the
--- permission and the rule it describes in one migration.
 INSERT INTO access_permissions (type, key, parent_key, label, description, route, sort_order, is_active)
 VALUES
   ('page', 'fleet.vehicle-stats', 'fleet', 'Vehicle Stats', 'View per-vehicle telematics day statistics', '/fleet/vehicles', 27, true),
