@@ -118,9 +118,12 @@ ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN N
 --     must fail the migration loudly.
 --
 -- Split into a close and an insert over a temporary table rather than one
--- data-modifying CTE: the exclusion constraint checks an inserted row against a
--- dirty snapshot, and a row UPDATEd by the same command can still read as open
--- to that check. Two statements in one transaction have no such ambiguity.
+-- data-modifying CTE. That is a CLARITY choice, not a correctness one: the
+-- single-statement CTE form was tested on PostgreSQL 15 and the exclusion
+-- constraint accepts it, because the meeting endpoints of two half-open ranges
+-- do not overlap however the rows are written. The temp table is kept because
+-- it names the set the insert operates on — the types just closed — instead of
+-- burying it in a CTE whose UPDATE and INSERT have to be read together.
 DROP TABLE IF EXISTS mig529_reversioned;
 CREATE TEMP TABLE mig529_reversioned AS
 WITH closed AS (
