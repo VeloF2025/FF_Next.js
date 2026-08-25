@@ -243,7 +243,7 @@ describe('nothing reads the base table behind the view', () => {
   });
 
   /**
-   * The retention gate no longer reads aggregates at all — migration 528 gave
+   * The retention gate no longer reads aggregates at all — migration 530 gave
    * it a recorded fact to read instead, because counting published rows made a
    * correctly-aggregated month that published nothing look like a month that
    * was never aggregated.

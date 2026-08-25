@@ -1,5 +1,5 @@
 /**
- * The deletion gate reads recorded coverage, not published rows (migration 528).
+ * The deletion gate reads recorded coverage, not published rows (migration 530).
  *
  * The distinction these tests hold: "this month published no aggregates" and
  * "this month was never aggregated" are different facts, and only one of them

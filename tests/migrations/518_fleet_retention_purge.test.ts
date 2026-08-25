@@ -39,10 +39,10 @@ const RETENTION = readFileSync(join(SQL_DIR, '518_fleet_operational_analytics_re
 const DELETE_GRANTS = readFileSync(join(SQL_DIR, '521_fleet_retention_delete_grants.sql'), 'utf8');
 // 527 creates the published view, which the analytics read path uses.
 const PUBLISHED_VIEW = readFileSync(join(SQL_DIR, '527_fleet_aggregates_published_view.sql'), 'utf8');
-// 528 creates the coverage table. `hasCompleteAggregateCoverage` reads it
+// 530 creates the coverage table. `hasCompleteAggregateCoverage` reads it
 // rather than counting aggregate rows, so the gate cannot be exercised without
 // it — the table is part of this fixture's schema, not an optional extra.
-const COVERAGE = readFileSync(join(SQL_DIR, '528_fleet_aggregate_month_coverage.sql'), 'utf8');
+const COVERAGE = readFileSync(join(SQL_DIR, '530_fleet_aggregate_month_coverage.sql'), 'utf8');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
@@ -224,7 +224,7 @@ async function seedAggregateRow(monthStart: string): Promise<void> {
 }
 
 /**
- * The recorded fact that a month was aggregated (migration 528) — what the gate
+ * The recorded fact that a month was aggregated (migration 530) — what the gate
  * actually reads. `rowCount` is deliberately a parameter: zero is a complete,
  * valid answer and is the case the old row-counting gate got wrong.
  */
@@ -556,7 +556,7 @@ describe('aggregate coverage gate', () => {
   });
 
   /**
-   * The defect migration 528 closes, against a real database.
+   * The defect migration 530 closes, against a real database.
    *
    * A month can be aggregated fully and correctly and publish NOTHING — the
    * release rule withholds a metric whose support is empty rather than storing

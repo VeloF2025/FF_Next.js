@@ -194,7 +194,7 @@ export async function listIncidentStorageObjects(incidentId: string): Promise<In
  * The coverage gate. Identifiable detail may only be deleted once the month has
  * been aggregated under the metric version in force.
  *
- * Reads the RECORDED fact (migration 528) rather than counting published rows.
+ * Reads the RECORDED fact (migration 530) rather than counting published rows.
  * Those are not the same question, and the difference has one direction: a
  * month can be aggregated fully and correctly and publish nothing at all,
  * because the release rule withholds a metric with empty support rather than

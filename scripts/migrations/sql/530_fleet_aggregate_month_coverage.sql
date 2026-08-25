@@ -1,4 +1,4 @@
--- 528_fleet_aggregate_month_coverage.sql
+-- 530_fleet_aggregate_month_coverage.sql
 --
 -- Records, explicitly, that a month was aggregated — so retention's deletion
 -- gate stops inferring it from the presence of aggregate rows.

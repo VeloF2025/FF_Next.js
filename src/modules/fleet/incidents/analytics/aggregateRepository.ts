@@ -136,7 +136,7 @@ export async function replaceMonth(
     );
 
     // Coverage is recorded HERE, in the same transaction as the rows it
-    // attests to (migration 528). A separate write after the fact could commit
+    // attests to (migration 530). A separate write after the fact could commit
     // while the rows did not, and the consequence of that particular lie is
     // retention deleting identifiable detail against an aggregate that was
     // never written.

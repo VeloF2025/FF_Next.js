@@ -1,5 +1,5 @@
 /**
- * Coverage recording (migration 528).
+ * Coverage recording (migration 530).
  *
  * The defect being closed: a month can be aggregated fully and correctly and
  * publish nothing — the release rule withholds a metric whose support is empty

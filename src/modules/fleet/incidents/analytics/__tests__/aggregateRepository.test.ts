@@ -118,7 +118,7 @@ describe('replaceMonth', () => {
         : c.sql.includes('aggregates:insert') ? 'insert'
         : c.sql.includes('retire-other-versions') ? 'retire'
         : c.sql.includes('record-coverage') ? 'coverage' : 'other');
-    // Coverage last (migration 528): it asserts the rows above exist, so
+    // Coverage last (migration 530): it asserts the rows above exist, so
     // anything that throws before it must leave no coverage row behind.
     expect(kinds).toEqual(['clear', 'insert', 'retire', 'coverage']);
     expect(calls[2]?.params).toEqual(['2026-07-01', 2]);
