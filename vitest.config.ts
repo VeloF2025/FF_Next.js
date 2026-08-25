@@ -47,6 +47,7 @@ export default defineConfig({
       'tests/migrations/521_fleet_retention_delete_grants.test.ts',
       'tests/migrations/518_fleet_retention_purge.test.ts',
       'tests/migrations/527_fleet_aggregates_published_view.test.ts',
+      'tests/migrations/529_fleet_vehicle_operational_rules.test.ts',
       'tests/migrations/358_snag_reports_scope.test.ts',
       'tests/migrations/378_rbac_field_stock_force_correct.test.ts',
       'tests/migrations/471_hs_training_certificate_upload.test.ts',
