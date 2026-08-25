@@ -47,7 +47,8 @@ export interface StockTake {
   created_by?: string;
   updated_by?: string;
 
-  // Computed (from view)
+  // Computed (from view / API join)
+  created_by_name?: string;
   location_name?: string;
   location_code?: string;
   warehouse_name?: string;

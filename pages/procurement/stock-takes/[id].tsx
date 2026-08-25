@@ -294,6 +294,11 @@ export default function StockTakeDetailPage() {
                 {getStatusBadge(stockTake.status)}
               </div>
               <p className="text-gray-400 text-sm mt-1">{stockTake.reference_number}</p>
+              <p className="text-gray-400 text-sm mt-1">
+                {[stockTake.location_name, stockTake.warehouse_name, stockTake.project_name].filter(Boolean).join(' · ') || 'No site'}
+                {' · '}
+                {stockTake.created_by_name ? `Started by ${stockTake.created_by_name}` : 'Started by unknown'}
+              </p>
               {stockTake.description && (
                 <p className="text-gray-400 text-sm mt-2">{stockTake.description}</p>
               )}
@@ -467,6 +472,7 @@ export default function StockTakeDetailPage() {
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Expected</th>
                 )}
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Counted</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Counted by</th>
                 {!isBlindCount && (
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Variance</th>
                 )}
@@ -477,7 +483,7 @@ export default function StockTakeDetailPage() {
             <tbody>
               {filteredLines.length === 0 ? (
                 <tr>
-                  <td colSpan={4 + (isBlindCount ? 0 : 2) + (canEdit ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={5 + (isBlindCount ? 0 : 2) + (canEdit ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">
                     <Box className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>No items to display</p>
                     {stockTake.status === 'draft' && lines.length === 0 && (
@@ -518,6 +524,9 @@ export default function StockTakeDetailPage() {
                           {line.counted_quantity !== null ? line.counted_quantity : '-'}
                         </span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-left text-sm text-gray-300">
+                      {line.recounted_by_name || line.counted_by_name || '-'}
                     </td>
                     {!isBlindCount && (
                     <td className="px-4 py-3 text-right">
