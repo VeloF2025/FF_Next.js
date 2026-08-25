@@ -110,6 +110,8 @@ export function parseAllActivityCsv(csv: string): ProviderPosition[] {
       odometerKm: parseDecimalComma(row[COLUMNS.odometer]),
       linearG: null,
       lateralG: null,
+      // This feed exposes no event vocabulary of its own. Null, never a synthesised value.
+      providerEventType: null,
       bearing: null,             // no heading column in this export
       altitudeM: null,
       gpsFixType: null,

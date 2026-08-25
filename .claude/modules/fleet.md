@@ -1595,6 +1595,13 @@ speed_kph=0` fires on 12–23 % of fixes everywhere:
 | `cartrack/urent` | 6 | 17.6 % |
 | `ituran/avis` | 3 | 12.1 % |
 
+> **Superseded by PR1 (mig 528).** Idle-feasible FIXES are not idle SECONDS: attributing an interval
+> needs both ends close together, and only `cartrack/velocity` (8 s median gap) clears the 300 s
+> attribution ceiling. `coverage_ignition` therefore means MEASURABLE — ignition asserted on ≥90 % of
+> fixes **AND** the day's median gap ≤ the ceiling — so `cartrack/urent`, `netstar/europcar` and
+> `ituran/avis` fold to `coverage_ignition = false` with ignition/moving/idle at 0, rather than
+> publishing a zero that reads as a parked vehicle.
+
 Days with ≥1 fix out of 30: all seven `cartrack/velocity` vehicles 23–31; every `netstar`, `ituran`
 and two `urent` vehicles exactly **19** (13 for one), because those feeds only went live 2026-08-06/07.
 Coverage denominators must start at the vehicle's first position, never at 30.
