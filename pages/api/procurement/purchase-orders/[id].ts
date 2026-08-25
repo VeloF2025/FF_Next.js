@@ -497,7 +497,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           const total = qty * price;
           await sql`
             UPDATE purchase_order_items
-            SET quantity_ordered = ${qty}, unit_price = ${price}, total_price = ${total}, updated_at = NOW()
+            SET quantity_ordered = ${qty}, unit_price = ${price}, total_price = ${total}
             WHERE id = ${item.id} AND purchase_order_id = ${id}
           `;
         }
