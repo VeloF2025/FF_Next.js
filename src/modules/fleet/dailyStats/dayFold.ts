@@ -35,6 +35,19 @@
  * asserts "the window ended when observation ended"; the build service passes the real one. The
  * arithmetic and its reasoning live in `dayWindow.ts`.
  *
+ * ## A row is only meaningful if the window covers that day's whole span
+ *
+ * The three contracts above make a fold correct for the window it was given. This one is about
+ * which windows are worth asking for. `coverage_complete`, `tracker_silence_seconds` and every
+ * ignition-derived second describe A DAY -- so a window that opens or closes mid-day yields a row
+ * describing only the part it saw, which is honest but is not the day.
+ *
+ * The head and tail machinery makes that visible rather than hidden: a partial day reports the
+ * unobserved remainder as silence and gives up its completeness claim. It does not make the row
+ * a whole-day row. So an incremental caller must open its window at a SAST day boundary (or at a
+ * `leadIn` that reaches back to one) and either close it at a boundary or accept that the final
+ * day is still in progress. PR2's build service does exactly this.
+ *
  * ## The SAST boundary
  *
  * SAST is UTC+2 with no DST, so 21:59:59Z is still today in Johannesburg and 22:00:00Z is already
@@ -56,7 +69,7 @@ import {
   hasImplausibleOdometerJump, intervalDistanceKm, intervalLabel, nextEventState, sastDay,
   splitAcrossDays,
 } from './dayIntervals';
-import { assertWindowCoversLastFix, parseWindowEnd, windowEdges } from './dayWindow';
+import { parseWindowEnd, windowEdgeSilence } from './dayWindow';
 import type { EventState } from './dayIntervals';
 import { finaliseDay, newDay } from './dayRow';
 import type { DayAcc } from './dayRow';
@@ -224,19 +237,6 @@ export function createDayFold(
     prevMs = curMs;
   }
 
-  /** Charges the two unobserved edges of the window to silence. See `dayWindow.ts`. */
-  function applyWindowEdges(): void {
-    if (firstFixMs === null || lastFixMs === null) return;
-    assertWindowCoversLastFix(windowEndMs, lastFixMs);
-    const edges = windowEdges(
-      firstFixMs, lastFixMs, leadIn === null ? null : Date.parse(leadIn.recordedAt), windowEndMs,
-    );
-    const firstAcc = dayFor(edges.firstDay);
-    firstAcc.largestGapMs = Math.max(firstAcc.largestGapMs, edges.headMs);
-    const lastAcc = dayFor(edges.lastDay);
-    lastAcc.largestGapMs = Math.max(lastAcc.largestGapMs, edges.tailMs);
-  }
-
   return {
     addPositions(batch) { for (const p of batch) addPosition(p); },
 
@@ -251,7 +251,11 @@ export function createDayFold(
     },
 
     result() {
-      applyWindowEdges();
+      // Recomputed per call and never stored -- see `windowEdgeSilence` for what accumulating it
+      // cost. This is what makes result() repeatable.
+      const edgeSilence = windowEdgeSilence(
+        firstFixMs, lastFixMs, leadIn === null ? null : Date.parse(leadIn.recordedAt), windowEndMs,
+      );
       return [...days.values()]
         // A date the accumulator only ever touched while apportioning a silence across it is not
         // a vehicle-day we observed -- it is the shape of a gap. Emitting a row for it would
@@ -260,7 +264,7 @@ export function createDayFold(
         // an observation, just one whose positions have aged out.
         .filter((day) => day.positionCount > 0 || day.tripIgnitionMs > 0)
         .sort((a, b) => a.workDate.localeCompare(b.workDate))
-        .map(finaliseDay);
+        .map((day) => finaliseDay(day, edgeSilence.get(day.workDate) ?? 0));
     },
   };
 }

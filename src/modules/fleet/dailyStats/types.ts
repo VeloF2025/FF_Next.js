@@ -96,7 +96,12 @@ export interface VehicleDayStats {
   firstIgnitionAt: string | null;
   lastIgnitionAt: string | null;
   positionCount: number;
-  /** The LARGEST gap between consecutive fixes in the day, not the sum of gaps. */
+  /**
+   * The LARGEST unobserved stretch in the day, not the sum of them.
+   *
+   * Includes the window's HEAD and TAIL -- the hours before the first fix and after the last --
+   * not only the gaps between fixes. See `dayWindow.ts`.
+   */
   trackerSilenceSeconds: number;
   provider: string | null;
   accountRef: string | null;

@@ -105,6 +105,57 @@ describe('batch-size invariance', () => {
     }
   });
 
+});
+
+describe('result() is a read, not a write', () => {
+  /** A whole SAST day at a 216 s cadence: 400 fixes, 00:00:00 through 23:56:24. */
+  const DAY_START = '2026-08-09T22:00:00.000Z';
+  const WINDOW_END = '2026-08-10T22:00:00.000Z';
+  const wholeDay = () => velocityRun(DAY_START, 400, [45])
+    .map((p, i) => ({ ...p, recordedAt: new Date(Date.parse(DAY_START) + i * 216_000).toISOString() }));
+
+  it('called MID-STREAM does not poison the rows that come after it', () => {
+    // The tail gap depends on windowEnd and on the last fix seen SO FAR. Written into the
+    // accumulator, a mid-stream result() baked in a tail measured against a half-finished
+    // window: the day reported 43,416 s of silence instead of 216 s and flipped
+    // coverage_complete to false — and the row passed every CHECK in migration 528, so nothing
+    // downstream would have caught it.
+    const all = wholeDay();
+    const streamed = createDayFold({ windowEnd: WINDOW_END });
+    streamed.addPositions(all.slice(0, 200));
+    const midStream = streamed.result();
+    streamed.addPositions(all.slice(200));
+    const afterMore = streamed.result();
+
+    const oneShot = foldVehicleDays(all, [], { windowEnd: WINDOW_END });
+
+    expect(afterMore.map(rowHash)).toEqual(oneShot.map(rowHash));
+    expect(afterMore[0]!.trackerSilenceSeconds).toBe(216);
+    expect(afterMore[0]!.coverageComplete).toBe(true);
+    // The mid-stream row was honest about what it had seen at the time — half a day, still open.
+    expect(midStream[0]!.trackerSilenceSeconds).toBeGreaterThan(216);
+  });
+
+  it('called twice with no new input returns identical rows', () => {
+    const fold = createDayFold({ windowEnd: WINDOW_END });
+    fold.addPositions(wholeDay());
+    expect(fold.result().map(rowHash)).toEqual(fold.result().map(rowHash));
+  });
+
+  it('is idempotent even when the window edges are the only thing it would charge', () => {
+    // A single fix: head and tail are the whole day between them, and both are recomputed from
+    // scratch on every call rather than accumulated.
+    const fold = createDayFold({ windowEnd: WINDOW_END });
+    fold.addPositions([wholeDay()[100]!]);
+    const first = fold.result();
+    const second = fold.result();
+    const third = fold.result();
+    expect(second.map(rowHash)).toEqual(first.map(rowHash));
+    expect(third.map(rowHash)).toEqual(first.map(rowHash));
+  });
+});
+
+describe('batch-size invariance, continued', () => {
   it('is not vacuous — the hash does distinguish two different rows', () => {
     const a = foldVehicleDays(velocityRun(MORNING, 20, [40]));
     const b = foldVehicleDays(velocityRun(MORNING, 20, [41]));

@@ -58,7 +58,14 @@ function dominantFeed(day: DayAcc): { provider: string | null; accountRef: strin
   return ranked.length === 0 ? { provider: null, accountRef: null } : ranked[0]![1];
 }
 
-export function finaliseDay(day: DayAcc): VehicleDayStats {
+/**
+ * @param windowEdgeSilenceMs unobserved milliseconds at the window's head or tail that belong to
+ *   THIS day. Passed in rather than accumulated, because the tail depends on `windowEnd` and the
+ *   last fix seen SO FAR -- both of which move as more input arrives. Writing it into the
+ *   accumulator made `result()` destructive: a mid-stream call baked a tail gap in permanently,
+ *   and every later row carried a silence measured against a window that had since grown.
+ */
+export function finaliseDay(day: DayAcc, windowEdgeSilenceMs = 0): VehicleDayStats {
   const seconds = (ms: number) => Math.round(ms / 1_000);
   const profiles = [...day.feeds.values()].map((f) => feedProfile(f.provider, f.accountRef));
   const granularity = dayGranularity(profiles);
@@ -86,12 +93,15 @@ export function finaliseDay(day: DayAcc): VehicleDayStats {
     ignitionSeconds = 0; movingSeconds = 0; idleSeconds = 0;
   }
 
-  const trackerSilenceSeconds = seconds(day.largestGapMs);
+  const trackerSilenceSeconds = seconds(Math.max(day.largestGapMs, windowEdgeSilenceMs));
   return {
     workDate: day.workDate,
     ignitionSeconds, movingSeconds, idleSeconds,
     distanceKm: Math.round(day.distanceKm * 100) / 100,
-    maxSpeedKph: day.maxSpeedKph,
+    // Rounded to NUMERIC(6,2), the column's own scale, so the value the fold reports and the value
+    // the database stores are the same number. Without it a fold-vs-row comparison in a test or a
+    // backfill check fails on a difference the schema itself introduced.
+    maxSpeedKph: day.maxSpeedKph === null ? null : Math.round(day.maxSpeedKph * 100) / 100,
     speedingEvents: day.speedingEvents,
     speedingSeconds: seconds(day.speedingMs),
     // Each evidence base is gated on its own coverage flag. Neither can contribute a count the

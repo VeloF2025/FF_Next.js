@@ -113,3 +113,35 @@ export function tailGapMs(
 ): number {
   return Math.max(0, Math.min(windowEndMs, dayEndMs) - lastFixMs);
 }
+
+/**
+ * Both edges as a lookup of `workDate` -> unobserved milliseconds to charge to that day.
+ *
+ * Returned as a VALUE, never written into the fold's accumulator. The tail depends on `windowEnd`
+ * and on the last fix seen so far, so it moves as more input arrives -- accumulating it made
+ * `result()` destructive: a mid-stream call baked in a tail measured against a half-finished
+ * window, the day reported 43,416 s of silence instead of 216 s, `coverage_complete` flipped to
+ * false, and the row still passed every CHECK in migration 528. Recomputing it per call is what
+ * makes `result()` a read.
+ *
+ * Empty when the fold has seen no positions: with no first or last fix there is no window to
+ * measure the edges of.
+ */
+export function windowEdgeSilence(
+  firstFixMs: number | null,
+  lastFixMs: number | null,
+  leadInMs: number | null,
+  windowEndMs: number | null,
+): Map<string, number> {
+  const byDay = new Map<string, number>();
+  if (firstFixMs === null || lastFixMs === null) return byDay;
+  assertWindowCoversLastFix(windowEndMs, lastFixMs);
+  const edges = windowEdges(firstFixMs, lastFixMs, leadInMs, windowEndMs);
+  // A one-day window charges both edges to the same date; the larger stands.
+  const charge = (workDate: string, ms: number) => {
+    byDay.set(workDate, Math.max(byDay.get(workDate) ?? 0, ms));
+  };
+  charge(edges.firstDay, edges.headMs);
+  charge(edges.lastDay, edges.tailMs);
+  return byDay;
+}

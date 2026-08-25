@@ -87,7 +87,12 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_daily_stats (
 
   distance_km NUMERIC(10,2) NOT NULL DEFAULT 0,
   max_speed_kph NUMERIC(6,2),
+  -- Rising edges of the provider's own is_speeding flag: one per stretch, not one per fix.
   speeding_events INTEGER NOT NULL DEFAULT 0,
+  -- Duration, and it shares the fold's attribution ceiling with ignition time: only an interval
+  -- short enough to attribute honestly contributes. So 0 seconds beside a non-zero
+  -- speeding_events is not "a speeding event of no duration" -- it is a feed too coarse to
+  -- measure one, and coverage_ignition = false is the signal that says so.
   speeding_seconds BIGINT NOT NULL DEFAULT 0,
   harsh_brake_events INTEGER NOT NULL DEFAULT 0,
   harsh_accel_events INTEGER NOT NULL DEFAULT 0,
@@ -98,10 +103,15 @@ CREATE TABLE IF NOT EXISTS fleet_vehicle_daily_stats (
 
   position_count INTEGER NOT NULL DEFAULT 0,
 
-  -- The LARGEST gap between consecutive fixes in the day, not the sum of gaps. A sum answers
-  -- "how much of the day was unobserved", which for a snapshot feed is almost all of it and
-  -- therefore says nothing; the largest gap answers "did this tracker go dark", which is the
-  -- question a coverage flag and a lost-contact detector both need.
+  -- The LARGEST unobserved stretch in the day, not the sum of them. A sum answers "how much of
+  -- the day was unobserved", which for a snapshot feed is almost all of it and therefore says
+  -- nothing; the largest stretch answers "did this tracker go dark", which is the question a
+  -- coverage flag and a lost-contact detector both need.
+  --
+  -- "Unobserved" includes the window's HEAD and TAIL, not only the gaps between fixes. A vehicle
+  -- whose first fix lands at 23:00 SAST has 23 hours nobody looked at and an eight-second largest
+  -- inter-fix gap; counting only the gaps would let that day report complete coverage off forty
+  -- minutes of evidence.
   tracker_silence_seconds BIGINT NOT NULL DEFAULT 0,
 
   -- The feed that contributed the most fixes to this day. A vehicle can change tracker mid-day,
@@ -199,7 +209,11 @@ COMMENT ON TABLE fleet_vehicle_daily_stats IS
   'Per-vehicle rollup of fleet_vehicle_positions over one SAST calendar day. Rebuilt in place; '
   'the coverage_* flags state what the day''s feed could actually observe.';
 COMMENT ON COLUMN fleet_vehicle_daily_stats.tracker_silence_seconds IS
-  'LARGEST gap between consecutive fixes in the day, not the sum of gaps.';
+  'LARGEST unobserved stretch in the day, not the sum. Includes the window''s head and tail -- the '
+  'hours before the first fix and after the last -- not only the gaps between fixes.';
+COMMENT ON COLUMN fleet_vehicle_daily_stats.speeding_seconds IS
+  'Shares the fold''s attribution ceiling with ignition time. 0 beside a non-zero speeding_events '
+  'means the feed was too coarse to measure the duration, not that the event had none.';
 COMMENT ON COLUMN fleet_vehicle_daily_stats.coverage_gforce IS
   'A fix in THIS vehicle-day carried a non-zero linear_g or lateral_g. Never derived from the '
   'provider: six of seven cartrack/velocity vehicles report constant zero rather than null.';

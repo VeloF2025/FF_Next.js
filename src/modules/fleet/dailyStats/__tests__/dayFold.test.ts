@@ -465,6 +465,18 @@ describe('max speed', () => {
     expect(foldVehicleDays(positions)[0]!.maxSpeedKph).toBeNull();
   });
 
+  it('is rounded to the column scale, so the fold and the stored row agree', () => {
+    // max_speed_kph is NUMERIC(6,2). A provider reporting more precision than that would make the
+    // fold's answer and the database's differ by a hair -- enough to fail a fold-vs-row comparison
+    // in a backfill check on a difference the schema itself introduced. Every other speed fixture
+    // in this file is a whole number, so nothing else here would notice.
+    const precise = [0, 8].map((offsetSeconds, i) => fix(MORNING, 'cartrack', 'velocity', {
+      offsetSeconds, providerEventId: `prec-${i}`, ignition: true, speedKph: i === 0 ? 87.4567 : 12.3,
+    }));
+    const [day] = foldVehicleDays(precise);
+    expect(day!.maxSpeedKph).toBe(87.46);
+  });
+
   it('is the largest speed observed, not the last one', () => {
     const [day] = foldVehicleDays(velocityRun(MORNING, 6, [40, 110, 60]));
     expect(day!.maxSpeedKph).toBe(110);
@@ -550,6 +562,38 @@ describe('harsh events', () => {
       expect(Number.isInteger(count)).toBe(true);
       expect(count).toBe(0);
     }
+  });
+
+  it('treats a g reading of EXACTLY the threshold as harsh, on both axes', () => {
+    // The two g comparisons are inclusive and both are one character from being wrong. Every other
+    // fixture in this file sits a comfortable distance from 0.350, so a `>=` quietly becoming `>`
+    // moves nothing — which is the whole reason to drive the boundary itself.
+    const onTheLine = [
+      fix(MORNING, 'cartrack', 'velocity', {
+        offsetSeconds: 0, providerEventId: 'g-corner', ignition: true, speedKph: 90, lateralG: 0.35,
+      }),
+      fix(MORNING, 'cartrack', 'velocity', {
+        offsetSeconds: 8, providerEventId: 'g-brake', ignition: true, speedKph: 90, linearG: -0.35,
+      }),
+      fix(MORNING, 'cartrack', 'velocity', {
+        offsetSeconds: 16, providerEventId: 'g-accel', ignition: true, speedKph: 90, linearG: 0.35,
+      }),
+    ];
+    const [day] = foldVehicleDays(onTheLine);
+    expect(day!.harshCornerEvents).toBe(1);
+    expect(day!.harshBrakeEvents).toBe(1);
+    expect(day!.harshAccelEvents).toBe(1);
+
+    // A hair under the threshold is not harsh, so the assertion above is about the boundary and
+    // not merely about g being read at all.
+    const justUnder = onTheLine.map((p, i) => ({
+      ...p,
+      providerEventId: `under-${i}`,
+      lateralG: p.lateralG === null ? null : 0.349,
+      linearG: p.linearG === null ? null : (p.linearG < 0 ? -0.349 : 0.349),
+    }));
+    const [under] = foldVehicleDays(justUnder);
+    expect(under!.harshCornerEvents + under!.harshBrakeEvents + under!.harshAccelEvents).toBe(0);
   });
 
   it('counts a fix carrying BOTH a HARSH_ event and a g spike exactly once', () => {
