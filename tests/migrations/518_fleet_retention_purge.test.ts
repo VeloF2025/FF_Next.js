@@ -37,6 +37,10 @@ const RETENTION = readFileSync(join(SQL_DIR, '518_fleet_operational_analytics_re
 // 521 is what makes the purge executable as the application role at all; the
 // grant contract itself lives in 521_fleet_retention_delete_grants.test.ts.
 const DELETE_GRANTS = readFileSync(join(SQL_DIR, '521_fleet_retention_delete_grants.sql'), 'utf8');
+// 527 creates the published view. `hasCompleteAggregateCoverage` reads it
+// rather than the base table, so the coverage gate cannot be exercised without
+// it — the view is part of this fixture's schema, not an optional extra.
+const PUBLISHED_VIEW = readFileSync(join(SQL_DIR, '527_fleet_aggregates_published_view.sql'), 'utf8');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
@@ -241,6 +245,7 @@ beforeAll(async () => {
   await db.query(DRIVER_INPUT);
   await db.query(RETENTION);
   await db.query(DELETE_GRANTS);
+  await db.query(PUBLISHED_VIEW);
   // The purge also removes this module's bell notifications; the real table
   // already grants the application DELETE, and the scratch copy mirrors that.
   await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ${SCHEMA}.user_notifications TO fibreflow_user`);

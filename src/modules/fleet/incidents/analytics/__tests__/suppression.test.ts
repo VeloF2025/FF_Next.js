@@ -1,331 +1,215 @@
 /**
- * Anonymity release: what may leave the calculator and become a stored row.
+ * The tier rule: which rows may leave the calculator and become stored rows.
  *
- * The threat these tests are written against is not "a row with four people in
- * it" — the aggregate table's CHECK already refuses that. It is DIFFERENCING:
- * subtracting the published children of a parent from the parent to recover the
- * one child that was withheld. A per-row threshold cannot see that, so it is
- * tested here, at the only layer that can.
+ * The threat is not "a row with four people in it" — the aggregate table's CHECK
+ * already refuses that. It is DIFFERENCING, and the answer is no longer to
+ * publish cautiously and then search for what a reader could recover. A
+ * component is published whole, or reduced to its root total, or not at all.
+ *
+ * The organisation is the only level with published children, so it is decided
+ * differently: it publishes at a tier only if every project is ALL-IN OR
+ * ALL-OUT at that tier, and if the projects publishing nothing — aggregated
+ * into one VIRTUAL CELL — pass the same check a real cell passes. Then
+ * `organisation - sum(publishing projects)` is exactly that virtual cell, and
+ * it has already cleared the threshold.
+ *
+ * Facts go through the real calculator, never hand-built groups: the complements
+ * the rule turns on are COUNTED there, and reconstructing them from contributor
+ * sets is exactly what was wrong with the design this replaced.
  */
 import { describe, expect, it } from 'vitest';
-import { releaseAnonymousGroups } from '../suppression';
-import type { CalculatedMetricGroup } from '../facts';
 import { FORBIDDEN_AGGREGATE_COLUMN_TOKENS } from '../aggregateSchema';
-
-const MONTH = '2026-07-01';
-
-function group(
-  projectId: string,
-  operationalSiteId: string,
-  contributors: string[],
-  numerator: number,
-  denominator: number | null = null,
-): CalculatedMetricGroup {
-  return {
-    monthStart: MONTH,
-    metricVersion: 1,
-    projectId,
-    operationalSiteId,
-    metricKey: 'presence.scheduled_days',
-    numerator,
-    denominator,
-    histogram: null,
-    contributors: new Set(contributors),
-  };
-}
-
-function people(prefix: string, count: number): string[] {
-  return Array.from({ length: count }, (_, i) => `${prefix}-${i}`);
-}
+import { calculateMonthly } from '../metricCalculator';
+import { releaseAnonymousGroups, releaseTiers } from '../suppression';
+import type { OperationsFact } from '../facts';
+import { incident, notification, presence } from './factFixtures';
 
 const K = 5;
 
-describe('releaseAnonymousGroups', () => {
-  it('releases a site whose group reaches the threshold', () => {
-    const released = releaseAnonymousGroups([group('p1', 's1', people('a', 5), 50)], K);
+const release = (facts: OperationsFact[], k = K) => releaseAnonymousGroups(calculateMonthly(facts, 1), k);
+const tiersOf = (facts: OperationsFact[], k = K) => releaseTiers(calculateMonthly(facts, 1), k);
 
-    const site = released.find((r) => r.dimensionLevel === 'site');
-    expect(site).toBeDefined();
-    expect(site?.dimensionSiteId).toBe('s1');
-    expect(site?.contributorCount).toBe(5);
-    expect(site?.numerator).toBe(50);
-    expect(site?.generalizedFromLevel).toBeNull();
+/** A roster whose presence is entirely confirmed: every presence variable clears. */
+function confirmedRoster(projectId: string, prefix: string, size: number): OperationsFact[] {
+  return Array.from({ length: size }, (_, index) => presence(projectId, prefix, `${prefix}-${index}`, 'confirmed'));
+}
+
+describe('what the tier rule publishes', () => {
+  it('publishes a whole component when every variable in it clears the threshold', () => {
+    const released = release(confirmedRoster('p1', 's1', 7));
+    const keys = released.filter((row) => row.dimensionLevel === 'project').map((row) => row.metricKey);
+    // `presence.unconfirmed_days` and `presence.vehicle_only_days` have nobody
+    // behind them, so they are zero and not stored; the total and the confirmed
+    // days are the component's whole publishable content.
+    expect(keys.sort()).toEqual(['presence.confirmed_days', 'presence.scheduled_days']);
+    const confirmed = released.find((row) => row.metricKey === 'presence.confirmed_days');
+    expect(confirmed?.denominator).toBe(7);
   });
 
-  it('withholds a site below the threshold and folds it into its project', () => {
-    // 'small' has 3 people, so the residual would be 3 - under the threshold -
-    // and the smallest passing sibling is withheld with it. Both foldings are
-    // the residual rule doing its job; this test asserts the below-threshold
-    // site never appears, not that it was the only one withheld.
-    const released = releaseAnonymousGroups(
-      [
-        group('p1', 'small', people('a', 3), 30),
-        group('p1', 'big-1', people('b', 6), 60),
-        group('p1', 'big-2', people('c', 7), 70),
-      ],
-      K,
-    );
-
-    expect(released.some((r) => r.dimensionSiteId === 'small')).toBe(false);
-
-    const project = released.find((r) => r.dimensionLevel === 'project');
-    expect(project?.numerator).toBe(160); // every site, published or not
-    expect(project?.contributorCount).toBe(16);
-    expect(project?.generalizedFromLevel).toBe('site');
+  it('falls back to the root total alone when a member does not clear', () => {
+    // Six people confirmed, ONE of whom also has an unconfirmed day. The
+    // unconfirmed member describes one person, so the component cannot be
+    // published whole — but `presence.scheduled_days` still covers six.
+    const facts = [
+      ...confirmedRoster('p1', 's1', 6),
+      presence('p1', 's1', 's1-0', 'unconfirmed'),
+    ];
+    const released = release(facts);
+    const keys = released.filter((row) => row.dimensionLevel === 'project').map((row) => row.metricKey);
+    expect(keys).toEqual(['presence.scheduled_days']);
+    expect(released.every((row) => row.denominator === null)).toBe(true);
+    expect(tiersOf(facts).get('2026-07-01|project|p1|presence.scheduled_days')).toBe('total_only');
   });
 
-  it('THE DIFFERENCING GUARD: never leaves exactly one site withheld', () => {
-    // p1 = one failing site (3) and two passing (6, 7). Publishing both passing
-    // sites would make project - (6 + 7) == the withheld site, exactly.
-    const released = releaseAnonymousGroups(
-      [
-        group('p1', 'small', people('a', 3), 30),
-        group('p1', 'mid', people('b', 6), 60),
-        group('p1', 'large', people('c', 7), 70),
-      ],
-      K,
-    );
-
-    const sites = released.filter((r) => r.dimensionLevel === 'site').map((r) => r.dimensionSiteId);
-    expect(sites).toEqual(['large']);
-
-    // The property that matters is not "more than one site was withheld" -- it
-    // is that the RESIDUAL describes at least K people. Two withheld sites of
-    // two people each would satisfy the former and leak under the latter.
-    const project = released.find((r) => r.dimensionLevel === 'project');
-    const publishedSites = released.filter((r) => r.dimensionLevel === 'site');
-    const residualHeadcount = (project?.contributorCount ?? 0)
-      - publishedSites.reduce((sum, r) => sum + r.contributorCount, 0);
-    expect(residualHeadcount).toBeGreaterThanOrEqual(K);
+  it('publishes nothing when even the root total is too small', () => {
+    const facts = confirmedRoster('p1', 's1', 3);
+    expect(release(facts)).toEqual([]);
+    expect(tiersOf(facts).get('2026-07-01|project|p1|presence.scheduled_days')).toBe('none');
   });
 
-  it('THE REAL GUARD: a residual of two small sites is still withheld', () => {
-    // The defect this replaced: the rule fired only when EXACTLY ONE child was
-    // withheld. Two sites of two people each leave a four-person residual that
-    // the project row hands over by subtraction -- and contributor_count states
-    // the headcount outright. Reproduced against the real implementation before
-    // the fix: residual of 84 over 4 people.
-    const released = releaseAnonymousGroups(
-      [
-        group('p1', 'big', people('a', 20), 400),
-        group('p1', 'tiny-1', people('b', 2), 40),
-        group('p1', 'tiny-2', people('c', 2), 44),
-      ],
-      K,
-    );
+  it('never publishes a site row, however large the site', () => {
+    const released = release(confirmedRoster('p1', 's1', 40));
+    expect(released.some((row) => row.dimensionLevel === 'site')).toBe(false);
+    expect(released.every((row) => row.dimensionSiteId === null)).toBe(true);
+  });
+});
 
-    // 'big' must NOT be published: doing so leaves 84 days over 4 people.
-    expect(released.some((r) => r.dimensionLevel === 'site')).toBe(false);
+describe('the organisation asks whether what it leaves behind is safe to leave', () => {
+  const mixed = (): OperationsFact[] => [
+    // p1 is clean: every presence variable clears.
+    ...confirmedRoster('p1', 'a', 8),
+    // p2 has one person with an unconfirmed day, so it can only reach TOTAL_ONLY.
+    ...confirmedRoster('p2', 'b', 6),
+    presence('p2', 'b', 'b-0', 'unconfirmed'),
+  ];
 
-    const project = released.find((r) => r.dimensionLevel === 'project');
-    expect(project?.numerator).toBe(484);
-    expect(project?.contributorCount).toBe(24);
+  it('publishes only what every surviving project also publishes', () => {
+    const tiers = tiersOf(mixed());
+    expect(tiers.get('2026-07-01|project|p1|presence.scheduled_days')).toBe('full');
+    expect(tiers.get('2026-07-01|project|p2|presence.scheduled_days')).toBe('total_only');
+    // Nothing is withheld at TOTAL_ONLY — both projects reach it — so the
+    // organisation publishes there and the difference across levels is zero.
+    expect(tiers.get('2026-07-01|organisation||presence.scheduled_days')).toBe('total_only');
   });
 
-  it('measures the residual by UNION, so shared staff cannot pad it', () => {
-    // Two withheld sites of three, sharing two people: four distinct people in
-    // the residual, not six. Summing the child headcounts reaches the threshold
-    // and publishes 'big', handing over a four-person group by subtraction.
-    const shared = ['shared-1', 'shared-2'];
-    const released = releaseAnonymousGroups(
-      [
-        group('p1', 'big', people('a', 20), 400),
-        group('p1', 'tiny-1', [...shared, 'only-1'], 30),
-        group('p1', 'tiny-2', [...shared, 'only-2'], 33),
-      ],
-      K,
-    );
-
-    expect(released.some((r) => r.dimensionLevel === 'site')).toBe(false);
-    const project = released.find((r) => r.dimensionLevel === 'project');
-    // 20 + 4 distinct, not 20 + 6.
-    expect(project?.contributorCount).toBe(24);
+  it('leaves the difference across levels at exactly zero', () => {
+    // The proof, checked rather than asserted: every key the organisation
+    // publishes is published by every project that is not in the virtual cell,
+    // so subtracting them yields the virtual cell — here, nothing.
+    const released = release(mixed());
+    const organisation = released.filter((row) => row.dimensionLevel === 'organisation');
+    expect(organisation.length).toBeGreaterThan(0);
+    for (const row of organisation) {
+      const projects = released.filter(
+        (candidate) => candidate.dimensionLevel === 'project' && candidate.metricKey === row.metricKey,
+      );
+      expect(projects.map((project) => project.dimensionProjectId).sort()).toEqual(['p1', 'p2']);
+      expect(projects.reduce((total, project) => total + project.numerator, 0)).toBe(row.numerator);
+    }
   });
 
-  it('withholds down to nothing rather than leave a sub-threshold residual', () => {
-    // Three one-person sites alongside a large one: the residual only clears K
-    // once every site is withheld.
-    const released = releaseAnonymousGroups(
-      [
-        group('p1', 'big', people('a', 20), 400),
-        group('p1', 's1', people('b', 1), 21),
-        group('p1', 's2', people('c', 1), 19),
-        group('p1', 's3', people('d', 1), 17),
-      ],
-      K,
-    );
-    expect(released.filter((r) => r.dimensionLevel === 'site')).toHaveLength(0);
+  it('publishes over two withheld projects whose people together clear the threshold', () => {
+    // Neither small project can publish anything: three people each. Their
+    // AGGREGATE is six, so the residual an organisation row leaves describes
+    // six people and is safe. The rule this replaced, which took the minimum
+    // tier over the projects, refused this outright.
+    const facts = [
+      ...confirmedRoster('big', 'b', 9),
+      ...confirmedRoster('small-a', 'a', 3),
+      ...confirmedRoster('small-b', 'z', 3),
+    ];
+    const tiers = tiersOf(facts);
+    expect(tiers.get('2026-07-01|project|small-a|presence.scheduled_days')).toBe('none');
+    expect(tiers.get('2026-07-01|project|small-b|presence.scheduled_days')).toBe('none');
+    expect(tiers.get('2026-07-01|organisation||presence.scheduled_days')).toBe('full');
   });
 
-  it('publishes every site when none is withheld, leaving no residual at all', () => {
-    const released = releaseAnonymousGroups(
-      [
-        group('p1', 'a', people('a', 6), 60),
-        group('p1', 'b', people('b', 7), 70),
-      ],
-      K,
-    );
-    const sites = released.filter((r) => r.dimensionLevel === 'site').map((r) => r.dimensionSiteId);
-    expect(sites).toEqual(['a', 'b']);
-    const project = released.find((r) => r.dimensionLevel === 'project');
-    expect(project?.generalizedFromLevel).toBeNull();
+  it('refuses when the single withheld project is the residual and cannot clear', () => {
+    // One withheld project means the virtual cell IS that project, so it has to
+    // pass in full. Four people never will, and no rule can publish an
+    // organisation row whose residual is those four.
+    const facts = [...confirmedRoster('big', 'b', 9), ...confirmedRoster('tiny', 't', 4)];
+    const tiers = tiersOf(facts);
+    expect(tiers.get('2026-07-01|project|tiny|presence.scheduled_days')).toBe('none');
+    expect(tiers.get('2026-07-01|organisation||presence.scheduled_days')).toBe('none');
   });
 
-  it('keeps metric versions in separate slices', () => {
-    const v2 = { ...group('p1', 's1', people('a', 6), 99), metricVersion: 2 };
-    const released = releaseAnonymousGroups([group('p1', 's1', people('a', 6), 50), v2], K);
-    const siteRows = released.filter((r) => r.dimensionLevel === 'site');
-    expect(siteRows).toHaveLength(2);
-    expect(siteRows.map((r) => [r.metricVersion, r.numerator]).sort())
-      .toEqual([[1, 50], [2, 99]]);
-  });
-
-  it('breaks the complementary tie deterministically, smallest then lowest id', () => {
-    const first = releaseAnonymousGroups(
-      [
-        group('p1', 'small', people('a', 3), 30),
-        group('p1', 'zz-tie', people('b', 6), 60),
-        group('p1', 'aa-tie', people('c', 6), 61),
-        group('p1', 'largest', people('d', 9), 90),
-      ],
-      K,
-    );
-    // Two siblings tie at 6 contributors; the lower id is the one folded.
-    const sites = first.filter((r) => r.dimensionLevel === 'site').map((r) => r.dimensionSiteId);
-    expect(sites).toEqual(['largest', 'zz-tie']);
-  });
-
-  it('generalizes a project below the threshold to the organisation', () => {
-    const released = releaseAnonymousGroups(
-      [
-        group('tiny', 's1', people('a', 2), 20),
-        group('big-1', 's2', people('b', 6), 60),
-        group('big-2', 's3', people('c', 7), 70),
-      ],
-      K,
-    );
-
-    expect(released.some((r) => r.dimensionProjectId === 'tiny')).toBe(false);
-
-    const org = released.find((r) => r.dimensionLevel === 'organisation');
-    expect(org?.numerator).toBe(150);
-    expect(org?.contributorCount).toBe(15);
-    expect(org?.generalizedFromLevel).toBe('project');
-    expect(org?.dimensionProjectId).toBeNull();
-    expect(org?.dimensionSiteId).toBeNull();
-  });
-
-  it('applies the differencing guard at project level too', () => {
-    const released = releaseAnonymousGroups(
-      [
-        group('tiny', 's1', people('a', 2), 20),
-        group('mid', 's2', people('b', 6), 60),
-        group('large', 's3', people('c', 8), 80),
-      ],
-      K,
-    );
-
-    const projects = released
-      .filter((r) => r.dimensionLevel === 'project')
-      .map((r) => r.dimensionProjectId);
-    expect(projects).toEqual(['large']);
-  });
-
-  it('omits everything when the organisation itself is below the threshold', () => {
-    const released = releaseAnonymousGroups(
-      [group('p1', 's1', people('a', 2), 20), group('p2', 's2', people('b', 2), 20)],
-      K,
-    );
-    expect(released).toEqual([]);
-  });
-
-  it('counts a contributor working two sites once at the parent', () => {
-    // 'shared-0' appears at both sites. The parent must union, not add.
-    const released = releaseAnonymousGroups(
-      [
-        group('p1', 's1', ['shared-0', ...people('a', 5)], 60),
-        group('p1', 's2', ['shared-0', ...people('b', 5)], 60),
-      ],
-      K,
-    );
-
-    const project = released.find((r) => r.dimensionLevel === 'project');
-    expect(project?.contributorCount).toBe(11); // 12 memberships, 11 people
-    const org = released.find((r) => r.dimensionLevel === 'organisation');
-    expect(org?.contributorCount).toBe(11);
-  });
-
-  it('sums a folded site into its parent exactly once', () => {
-    const released = releaseAnonymousGroups(
-      [
-        group('p1', 'small', people('a', 3), 30),
-        group('p1', 'mid', people('b', 6), 60),
-        group('p1', 'large', people('c', 7), 70),
-      ],
-      K,
-    );
-    const org = released.find((r) => r.dimensionLevel === 'organisation');
-    expect(org?.numerator).toBe(160);
-  });
-
-  it('keeps each month and metric key independent', () => {
-    const other: CalculatedMetricGroup = {
-      ...group('p1', 's1', people('a', 6), 12),
-      monthStart: '2026-08-01',
-    };
-    const released = releaseAnonymousGroups([group('p1', 's1', people('a', 6), 50), other], K);
-    const months = released.map((r) => r.monthStart);
-    expect(new Set(months)).toEqual(new Set(['2026-07-01', '2026-08-01']));
-    expect(released.filter((r) => r.monthStart === '2026-08-01' && r.dimensionLevel === 'site')[0]?.numerator).toBe(12);
-  });
-
-  it('merges denominators and histograms when folding', () => {
-    const withHistogram = (site: string, contributors: string[], buckets: number[], sum: number) => ({
-      ...group('p1', site, contributors, 0, null),
-      metricKey: 'timing.acknowledgement' as const,
-      histogram: { sampleCount: buckets.reduce((a, b) => a + b, 0), sumSeconds: sum, buckets },
-    });
-
-    const released = releaseAnonymousGroups(
-      [
-        withHistogram('small', people('a', 3), [1, 0, 0, 0, 0, 0], 100),
-        withHistogram('mid', people('b', 6), [0, 2, 0, 0, 0, 0], 900),
-        withHistogram('large', people('c', 7), [0, 0, 3, 0, 0, 0], 3000),
-      ],
-      K,
-    );
-
-    const project = released.find((r) => r.dimensionLevel === 'project');
-    expect(project?.histogram).toEqual({ sampleCount: 6, sumSeconds: 4000, buckets: [1, 2, 3, 0, 0, 0] });
-  });
-
-  it('emits no key that the aggregate column allow-list forbids', () => {
-    const released = releaseAnonymousGroups([group('p1', 's1', people('a', 6), 50)], K);
-    const keys = released.flatMap((row) => Object.keys(row));
-
-    for (const key of keys) {
-      const snake = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-      // dimensionProjectId/dimensionSiteId are the two allowed identity-shaped
-      // keys: they name a place, not a person, and the migration permits them.
-      if (snake === 'dimension_project_id' || snake === 'dimension_site_id') continue;
-      for (const token of FORBIDDEN_AGGREGATE_COLUMN_TOKENS) {
-        expect(snake).not.toContain(token);
+  it('refuses FULL when the silent projects aggregate to a small COMPLEMENT', () => {
+    // Six people between two silent projects, so every member of the
+    // notifications component clears in the aggregate: sent by six, delivered
+    // by six. What does not clear is the difference — the notifications that
+    // FAILED belong to two people. Publishing the organisation's whole
+    // component hands the reader that aggregate's sent and delivered, and
+    // therefore their difference, over those two.
+    //
+    // Nothing in the member supports says so; the complement is counted
+    // separately by `metricCalculator` precisely because it cannot be inferred
+    // from them. A virtual-cell check that looked only at members would publish
+    // this.
+    const facts: OperationsFact[] = [
+      ...confirmedRoster('big', 'b', 9),
+      ...Array.from({ length: 9 }, (_, index) => notification('big', 'b', `b-${index}`, true)),
+      // FIVE of the big project's people also had one that failed, so the
+      // ORGANISATION's own complement clears and its own check cannot be what
+      // refuses. What is left to refuse is the virtual cell.
+      ...Array.from({ length: 5 }, (_, index) => notification('big', 'b', `b-${index}`, false)),
+    ];
+    for (const [project, prefix] of [['silent-a', 'a'], ['silent-b', 'z']] as const) {
+      facts.push(...confirmedRoster(project, prefix, 3));
+      for (let index = 0; index < 3; index += 1) {
+        facts.push(notification(project, prefix, `${prefix}-${index}`, true));
       }
+      // One person at each: a notification that did not arrive.
+      facts.push(notification(project, prefix, `${prefix}-0`, false));
     }
+    const tiers = tiersOf(facts);
+    expect(tiers.get('2026-07-01|project|silent-a|reliability.notifications_sent')).toBe('none');
+    expect(tiers.get('2026-07-01|project|silent-b|reliability.notifications_sent')).toBe('none');
+    // The root still clears in the aggregate, so the total may be published —
+    // but not the members.
+    expect(tiers.get('2026-07-01|organisation||reliability.notifications_sent')).toBe('total_only');
   });
 
-  it('carries no contributor identity off the calculator', () => {
-    const released = releaseAnonymousGroups([group('p1', 's1', people('a', 6), 50)], K);
-    const serialized = JSON.stringify(released);
-    expect(serialized).not.toContain('a-0');
-    for (const row of released) {
-      expect(Object.values(row).some((v) => v instanceof Set || Array.isArray(v))).toBe(false);
+  it('refuses FULL when the single withheld project fails only a complement', () => {
+    // `mid` clears every support but has a one-person unconfirmed complement,
+    // so it reaches TOTAL_ONLY and not FULL. The organisation may not publish
+    // the whole component over it: the reader would recover mid's entire
+    // component, complement included.
+    const facts = [
+      ...confirmedRoster('big', 'b', 9),
+      ...confirmedRoster('mid', 'm', 6),
+      presence('mid', 'm', 'm-0', 'unconfirmed'),
+    ];
+    const tiers = tiersOf(facts);
+    expect(tiers.get('2026-07-01|project|mid|presence.scheduled_days')).toBe('total_only');
+    expect(tiers.get('2026-07-01|organisation||presence.scheduled_days')).toBe('total_only');
+  });
+});
+
+describe('the rows themselves', () => {
+  it('carries no contributor identity and no forbidden token', () => {
+    const released = release(confirmedRoster('p1', 's1', 9));
+    expect(released.length).toBeGreaterThan(0);
+    const serialized = JSON.stringify(released).toLowerCase();
+    for (const token of FORBIDDEN_AGGREGATE_COLUMN_TOKENS) {
+      if (token === 'name' || token === 'point') continue; // substrings of ordinary words
+      expect(serialized).not.toContain(`"${token}`);
     }
+    expect(serialized).not.toContain('s1-0');
   });
 
-  it('honours a threshold above the floor', () => {
-    const released = releaseAnonymousGroups([group('p1', 's1', people('a', 6), 50)], 8);
-    // Six clears five but not eight, so nothing at any level may be released.
-    expect(released).toEqual([]);
+  it('produces byte-identical rows on a re-run, so the checksum settles', () => {
+    const facts = [
+      ...confirmedRoster('p1', 's1', 7),
+      ...Array.from({ length: 6 }, (_, index) => incident('p1', 's1', `s1-${index}`)),
+      ...Array.from({ length: 6 }, (_, index) => notification('p1', 's1', `s1-${index}`, index < 5)),
+    ];
+    expect(JSON.stringify(release(facts))).toBe(JSON.stringify(release(facts)));
+  });
+
+  it('honours a threshold above the schema floor', () => {
+    const facts = confirmedRoster('p1', 's1', 7);
+    expect(release(facts, 5).length).toBeGreaterThan(0);
+    expect(release(facts, 9)).toEqual([]);
   });
 });

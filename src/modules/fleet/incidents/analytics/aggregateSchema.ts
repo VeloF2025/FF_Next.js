@@ -138,6 +138,40 @@ export const PUBLIC_AGGREGATE_COLUMNS = [
 ] as const;
 
 /**
+ * The columns migration 527's published view exposes — a strict subset of the
+ * table's, and the actual public surface.
+ *
+ * Four kinds of column are missing, for three different reasons.
+ *
+ * `contributor_count` and the histogram columns are CHANNELS: a contributor
+ * count differences across metric keys exactly as a numerator does, and
+ * `sum_seconds` over one sample is one person's exact duration. They stay in the
+ * table because the writer needs them and a median has to remain estimable after
+ * the incident is purged; they are not published.
+ *
+ * `checksum` is absent because it RECONSTRUCTS them. `canonicalize` hashes a
+ * fixed field order that includes all four, and every other field in that
+ * preimage is published — so one unknown small integer stands between a reader
+ * and the digest, and a few thousand hashes closes it. Dropping three columns
+ * while publishing a fourth that gives them back is what a column list has to be
+ * read as a whole to catch.
+ *
+ * `generalized_from_level` is absent for a different reason again: under the
+ * tier rule its value is a function of the row's level, so it says nothing.
+ *
+ * The view also restricts ROWS, to organisation and project level. Site
+ * aggregates are computed, stored, and never published.
+ */
+export const PUBLISHED_VIEW_COLUMNS = [
+  'id', 'metric_version', 'month_start', 'dimension_level', 'dimension_project_id',
+  'dimension_site_id', 'metric_key', 'metric_kind', 'numerator', 'denominator',
+  'is_active', 'aggregation_run_id', 'created_at', 'updated_at',
+] as const;
+
+/** The dimension levels the published view exposes. Site is deliberately absent. */
+export const PUBLISHED_DIMENSION_LEVELS = ['organisation', 'project'] as const;
+
+/**
  * The metric kind a row must carry, mirroring the migration's
  * `histogram_pairing` CHECK: it makes `metric_key LIKE 'timing.%'` and
  * `metric_kind = 'duration_histogram'` the same condition, so the kind is a

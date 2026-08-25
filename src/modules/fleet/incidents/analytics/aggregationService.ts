@@ -19,7 +19,7 @@ import { query, queryOne } from '@/lib/db-pool';
 import { replaceMonth } from './aggregateRepository';
 import type { OperationsFact } from './facts';
 import { loadIncidentFacts, loadNotificationFacts } from './incidentFactQueries';
-import { calculateMonthlyMetrics } from './metricCalculator';
+import { calculateMonthly } from './metricCalculator';
 import { loadMonitorRunFacts } from './monitorFactQueries';
 import { loadPresenceFacts, loadProjectsWithOperationalSites } from './presenceFactQueries';
 import { getEffectiveAnalyticsRetentionSettings } from './settingsRepository';
@@ -123,8 +123,8 @@ export async function aggregateOperationsMonths(requestedAt: string): Promise<Ag
       if (skippedDays > 0) {
         throw new Error(`${skippedDays} project-day(s) could not be evaluated`);
       }
-      const groups = calculateMonthlyMetrics(facts, policy.metricVersion);
-      const released = releaseAnonymousGroups(groups, policy.anonymityMinContributors);
+      const siteMonths = calculateMonthly(facts, policy.metricVersion);
+      const released = releaseAnonymousGroups(siteMonths, policy.anonymityMinContributors);
       const outcome = await replaceMonth(monthStart, policy.metricVersion, released, runId);
       monthsSucceeded += 1;
       rowsWritten += outcome.rowsWritten;

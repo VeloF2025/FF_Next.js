@@ -27,7 +27,6 @@ function canonicalize(row: ReleasedAggregate): string {
     row.dimensionLevel,
     row.dimensionProjectId ?? '',
     row.dimensionSiteId ?? '',
-    row.generalizedFromLevel ?? '',
     row.metricKey,
     row.metricKind,
     row.numerator,

@@ -79,7 +79,7 @@ function insertParams(
     : DURATION_BUCKET_COLUMNS.map(() => null);
   return [
     row.metricVersion, row.monthStart, row.dimensionLevel, row.dimensionProjectId, row.dimensionSiteId,
-    row.generalizedFromLevel, row.metricKey, row.metricKind, row.numerator, row.denominator,
+    null, row.metricKey, row.metricKind, row.numerator, row.denominator,
     row.histogram?.sampleCount ?? null, row.histogram?.sumSeconds ?? null, ...buckets,
     row.contributorCount, true, runId, checksum,
   ];

@@ -73,6 +73,7 @@
     "db:migrate:realtime": "node scripts/run-realtime-migration.js",
     "embed-manual": "node scripts/embed-manual-content.js",
     "test:migrations": "vitest --config vitest.migrations.config.ts run",
+    "typecheck:analytics-tests": "tsc -p tsconfig.analytics-tests.json",
     "test:db:action-items": "vitest --config vitest.db.config.ts run tests/db/action-items",
     "cron:refresh-aois": "tsx scripts/cron/refresh-project-aois.ts"
   },
