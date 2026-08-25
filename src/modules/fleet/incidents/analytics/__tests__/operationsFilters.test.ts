@@ -154,3 +154,44 @@ describe('retained-only filters', () => {
     }))).toEqual(['op_driver', 'op_severity']);
   });
 });
+
+describe('an op_ key this endpoint does not know', () => {
+  it('is refused, and named, rather than quietly discarded', () => {
+    // A typo'd filter that is dropped returns every severity under a heading
+    // that says one. The header promises this; it was not enforced.
+    expect(() => parseOperationsFilters({ ...range, op_sevrity: 'high' }))
+      .toThrow(/op_sevrity is not a filter this endpoint accepts/);
+  });
+
+  it('lists the filters that are accepted, so the caller can fix it', () => {
+    expect(() => parseOperationsFilters({ ...range, op_nonsense: 'x' }))
+      .toThrow(/op_start, op_end, op_project/);
+  });
+
+  it('names every unknown key, not just the first', () => {
+    expect(() => parseOperationsFilters({ ...range, op_alpha: '1', op_beta: '2' }))
+      .toThrow(/op_alpha, op_beta are not filters/);
+  });
+
+  it('accepts every key it does know', () => {
+    expect(() => parseOperationsFilters({
+      ...range, op_project: PROJECT, op_driver: DRIVER, op_vehicle: VEHICLE,
+      op_type: 'late', op_severity: 'high', op_outcome: 'confirmed', op_evidence: 'true',
+    })).not.toThrow();
+    expect(() => parseOperationsFilters({ ...range, op_manager: MANAGER })).not.toThrow();
+    expect(() => parseOperationsFilters({ ...range, op_site: SITE })).not.toThrow();
+  });
+
+  it('leaves keys outside the op_ namespace alone', () => {
+    // The drill-down carries `cursor`, and the router adds its own; refusing
+    // those would break callers over parameters this parser never owned.
+    expect(() => parseOperationsFilters({ ...range, cursor: 'abc', projectId: PROJECT })).not.toThrow();
+  });
+
+  it('refuses the unknown key before validating any value', () => {
+    // Otherwise a request with both a typo and a bad date reports the date and
+    // the caller fixes that, resubmits, and is still silently unfiltered.
+    expect(() => parseOperationsFilters({ op_start: 'January', op_end: '2026-03-31', op_typo: '1' }))
+      .toThrow(/op_typo/);
+  });
+});

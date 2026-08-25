@@ -1375,6 +1375,7 @@ Four things to know before changing it:
   what lets the in-memory merge use it directly. Displayed `occurredAt` stays the `Date`.
 - **Scope failures answer 403, missing incidents 404** — the same pair, in the same order, as
   `GET /api/fleet/incidents/[incidentId]`. `limit` above 200 is a 400, never a silent clamp.
+
 ## Operations analytics read path (PR 8 task 7)
 
 ### APIs and scope

@@ -13,10 +13,12 @@
  * from the queue silently pre-filter the analytics screen, or the reverse.
  *
  * Every value is validated against a closed set or a format, never passed
- * through. A bad value is refused rather than ignored: dropping an
- * unrecognised filter silently WIDENS the result, and a manager reading a
- * number that answers a different question than the one they asked has no way
- * to notice.
+ * through, and so is every KEY: an `op_` parameter this parser does not know is
+ * refused rather than ignored. Both halves of that matter for the same reason —
+ * dropping an unrecognised filter silently WIDENS the result, and a manager
+ * reading a number that answers a different question than the one they asked
+ * has no way to notice. A typo'd `op_sevrity` that is quietly discarded returns
+ * every severity under a heading that says one.
  */
 import { OUTCOMES, INCIDENT_TYPES, SEVERITIES } from '../reviewValidation';
 import { datesInMonth } from './sastDates';
@@ -105,7 +107,34 @@ function wholeMonths(start: string, end: string): { start: string; end: string }
   return { start: `${start.slice(0, 7)}-01`, end: lastDay };
 }
 
+/**
+ * Every `op_` key this parser reads. A key outside it is a caller asking for
+ * something this endpoint does not offer, and the honest answer is to say so.
+ */
+const KNOWN_OP_KEYS: ReadonlySet<string> = new Set([
+  'op_start', 'op_end', 'op_project', 'op_manager', 'op_site',
+  'op_driver', 'op_vehicle', 'op_type', 'op_severity', 'op_outcome', 'op_evidence',
+]);
+
+/**
+ * Only the `op_` namespace is policed. The query string legitimately carries
+ * other things — `cursor` on the drill-down, and whatever the router put there
+ * — and refusing those would break callers over parameters this parser was
+ * never responsible for.
+ */
+function assertNoUnknownOpKeys(query: RawOperationsQuery): void {
+  const unknown = Object.keys(query)
+    .filter((key) => key.startsWith('op_') && !KNOWN_OP_KEYS.has(key))
+    .sort();
+  if (unknown.length === 0) return;
+  throw new OperationsFilterError(
+    `${unknown.join(', ')} ${unknown.length === 1 ? 'is not a filter' : 'are not filters'} this endpoint accepts; `
+    + `the ones it does are: ${[...KNOWN_OP_KEYS].join(', ')}`,
+  );
+}
+
 export function parseOperationsFilters(query: RawOperationsQuery): OperationsFilters {
+  assertNoUnknownOpKeys(query);
   const rawStart = requiredDate(query, 'op_start');
   const rawEnd = requiredDate(query, 'op_end');
   if (rawEnd < rawStart) throw new OperationsFilterError('op_end cannot be before op_start');

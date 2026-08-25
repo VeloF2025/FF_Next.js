@@ -197,7 +197,7 @@ describe('GET /api/fleet/analytics/operations/drill-down', () => {
   it('returns aggregate_only as a normal answer, not an error', async () => {
     mocks.drillDown.mockResolvedValue({
       mode: 'aggregate_only',
-      values: [{ metricKey: 'incident.late', numerator: 9, denominator: null, histogram: null, generalized: false }],
+      values: [{ metricKey: 'incident.late', numerator: 9, denominator: null, histogram: null, coverage: { months: 1, of: 1 } }],
       incidentIds: [], nextCursor: null,
     });
     const result = await call(drillDownHandler, 'GET');
