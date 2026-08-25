@@ -25,7 +25,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool } from 'pg';
-import { REVERSIONED_TELEMATICS_INCIDENT_TYPES } from '@/modules/fleet/vehicleDetectors/types';
+import { REVERSIONED_TELEMATICS_INCIDENT_TYPES, TELEMATICS_REVERSION_CHANGE_REASON } from '@/modules/fleet/vehicleDetectors/types';
 
 const SCHEMA = 'mig529_fleet_vehicle_operational_rules_scratch';
 const BASE_URL = process.env.TEST_DATABASE_URL;
@@ -39,6 +39,19 @@ const USER = '11111111-1111-4111-8111-111111111111';
 const VEHICLE = '55555555-5555-4555-8555-555555555555';
 /** Every open incident rule 510 seeds — the count 529 must leave unchanged. */
 const SEEDED_OPEN_RULE_COUNT = 14;
+
+/**
+ * 510's rule seed, lifted verbatim out of its own file.
+ *
+ * Every test starts from exactly this state. The scenario tests below leave
+ * operator-authored rows behind that the rollback deliberately does NOT remove,
+ * so resetting has to mean "back to 510", not "run the rollback".
+ */
+const SEED_RULES = (() => {
+  const from = INCIDENTS.indexOf('INSERT INTO fleet_operational_incident_rules');
+  if (from < 0) throw new Error('510 no longer seeds fleet_operational_incident_rules');
+  return INCIDENTS.slice(from, INCIDENTS.indexOf(';', from) + 1);
+})();
 
 const admin = new Pool({ connectionString: BASE_URL, ssl: false, max: 1 });
 const db = new Pool({ connectionString: SCOPED_URL, ssl: false, max: 4 });
@@ -126,9 +139,57 @@ beforeEach(async () => {
   // Return to the pre-529 world, then re-seed the vehicle row so every test
   // that reads after_hours_exempt is reading a row that PREDATES the ALTER.
   await db.query(ROLLBACK);
+  await db.query('DELETE FROM fleet_operational_incident_rules');
+  await db.query(SEED_RULES);
   await db.query('DELETE FROM fleet_vehicles');
   await db.query(`INSERT INTO fleet_vehicles (id, registration) VALUES ('${VEHICLE}', 'CA 123-456')`);
 });
+
+/**
+ * Stand in for an operator who edited a rule through the incident-settings UI:
+ * close whatever is open for `type` and open a new version at `version`.
+ */
+async function operatorVersion(type: string, version: number, severity: string): Promise<void> {
+  // One dedicated client: a BEGIN issued on the POOL can land on a different
+  // connection from the statements that follow it.
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'UPDATE fleet_operational_incident_rules SET effective_to = now() WHERE incident_type = $1 AND effective_to IS NULL',
+      [type],
+    );
+    await client.query(
+      `INSERT INTO fleet_operational_incident_rules
+         (incident_type, version, effective_from, creates_incident, severity, immediate_notification,
+          in_app_enabled, email_enabled, whatsapp_enabled, include_in_morning_summary,
+          acknowledgement_target_minutes, change_reason)
+       VALUES ($1, $2, now(), true, $3, true, true, true, true, false, 5, 'Operator edit')`,
+      [type, version, severity],
+    );
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+}
+
+/** A closed version that sits entirely BEFORE the open one — history, not a conflict. */
+async function closedHistoricVersion(type: string, version: number): Promise<void> {
+  await db.query(
+    `INSERT INTO fleet_operational_incident_rules
+       (incident_type, version, effective_from, effective_to, creates_incident, severity,
+        immediate_notification, in_app_enabled, email_enabled, whatsapp_enabled,
+        include_in_morning_summary, acknowledgement_target_minutes)
+     VALUES ($1, $2, now() - interval '2 hours', now() - interval '1 hour', true, 'critical',
+             true, true, true, true, false, 5)`,
+    [type, version],
+  );
+}
+
+async function openRuleFor(type: string) {
+  const open = await openIncidentRules();
+  return open.find((row) => row.incident_type === type);
+}
 
 describe('before the migration runs', () => {
   it('leaves all six telematics rules critical with WhatsApp armed', async () => {
@@ -231,6 +292,76 @@ describe('the forward migration', () => {
     for (const row of roles.rows) {
       expect(row.actions).toMatchObject({ view: true, create: true, edit: true, delete: false });
     }
+  });
+});
+
+describe('a database an operator has already edited', () => {
+  // The first shape of this migration pinned the close and the insert to
+  // `version = 1`. Every test in this block failed against it — silently, with
+  // the migration exiting 0 and the type left critical with WhatsApp armed.
+
+  it('re-versions on top of an operator open version 2, at version 3', async () => {
+    await operatorVersion('severe_driving', 2, 'critical');
+    await db.query(FORWARD);
+
+    expect(await openRuleFor('severe_driving')).toMatchObject({
+      version: 3, severity: 'high', whatsapp_enabled: false,
+      immediate_notification: false, include_in_morning_summary: true,
+    });
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('steps past a CLOSED version 2 instead of colliding with it', async () => {
+    // A hard-coded version 2 raises 23505 here, or — with ON CONFLICT DO
+    // NOTHING — inserts nothing and leaves the type with ZERO open rules, which
+    // makes the incident producer throw for every incident of that type.
+    await closedHistoricVersion('dangerous_area_entry', 2);
+    await db.query(FORWARD);
+
+    expect(await openRuleFor('dangerous_area_entry')).toMatchObject({ version: 3, severity: 'high' });
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('leaves an operator deliberate non-critical version completely alone', async () => {
+    // The close is scoped by severity, so a type an operator has already taken
+    // off critical is not re-versioned on top of. Their row stays open.
+    await operatorVersion('lost_contact_moving', 2, 'normal');
+    await db.query(FORWARD);
+
+    expect(await openRuleFor('lost_contact_moving')).toMatchObject({ version: 2, severity: 'normal' });
+    const authored = await db.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM fleet_operational_incident_rules
+        WHERE incident_type = 'lost_contact_moving' AND change_reason = $1`,
+      [TELEMATICS_REVERSION_CHANGE_REASON],
+    );
+    expect(authored.rows[0]!.count).toBe(0);
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('is a no-op on a second run, whatever the starting state', async () => {
+    await operatorVersion('severe_driving', 2, 'critical');
+    await closedHistoricVersion('dangerous_area_entry', 2);
+    await operatorVersion('lost_contact_moving', 2, 'normal');
+    await db.query(FORWARD);
+    const afterFirst = await openIncidentRules();
+
+    await db.query(FORWARD);
+
+    expect(await openIncidentRules()).toEqual(afterFirst);
+    expect(afterFirst).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('never leaves a type with zero or two open rules', async () => {
+    await operatorVersion('severe_driving', 2, 'critical');
+    await closedHistoricVersion('dangerous_area_entry', 2);
+    await db.query(FORWARD);
+
+    const counts = await db.query<{ incident_type: string; count: number }>(
+      `SELECT incident_type, count(*)::int AS count FROM fleet_operational_incident_rules
+        WHERE effective_to IS NULL GROUP BY incident_type ORDER BY incident_type`,
+    );
+    expect(counts.rows).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+    for (const row of counts.rows) expect(row.count, row.incident_type).toBe(1);
   });
 });
 
@@ -418,5 +549,54 @@ describe('the rollback', () => {
     const open = await openIncidentRules();
     expect(open).toHaveLength(SEEDED_OPEN_RULE_COUNT);
     expect(open.find((row) => row.incident_type === 'severe_driving')).toMatchObject({ version: 2, severity: 'high' });
+  });
+
+  it('restores an operator version 2, not version 1', async () => {
+    await operatorVersion('severe_driving', 2, 'critical');
+    await db.query(FORWARD);
+    await db.query(ROLLBACK);
+
+    // 529 closed the operator's row, so that is the row the rollback owes back.
+    expect(await openRuleFor('severe_driving')).toMatchObject({
+      version: 2, severity: 'critical', whatsapp_enabled: true,
+    });
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('restores version 1 when a closed version 2 sits in the history', async () => {
+    await closedHistoricVersion('dangerous_area_entry', 2);
+    await db.query(FORWARD);
+    await db.query(ROLLBACK);
+
+    expect(await openRuleFor('dangerous_area_entry')).toMatchObject({ version: 1, severity: 'critical' });
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('never deletes a version 2 it did not author', async () => {
+    await operatorVersion('severe_driving', 2, 'normal');
+    await db.query(FORWARD);
+    await db.query(ROLLBACK);
+
+    const rows = await db.query<{ version: number; severity: string }>(
+      `SELECT version, severity FROM fleet_operational_incident_rules
+        WHERE incident_type = 'severe_driving' ORDER BY version`,
+    );
+    expect(rows.rows).toEqual([
+      { version: 1, severity: 'critical' },
+      { version: 2, severity: 'normal' },
+    ]);
+    expect(await openRuleFor('severe_driving')).toMatchObject({ version: 2, severity: 'normal' });
+  });
+
+  it('is idempotent — a second rollback changes nothing', async () => {
+    await operatorVersion('severe_driving', 2, 'critical');
+    await db.query(FORWARD);
+    await db.query(ROLLBACK);
+    const afterFirst = await openIncidentRules();
+
+    await db.query(ROLLBACK);
+
+    expect(await openIncidentRules()).toEqual(afterFirst);
+    expect(afterFirst).toHaveLength(SEEDED_OPEN_RULE_COUNT);
   });
 });

@@ -101,32 +101,52 @@ ON CONFLICT (version) DO NOTHING;
 ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN NOT NULL DEFAULT false;
 
 -- Re-version the four non-emergency telematics incident rules. See the header.
--- `version = 1` is load-bearing, not decoration. Without it a second run of
--- this file closes the version 2 rows it just opened, and the follow-up INSERT
--- is a no-op under ON CONFLICT — leaving four incident types with NO effective
--- rule, which makes the incident producer throw.
-UPDATE fleet_operational_incident_rules
-   SET effective_to = now(), updated_at = now()
- WHERE effective_to IS NULL
-   AND version = 1
-   AND incident_type = ANY(ARRAY[
-     'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
-   ]::text[]);
+--
+-- Two things make this safe against a database an operator has already touched
+-- through the incident-settings UI, which `version = 1` did NOT:
+--
+--   * The close is scoped by `severity = 'critical'`, not by version. That is
+--     self-limiting: after this migration no open row among the four is
+--     critical, so a re-run closes nothing and inserts nothing. It also leaves
+--     an operator's own deliberate non-critical version alone rather than
+--     re-versioning on top of it.
+--   * The new row takes `max(version) + 1` FOR THAT TYPE, computed per type
+--     from the rows just closed. Hard-coding 2 collides with an operator's
+--     existing version 2 — and under `ON CONFLICT DO NOTHING` that collision is
+--     silent, leaving the type critical with WhatsApp armed and the migration
+--     exiting 0. There is deliberately no ON CONFLICT clause here: a collision
+--     must fail the migration loudly.
+--
+-- Split into a close and an insert over a temporary table rather than one
+-- data-modifying CTE: the exclusion constraint checks an inserted row against a
+-- dirty snapshot, and a row UPDATEd by the same command can still read as open
+-- to that check. Two statements in one transaction have no such ambiguity.
+DROP TABLE IF EXISTS mig529_reversioned;
+CREATE TEMP TABLE mig529_reversioned AS
+WITH closed AS (
+  UPDATE fleet_operational_incident_rules
+     SET effective_to = now(), updated_at = now()
+   WHERE effective_to IS NULL
+     AND severity = 'critical'
+     AND incident_type = ANY(ARRAY[
+       'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
+     ]::text[])
+  RETURNING incident_type
+)
+SELECT incident_type FROM closed;
 
 INSERT INTO fleet_operational_incident_rules (
   incident_type, version, effective_from, creates_incident, severity, immediate_notification,
   in_app_enabled, email_enabled, whatsapp_enabled, include_in_morning_summary,
   acknowledgement_target_minutes, change_reason
-) VALUES
-  ('severe_driving', 2, now(), true, 'high', false, true, true, false, true, 5,
-   'Telematics detectors report through the morning summary, not a WhatsApp blast'),
-  ('prolonged_unauthorized_stop', 2, now(), true, 'high', false, true, true, false, true, 5,
-   'Telematics detectors report through the morning summary, not a WhatsApp blast'),
-  ('lost_contact_moving', 2, now(), true, 'high', false, true, true, false, true, 5,
-   'Telematics detectors report through the morning summary, not a WhatsApp blast'),
-  ('dangerous_area_entry', 2, now(), true, 'high', false, true, true, false, true, 5,
-   'Telematics detectors report through the morning summary, not a WhatsApp blast')
-ON CONFLICT (incident_type, version) DO NOTHING;
+)
+SELECT c.incident_type,
+       (SELECT max(r.version) + 1 FROM fleet_operational_incident_rules r WHERE r.incident_type = c.incident_type),
+       now(), true, 'high', false, true, true, false, true, 5,
+       'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast'
+  FROM mig529_reversioned c;
+
+DROP TABLE mig529_reversioned;
 
 INSERT INTO access_permissions (type, key, parent_key, label, description, route, sort_order, is_active)
 VALUES

@@ -11,46 +11,74 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { REVERSIONED_TELEMATICS_INCIDENT_TYPES } from '../types';
+import { REVERSIONED_TELEMATICS_INCIDENT_TYPES, TELEMATICS_REVERSION_CHANGE_REASON } from '../types';
 
 const SQL_DIR = resolve(process.cwd(), 'scripts/migrations/sql');
 const forward = readFileSync(resolve(SQL_DIR, '529_fleet_vehicle_operational_rules.sql'), 'utf8');
 const rollback = readFileSync(resolve(SQL_DIR, 'rollback_529_fleet_vehicle_operational_rules.sql'), 'utf8');
 
-/** The types named inside the migration's `ARRAY[...]` re-version list. */
-function reversionedTypesInSql(sql: string): string[] {
-  const block = sql.match(/incident_type = ANY\(ARRAY\[([\s\S]*?)\]::text\[\]\)/);
-  if (!block?.[1]) throw new Error('529 no longer re-versions an explicit incident-type list');
-  return [...block[1].matchAll(/'([a-z_]+)'/g)].map((match) => match[1]!);
+/**
+ * Every `incident_type = ANY(ARRAY[...])` list in a migration file.
+ *
+ * All of them, not the first: the rollback carries two (the delete and the
+ * restore), and a fifth type slipped into just one of them would leave a type
+ * deleted and never reopened.
+ */
+function reversionedTypeLists(sql: string): string[][] {
+  const blocks = [...sql.matchAll(/incident_type = ANY\(ARRAY\[([\s\S]*?)\]::text\[\]\)/g)];
+  if (blocks.length === 0) throw new Error('529 no longer names an explicit incident-type list');
+  return blocks.map((block) => [...block[1]!.matchAll(/'([a-z_]+)'/g)].map((match) => match[1]!));
 }
 
+const expectedTypes = [...REVERSIONED_TELEMATICS_INCIDENT_TYPES].sort();
+
 describe('the re-versioned incident types', () => {
-  it('are exactly the four the TS constant names', () => {
-    expect(reversionedTypesInSql(forward).sort()).toEqual([...REVERSIONED_TELEMATICS_INCIDENT_TYPES].sort());
+  it('are exactly the four the TS constant names, in every list', () => {
+    for (const list of reversionedTypeLists(forward)) expect(list.sort()).toEqual(expectedTypes);
   });
 
   it('never include the two emergency types that must keep WhatsApp', () => {
-    const types = reversionedTypesInSql(forward);
-    expect(types).not.toContain('accident_sos');
-    expect(types).not.toContain('theft_after_hours_movement');
-  });
-
-  it('are inserted at severity high with WhatsApp off and the morning summary on', () => {
-    // `requiresMandatoryIncidentWhatsApp` is severity === 'critical' && producerKind
-    // === 'source_event'. 'high' is the whole mechanism; 'critical' here would
-    // arm a WhatsApp blast for every harsh-braking event.
-    const block = forward.slice(forward.indexOf('INSERT INTO fleet_operational_incident_rules'));
-    const values = block.slice(block.indexOf(') VALUES'), block.indexOf('ON CONFLICT (incident_type, version)'));
-    const inserts = values.split(/\n\s*\(/).filter((row) => /^'[a-z_]+', 2,/.test(row.trim()));
-    expect(inserts).toHaveLength(REVERSIONED_TELEMATICS_INCIDENT_TYPES.length);
-    for (const insert of inserts) {
-      expect(insert, insert).toContain("'high'");
-      expect(insert, insert).not.toContain("'critical'");
+    for (const list of reversionedTypeLists(forward)) {
+      expect(list).not.toContain('accident_sos');
+      expect(list).not.toContain('theft_after_hours_movement');
     }
-    expect(forward).toMatch(/INSERT INTO fleet_operational_incident_rules[\s\S]*whatsapp_enabled, include_in_morning_summary/);
   });
 
-  it('close version 1 before opening version 2, so the gist exclusion holds', () => {
+  it('are closed by severity, not by version — so a re-run is a no-op', () => {
+    // `version = 1` was the first shape of this, and it was wrong: an operator
+    // who had already created version 2 of a type through the settings UI would
+    // see the close match nothing and the type stay critical. Scoping the close
+    // to `severity = 'critical'` is self-limiting instead — after the migration
+    // no open row among the four is critical.
+    const close = forward.slice(forward.indexOf('UPDATE fleet_operational_incident_rules'));
+    const statement = close.slice(0, close.indexOf(';'));
+    expect(statement).toContain("severity = 'critical'");
+    expect(statement).toContain('effective_to IS NULL');
+    expect(statement).not.toMatch(/\bversion = \d/);
+  });
+
+  it('insert at max(version) + 1 per type, and never swallow a collision', () => {
+    const insert = forward.slice(forward.indexOf('INSERT INTO fleet_operational_incident_rules'));
+    const statement = insert.slice(0, insert.indexOf(';'));
+    expect(statement).toContain('max(r.version) + 1');
+    // A hard-coded 2 collides with an operator's own version 2, and
+    // ON CONFLICT DO NOTHING would make that collision silent — leaving the
+    // type critical with WhatsApp armed and the migration exiting 0.
+    expect(statement).not.toMatch(/ON CONFLICT/i);
+  });
+
+  it('insert at severity high with WhatsApp off and the morning summary on', () => {
+    // `requiresMandatoryIncidentWhatsApp` is severity === 'critical' &&
+    // producerKind === 'source_event'. 'high' is the whole mechanism.
+    const insert = forward.slice(forward.indexOf('INSERT INTO fleet_operational_incident_rules'));
+    const statement = insert.slice(0, insert.indexOf(';'));
+    expect(statement).toContain("'high'");
+    expect(statement).not.toContain("'critical'");
+    expect(statement).toContain('whatsapp_enabled, include_in_morning_summary');
+    expect(statement).toContain(TELEMATICS_REVERSION_CHANGE_REASON);
+  });
+
+  it('close before opening, so the gist exclusion holds', () => {
     const updateAt = forward.indexOf('UPDATE fleet_operational_incident_rules');
     const insertAt = forward.indexOf('INSERT INTO fleet_operational_incident_rules');
     expect(updateAt).toBeGreaterThan(-1);
@@ -58,9 +86,9 @@ describe('the re-versioned incident types', () => {
   });
 
   it('carry no explicit BEGIN, because the runner already opens the transaction', () => {
-    // scripts/migrations/run.ts wraps every file in BEGIN/COMMIT. An explicit
-    // BEGIN here nests (a warning) and the COMMIT ends the runner's transaction
-    // early, which would split the close and the insert into two commits.
+    // scripts/migrations/run.ts wraps every forward file in BEGIN/COMMIT. An
+    // explicit BEGIN here nests and the COMMIT would end the runner's
+    // transaction early, splitting the close and the insert into two commits.
     expect(forward).not.toMatch(/^\s*BEGIN\s*;/mi);
     expect(forward).not.toMatch(/^\s*COMMIT\s*;/mi);
   });
@@ -104,13 +132,36 @@ describe('the versioned rule table', () => {
 });
 
 describe('the rollback', () => {
-  it('deletes version 2 and explicitly reopens version 1 — in that order', () => {
-    const deleteAt = rollback.indexOf('DELETE FROM fleet_operational_incident_rules');
-    const reopenAt = rollback.indexOf('SET effective_to = NULL');
-    expect(deleteAt).toBeGreaterThan(-1);
-    // Reopening first would collide with ux_fleet_operational_incident_rules_open_type.
-    expect(reopenAt).toBeGreaterThan(deleteAt);
-    expect(reversionedTypesInSql(rollback).sort()).toEqual([...REVERSIONED_TELEMATICS_INCIDENT_TYPES].sort());
+  it('is one transaction, because psql autocommits statement by statement', () => {
+    // Removing 529's rows without reopening what they replaced leaves four
+    // incident types with no effective rule at all.
+    expect(rollback).toMatch(/^BEGIN;$/m);
+    expect(rollback).toMatch(/^COMMIT;$/m);
+  });
+
+  it('removes only the rows 529 authored, by change reason — never "version 2"', () => {
+    const del = rollback.slice(rollback.indexOf('DELETE FROM fleet_operational_incident_rules'));
+    const statement = del.slice(0, del.indexOf(';'));
+    expect(statement).toContain(TELEMATICS_REVERSION_CHANGE_REASON);
+    expect(statement).toContain("severity = 'high'");
+    // An operator may have authored their own version 2 of any of these types.
+    expect(statement).not.toMatch(/\bversion = \d/);
+  });
+
+  it('reopens the newest closed critical row per type, and only if none is open', () => {
+    const restore = rollback.slice(rollback.indexOf('WITH restore AS'));
+    const statement = restore.slice(0, restore.indexOf(';'));
+    expect(statement).toContain('DISTINCT ON (incident_type)');
+    expect(statement).toContain("severity = 'critical'");
+    expect(statement).toContain('ORDER BY incident_type, effective_to DESC, version DESC');
+    expect(statement).toContain('NOT EXISTS');
+    expect(statement).toContain('SET effective_to = NULL');
+  });
+
+  it('deletes before it reopens — the open-per-type index forbids the other order', () => {
+    expect(rollback.indexOf('DELETE FROM fleet_operational_incident_rules'))
+      .toBeLessThan(rollback.indexOf('WITH restore AS'));
+    for (const list of reversionedTypeLists(rollback)) expect(list.sort()).toEqual(expectedTypes);
   });
 
   it('removes the table, the column, the permission rows and the migration record', () => {

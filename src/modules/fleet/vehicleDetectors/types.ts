@@ -65,3 +65,14 @@ export const REVERSIONED_TELEMATICS_INCIDENT_TYPES = [
 ] as const;
 
 export type ReversionedTelematicsIncidentType = (typeof REVERSIONED_TELEMATICS_INCIDENT_TYPES)[number];
+
+/**
+ * The exact `change_reason` migration 529 stamps on the rows it inserts.
+ *
+ * It is the rollback's only handle on "rows 529 authored": the version number
+ * is not 529's to claim, because an operator may have created their own version
+ * 2 of any of these types through the incident-settings UI. Pinned against both
+ * SQL files by `__tests__/migrationContract.test.ts`.
+ */
+export const TELEMATICS_REVERSION_CHANGE_REASON =
+  'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast';
