@@ -57,9 +57,9 @@ notifying oversight members.
 | 518 | Aggregates, runs, settings, holds, retention items | ✅ |
 | 521 | Delete grants the purge needs to execute as `fibreflow_user` | ✅ |
 | 527 | `…_published` view — the only relation a read path may use | ✅ |
-| **528** | `fleet_operational_aggregate_month_coverage` | ❌ **not applied** |
+| **530** | `fleet_operational_aggregate_month_coverage` | ❌ **not applied** |
 
-### ⚠️ Migration 528 must be applied BEFORE the code that reads it deploys
+### ⚠️ Migration 530 must be applied BEFORE the code that reads it deploys
 
 The retention cron is live (5 runs, most recent 2026-08-25 03:30 SAST). Once
 the coverage-gate change deploys, `hasCompleteAggregateCoverage` queries
@@ -67,7 +67,7 @@ the coverage-gate change deploys, `hasCompleteAggregateCoverage` queries
 applied, the nightly retention run fails with `relation … does not exist`.
 
 It fails **closed** — nothing is deleted — but it fails loudly every night
-until the migration lands. Apply 528, then deploy.
+until the migration lands. Apply 530, then deploy.
 
 Why the gate changed: the previous one inferred coverage from the presence of
 aggregate rows, and a month can be aggregated fully and correctly while
@@ -120,7 +120,7 @@ detected by checksum and rewrite nothing.
 Deletion is irreversible. Each step is its own approval.
 
 1. **Confirm a database backup** covering the incidents and evidence tables.
-2. **Apply migration 528** and read it back.
+2. **Apply migration 530** and read it back.
 3. **Confirm aggregate coverage** for every month that would be in scope — the
    gate refuses uncovered months, so a gap here means those incidents simply
    are not purged.
@@ -151,7 +151,7 @@ SELECT filename FROM schema_migrations
 SELECT status, months_requested, months_succeeded, months_failed, rows_written, started_at
   FROM fleet_operational_aggregation_runs ORDER BY started_at DESC LIMIT 5;
 
--- Coverage actually recorded (after 528)
+-- Coverage actually recorded (after 530)
 SELECT metric_version, month_start, row_count, completed_at
   FROM fleet_operational_aggregate_month_coverage ORDER BY month_start DESC LIMIT 12;
 
@@ -173,7 +173,7 @@ SELECT version, retention_months, anonymity_min_contributors, live_retention_ena
 
 | Rolling back | Effect |
 |---|---|
-| 528 | The coverage gate's table disappears and retention fails loudly rather than falling back. Deliberate: a silent fallback would reintroduce the defect 528 fixes, invisibly. Retention stops; it does not revert. |
+| 530 | The coverage gate's table disappears and retention fails loudly rather than falling back. Deliberate: a silent fallback would reintroduce the defect 530 fixes, invisibly. Retention stops; it does not revert. |
 | 527 | The published view goes, and every analytics read path breaks loudly. Also deliberate — a read path quietly falling back to the base table would begin returning superseded, pre-tightening generations. |
 | 518 | Removes the whole stage-8 schema. Only safe while no aggregates or holds exist that anyone needs. |
 
