@@ -150,9 +150,23 @@ export interface IncidentActionRunnerResult {
   escalatedCount: number;
   summariesSentCount: number;
   notifications: IncidentDeliverySummary;
+  /** PR8's vehicle summary. Null before 08:15 SAST, or when that phase threw — it has no monitor-run row, so this is its only report. Required, not optional: `runIncidentActions` always sets it, and an optional field would let a caller read `undefined` as "the phase is not wired up" when it means "it did not run today". */
+  vehicleSummary: VehicleSummaryResult | null;
 }
 
 export type IncidentDeliverySummary = NotifyResult;
+
+/** PR8's 08:15 SAST vehicle-incident summary outcome. It has no monitor-run row (migration 510's run-kind CHECK admits only three kinds), so this result is its only bookkeeping. */
+export interface VehicleSummaryResult {
+  /** The SAST calendar date summarised — the day BEFORE the tick's SAST date. */
+  workDate: string;
+  totalIncidents: number;
+  /** True only when the group post was attempted and failed. NOT the inverse of "posted": a later tick that day is claim-suppressed and reports `false`, because nothing failed. */
+  groupPostFailed: boolean;
+  /** Per-recipient notifications actually delivered — never attempts. */
+  delivered: number;
+  failed: number;
+}
 
 export interface IncidentListRequest {
   lifecycleStatuses?: IncidentLifecycleStatus[];

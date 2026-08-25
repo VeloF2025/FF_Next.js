@@ -285,7 +285,7 @@ Two independent cron endpoints, both behind `pages/api/cron/...` and a matching
 | Endpoint | Cadence | Does |
 |---|---|---|
 | `/api/cron/fleet-operational-monitor` | every 5 min | Loads every active project's complete PR 4 roster (one roster-loading *phase*; any one project's load failing fails the whole phase — never a silent partial), runs `incidentProducer` per staff row, sends `opened` notifications after each incident transaction commits. |
-| `/api/cron/fleet-incident-actions` | at least every 5 min | Three independent phases in one tick: escalation (always), 08:15 SAST morning summary (at most once per SAST work date, skipped entirely before 08:15), status-monitor health check (always). One phase's failure never blocks or hides another's. |
+| `/api/cron/fleet-incident-actions` | at least every 5 min | **Four** independent phases in one tick: escalation (always), 08:15 SAST roster morning summary (at most once per SAST work date, skipped entirely before 08:15), 08:15 SAST **vehicle** summary (same gate, guarded by a claim rather than a run row — see Health below), status-monitor health check (always). One phase's failure never blocks or hides another's. |
 
 **Auth is `x-cron-secret: <CRON_SECRET>`** — matching this Fleet module's own
 existing convention (`fleet-parking-check.ts`, `fleet-check-reminders.ts`), fail-
@@ -308,7 +308,19 @@ lifetime. Lock names are distinct per endpoint: `fleet-operational-monitor` and
 
 **Health.** `fleet_operational_monitor_runs` records `running` → `succeeded` /
 `partial_failure` / `failed` for each of the three run kinds
-(`status_monitor`/`escalation`/`morning_summary`). The incident-actions tick checks
+(`status_monitor`/`escalation`/`morning_summary`).
+
+**The vehicle summary phase (`vehicleSummaryPhase.ts`) deliberately has NO run
+row.** `fleet_operational_monitor_runs_kind_check` admits only those three
+kinds, and a fourth would need a migration purely for bookkeeping. Its
+once-per-SAST-day guard is instead the Fleet Alerts group post's own
+notification claim (`fleet-vehicle-morning-summary:<workDate>`), so exactly one
+post reaches the group per day. The consequence to know before debugging it: its
+counting query and per-recipient fan-out re-run on **every** tick after 08:15 —
+harmless, because each notification is suppressed by its own idempotency key —
+and its outcome appears only in `IncidentActionRunnerResult.vehicleSummary` and
+the log, never in the runs table. Do not go looking for a
+`vehicle_morning_summary` row; there isn't one. The incident-actions tick checks
 the *other* cron's health: a `status_monitor` run stuck `running` for more than 15
 minutes (3× the 5-minute cadence — absorbs one missed tick, still catches a real
 outage promptly) is converted to `failed` and alerted; if nothing is stale, a
@@ -338,7 +350,17 @@ do not count them here. Idempotency
 keys are exact strings, not implementation detail: `fleet-incident-opened:<id>`,
 `fleet-incident-escalated:<id>:<level>`, `fleet-incident-resolved:<id>:<outcome>`,
 `fleet-morning-summary:<userId>:<projectId|unassigned>:<workDate>`,
-`fleet-monitor-failed:<runKind>:<runId|missing>`.
+`fleet-monitor-failed:<runKind>:<runId|missing>`,
+`fleet-vehicle-morning-summary:<userId>:<workDate>` (per-recipient) and
+`fleet-vehicle-morning-summary:<workDate>` (the group post's claim).
+
+The vehicle summary reuses the registered `fleet.operational_morning_summary`
+event but **must never** reuse `buildMorningSummaryIdempotencyKey`: that builder
+renders a null project as the literal `unassigned`, which the roster summary
+already emits for its own projectless bucket, so a shared namespace would give
+both digests the same key per recipient per day and `claimNotification` would
+silently drop whichever ran second. Vehicle incidents are projectless by
+construction, so this is not a hypothetical collision.
 
 **Mandatory WhatsApp for critical explicit-source incidents.** `notify()` resolves
 channels from `DEFAULT_CHANNEL_PREFERENCES` plus a per-user override and has no

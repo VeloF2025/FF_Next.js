@@ -13,17 +13,20 @@
  * returned counters instead of aborting the tick.
  */
 import { query, transaction, type TxnClient } from '@/lib/db-pool';
+import { log } from '@/lib/logger';
 import { insertIncidentAction } from './incidentRepository';
 import { sendEscalationNotification, sendMonitorFailedNotification } from './incidentNotifications';
 import {
   findLatestMonitorRun, findStaleRunningRuns, finalizeMonitorRun, startMonitorRun,
 } from './runRepository';
 import { sastDateString } from '../parking/sastDate';
-import { addMinutesIso, applyDelivery, boundedErrorSummary, recordPhaseError } from './incidentActionShared';
+import { addMinutesIso, applyDelivery, boundedErrorSummary, MODULE, recordPhaseError } from './incidentActionShared';
 import type { EscalationTotals, SummaryTotals } from './incidentActionShared';
 import { runMorningSummaryPhase } from './incidentSummaryPhase';
+import { runVehicleMorningSummaryPhase } from './vehicleSummaryPhase';
 import type {
-  IncidentActionRunnerRequest, IncidentActionRunnerResult, IncidentProducerKind, IncidentSeverity, IncidentType,
+  IncidentActionRunnerRequest, IncidentActionRunnerResult, IncidentProducerKind, IncidentSeverity,
+  IncidentType, VehicleSummaryResult,
 } from './types';
 
 const STALE_STATUS_MONITOR_MINUTES = 15; // 3x the 5-min cadence: absorbs one missed tick, still catches a real outage promptly
@@ -178,6 +181,18 @@ export async function runIncidentActions(request: IncidentActionRunnerRequest): 
 
   await runEscalationPhase(request, run.id, totals);
   await runMorningSummaryPhase(request, summaryTotals);
+  // A fourth, fully isolated phase (PR8). It keeps its own totals and its own guard —
+  // a throw here must not reach the escalation or roster-summary counters, and must not
+  // change this run's finalized status, or one broken vehicle query would report the
+  // roster summary as degraded too.
+  let vehicleSummary: VehicleSummaryResult | null = null;
+  try {
+    vehicleSummary = await runVehicleMorningSummaryPhase(request);
+  } catch (vehicleError) {
+    log.error('[fleet-incident-actions] vehicle morning-summary phase failed', {
+      error: vehicleError instanceof Error ? vehicleError.message : String(vehicleError),
+    }, MODULE);
+  }
   await runStatusMonitorHealthCheck(request.effectiveAt, totals);
 
   const status = (totals.errorCount + summaryTotals.errorCount) > 0 || (totals.notifFailed + summaryTotals.notifFailed) > 0
@@ -194,5 +209,9 @@ export async function runIncidentActions(request: IncidentActionRunnerRequest): 
       delivered: totals.notifAccepted + summaryTotals.notifAccepted, suppressed: 0,
       failed: totals.notifFailed + summaryTotals.notifFailed,
     },
+    // Reported separately, never folded into the counters above: the vehicle summary has no
+    // monitor-run row of its own (see vehicleSummaryPhase.ts), so this is where its outcome
+    // becomes visible in the cron response.
+    vehicleSummary,
   };
 }
