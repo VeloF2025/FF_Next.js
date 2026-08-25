@@ -19,6 +19,7 @@
  * looking at the form.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { log } from '@/lib/logger';
 import { IncidentApiError } from './incidentApi';
 import { retentionSettingsApi } from './retentionSettingsApi';
 import type { AnalyticsRetentionSettingsChangeRequest } from './retentionSettingsApi';
@@ -79,6 +80,7 @@ export function RetentionAnalyticsSection({ canEdit }: { canEdit: boolean }) {
       // Left null rather than defaulted: a form pre-filled with invented
       // numbers would let someone "save" a policy nobody is looking at.
       setError(caught instanceof IncidentApiError ? caught.message : 'Could not load analytics and retention settings');
+      log.error('Fleet analytics/retention settings failed to load', { error: caught }, 'fleet');
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -119,6 +121,7 @@ export function RetentionAnalyticsSection({ canEdit }: { canEdit: boolean }) {
       await load();
     } catch (caught) {
       setError(caught instanceof IncidentApiError ? caught.message : 'Could not update analytics and retention settings');
+      log.error('Fleet analytics/retention settings update failed', { error: caught }, 'fleet');
     } finally { setSaving(false); }
   }
 
