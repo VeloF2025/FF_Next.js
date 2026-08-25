@@ -202,6 +202,7 @@ describe('sendEscalationNotification', () => {
     severity: 'high' as const, producerKind: 'scheduled_detection' as const,
     projectId: PROJECT, staffName: 'Jane Driver', projectName: 'Project One',
     operationalSiteName: 'Site One', escalationLevel: 2,
+    vehicleRegistration: 'JX 12 AB GP', detectedAt: '2026-08-18T08:00:00.000Z',
   };
 
   it('uses the incident id + escalation level idempotency key', async () => {
