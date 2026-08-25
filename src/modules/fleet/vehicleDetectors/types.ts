@@ -67,41 +67,33 @@ export const REVERSIONED_TELEMATICS_INCIDENT_TYPES = [
 export type ReversionedTelematicsIncidentType = (typeof REVERSIONED_TELEMATICS_INCIDENT_TYPES)[number];
 
 /**
- * The exact `change_reason` migration 529 stamps on the rows it inserts.
+ * The marker migration 529 appends to a `change_reason` it re-versioned.
  *
- * It is the rollback's only handle on "rows 529 authored": the version number
- * is not 529's to claim, because an operator may have created their own version
- * 2 of any of these types through the incident-settings UI. Pinned against both
- * SQL files by `__tests__/migrationContract.test.ts`.
+ * 529 inserts no rows and closes none: it rewrites the four telematics rules in
+ * place, behind a guard proving no incident references them. This marker is the
+ * only record that it did, and the rollback restores by it alone — so an
+ * operator's own `high` row is never touched.
+ *
+ * It CARRIES the prior flag values, e.g. `529:reversioned{wa=false,imm=false,
+ * morn=true}`. 529's filter constrains severity and nothing else, so restoring
+ * 510's seed flags on rollback would silently re-arm an operator's
+ * deliberately-disabled WhatsApp.
+ *
+ * Anchored to the END of `change_reason`. Residual risk, accepted: prose that
+ * itself ends with the exact literal would be matched. Prose that merely
+ * contains it mid-string is not.
  */
-export const TELEMATICS_REVERSION_CHANGE_REASON =
-  'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast';
-
-/**
- * The marker migration 529 appends to a PENDING rule's `change_reason`.
- *
- * A pending row (`effective_from` in the future) cannot be closed:
- * `effective_to = now()` would be earlier than its own `effective_from` and
- * violate the range-order CHECK. 529 edits it in place instead, and this marker
- * is the only record that it did — the rollback restores by the marker alone,
- * so an operator's own pending `high` row is never touched.
- *
- * The marker CARRIES the prior flag values, e.g.
- * `529:pending{wa=false,imm=false,morn=true}`. 529's filter constrains severity
- * and nothing else, so restoring 510's seed flags on rollback would silently
- * re-arm an operator's deliberately-disabled WhatsApp.
- */
-export const TELEMATICS_PENDING_REVERSION_MARKER_PREFIX = '529:pending{';
+export const TELEMATICS_REVERSION_MARKER_PREFIX = '529:reversioned{';
 
 /** The exact marker shape both 529 and its rollback must agree on. */
-export const TELEMATICS_PENDING_REVERSION_MARKER_PATTERN =
-  String.raw`529:pending\{wa=(true|false),imm=(true|false),morn=(true|false)\}$`;
+export const TELEMATICS_REVERSION_MARKER_PATTERN =
+  String.raw`529:reversioned\{wa=(true|false),imm=(true|false),morn=(true|false)\}$`;
 
 /** The marker 529 writes for a row that held `flags` before it was re-versioned. */
-export function telematicsPendingMarker(flags: {
+export function telematicsReversionMarker(flags: {
   whatsappEnabled: boolean; immediateNotification: boolean; includeInMorningSummary: boolean;
 }): string {
-  return `529:pending{wa=${flags.whatsappEnabled},imm=${flags.immediateNotification},morn=${flags.includeInMorningSummary}}`;
+  return `529:reversioned{wa=${flags.whatsappEnabled},imm=${flags.immediateNotification},morn=${flags.includeInMorningSummary}}`;
 }
 
 /**

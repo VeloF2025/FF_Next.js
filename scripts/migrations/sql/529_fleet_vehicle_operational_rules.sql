@@ -5,7 +5,8 @@
 -- Three things ship together because they are one decision:
 --   1. the versioned vehicle rule table (thresholds measured by PR0, not guessed);
 --   2. fleet_vehicles.after_hours_exempt, which the theft detector reads;
---   3. a re-version of four telematics incident rules from 'critical' to 'high'.
+--   3. a re-version of four telematics incident rules from 'critical' to 'high',
+--      in place, behind a guard that proves no incident references them.
 --
 -- (3) is the WhatsApp gate. `requiresMandatoryIncidentWhatsApp(severity, producerKind)`
 -- in src/modules/fleet/incidents/types.ts is `severity === 'critical' && producerKind ===
@@ -33,17 +34,11 @@
 -- `npm run db:migrate rollback <n>` — not this one.)
 --
 -- The one place a file genuinely needs its own atomicity is the incident-rule
--- re-versioning at the foot of this file, because closing a row and opening its
--- replacement are only correct together. That is solved by making THAT pair a
--- single statement, which is atomic in every execution mode without any
--- transaction control at all — including a hand-run `psql -f`, which
--- autocommits.
---
--- The re-versioning is two statements overall (active rows, then pending rows),
--- but they touch DISJOINT sets of rows, neither leaves a type without an open
--- rule on its own, and both are idempotent under their `severity = 'critical'`
--- filter. A `psql -f` run that dies between them is repaired by re-running the
--- file; there is no state in which one has run and the other must not.
+-- re-versioning at the foot of this file, and that is a single DO block: a
+-- guard and an UPDATE that cannot be half-executed in any mode, with no
+-- transaction control of its own. Every other statement here is independently
+-- idempotent (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`), so a `psql -f` run
+-- that dies part-way is repaired by re-running the file.
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
@@ -139,130 +134,95 @@ ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN N
 --     exiting 0. There is deliberately no ON CONFLICT clause here: a collision
 --     must fail the migration loudly.
 --
--- The re-versioning splits by STATE, because an open row is not necessarily an
--- effective one.
+-- Re-version the four non-emergency telematics incident rules.
 --
--- `fleet_operational_incident_rules_range_order` is
--- `CHECK (effective_to IS NULL OR effective_to > effective_from)`, so closing an
--- open row whose `effective_from` is in the future is earlier than its own start
--- and fails: the runner aborts the whole deploy, and a hand-run `psql -f`
--- half-applies and exits 0 with all four types still critical and still on
--- WhatsApp.
+-- ONE statement. No branches, no version arithmetic, no close-and-insert, no
+-- clock read, no interaction with any constraint on the table.
 --
--- How a pending row gets there matters for judging the risk, so be precise:
--- `IncidentSettingsDialog.tsx`'s RULED_TYPES is ['late', 'wrong_site',
--- 'evidence_mismatch', 'left_early'], so the settings UI cannot author a version
--- for ANY of the four telematics types. `versionIncidentRule` in
--- settingsRepository.ts accepts any IncidentType, though, and every version it
--- writes is future-dated. A pending critical row for these four is therefore
--- API- or SQL-authored, not clicked — reachable, and not something a migration
--- may assume away.
+-- WHY IT IS ALLOWED TO REWRITE HISTORY IN PLACE
 --
--- Branch A — ACTIVE open rows (`effective_from < now()`): close and open a
--- successor, which is the ordinary versioning move and preserves the history of
--- a rule that has actually been in force.
+-- Versioning exists so that an incident can say which rule judged it. These
+-- four rules have never judged anything: nothing calls the telematics
+-- detectors yet — they arrive in PR4, strictly after this migration — so no
+-- row of `fleet_operational_incidents` carries any of these four types. Rows
+-- that never governed an incident carry no history worth preserving, and
+-- editing them in place is therefore not a rewrite of the record but a
+-- correction of a seed that was wrong the day 510 wrote it.
 --
--- Branch B — WHATEVER BRANCH A LEFT OPEN: update IN PLACE. A pending row has
--- never judged an incident, so there is no history to preserve, no successor to
--- open, and no range to touch. Branch B carries NO `effective_from` predicate of
--- its own — reading the clock a second time opens a gap between the two
--- statements under `psql -f`; see the note on the statement itself.
+-- The guard below PROVES that at apply time rather than asserting it. If a
+-- single incident of any of the four types exists, the migration refuses and
+-- says so, and a human decides. It is inside the same DO block as the UPDATE
+-- deliberately: as two statements it would only stop the UPDATE under
+-- ON_ERROR_STOP, which scripts/run-pending-migrations.sh:127 does pass
+-- (`psql -v ON_ERROR_STOP=1 -q -1`) but a hand-run `psql -f` does not. One
+-- block cannot be half-executed in any mode.
 --
--- Both branches filter on `severity = 'critical'`, which is what makes them
--- idempotent and what leaves an operator's deliberate non-critical version
--- alone. The two sets are disjoint and together cover every open row.
-
--- Branch A. ONE statement, for two independent reasons.
+-- WHAT IT REPLACES, AND WHY
 --
---   * Atomicity in every mode. Closing a row and opening its replacement are
---     only correct together: the close alone leaves four incident types with NO
---     open rule, and `loadEffectiveIncidentRule` throws for a type with no open
---     row — taking the whole operational monitor down. As two statements this
---     holds only where something supplies a transaction; as one statement it
---     holds under `psql -f` autocommit too.
---   * `closed.effective_to` is carried out of the UPDATE by RETURNING and used
---     as the new row's `effective_from`. Adjacency is then a DATA DEPENDENCY,
---     not a coincidence of two statements happening to observe the same
---     `now()`. The rollback identifies what to reopen by exactly this equality,
---     so if the two instants could ever differ — by a millisecond, under any
---     execution mode — the rollback would silently reopen nothing and exit 0.
+-- Five earlier shapes of this migration tried to preserve version history —
+-- close the open row and insert a successor. Every one of them was defeated by
+-- a state the previous one had not considered: an operator's own version 2, a
+-- closed version 2 in the history, a PENDING open row that cannot be closed at
+-- all (`effective_to = now()` is earlier than its own `effective_from` and
+-- fails fleet_operational_incident_rules_range_order), a row that activates
+-- between two statements' clock reads, and a closed-but-still-effective
+-- predecessor left behind by `versionIncidentRule`. That is a design problem,
+-- not five bugs: the state machine of "which row is the current rule" has more
+-- states than a migration can enumerate. This shape has no state machine. It
+-- matches on `incident_type` and `severity` and nothing else, so it is correct
+-- for every row of those types whatever its dates, its version number or its
+-- open/closed state.
 --
--- The half-open '[)' ranges therefore MEET rather than overlap, which is what
--- the gist exclusion constraint requires.
---
--- The version is `max(version) + 1` FOR THAT TYPE. A global max would hand a
--- type a version number unrelated to its own history and break the per-type
--- `(incident_type, version)` sequence the audit trail reads.
---
--- No ON CONFLICT clause: hard-coding a version collides with an operator's
--- existing one, and ON CONFLICT DO NOTHING would make that collision silent —
--- leaving the type critical with WhatsApp armed and the migration exiting 0.
-WITH closed AS (
-  UPDATE fleet_operational_incident_rules
-     SET effective_to = now(), updated_at = now()
-   WHERE effective_to IS NULL
-     AND effective_from < now()
-     AND severity = 'critical'
-     AND incident_type = ANY(ARRAY[
-       'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
-     ]::text[])
-  RETURNING incident_type, effective_to
-)
-INSERT INTO fleet_operational_incident_rules (
-  incident_type, version, effective_from, creates_incident, severity, immediate_notification,
-  in_app_enabled, email_enabled, whatsapp_enabled, include_in_morning_summary,
-  acknowledgement_target_minutes, change_reason
-)
-SELECT closed.incident_type,
-       (SELECT max(existing.version) + 1 FROM fleet_operational_incident_rules existing
-         WHERE existing.incident_type = closed.incident_type),
-       closed.effective_to,
-       true, 'high', false, true, true, false, true, 5,
-       'Migration 529: telematics detectors report through the morning summary, not a WhatsApp blast'
-  FROM closed;
-
--- Branch B. Whatever branch A left open.
---
--- No `effective_from` predicate, deliberately. Branch A already took every
--- ACTIVE row, so any open `critical` row of these four types that survives it is
--- pending by construction. A mirror-image `effective_from >= now()` here would
--- read the clock a SECOND time, and under `psql -f` the two statements are two
--- transactions: a row whose effective_from falls between branch A's now() and
--- branch B's now() is pending to A and active to B, and neither matches it. It
--- would stay critical with WhatsApp armed, silently.
---
--- A pending row is edited where it stands; its version, its effective_from and
--- its place in the history are all left exactly as the operator set them. That
--- is the only option available: `effective_to = now()` on a row whose
--- effective_from is in the future is earlier than its own start and fails
--- fleet_operational_incident_rules_range_order.
+-- IDEMPOTENT by the `severity = 'critical'` filter: after it runs, no row of
+-- these four types is critical, so a re-run matches nothing. It also leaves an
+-- operator's deliberate non-critical row alone.
 --
 -- The marker appended to change_reason CARRIES THE PRIOR FLAG VALUES, because
--- the `severity = 'critical'` filter constrains severity and nothing else. An
--- operator may perfectly well hold a critical row with whatsapp_enabled false;
--- restoring 510's seed shape on rollback would silently turn their WhatsApp
--- back on. The three booleans are read from the row being updated — a SET
--- expression sees the OLD values — and the rollback parses them back out.
-UPDATE fleet_operational_incident_rules
-   SET severity = 'high',
-       whatsapp_enabled = false,
-       immediate_notification = false,
-       include_in_morning_summary = true,
-       change_reason = CASE
-         WHEN NULLIF(btrim(COALESCE(change_reason, '')), '') IS NULL
-           THEN '529:pending{wa=' || whatsapp_enabled
-                || ',imm=' || immediate_notification
-                || ',morn=' || include_in_morning_summary || '}'
-         ELSE btrim(change_reason) || ' | 529:pending{wa=' || whatsapp_enabled
-                || ',imm=' || immediate_notification
-                || ',morn=' || include_in_morning_summary || '}'
-       END,
-       updated_at = now()
- WHERE effective_to IS NULL
-   AND severity = 'critical'
-   AND incident_type = ANY(ARRAY[
-     'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
-   ]::text[]);
+-- the filter constrains severity and nothing else. An operator may hold a
+-- critical row with whatsapp_enabled false; restoring 510's seed shape on
+-- rollback would silently re-arm their WhatsApp. The three booleans are read
+-- from the row being updated — a SET expression sees the OLD values — and the
+-- rollback parses them back out.
+--
+-- The marker is anchored to the END of change_reason and the rollback matches
+-- it with `$`. Residual risk, accepted and stated: an operator whose own prose
+-- happens to END with the exact literal `529:reversioned{wa=...,imm=...,
+-- morn=...}` would have that row restored by the rollback. Prose that merely
+-- CONTAINS the marker mid-string is not matched, which is the case worth
+-- guarding and is tested.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM fleet_operational_incidents
+     WHERE incident_type = ANY(ARRAY[
+       'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
+     ]::text[])
+  ) THEN
+    RAISE EXCEPTION '529: operational incidents already exist for the telematics incident types. '
+      'This migration rewrites those rules in place, which is only safe while no incident '
+      'references them. Decide manually how to version them and re-run.';
+  END IF;
+
+  UPDATE fleet_operational_incident_rules
+     SET severity = 'high',
+         whatsapp_enabled = false,
+         immediate_notification = false,
+         include_in_morning_summary = true,
+         change_reason = CASE
+           WHEN NULLIF(btrim(COALESCE(change_reason, '')), '') IS NULL
+             THEN '529:reversioned{wa=' || whatsapp_enabled
+                  || ',imm=' || immediate_notification
+                  || ',morn=' || include_in_morning_summary || '}'
+           ELSE btrim(change_reason) || ' | 529:reversioned{wa=' || whatsapp_enabled
+                  || ',imm=' || immediate_notification
+                  || ',morn=' || include_in_morning_summary || '}'
+         END,
+         updated_at = now()
+   WHERE severity = 'critical'
+     AND incident_type = ANY(ARRAY[
+       'severe_driving', 'prolonged_unauthorized_stop', 'lost_contact_moving', 'dangerous_area_entry'
+     ]::text[]);
+END $$;
 
 INSERT INTO access_permissions (type, key, parent_key, label, description, route, sort_order, is_active)
 VALUES

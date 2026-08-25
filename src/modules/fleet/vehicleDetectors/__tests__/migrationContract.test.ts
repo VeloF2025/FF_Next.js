@@ -13,9 +13,8 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   REVERSIONED_TELEMATICS_INCIDENT_TYPES,
-  TELEMATICS_PENDING_REVERSION_MARKER_PATTERN,
-  TELEMATICS_PENDING_REVERSION_MARKER_PREFIX,
-  TELEMATICS_REVERSION_CHANGE_REASON,
+  TELEMATICS_REVERSION_MARKER_PATTERN,
+  TELEMATICS_REVERSION_MARKER_PREFIX,
   VEHICLE_RULE_TIMEZONE,
 } from '../types';
 
@@ -38,18 +37,17 @@ function reversionedTypeLists(sql: string): string[][] {
 
 const expectedTypes = [...REVERSIONED_TELEMATICS_INCIDENT_TYPES].sort();
 
-/** Branch A: the single statement that closes ACTIVE rules and opens their replacements. */
-function reversionStatement(): string {
-  const from = forward.indexOf('WITH closed AS (');
-  if (from < 0) throw new Error('529 no longer re-versions active rows in one statement');
-  return forward.slice(from, forward.indexOf(';', from));
+/** The whole re-versioning: one guarded DO block. */
+function reversionBlock(): string {
+  const from = forward.indexOf('DO $$\nBEGIN\n  IF EXISTS (');
+  if (from < 0) throw new Error('529 no longer re-versions inside a guarded DO block');
+  return forward.slice(from, forward.indexOf('END $$;', from));
 }
 
-/** Branch B: the in-place update of PENDING rules. */
-function pendingStatement(): string {
-  const from = forward.indexOf("UPDATE fleet_operational_incident_rules\n   SET severity = 'high'");
-  if (from < 0) throw new Error('529 no longer updates pending rows in place');
-  return forward.slice(from, forward.indexOf(';', from));
+/** Just the UPDATE inside that block — no guard prose, so word matches are meaningful. */
+function reversionUpdate(): string {
+  const block = reversionBlock();
+  return block.slice(block.indexOf('UPDATE fleet_operational_incident_rules'));
 }
 
 describe('the re-versioned incident types', () => {
@@ -64,115 +62,72 @@ describe('the re-versioned incident types', () => {
     }
   });
 
-  it('are closed by severity, not by version — so a re-run is a no-op', () => {
-    // `version = 1` was the first shape of this, and it was wrong: an operator
-    // who had already created version 2 of a type through the settings UI would
-    // see the close match nothing and the type stay critical. Scoping the close
-    // to `severity = 'critical'` is self-limiting instead — after the migration
-    // no open row among the four is critical.
-    const close = forward.slice(forward.indexOf('UPDATE fleet_operational_incident_rules'));
-    const statement = close.slice(0, close.indexOf('RETURNING'));
-    expect(statement).toContain("severity = 'critical'");
-    expect(statement).toContain('effective_to IS NULL');
-    expect(statement).not.toMatch(/\bversion = \d/);
-  });
-
-  it('closes and opens in ONE statement, so no execution mode can split the pair', () => {
-    // As two statements this is atomic only where something supplies a
-    // transaction. `psql -f` autocommits, and a failure between them leaves four
-    // incident types with no open rule at all.
-    const statement = reversionStatement();
-    expect(statement).toContain('UPDATE fleet_operational_incident_rules');
-    expect(statement).toContain('INSERT INTO fleet_operational_incident_rules');
+  it('are re-versioned by ONE statement with no state machine at all', () => {
+    // Five earlier shapes closed the open row and inserted a successor, and each
+    // was defeated by a state the previous one had not enumerated. This one
+    // matches on incident_type and severity and nothing else.
+    const block = reversionBlock();
+    expect(block).toContain('UPDATE fleet_operational_incident_rules');
+    expect(block).not.toMatch(/INSERT INTO fleet_operational_incident_rules/i);
+    const update = reversionUpdate();
+    // No dates, no version arithmetic, no clock: nothing that can disagree with
+    // a row's state.
+    expect(update).not.toMatch(/effective_to\s*=/);
+    expect(update).not.toMatch(/effective_from/);
+    expect(update).not.toMatch(/max\(/);
+    expect(update).not.toMatch(/\bversion\b/);
+    expect(update).not.toMatch(/\bnow\(\)\s*(<|>|<=|>=)/);
     expect(forward).not.toContain('CREATE TEMP TABLE');
+    expect(forward).not.toContain('WITH closed AS (');
   });
 
-  it('carries the closed row effective_to into the new row effective_from', () => {
-    // Adjacency must be a DATA dependency, not two statements coincidentally
-    // observing the same now(). The rollback finds what to reopen by exactly
-    // this equality; if the instants could differ by a millisecond it would
-    // silently reopen nothing and exit 0.
-    const statement = reversionStatement();
-    expect(statement).toContain('RETURNING incident_type, effective_to');
-    expect(statement).toContain('closed.effective_to,');
-    // The new row's effective_from is the carried value, never a fresh read.
-    expect(statement).not.toMatch(/\n\s+now\(\),\n\s+true, 'high'/);
+  it('refuses to run at all if any incident of those types exists', () => {
+    // In-place editing is only safe while no incident references these rules.
+    // The guard proves that at apply time instead of asserting it.
+    const block = reversionBlock();
+    expect(block).toContain('SELECT 1 FROM fleet_operational_incidents');
+    expect(block).toMatch(/RAISE EXCEPTION '529:/);
+    // Guard BEFORE update, and inside the same block.
+    expect(block.indexOf('RAISE EXCEPTION')).toBeLessThan(block.indexOf('UPDATE fleet_operational_incident_rules'));
   });
 
-  it('closes only ACTIVE open rows, never a pending one', () => {
-    // range_order is CHECK (effective_to IS NULL OR effective_to > effective_from).
-    // The incident-settings dialog only ever creates FUTURE activations, so an
-    // open row with effective_from > now() is the normal product of using the
-    // UI — and closing it at now() aborts the deploy.
-    expect(reversionStatement()).toContain('effective_from < now()');
+  it('keeps the guard and the update inseparable, in every execution mode', () => {
+    // As two statements the guard would only stop the update under
+    // ON_ERROR_STOP. run-pending-migrations.sh:127 passes it; a hand-run
+    // `psql -f` does not. One DO block cannot be half-executed.
+    expect(reversionBlock()).toMatch(/DO \$\$[\s\S]*RAISE EXCEPTION[\s\S]*UPDATE fleet_operational_incident_rules/);
   });
 
-  it('edits whatever branch A left open, in place', () => {
-    const statement = pendingStatement();
-    expect(statement).toContain('effective_to IS NULL');
-    expect(statement).toContain("severity = 'critical'");
-    expect(statement).toContain("severity = 'high'");
-    expect(statement).toContain('whatsapp_enabled = false');
-    expect(statement).toContain('immediate_notification = false');
-    expect(statement).toContain('include_in_morning_summary = true');
-    // In place: no new version, no range touched.
-    expect(statement).not.toMatch(/INSERT INTO/i);
-    expect(statement).not.toMatch(/effective_to\s*=\s*now\(\)/);
+  it('sets high with WhatsApp off and the morning summary on', () => {
+    // `requiresMandatoryIncidentWhatsApp` is severity === 'critical' &&
+    // producerKind === 'source_event'. 'high' is the whole mechanism.
+    const block = reversionBlock();
+    expect(block).toContain("severity = 'high'");
+    expect(block).toContain('whatsapp_enabled = false');
+    expect(block).toContain('immediate_notification = false');
+    expect(block).toContain('include_in_morning_summary = true');
   });
 
-  it('reads the clock ONCE — branch B carries no effective_from predicate', () => {
-    // A mirror-image `effective_from >= now()` reads the clock a second time,
-    // and under `psql -f` the two statements are two transactions: a row whose
-    // effective_from falls between them is pending to A and active to B, and
-    // neither matches it. It would stay critical with WhatsApp armed.
-    expect(reversionStatement()).toContain('effective_from < now()');
-    expect(pendingStatement()).not.toContain('effective_from');
+  it('is idempotent by the severity filter, and by nothing else', () => {
+    const block = reversionBlock();
+    expect(block).toContain("WHERE severity = 'critical'");
   });
 
   it('carries the prior flag values in the marker, not just a note', () => {
     // The severity filter constrains severity and NOTHING else. An operator may
     // hold a critical row with whatsapp_enabled false; restoring 510's seed
     // shape on rollback would silently re-arm their WhatsApp.
-    const statement = pendingStatement();
-    expect(statement).toContain(TELEMATICS_PENDING_REVERSION_MARKER_PREFIX);
-    expect(statement).toContain("'529:pending{wa=' || whatsapp_enabled");
-    expect(statement).toContain("',imm=' || immediate_notification");
-    expect(statement).toContain("',morn=' || include_in_morning_summary");
-  });
-
-  it('insert at max(version) + 1 per type, and never swallow a collision', () => {
-    const statement = reversionStatement();
-    expect(statement).toContain('max(existing.version) + 1');
-    // Per type. A global max hands a type a version unrelated to its own
-    // history and breaks the (incident_type, version) sequence the audit reads.
-    expect(statement).toContain('WHERE existing.incident_type = closed.incident_type');
-    // A hard-coded 2 collides with an operator's own version 2, and
-    // ON CONFLICT DO NOTHING would make that collision silent — leaving the
-    // type critical with WhatsApp armed and the migration exiting 0.
-    expect(statement).not.toMatch(/ON CONFLICT/i);
-  });
-
-  it('insert at severity high with WhatsApp off and the morning summary on', () => {
-    // `requiresMandatoryIncidentWhatsApp` is severity === 'critical' &&
-    // producerKind === 'source_event'. 'high' is the whole mechanism.
-    const statement = reversionStatement();
-    expect(statement).toContain("'high'");
-    expect(statement).not.toContain("'critical', false");
-    expect(statement).toContain('whatsapp_enabled, include_in_morning_summary');
-    expect(statement).toContain(TELEMATICS_REVERSION_CHANGE_REASON);
-  });
-
-  it('closes before it opens, so the gist exclusion holds', () => {
-    const statement = reversionStatement();
-    expect(statement.indexOf('UPDATE fleet_operational_incident_rules'))
-      .toBeLessThan(statement.indexOf('INSERT INTO fleet_operational_incident_rules'));
+    const block = reversionBlock();
+    expect(block).toContain(TELEMATICS_REVERSION_MARKER_PREFIX);
+    expect(block).toContain("'529:reversioned{wa=' || whatsapp_enabled");
+    expect(block).toContain("',imm=' || immediate_notification");
+    expect(block).toContain("',morn=' || include_in_morning_summary");
   });
 
   it('carry no explicit BEGIN — psql -1 already wraps the file AND its record', () => {
     // Measured on PostgreSQL 15: with an inner BEGIN/COMMIT, a failure in the
     // trailing `-c "INSERT INTO schema_migrations ..."` leaves the migration
     // APPLIED and UNRECORDED, and an unrecorded migration re-runs next deploy.
-    // Atomicity for the one pair that needs it comes from being one statement.
     expect(forward).not.toMatch(/^\s*BEGIN\s*;/mi);
     expect(forward).not.toMatch(/^\s*COMMIT\s*;/mi);
     expect(forward).toContain('run-pending-migrations.sh:127');
@@ -237,51 +192,20 @@ describe('the versioned rule table', () => {
 
 describe('the rollback', () => {
   it('is one transaction, because psql autocommits statement by statement', () => {
-    // Removing 529's rows without reopening what they replaced leaves four
-    // incident types with no effective rule at all.
     expect(rollback).toMatch(/^BEGIN;$/m);
     expect(rollback).toMatch(/^COMMIT;$/m);
   });
 
-  it('captures only the rows 529 authored and still has open', () => {
-    const capture = rollback.slice(rollback.indexOf('CREATE TEMP TABLE rb529_authored'));
-    const statement = capture.slice(0, capture.indexOf(';'));
-    expect(statement).toContain(TELEMATICS_REVERSION_CHANGE_REASON);
-    expect(statement).toContain("severity = 'high'");
-    // A superseded 529 row stays: incidents opened while it was in force carry
-    // its id in incident_rule_id, and the FK is ON DELETE SET NULL.
-    expect(statement).toContain('effective_to IS NULL');
-    // An operator may have authored their own version 2 of any of these types.
-    expect(statement).not.toMatch(/\bversion = \d/);
+  it('has nothing to delete or reopen — 529 inserted no rows and closed none', () => {
+    expect(rollback).not.toMatch(/DELETE FROM fleet_operational_incident_rules/i);
+    expect(rollback).not.toContain('rb529_authored');
+    expect(rollback).not.toMatch(/SET effective_to = NULL/i);
   });
 
-  it('reopens by the meeting instant, not by severity or version', () => {
-    // 529 closes a row and opens its replacement in one transaction, so the
-    // half-open ranges meet: closed.effective_to === authored.effective_from.
-    // A "newest closed critical row" selection extends an older row to
-    // 'infinity' straight through a later one and raises 23P01.
-    const restore = rollback.slice(rollback.indexOf('UPDATE fleet_operational_incident_rules target'));
-    const statement = restore.slice(0, restore.indexOf(';'));
-    expect(statement).toContain('target.effective_to = authored.effective_from');
-    expect(statement).toContain('target.incident_type = authored.incident_type');
-    expect(statement).toContain('NOT EXISTS');
-    expect(statement).toContain('SET effective_to = NULL');
-    expect(statement).not.toMatch(/severity\s*=/);
-    expect(statement).not.toMatch(/\bversion\b/);
-  });
-
-  it('deletes before it reopens — the open-per-type index forbids the other order', () => {
-    expect(rollback.indexOf('DELETE FROM fleet_operational_incident_rules'))
-      .toBeLessThan(rollback.indexOf('UPDATE fleet_operational_incident_rules target'));
-    for (const list of reversionedTypeLists(rollback)) expect(list.sort()).toEqual(expectedTypes);
-  });
-
-  it('restores pending rows from the marker values, not from seed constants', () => {
+  it('restores from the marker values, not from seed constants', () => {
     const from = rollback.indexOf("SET severity = 'critical'");
     expect(from).toBeGreaterThan(-1);
     const statement = rollback.slice(from, rollback.indexOf(';', from));
-    // Parsed back out of the marker. Restoring 510's seed flags would re-arm an
-    // operator's deliberately-disabled WhatsApp.
     expect(statement).toContain('regexp_match(');
     expect(statement).toContain('[1]::boolean');
     expect(statement).toContain('[2]::boolean');
@@ -289,19 +213,23 @@ describe('the rollback', () => {
     expect(statement).not.toContain('whatsapp_enabled = true');
     expect(statement).not.toContain('immediate_notification = true');
     expect(statement).not.toContain('include_in_morning_summary = false');
-    // Severity is the one value the filter pins, so it alone comes from a constant.
+    // Severity is the one value the filter pins, so it alone is a constant.
     expect(statement).toContain("severity = 'critical'");
     // Stripping the marker is what makes a second run a no-op.
     expect(statement).toContain('regexp_replace(change_reason');
-    // An operator's own pending `high` row carries no marker and is untouched.
-    expect(statement).toContain(TELEMATICS_PENDING_REVERSION_MARKER_PATTERN.replace(/\$$/, ''));
   });
 
-  it('agrees with the TS marker pattern exactly', () => {
+  it('matches the marker anchored to the END of change_reason', () => {
+    // Prose that merely CONTAINS the marker mid-string must not be restored.
+    expect(rollback).toContain(TELEMATICS_REVERSION_MARKER_PATTERN);
+    expect(rollback).toMatch(/change_reason ~ '529:reversioned[^']*\$'/);
+  });
+
+  it('agrees with the TS marker constants exactly', () => {
     // The forward writes the marker literally; the rollback matches it as a
     // regex, so its braces are escaped. Both are pinned to the same constants.
-    expect(forward).toContain(TELEMATICS_PENDING_REVERSION_MARKER_PREFIX);
-    expect(rollback).toContain(TELEMATICS_PENDING_REVERSION_MARKER_PATTERN);
+    expect(forward).toContain(TELEMATICS_REVERSION_MARKER_PREFIX);
+    expect(rollback).toContain(TELEMATICS_REVERSION_MARKER_PATTERN);
   });
 
   it('removes the table, the column, the permission rows and the migration record', () => {
