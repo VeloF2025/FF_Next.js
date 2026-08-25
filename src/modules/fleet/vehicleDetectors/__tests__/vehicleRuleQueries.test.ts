@@ -113,6 +113,22 @@ describe('creating a version', () => {
     ]);
   });
 
+  it.each([
+    [1, 2],
+    [2, 3],
+    [7, 8],
+  ])('derives the next version from the open row: v%i becomes v%i', async (open, next) => {
+    // A constant 2 here passes every test that only ever starts from version 1,
+    // and then collides forever on the third version an operator creates.
+    db.txnQueryOne
+      .mockResolvedValueOnce({ ...row, version: open })
+      .mockResolvedValueOnce({ ...row, version: next, effective_from: input.effectiveFrom });
+    db.txnQuery.mockResolvedValue([]);
+
+    await expect(createVehicleRuleVersion(input, USER)).resolves.toMatchObject({ version: next });
+    expect((db.txnQueryOne.mock.calls[1]?.[1] as unknown[])[0]).toBe(next);
+  });
+
   it('refuses a backdated activation before opening a transaction', async () => {
     await expect(createVehicleRuleVersion({ ...input, effectiveFrom: '2020-01-01T00:00:00.000Z' }, USER))
       .rejects.toBeInstanceOf(VehicleRuleValidationError);
@@ -126,9 +142,11 @@ describe('creating a version', () => {
     expect(db.txnQuery).not.toHaveBeenCalled();
   });
 
-  it('refuses to invent a first version when none is open', async () => {
+  it('refuses to invent a first version, and names the likely cause', async () => {
     db.txnQueryOne.mockResolvedValueOnce(null);
-    await expect(createVehicleRuleVersion(input, USER)).rejects.toBeInstanceOf(VehicleRuleValidationError);
+    // 529 seeds an open version and every path leaves exactly one, so "none"
+    // almost always means a concurrent caller won the race.
+    await expect(createVehicleRuleVersion(input, USER)).rejects.toThrow(/created concurrently; reload/);
     expect(db.txnQuery).not.toHaveBeenCalled();
   });
 

@@ -70,7 +70,10 @@ async function route(req: Request, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET' && req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
   }
-  const action = req.method === 'POST' ? 'edit' : 'view';
+  // 'create', not 'edit': a POST authors a NEW version and never mutates an
+  // existing row. Rule history is append-only by design, and the role grants in
+  // 529 say create and edit separately so the two can diverge later.
+  const action = req.method === 'POST' ? 'create' : 'view';
   return withPermission('fleet.vehicle-rules', action)(handler)(req, res);
 }
 

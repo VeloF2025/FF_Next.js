@@ -39,6 +39,7 @@ const USER = '11111111-1111-4111-8111-111111111111';
 const VEHICLE = '55555555-5555-4555-8555-555555555555';
 /** Every open incident rule 510 seeds — the count 529 must leave unchanged. */
 const SEEDED_OPEN_RULE_COUNT = 14;
+const DELETE_ONLY_ROLE = 'mig529_delete_only';
 
 /**
  * 510's rule seed, lifted verbatim out of its own file.
@@ -125,8 +126,18 @@ beforeAll(async () => {
     END IF;
   END $$;`);
   await admin.query(`GRANT USAGE ON SCHEMA ${SCHEMA} TO fibreflow_user`);
+  // A role that may read and DELETE incident rules but not UPDATE them. It
+  // exists to make the rollback's third statement fail after its second has
+  // already run — the exact shape that strands four incident types.
+  await admin.query(`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${DELETE_ONLY_ROLE}') THEN
+      CREATE ROLE ${DELETE_ONLY_ROLE} NOLOGIN;
+    END IF;
+  END $$;`);
+  await admin.query(`GRANT USAGE ON SCHEMA ${SCHEMA} TO ${DELETE_ONLY_ROLE}`);
   await db.query(PREREQUISITES);
   await db.query(INCIDENTS);
+  await db.query(`GRANT SELECT, DELETE ON fleet_operational_incident_rules TO ${DELETE_ONLY_ROLE}`);
 }, 120_000);
 
 afterAll(async () => {
@@ -184,6 +195,40 @@ async function closedHistoricVersion(type: string, version: number): Promise<voi
              true, true, true, true, false, 5)`,
     [type, version],
   );
+}
+
+/**
+ * The rollback's statements, one per array entry.
+ *
+ * Sent SEPARATELY, which is the whole point: a multi-statement simple query is
+ * wrapped in an implicit transaction by Postgres, so running the file as one
+ * `query()` is atomic whether or not it contains a BEGIN — and a test that does
+ * that cannot tell the two apart. `psql -f` sends them one at a time.
+ */
+function rollbackStatements({ withTransaction }: { withTransaction: boolean }): string[] {
+  const statements = ROLLBACK.split('\n')
+    .filter((line) => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0);
+  return withTransaction ? statements : statements.filter((s) => !/^(BEGIN|COMMIT)$/i.test(s));
+}
+
+async function runStatements(client: { query: (text: string) => Promise<unknown> }, statements: string[]): Promise<void> {
+  for (const statement of statements) await client.query(statement);
+}
+
+/** How many rows migration 529 authored are still present. */
+async function authoredCount(type?: string): Promise<number> {
+  const rows = type
+    ? await db.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM fleet_operational_incident_rules
+        WHERE change_reason = $1 AND incident_type = $2`, [TELEMATICS_REVERSION_CHANGE_REASON, type])
+    : await db.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM fleet_operational_incident_rules WHERE change_reason = $1`,
+      [TELEMATICS_REVERSION_CHANGE_REASON]);
+  return rows.rows[0]!.count;
 }
 
 async function openRuleFor(type: string) {
@@ -279,7 +324,25 @@ describe('the forward migration', () => {
     expect(rows.map((row) => row.incident_type)).toEqual([...REVERSIONED_TELEMATICS_INCIDENT_TYPES].sort());
   });
 
-  it('creates exactly the fleet.vehicle-rules permission, for admins only', async () => {
+  it('grants fleet.vehicle-stats view to every reading role', async () => {
+    const permission = await db.query(
+      `SELECT key, parent_key, route FROM access_permissions WHERE key = 'fleet.vehicle-stats'`,
+    );
+    expect(permission.rows).toHaveLength(1);
+    expect(permission.rows[0]).toMatchObject({ parent_key: 'fleet', route: '/fleet/vehicles' });
+    const roles = await db.query(
+      `SELECT role, actions FROM role_permissions WHERE permission_key = 'fleet.vehicle-stats' ORDER BY role`,
+    );
+    expect(roles.rows.map((row) => row.role)).toEqual([
+      'admin', 'manager', 'project_manager', 'super_admin', 'viewer',
+    ]);
+    for (const row of roles.rows) {
+      // Read-only: PR6's stats page shows telematics history, it never edits it.
+      expect(row.actions).toMatchObject({ view: true, create: false, edit: false, delete: false });
+    }
+  });
+
+  it('keeps fleet.vehicle-rules to admins, because it arms and disarms detectors', async () => {
     const permission = await db.query(
       `SELECT key, parent_key, route FROM access_permissions WHERE key = 'fleet.vehicle-rules'`,
     );
@@ -598,5 +661,100 @@ describe('the rollback', () => {
 
     expect(await openIncidentRules()).toEqual(afterFirst);
     expect(afterFirst).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('keeps an operator version it did not write, and keeps its own superseded row', async () => {
+    await db.query(FORWARD);
+    // The operator supersedes 529's row with a `high` version of their own —
+    // same severity, different author. Only the change_reason tells them apart.
+    await operatorVersion('severe_driving', 3, 'high');
+
+    await db.query(ROLLBACK);
+
+    expect(await openRuleFor('severe_driving')).toMatchObject({ version: 3, severity: 'high' });
+    // 529's row is closed now and stays closed: incidents opened while it was in
+    // force carry its id in incident_rule_id, and that FK is ON DELETE SET NULL,
+    // so deleting the row would make those incidents forget which rule judged
+    // them.
+    expect(await authoredCount('severe_driving')).toBe(1);
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('leaves a hand-closed 529 row alone instead of failing the whole file', async () => {
+    await db.query(FORWARD);
+    // Someone closed 529's rule without opening a replacement. The type is
+    // ALREADY broken (no open rule) and that is not the rollback's to repair.
+    // What matters is that it does not make things worse: reopening "the newest
+    // closed critical row" here would extend version 1 to 'infinity' straight
+    // through the closed 529 row, raise 23P01, and abort the whole transaction —
+    // taking the other three types' restoration down with it.
+    await db.query(
+      `UPDATE fleet_operational_incident_rules SET effective_to = now()
+        WHERE incident_type = 'severe_driving' AND effective_to IS NULL`,
+    );
+
+    await expect(db.query(ROLLBACK)).resolves.toBeTruthy();
+
+    expect(await openRuleFor('severe_driving')).toBeUndefined();
+    expect(await authoredCount('severe_driving')).toBe(1);
+    for (const type of REVERSIONED_TELEMATICS_INCIDENT_TYPES.filter((each) => each !== 'severe_driving')) {
+      expect(await openRuleFor(type), type).toMatchObject({ version: 1, severity: 'critical' });
+    }
+  });
+
+  it('is atomic — an induced failure after the delete takes the delete back', async () => {
+    await db.query(FORWARD);
+    expect(await authoredCount()).toBe(4);
+
+    const client = await db.connect();
+    try {
+      // No UPDATE privilege, so statement 3 (the reopen) fails after statement 2
+      // (the delete) has already run. Statements are sent ONE AT A TIME, as
+      // psql sends them — the file's own BEGIN is the only thing holding them
+      // together.
+      await client.query(`SET ROLE ${DELETE_ONLY_ROLE}`);
+      await expect(runStatements(client, rollbackStatements({ withTransaction: true })))
+        .rejects.toMatchObject({ code: '42501' });
+      await client.query('ROLLBACK').catch(() => undefined);
+      await client.query('RESET ROLE');
+    } finally {
+      client.release();
+    }
+
+    expect(await authoredCount()).toBe(4);
+    expect(await openIncidentRules()).toHaveLength(SEEDED_OPEN_RULE_COUNT);
+  });
+
+  it('without its transaction, that same failure strands four incident types', async () => {
+    // The counterfactual the BEGIN exists for. Four types end with NO open rule,
+    // and `loadEffectiveIncidentRule` throws for every incident of them.
+    await db.query(FORWARD);
+
+    const client = await db.connect();
+    try {
+      await client.query(`SET ROLE ${DELETE_ONLY_ROLE}`);
+      await expect(runStatements(client, rollbackStatements({ withTransaction: false })))
+        .rejects.toMatchObject({ code: '42501' });
+      await client.query('RESET ROLE');
+    } finally {
+      client.release();
+    }
+
+    expect(await authoredCount()).toBe(0);
+    expect(await openIncidentRules())
+      .toHaveLength(SEEDED_OPEN_RULE_COUNT - REVERSIONED_TELEMATICS_INCIDENT_TYPES.length);
+  });
+
+  it('removes both permission keys', async () => {
+    await db.query(FORWARD);
+    await db.query(ROLLBACK);
+    const permissions = await db.query(
+      `SELECT key FROM access_permissions WHERE key IN ('fleet.vehicle-rules', 'fleet.vehicle-stats')`,
+    );
+    expect(permissions.rows).toHaveLength(0);
+    const roles = await db.query(
+      `SELECT role FROM role_permissions WHERE permission_key IN ('fleet.vehicle-rules', 'fleet.vehicle-stats')`,
+    );
+    expect(roles.rows).toHaveLength(0);
   });
 });

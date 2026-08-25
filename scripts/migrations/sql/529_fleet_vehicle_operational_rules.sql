@@ -148,13 +148,24 @@ SELECT c.incident_type,
 
 DROP TABLE mig529_reversioned;
 
+-- Two keys, deliberately split by audience (plan §3.2). `fleet.vehicle-stats`
+-- is read-only and wide — PR6's per-vehicle stats API and page gate on it.
+-- `fleet.vehicle-rules` edits thresholds that arm and disarm detectors, so it
+-- stays with admins. Seeding vehicle-stats here rather than in PR6 keeps the
+-- permission and the rule it describes in one migration.
 INSERT INTO access_permissions (type, key, parent_key, label, description, route, sort_order, is_active)
 VALUES
-  ('page', 'fleet.vehicle-rules', 'fleet', 'Vehicle Rules', 'Manage versioned Fleet vehicle telematics thresholds', '/fleet/assignments', 27, true)
+  ('page', 'fleet.vehicle-stats', 'fleet', 'Vehicle Stats', 'View per-vehicle telematics day statistics', '/fleet/vehicles', 27, true),
+  ('page', 'fleet.vehicle-rules', 'fleet', 'Vehicle Rules', 'Manage versioned Fleet vehicle telematics thresholds', '/fleet/assignments', 28, true)
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO role_permissions (role, permission_key, actions)
 VALUES
+  ('super_admin', 'fleet.vehicle-stats', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
+  ('admin', 'fleet.vehicle-stats', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
+  ('manager', 'fleet.vehicle-stats', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
+  ('project_manager', 'fleet.vehicle-stats', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
+  ('viewer', 'fleet.vehicle-stats', '{"view":true,"create":false,"edit":false,"delete":false}'::jsonb),
   ('super_admin', 'fleet.vehicle-rules', '{"view":true,"create":true,"edit":true,"delete":false}'::jsonb),
   ('admin', 'fleet.vehicle-rules', '{"view":true,"create":true,"edit":true,"delete":false}'::jsonb)
 ON CONFLICT (role, permission_key) DO NOTHING;

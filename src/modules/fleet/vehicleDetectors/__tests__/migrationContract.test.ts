@@ -120,6 +120,21 @@ describe('the versioned rule table', () => {
     expect(forward).toContain(`${column} ${definition}`);
   });
 
+  it('seeds both permission keys, read-only stats wide and rule editing narrow', () => {
+    // Plan §3.2. PR6's per-vehicle stats API gates on fleet.vehicle-stats;
+    // editing a threshold arms and disarms detectors, so that stays with admins.
+    expect(forward).toContain("'page', 'fleet.vehicle-stats'");
+    expect(forward).toContain("'page', 'fleet.vehicle-rules'");
+    const grants = forward.slice(forward.indexOf('INSERT INTO role_permissions'));
+    for (const role of ['super_admin', 'admin', 'manager', 'project_manager', 'viewer']) {
+      expect(grants, role).toContain(`('${role}', 'fleet.vehicle-stats', '{"view":true,"create":false,"edit":false,"delete":false}'`);
+    }
+    for (const role of ['super_admin', 'admin']) {
+      expect(grants, role).toContain(`('${role}', 'fleet.vehicle-rules', '{"view":true,"create":true,"edit":true,"delete":false}'`);
+    }
+    expect(grants).not.toMatch(/'(manager|project_manager|viewer)', 'fleet\.vehicle-rules'/);
+  });
+
   it('adds after_hours_exempt additively and defaulted', () => {
     expect(forward).toContain('ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN NOT NULL DEFAULT false');
   });
@@ -139,36 +154,46 @@ describe('the rollback', () => {
     expect(rollback).toMatch(/^COMMIT;$/m);
   });
 
-  it('removes only the rows 529 authored, by change reason — never "version 2"', () => {
-    const del = rollback.slice(rollback.indexOf('DELETE FROM fleet_operational_incident_rules'));
-    const statement = del.slice(0, del.indexOf(';'));
+  it('captures only the rows 529 authored and still has open', () => {
+    const capture = rollback.slice(rollback.indexOf('CREATE TEMP TABLE rb529_authored'));
+    const statement = capture.slice(0, capture.indexOf(';'));
     expect(statement).toContain(TELEMATICS_REVERSION_CHANGE_REASON);
     expect(statement).toContain("severity = 'high'");
+    // A superseded 529 row stays: incidents opened while it was in force carry
+    // its id in incident_rule_id, and the FK is ON DELETE SET NULL.
+    expect(statement).toContain('effective_to IS NULL');
     // An operator may have authored their own version 2 of any of these types.
     expect(statement).not.toMatch(/\bversion = \d/);
   });
 
-  it('reopens the newest closed critical row per type, and only if none is open', () => {
-    const restore = rollback.slice(rollback.indexOf('WITH restore AS'));
+  it('reopens by the meeting instant, not by severity or version', () => {
+    // 529 closes a row and opens its replacement in one transaction, so the
+    // half-open ranges meet: closed.effective_to === authored.effective_from.
+    // A "newest closed critical row" selection extends an older row to
+    // 'infinity' straight through a later one and raises 23P01.
+    const restore = rollback.slice(rollback.lastIndexOf('UPDATE fleet_operational_incident_rules'));
     const statement = restore.slice(0, restore.indexOf(';'));
-    expect(statement).toContain('DISTINCT ON (incident_type)');
-    expect(statement).toContain("severity = 'critical'");
-    expect(statement).toContain('ORDER BY incident_type, effective_to DESC, version DESC');
+    expect(statement).toContain('target.effective_to = authored.effective_from');
+    expect(statement).toContain('target.incident_type = authored.incident_type');
     expect(statement).toContain('NOT EXISTS');
     expect(statement).toContain('SET effective_to = NULL');
+    expect(statement).not.toMatch(/severity\s*=/);
+    expect(statement).not.toMatch(/\bversion\b/);
   });
 
   it('deletes before it reopens — the open-per-type index forbids the other order', () => {
     expect(rollback.indexOf('DELETE FROM fleet_operational_incident_rules'))
-      .toBeLessThan(rollback.indexOf('WITH restore AS'));
+      .toBeLessThan(rollback.lastIndexOf('UPDATE fleet_operational_incident_rules'));
     for (const list of reversionedTypeLists(rollback)) expect(list.sort()).toEqual(expectedTypes);
   });
 
   it('removes the table, the column, the permission rows and the migration record', () => {
     expect(rollback).toContain('DROP TABLE IF EXISTS fleet_vehicle_operational_rules');
     expect(rollback).toContain('ALTER TABLE fleet_vehicles DROP COLUMN IF EXISTS after_hours_exempt');
-    expect(rollback).toMatch(/DELETE FROM role_permissions[\s\S]*'fleet\.vehicle-rules'/);
-    expect(rollback).toMatch(/DELETE FROM access_permissions[\s\S]*'fleet\.vehicle-rules'/);
+    for (const key of ['fleet.vehicle-rules', 'fleet.vehicle-stats']) {
+      expect(rollback).toMatch(new RegExp(`DELETE FROM role_permissions[\\s\\S]*'${key.replace('.', '\\.')}'`));
+      expect(rollback).toMatch(new RegExp(`DELETE FROM access_permissions[\\s\\S]*'${key.replace('.', '\\.')}'`));
+    }
     expect(rollback).toContain("filename = '529_fleet_vehicle_operational_rules.sql'");
   });
 });

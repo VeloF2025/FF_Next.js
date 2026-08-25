@@ -157,7 +157,15 @@ export async function createVehicleRuleVersion(
       `SELECT ${columns} FROM fleet_vehicle_operational_rules
         WHERE effective_to IS NULL ORDER BY version DESC LIMIT 1 FOR UPDATE`,
     );
-    if (!current) throw new VehicleRuleValidationError('No open vehicle operational rule exists');
+    // Migration 529 seeds an open version and every path here leaves exactly one
+    // open, so "none" almost always means a concurrent caller closed it between
+    // this transaction's snapshot and its lock — say that, rather than sending
+    // the operator to look for a missing seed row.
+    if (!current) {
+      throw new VehicleRuleValidationError(
+        'No open vehicle operational rule: another version was created concurrently; reload and retry',
+      );
+    }
     if (new Date(normalized.effectiveFrom).getTime() <= new Date(iso(current.effective_from)).getTime()) {
       throw new VehicleRuleValidationError('effectiveFrom must be after the current rule activation');
     }

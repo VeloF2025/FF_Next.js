@@ -56,7 +56,8 @@ describe('vehicle rules API access', () => {
     expect(mocks.gates).toEqual([['fleet.vehicle-rules', 'view']]);
     mocks.gates.length = 0;
     await call('POST');
-    expect(mocks.gates).toEqual([['fleet.vehicle-rules', 'edit']]);
+    // 'create', not 'edit': a POST authors a new version and never mutates a row.
+    expect(mocks.gates).toEqual([['fleet.vehicle-rules', 'create']]);
   });
 
   it('refuses an unauthenticated request rather than acting as nobody', async () => {
