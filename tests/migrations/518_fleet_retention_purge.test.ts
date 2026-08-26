@@ -120,11 +120,15 @@ function urlAsRole(role: string): string {
 /** A role with no grants at all, used to prove the identity seam actually routes. */
 const UNPRIVILEGED_ROLE = 'fleet_retention_seam_probe';
 
+import type { ReleasedAggregate } from '@/modules/fleet/incidents/analytics/suppression';
+
+type Aggregates = typeof import('@/modules/fleet/incidents/analytics/aggregateRepository');
 type Repo = typeof import('@/modules/fleet/incidents/retention/retentionRepository')
   & typeof import('@/modules/fleet/incidents/retention/retentionRunRepository');
 type Purge = typeof import('@/modules/fleet/incidents/retention/incidentPurge');
 type RetentionDb = typeof import('@/modules/fleet/incidents/retention/retentionDb');
 let repo: Repo;
+let aggregates: Aggregates;
 let purge: Purge;
 let retentionDb: RetentionDb;
 let transaction: typeof import('@/lib/db-pool').transaction;
@@ -228,7 +232,7 @@ async function seedAggregateRow(monthStart: string): Promise<void> {
  * actually reads. `rowCount` is deliberately a parameter: zero is a complete,
  * valid answer and is the case the old row-counting gate got wrong.
  */
-async function seedAggregateCoverage(monthStart: string, rowCount = 1, metricVersion = 1): Promise<void> {
+async function seedAggregationRun(metricVersion = 1): Promise<string> {
   // `finished_at` is not optional here: the runs table's `finish_pairing` CHECK
   // makes `status = 'running'` and `finished_at IS NULL` the same condition, so
   // a succeeded run without a finish time is rejected.
@@ -237,12 +241,25 @@ async function seedAggregateCoverage(monthStart: string, rowCount = 1, metricVer
      VALUES ('succeeded', $1, 1, now()) RETURNING id`,
     [metricVersion],
   );
+  return rows[0]!.id;
+}
+
+async function seedAggregateCoverage(monthStart: string, rowCount = 1, metricVersion = 1): Promise<void> {
   await db.query(
     `INSERT INTO fleet_operational_aggregate_month_coverage
        (metric_version, month_start, aggregation_run_id, row_count)
      VALUES ($1, $2::date, $3, $4)`,
-    [metricVersion, monthStart, rows[0]!.id, rowCount],
+    [metricVersion, monthStart, await seedAggregationRun(metricVersion), rowCount],
   );
+}
+
+/** One releasable aggregate, as the calculator would hand it to `replaceMonth`. */
+function releasedRow(monthStart: string, metricVersion: number): ReleasedAggregate {
+  return {
+    monthStart, metricVersion, dimensionLevel: 'project', dimensionProjectId: PROJECT,
+    dimensionSiteId: null, metricKey: 'incident.late', metricKind: 'count',
+    numerator: 4, denominator: null, histogram: null, contributorCount: 6,
+  };
 }
 
 async function count(table: string, where: string, params: unknown[]): Promise<number> {
@@ -279,6 +296,7 @@ beforeAll(async () => {
     ...await import('@/modules/fleet/incidents/retention/retentionRepository'),
     ...await import('@/modules/fleet/incidents/retention/retentionRunRepository'),
   };
+  aggregates = await import('@/modules/fleet/incidents/analytics/aggregateRepository');
   purge = await import('@/modules/fleet/incidents/retention/incidentPurge');
   retentionDb = await import('@/modules/fleet/incidents/retention/retentionDb');
   ({ transaction } = await import('@/lib/db-pool'));
@@ -579,6 +597,65 @@ describe('aggregate coverage gate', () => {
   it('does not accept published rows alone as coverage', async () => {
     await seedAggregateRow('2025-01-01');
     expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(false);
+  });
+
+  /**
+   * A superseded generation must not answer for its version — driven through
+   * `replaceMonth` itself, because the retirement and the coverage delete are
+   * one transaction and the bug lives in the gap between them.
+   *
+   * THE SCENARIO. Version 1 covers January. A bump to version 2 recomputes it:
+   * version 1's rows are retired and the published view stops returning them.
+   * Someone then REVERTS the metric version — a bad definition backed out, a
+   * config rollback — and the nightly job recomputes only the months still
+   * inside its recalculation window. January is not one of them, so
+   * `replaceMonth` is never called for it again.
+   *
+   * Without the coverage delete, January's version-1 coverage row outlives the
+   * rows it attests to, and the gate says yes for a month the published view
+   * answers with nothing — authorising the deletion of identifiable detail
+   * against an aggregate nobody can read. Permanently, because no later run
+   * revisits the month to correct it.
+   */
+  it('does not accept a superseded (inactive) generation as coverage after a version bump', async () => {
+    await aggregates.replaceMonth('2025-01-01', 1, [releasedRow('2025-01-01', 1)], await seedAggregationRun(1));
+    expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(true);
+
+    // The bump. Version 1's rows are retired in the same transaction that
+    // writes version 2's.
+    await aggregates.replaceMonth('2025-01-01', 2, [releasedRow('2025-01-01', 2)], await seedAggregationRun(2));
+
+    const published = await db.query<{ metric_version: number }>(
+      `SELECT metric_version FROM fleet_operational_monthly_aggregates_published
+        WHERE month_start = '2025-01-01'::date`,
+    );
+    expect(published.rows.map((r) => r.metric_version)).toEqual([2]);
+
+    // The revert. Nothing re-aggregates this month, so version 1's answer stays
+    // retired — and its coverage must have gone with it.
+    expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(false);
+    expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 2)).toBe(true);
+  });
+
+  /**
+   * The same delete, on the path that publishes NOTHING. A bump whose new
+   * definition releases no rows still retires the old one's, so it must still
+   * clear the old one's coverage — the case an early return would skip.
+   */
+  it('clears a superseded version coverage even when the new version publishes nothing', async () => {
+    await aggregates.replaceMonth('2025-03-01', 1, [releasedRow('2025-03-01', 1)], await seedAggregationRun(1));
+    await aggregates.replaceMonth('2025-03-01', 2, [], await seedAggregationRun(2));
+
+    expect(await repo.hasCompleteAggregateCoverage('2025-03-01', 1)).toBe(false);
+    expect(await repo.hasCompleteAggregateCoverage('2025-03-01', 2)).toBe(true);
+  });
+
+  /** And it is scoped: recomputing a version never deletes its own coverage. */
+  it('keeps the coverage of the version being written', async () => {
+    const first = await seedAggregationRun(1);
+    await aggregates.replaceMonth('2025-04-01', 1, [releasedRow('2025-04-01', 1)], first);
+    await aggregates.replaceMonth('2025-04-01', 1, [releasedRow('2025-04-01', 1)], await seedAggregationRun(1));
+    expect(await repo.hasCompleteAggregateCoverage('2025-04-01', 1)).toBe(true);
   });
 });
 

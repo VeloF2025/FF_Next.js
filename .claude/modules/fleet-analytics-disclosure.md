@@ -176,27 +176,35 @@ Two things about it are worth knowing:
   review. Verified 2026-08-24: neither the view nor the migration exists in the shared database, so
   no deployed reader is disturbed.
 
-### Operational consequence: months that will stop reporting coverage
+### Operational consequence: months that report no coverage
 
-`hasCompleteAggregateCoverage` counts rows through the view, and the view returns no site rows. A
-month whose STORED rows are all site-level — written by an earlier version of this code, before the
-rule stopped producing them — will therefore count zero and report no coverage. Its incidents are
-then never purged.
+Superseded by migration 530 in its cause, not in its operational consequence. The gate no longer
+counts rows through the view — `hasCompleteAggregateCoverage` reads
+`fleet_operational_aggregate_month_coverage`, one recorded row per `(metric_version, month_start)`
+written inside `replaceMonth`'s transaction. "No rows published" and "never aggregated" are no
+longer the same observation.
 
-- **Direction.** It fails CLOSED. Nothing is deleted that should not have been; the gate simply stops
-  authorising deletion for those months.
+What remains is that a month has coverage only once a run under the CURRENT metric version has
+written it, and 530 created the table empty. So:
+
+- **Direction.** Still CLOSED. A month with no coverage row is not purged; nothing is deleted that
+  should not have been.
 - **Is anything deleting today?** No. `live_retention_enabled` defaults to `false` in migration 518
   and reads `false` in the shared database (checked 2026-08-24). The retention run reports what it
   WOULD delete rather than deleting it, so this consequence is inert until that flag is turned on.
   Check it before enabling: `SELECT live_retention_enabled FROM fleet_operational_analytics_settings`.
-- **Which months.** Only those outside the nightly recompute window. A month still inside the window
-  is recomputed on the next run and gets organisation and project rows like any other.
-- **The backfill.** Re-run the aggregation cron for the affected months — the same job, over an older
-  range. It recomputes them under the current rule and writes organisation and project rows, at
-  which point coverage reports normally. No data migration and no SQL by hand.
-- **The underlying problem is still the one below**: coverage is INFERRED from the presence of rows
-  rather than recorded per month. Until that changes, "no rows" and "no qualifying data" are the same
-  observation.
+- **Which months.** Those outside the nightly recalculation window at the moment 530 was applied. A
+  month inside the window gets a coverage row on the next run, like any other; an older month has
+  none and never acquires one on its own, because `replaceMonth` is never called for it again.
+- **The backfill, which is an OPERATOR ACTION and not automatic.** Re-run the aggregation job over
+  the older range — the same job, a wider window. It recomputes those months under the current rule
+  and records coverage for each, at which point they become purgeable. Until somebody does this,
+  every month older than the window is unpurgeable. No data migration and no SQL by hand.
+- **A metric version DOWNGRADE leaves months uncovered on purpose.** Bumping the version retires the
+  previous version's rows and, in the same transaction, deletes the coverage that spoke for them.
+  Reverting the version therefore leaves every month outside the recalculation window with no
+  coverage under the version now in force — correctly, because the published view returns nothing
+  for it. Those months need the same backfill before retention applies to them again.
 
 ## What it costs, measured
 
@@ -292,13 +300,23 @@ reasoning above rather than merely changing the figures. Re-derive it before wid
 
 A metric nobody contributed to has an empty support and is withheld, rather than published as a
 roster-sized zero. That closed a real leak — see `anonymitySetFor` — but it means a month can
-legitimately store NO rows, and `hasCompleteAggregateCoverage` reads stored rows as proof that a
-month was aggregated. A month with no qualifying data therefore reports no coverage and its
-incidents are never purged.
+legitimately store NO rows, and `hasCompleteAggregateCoverage` USED TO read stored rows as proof
+that a month was aggregated. A month with no qualifying data therefore reported no coverage and its
+incidents were never purged.
 
 Failing closed is the right direction for a deletion gate, but it is not a working retention path.
-**Coverage should be recorded explicitly per month on the aggregation run, not inferred from the
-presence of aggregate rows.** That needs a migration and is the next piece of work here.
+
+**Closed by migration 530 (PR #2614).** Coverage is now RECORDED per `(metric_version, month_start)`
+in `fleet_operational_aggregate_month_coverage`, written by `replaceMonth` inside the same
+transaction as the rows it attests to — so it commits with them or not at all — and written on every
+path, including the month that publishes nothing. `hasCompleteAggregateCoverage` reads that table
+and no longer counts rows. Two properties are worth keeping in mind when changing this code:
+
+- **Keyed on the metric version**, so a month covered under one definition does not answer for
+  another. The gate fails closed across a version bump without anyone remembering to clear anything.
+- **A superseded version's coverage is deleted** in the same transaction that retires its rows.
+  Without that, a bump followed by a revert would leave a stale coverage row authorising the purge
+  of a month the published view answers with nothing — the one direction this gate may not fail in.
 
 ## History
 

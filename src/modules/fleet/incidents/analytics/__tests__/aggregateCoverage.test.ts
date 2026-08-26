@@ -44,8 +44,13 @@ function captureTransaction(): { calls: Statement[] } {
   return { calls };
 }
 
+/**
+ * The coverage WRITE, specifically. Matching the table name alone would also
+ * catch the DELETE that clears other versions' coverage (below), and a count of
+ * "one coverage statement" would then be counting two different things.
+ */
 function coverageStatements(calls: Statement[]): Statement[] {
-  return calls.filter((call) => /aggregate_month_coverage/i.test(call.sql));
+  return calls.filter((call) => /INSERT INTO fleet_operational_aggregate_month_coverage/i.test(call.sql));
 }
 
 beforeEach(() => {
@@ -139,8 +144,50 @@ describe('replaceMonth records coverage', () => {
     const captured = captureTransaction();
     await replaceMonth('2026-07-01', 1, [row()], RUN);
     const insertAt = captured.calls.findIndex((call) => /INSERT INTO fleet_operational_monthly_aggregates\b/i.test(call.sql));
-    const coverageAt = captured.calls.findIndex((call) => /aggregate_month_coverage/i.test(call.sql));
+    const coverageAt = captured.calls.findIndex((call) => /INSERT INTO fleet_operational_aggregate_month_coverage/i.test(call.sql));
     expect(insertAt).toBeGreaterThanOrEqual(0);
     expect(coverageAt).toBeGreaterThan(insertAt);
+  });
+});
+
+/**
+ * Retiring another version's ROWS without retiring the coverage that speaks for
+ * them leaves the gate answering TRUE for a month the published view returns
+ * nothing for — a stale yes, which is the only direction a deletion gate may
+ * not fail in. The end-to-end reproduction lives in the real-Postgres tests;
+ * these pin the statement's shape and its scope.
+ */
+describe('replaceMonth clears other versions coverage', () => {
+  function retireCoverage(calls: Statement[]): Statement | undefined {
+    return calls.find((call) => /DELETE FROM fleet_operational_aggregate_month_coverage/i.test(call.sql));
+  }
+
+  it('deletes the coverage of every OTHER version for the month', async () => {
+    const captured = captureTransaction();
+    await replaceMonth('2026-07-01', 2, [row({ metricVersion: 2 })], RUN);
+    const statement = retireCoverage(captured.calls);
+    expect(statement?.sql).toMatch(/DELETE FROM fleet_operational_aggregate_month_coverage/i);
+    expect(statement?.params).toEqual(['2026-07-01', 2]);
+  });
+
+  it('scopes the delete to other versions, never the one being written', async () => {
+    const captured = captureTransaction();
+    await replaceMonth('2026-07-01', 2, [row({ metricVersion: 2 })], RUN);
+    expect(retireCoverage(captured.calls)?.sql).toMatch(/metric_version\s*<>\s*\$2/);
+  });
+
+  it('runs on every path, including a month that publishes nothing', async () => {
+    const captured = captureTransaction();
+    await replaceMonth('2026-07-01', 2, [], RUN);
+    expect(retireCoverage(captured.calls)).toBeDefined();
+  });
+
+  it('runs before the coverage it must not delete is written', async () => {
+    const captured = captureTransaction();
+    await replaceMonth('2026-07-01', 2, [row({ metricVersion: 2 })], RUN);
+    const deleteAt = captured.calls.findIndex((call) => /DELETE FROM fleet_operational_aggregate_month_coverage/i.test(call.sql));
+    const insertAt = captured.calls.findIndex((call) => /INSERT INTO fleet_operational_aggregate_month_coverage/i.test(call.sql));
+    expect(deleteAt).toBeGreaterThanOrEqual(0);
+    expect(insertAt).toBeGreaterThan(deleteAt);
   });
 });
