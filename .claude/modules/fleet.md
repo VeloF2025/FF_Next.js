@@ -1814,7 +1814,9 @@ measured over 30 days on 2026-08-25 (`coverage.ts` carries the same numbers with
 ### Detectors — thresholds and status
 
 Migration 529 seeds `version 1`. **The detectors themselves (plan PR4) are NOT on master**:
-`produceSourceEventIncident` still has no caller, so no telematics incident is opened today.
+`produceSourceEventIncident` has no non-test constructor of a `source_event` request — the
+dispatcher in `incidentProducer.ts` routes to it, but nothing in the application builds one — so no
+telematics incident is opened today.
 `vehicleDetectors/` currently holds the after-hours calendar, the rule queries and their tests.
 
 | Type | Severity after 529 | Threshold (529 default) | Status |

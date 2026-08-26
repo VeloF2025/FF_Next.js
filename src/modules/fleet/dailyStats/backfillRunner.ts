@@ -34,7 +34,7 @@
  */
 import { queryOne } from '@/lib/db-pool';
 import { buildDailyStats, buildStatsForVehicle, DEFAULT_BUILD_OPTIONS } from './dailyStatsBuildService';
-import { dayStartMs, MS_PER_DAY } from './dayIntervals';
+import { dayStartMs, MS_PER_DAY, sastDay } from './dayIntervals';
 
 /** Passes before the run gives up and reports the backlog it could not clear. */
 export const DEFAULT_MAX_PASSES = 50;
@@ -44,14 +44,16 @@ export const REQUIRED_TABLES = ['fleet_vehicle_daily_stats', 'fleet_daily_stats_
 
 const WORK_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-export interface BackfillArgs {
-  mode: 'drain' | 'refold';
-  /** Drain one vehicle instead of the fleet; required in refold mode. */
-  vehicleId: string | null;
-
-  refoldDay: string | null;
-  maxPasses: number;
-}
+/**
+ * Discriminated on `mode` so the impossible states cannot be constructed or read.
+ *
+ * A single flat shape with two nullable fields forces every consumer to assert its way past
+ * `vehicleId!` / `refoldDay!` -- and those assertions are exactly the places a parser bug turns
+ * into `undefined` reaching a query. The union means a refold ALWAYS has both, checked once here.
+ */
+export type BackfillArgs =
+  | { mode: 'drain'; vehicleId: string | null; maxPasses: number }
+  | { mode: 'refold'; vehicleId: string; refoldDay: string; maxPasses: number };
 
 /** Where a refolded day opens and closes: its own SAST midnight to the next, and nothing else. */
 export interface RefoldWindow { start: string; end: string }
@@ -69,7 +71,25 @@ export interface BackfillOutcome {
 function requireValue(argv: readonly string[], index: number, flag: string): string {
   const value = argv[index];
   if (value === undefined || value.startsWith('--')) throw new Error(`${flag} needs a value`);
+  // An empty or blank value is not a missing flag -- `--vehicle ''` reaches the query as an id
+  // matching nothing, and a run that folds zero vehicles reports success.
+  if (value.trim() === '') throw new Error(`${flag} needs a non-empty value`);
   return value;
+}
+
+/**
+ * Rejects a date that parses but is not the day it names.
+ *
+ * `Date.parse('2026-02-30T00:00:00+02:00')` does NOT fail -- it rolls over to 2 March. So a typo
+ * would silently refold a different day than the operator asked for, overwriting a row that was
+ * correct. The round trip through `sastDay` is what notices: the day the instant lands in must be
+ * the day that was typed.
+ */
+function assertRealCalendarDay(workDate: string): void {
+  const startMs = dayStartMs(workDate);
+  if (!Number.isFinite(startMs) || sastDay(startMs) !== workDate) {
+    throw new Error(`--refold-day ${workDate} is not a real calendar date`);
+  }
 }
 
 export function parseBackfillArgs(argv: readonly string[]): BackfillArgs {
@@ -92,12 +112,13 @@ export function parseBackfillArgs(argv: readonly string[]): BackfillArgs {
 
   if (refoldDay !== null) {
     if (!WORK_DATE_RE.test(refoldDay)) throw new Error(`--refold-day must be YYYY-MM-DD, got ${refoldDay}`);
+    assertRealCalendarDay(refoldDay);
     // One vehicle-day is one vehicle AND one day; a fleet-wide refold is a full rescan in the
     // clothes of a repair.
     if (vehicleId === null) throw new Error('--refold-day requires --vehicle');
     return { mode: 'refold', vehicleId, refoldDay, maxPasses };
   }
-  return { mode: 'drain', vehicleId, refoldDay: null, maxPasses };
+  return { mode: 'drain', vehicleId, maxPasses };
 }
 
 /** `[midnight SAST, the next midnight SAST)` — exactly 24h, never truncated at the run instant. */
@@ -134,21 +155,33 @@ export async function assertSchemaReady(): Promise<void> {
   }
 }
 
-async function runRefold(args: BackfillArgs, report: BackfillReport, nowMs: number): Promise<BackfillOutcome> {
-  const day = args.refoldDay!;
-  assertDayClosed(day, nowMs);
-  const window = refoldWindow(day);
-  report(`refold ${day} (${window.start} → ${window.end}) vehicle ${args.vehicleId}`);
-  const result = await buildStatsForVehicle(args.vehicleId!, nowMs, { ...DEFAULT_BUILD_OPTIONS, windowOverride: window });
+async function runRefold(
+  args: Extract<BackfillArgs, { mode: 'refold' }>, report: BackfillReport, nowMs: number,
+): Promise<BackfillOutcome> {
+  assertDayClosed(args.refoldDay, nowMs);
+  const window = refoldWindow(args.refoldDay);
+  report(`refold ${args.refoldDay} (${window.start} → ${window.end}) vehicle ${args.vehicleId}`);
+  const result = await buildStatsForVehicle(args.vehicleId, nowMs, { ...DEFAULT_BUILD_OPTIONS, windowOverride: window });
   report(`  days ${result.daysWritten}  positions ${result.positionsProcessed}  batches ${result.batches}`);
+  // The per-run ceiling can stop a refold mid-day on a vehicle dense enough to need more than
+  // `maxBatchesPerVehicle` pages for one day. The day is then NOT rebuilt, and reporting success
+  // with `days 0` is the failure mode a repair tool can least afford: the operator believes the
+  // row was repaired. Another pass would not help either -- a refold always reopens the same
+  // window -- so this needs a larger batch size, not a retry.
+  if (result.moreRemaining) {
+    report('the per-run ceiling stopped this refold before the day was whole — the row was NOT rebuilt; re-run with a larger positionBatchSize');
+    return { passes: 1, daysWritten: result.daysWritten, positionsProcessed: result.positionsProcessed, exitCode: 1 };
+  }
   return { passes: 1, daysWritten: result.daysWritten, positionsProcessed: result.positionsProcessed, exitCode: 0 };
 }
 
-async function runDrainOneVehicle(args: BackfillArgs, report: BackfillReport, nowMs: () => number): Promise<BackfillOutcome> {
+async function runDrainOneVehicle(
+  args: BackfillArgs, vehicleId: string, report: BackfillReport, nowMs: () => number,
+): Promise<BackfillOutcome> {
   let daysWritten = 0;
   let positionsProcessed = 0;
   for (let pass = 1; pass <= args.maxPasses; pass += 1) {
-    const result = await buildStatsForVehicle(args.vehicleId!, nowMs(), DEFAULT_BUILD_OPTIONS);
+    const result = await buildStatsForVehicle(vehicleId, nowMs(), DEFAULT_BUILD_OPTIONS);
     daysWritten += result.daysWritten;
     positionsProcessed += result.positionsProcessed;
     report(`pass ${String(pass).padStart(3)}  days +${result.daysWritten} (${daysWritten})  positions ${result.positionsProcessed}  backlog ${result.moreRemaining ? 1 : 0}`);
@@ -193,6 +226,6 @@ export async function runBackfill(
   args: BackfillArgs, report: BackfillReport, clock: () => number = () => Date.now(),
 ): Promise<BackfillOutcome> {
   if (args.mode === 'refold') return runRefold(args, report, clock());
-  if (args.vehicleId !== null) return runDrainOneVehicle(args, report, clock);
+  if (args.vehicleId !== null) return runDrainOneVehicle(args, args.vehicleId, report, clock);
   return runDrainFleet(args, report, () => new Date(clock()).toISOString());
 }

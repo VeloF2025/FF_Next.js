@@ -56,8 +56,8 @@ known-site tables are the opposite of hazards. `accident_sos` remains a
 **stub**: no panic/SOS/impact field exists on any of the three feeds (all 57
 Cartrack event fields enumerated and cleared), the one open lead is Cartrack's
 undocumented `input_state` bitfield, and SOS must not be synthesised from
-g-force. The telematics **detectors are not wired** (plan PR4):
-`produceSourceEventIncident` still has no caller. **Recurrence is not advanced
+g-force. The telematics **detectors are not wired** (plan PR4): nothing
+outside the tests constructs a `source_event` producer request. **Recurrence is not advanced
 for source events** — dedup is `(incident_type, source_event_id)` only, so ten
 consecutive days of the same detector open ten unrelated incidents. Untracked
 vehicles produce **no row at all** (an `EXISTS` semi-join), so any UI must

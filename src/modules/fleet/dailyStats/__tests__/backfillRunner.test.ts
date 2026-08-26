@@ -65,14 +65,14 @@ beforeEach(() => {
 describe('parseBackfillArgs', () => {
   it('defaults to draining the whole fleet', () => {
     expect(parseBackfillArgs([])).toEqual({
-      mode: 'drain', vehicleId: null, refoldDay: null, maxPasses: DEFAULT_MAX_PASSES,
+      mode: 'drain', vehicleId: null, maxPasses: DEFAULT_MAX_PASSES,
     });
     expect(DEFAULT_MAX_PASSES).toBe(50);
   });
 
   it('takes a vehicle and a pass ceiling', () => {
     expect(parseBackfillArgs(['--vehicle', 'v1', '--max-passes', '7'])).toEqual({
-      mode: 'drain', vehicleId: 'v1', refoldDay: null, maxPasses: 7,
+      mode: 'drain', vehicleId: 'v1', maxPasses: 7,
     });
   });
 
@@ -84,6 +84,19 @@ describe('parseBackfillArgs', () => {
 
   it('refuses malformed input rather than guessing', () => {
     expect(() => parseBackfillArgs(['--refold-day', '14/08/2026'])).toThrow(/YYYY-MM-DD/);
+    // 2026-02-30 PARSES — Date.parse rolls it over to 2 March — so a shape check alone would
+    // refold a different day than the operator typed, over a row that was correct.
+    expect(() => parseBackfillArgs(['--vehicle', 'v1', '--refold-day', '2026-02-30']))
+      .toThrow(/not a real calendar date/);
+    expect(() => parseBackfillArgs(['--vehicle', 'v1', '--refold-day', '2026-02-29']))
+      .toThrow(/not a real calendar date/);
+    expect(() => parseBackfillArgs(['--vehicle', 'v1', '--refold-day', '2026-04-31']))
+      .toThrow(/not a real calendar date/);
+    // A real leap day is accepted, so the check is not simply refusing February.
+    expect(parseBackfillArgs(['--vehicle', 'v1', '--refold-day', '2024-02-29']).mode).toBe('refold');
+    // An empty vehicle id reaches the query as an id matching nothing and reports success.
+    expect(() => parseBackfillArgs(['--vehicle', ''])).toThrow(/non-empty/);
+    expect(() => parseBackfillArgs(['--vehicle', '   '])).toThrow(/non-empty/);
     expect(() => parseBackfillArgs(['--max-passes', '0'])).toThrow(/positive integer/);
     expect(() => parseBackfillArgs(['--max-passes', 'ten'])).toThrow(/positive integer/);
     expect(() => parseBackfillArgs(['--from', '2026-08-01'])).toThrow(/unknown argument/);
@@ -155,6 +168,18 @@ describe('runBackfill — refold', () => {
     expect(lines[0]).toContain('refold 2026-08-14');
   });
 
+  it('exits non-zero when the ceiling stopped it before the day was whole', async () => {
+    // days 0 with exit 0 is the worst outcome a repair tool can report: the operator believes the
+    // row was rebuilt. A refold always reopens the same window, so another pass would not help.
+    service.buildStatsForVehicle.mockResolvedValue(vehiclePass({ daysWritten: 0, moreRemaining: true }));
+    const lines: string[] = [];
+    const out = await runBackfill(
+      parseBackfillArgs(['--vehicle', 'v1', '--refold-day', '2026-08-14']), (l) => lines.push(l), () => NOW_MS,
+    );
+    expect(out.exitCode).toBe(1);
+    expect(lines.at(-1)).toMatch(/NOT rebuilt/);
+  });
+
   it('never reaches the service for a day that has not closed', async () => {
     await expect(runBackfill(
       parseBackfillArgs(['--vehicle', 'v1', '--refold-day', '2026-08-26']), () => {}, () => NOW_MS,
@@ -214,20 +239,31 @@ describe('runBackfill — drain', () => {
 
 describe('the backfill is not a second implementation', () => {
   const source = readFileSync(join(__dirname, '..', 'backfillRunner.ts'), 'utf8');
+  /** Every module this file imports from, read out of the source rather than assumed. */
+  const imports = [...source.matchAll(/from '([^']+)'/g)].map((m) => m[1]!).sort();
 
-  it('folds and writes only through the build service', () => {
-    expect(source).toMatch(/from '\.\/dailyStatsBuildService'/);
+  it('imports from an ALLOWLIST of modules — the service, the day arithmetic, the pool', () => {
+    // An allowlist, not a denylist of symbol names: a denylist is beaten by the next export
+    // somebody adds to `dayFold` (`foldVehicleDays`, say), because the test would have to know
+    // its name in advance. A module path cannot be renamed out from under this.
+    expect(imports).toEqual(['./dailyStatsBuildService', './dayIntervals', '@/lib/db-pool']);
+  });
+
+  it('never reaches the fold, the repository or the raw SQL, whatever they export', () => {
+    for (const forbidden of ['./dayFold', './dayWindow', './dailyStatsRepository', './dailyStatsSql', './coverage', './dayRow']) {
+      expect(imports).not.toContain(forbidden);
+    }
+    // And the two entry points it is allowed to use are actually used.
     for (const symbol of ['buildDailyStats', 'buildStatsForVehicle']) {
       expect(source).toContain(symbol);
     }
-    // Nothing that would let it compute a metric or write a row on its own.
-    for (const forbidden of ['createDayFold', 'upsertDayStats', 'writeWatermark', 'dailyStatsSql', 'dailyStatsRepository']) {
-      expect(source).not.toContain(forbidden);
-    }
   });
 
-  it('issues no SQL of its own beyond the schema probe', () => {
-    const statements = [...source.matchAll(/\b(SELECT|INSERT|UPDATE|DELETE|ON CONFLICT)\b/g)].map((m) => m[1]);
+  it('issues no SQL of its own beyond the schema probe — in ANY case', () => {
+    // Case-insensitive, because `insert into` reads to Postgres exactly as `INSERT INTO` does and
+    // an upper-case-only probe is a guard that a lower-case copy-paste walks straight past.
+    const statements = [...source.matchAll(/\b(SELECT|INSERT|UPDATE|DELETE|ON CONFLICT|MERGE)\b/gi)]
+      .map((m) => m[1]!.toUpperCase());
     // Exactly one, and it is the probe: anything else means fold or upsert SQL has been copied in.
     expect(statements).toEqual(['SELECT']);
     expect(source).toContain('SELECT to_regclass($1)::text AS present');

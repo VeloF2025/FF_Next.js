@@ -64,6 +64,7 @@ import {
 import {
   daysReadyToWrite, lastClosedDay, windowEndFor, windowStartFor,
 } from './dailyStatsWindow';
+import type { BuildWindow } from './dailyStatsWindow';
 import { createDayFold } from './dayFold';
 import { DAY_FOLD_POSITION_BATCH_SIZE } from './dayFoldOptions';
 import type { DayFoldOptions } from './dayFoldOptions';
@@ -99,25 +100,6 @@ export const POSITION_BATCH_SIZE = DAY_FOLD_POSITION_BATCH_SIZE;
  * holds -- bounded, since a day is finite, but not by this number.
  */
 export const MAX_BATCHES_PER_VEHICLE = 20;
-
-/**
- * A window supplied by the caller instead of derived from the watermark.
- *
- * The ONE reason this exists: the repository header names a horizon this job never goes back
- * past -- `min(watermark - 6h, yesterday 00:00 SAST)`, which only moves forward -- and names
- * PR9's backfill as the repair for a fix that lands older than it. That repair is this: the same
- * fold, the same upsert, the same lead-in query, pointed at a window the watermark would never
- * reopen. It is not a second code path, and there is deliberately no third caller.
- *
- * `start` must be a SAST midnight and `end` the next one, for exactly the reason the derived
- * window is snapped: a vehicle-day row is a full replacement, so a window covering part of a day
- * overwrites a complete row with a partial one. `backfillRunner.refoldWindow` is the only
- * constructor and pins both edges; nothing here re-derives them.
- */
-export interface BuildWindow {
-  start: string;
-  end: string;
-}
 
 export interface DailyStatsBuildOptions {
   positionBatchSize: number;

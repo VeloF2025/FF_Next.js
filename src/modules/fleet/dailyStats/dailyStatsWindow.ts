@@ -13,6 +13,25 @@ import type { VehicleDayStats } from './types';
 const MS_PER_DAY = 86_400_000;
 
 /**
+ * A window supplied by the caller instead of derived from the watermark.
+ *
+ * The ONE reason this exists: the repository header names a horizon the build never goes back
+ * past -- `min(watermark - 6h, yesterday 00:00 SAST)`, which only moves forward -- and names
+ * PR9's backfill as the repair for a fix that lands older than it. That repair is the same fold,
+ * the same upsert and the same lead-in query, pointed at a window the watermark would never
+ * reopen. It is not a second code path, and there is deliberately no third caller.
+ *
+ * `start` must be a SAST midnight and `end` the next one, for exactly the reason the derived
+ * window is snapped: a vehicle-day row is a full replacement, so a window covering part of a day
+ * overwrites a complete row with a partial one. `backfillRunner.refoldWindow` is the only
+ * constructor and pins both edges; nothing re-derives them.
+ */
+export interface BuildWindow {
+  start: string;
+  end: string;
+}
+
+/**
  * Where this vehicle's window opens: the earlier of the lookback floor and yesterday's midnight,
  * each snapped to a SAST day boundary. Null means the vehicle has never been built -- read
  * everything.
