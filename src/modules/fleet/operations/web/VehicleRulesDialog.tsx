@@ -96,7 +96,25 @@ export function VehicleRulesDialog({
       aria-label="Vehicle operational rules"
       className="fixed inset-0 z-50 overflow-auto bg-black/60 p-6"
     >
-      <div className="mx-auto max-w-4xl space-y-4 rounded-lg bg-[var(--ff-bg-primary)] p-6 text-[var(--ff-text-primary)]">
+      {/*
+        Surface class list is IDENTICAL to StatusRulesDialog's, and a test pins
+        it that way. In particular there is deliberately NO text colour here:
+        the sibling sets none, inherits the page's, and is verified correct in
+        both themes.
+
+        PR3 shipped this with `text-[var(--ff-text-primary)]` added, and a
+        browser check on dev found near-white labels (rgb(249,250,251)) on this
+        white surface in LIGHT theme while the sibling rendered dark text.
+
+        Do NOT generalise from that: `text-[var(--ff-text-primary)]` is the
+        repo's standard pattern (~4,800 uses), and 227 components pair it with
+        `bg-[var(--ff-bg-primary)]` exactly as this one did, with no reported
+        problem. The CSS mechanism was NOT identified — static analysis of the
+        loaded stylesheets does not reproduce that computed value. What is
+        established is the observation and the remedy: be identical to the
+        sibling that is known good.
+      */}
+      <div className="mx-auto max-w-4xl space-y-4 rounded-lg bg-[var(--ff-bg-primary)] p-6">
         <header className="flex justify-between">
           <div>
             <h2 className="text-xl font-semibold">Vehicle operational rules</h2>
