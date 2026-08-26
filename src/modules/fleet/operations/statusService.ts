@@ -1,7 +1,8 @@
+import { log } from '@/lib/logger';
 import { evaluateOperationalStatus } from './evaluateStatus';
 import { loadOperationalEvidence } from './evidenceQueries';
 import { parseStrictIsoInstant } from './instantValidation';
-import { hasScheduleWindow, operationalWindow } from './timeRules';
+import { hasScheduleWindow, operationalWindow, sastStartOfWorkDate } from './timeRules';
 import type { OperationalEvaluation, OperationalEvidence, OperationalStatusSummary } from './types';
 
 export class OperationalStatusRequestError extends Error { constructor(message: string) { super(message); this.name = 'OperationalStatusRequestError'; } }
@@ -23,7 +24,24 @@ function validDate(value: string): boolean { const match = DATE.exec(value); if 
 function validate(workDate: string, asOf: string): void {
   if (!validDate(workDate)) throw new OperationalStatusRequestError('workDate must be a valid ISO date');
   const timestamp = parseStrictIsoInstant(asOf); if (timestamp === null) throw new OperationalStatusRequestError('asOf must be an ISO instant');
-  const ageDays = (timestamp - Date.parse(`${workDate}T00:00:00Z`)) / 86_400_000;
+  // Measured from the SAST start of the work date, not UTC midnight. `workDate`
+  // is a South African calendar date — `monitorService` derives it in SAST —
+  // and a SAST day begins at 22:00Z the day before.
+  //
+  // `validDate` above accepts years 0000-0099 (`setUTCFullYear` sets the exact
+  // year given), but `sastStartOfWorkDate` builds its instant with `Date.UTC`,
+  // which maps those same years to 1900-1999 — so its own round-trip check
+  // then fails and throws a bare `Error`. Wrap it so that still surfaces as a
+  // request error instead of escaping the `OperationalStatusRequestError`
+  // branch in the status routes as an uncaught 500.
+  let startOfWorkDate: number;
+  try {
+    startOfWorkDate = sastStartOfWorkDate(workDate);
+  } catch (error) {
+    log.warn('Rejecting malformed operational status workDate', { workDate, error });
+    throw new OperationalStatusRequestError('workDate must be a valid ISO date');
+  }
+  const ageDays = (timestamp - startOfWorkDate) / 86_400_000;
   if (ageDays < 0 || ageDays > 31) throw new OperationalStatusRequestError('workDate must be within the 31-day history window');
 }
 

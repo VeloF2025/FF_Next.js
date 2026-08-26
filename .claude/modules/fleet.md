@@ -100,7 +100,7 @@ presence, and source errors. One malformed person's mapped evidence becomes that
 The effective rule and attendance schedule create `monitoringStart -> scheduledStart -> graceEnd ->
 scheduledEnd -> monitoringEnd` in `Africa/Johannesburg`. Evaluation outside that bounded window is
 `off_duty`; GPS history is loaded only from the earliest monitoring/confirmation lookback through
-the earlier of the requested `asOf` and monitoring end. Roster history is limited to 31 days. Tracker freshness is not redefined here:
+the earlier of the requested `asOf` and monitoring end. Roster history is limited to 31 days, measured from SAST midnight. Tracker freshness is not redefined here:
 the batch loader calls the shared `staleAfterSecondsFor(provider, account)` once per distinct feed,
 preserving the fast Cartrack REST versus slower portal-account thresholds.
 

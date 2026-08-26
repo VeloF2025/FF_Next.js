@@ -20,6 +20,13 @@ describe('status service validation and privacy', () => {
     { projectId: 'p', workDate: '2026-01-01', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 },
     { projectId: 'p', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', page: 0, limit: 25 },
     { projectId: 'p', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 101 },
+    // `validDate` accepts years 0000-0099 (`setUTCFullYear` sets the exact
+    // year given), but `sastStartOfWorkDate` builds its instant with
+    // `Date.UTC`, which maps those same years to 1900-1999 — its own
+    // round-trip check then throws a bare `Error` that must still surface as
+    // an `OperationalStatusRequestError`, not escape as an uncaught 500.
+    { projectId: 'p', workDate: '0099-12-31', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 },
+    { projectId: 'p', workDate: '0001-01-01', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 },
   ])('rejects invalid or out-of-bounds request %#', async (request) => {
     await expect(getOperationalRosterStatus(request)).rejects.toBeInstanceOf(OperationalStatusRequestError);
     expect(mocks.load).not.toHaveBeenCalled();
@@ -112,5 +119,49 @@ describe('status service validation and privacy', () => {
   it('propagates a top-level load failure', async () => {
     mocks.load.mockRejectedValue(new Error('database unavailable'));
     await expect(getOperationalRosterStatus({ projectId: 'p', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 })).rejects.toThrow('database unavailable');
+  });
+});
+
+/**
+ * The history window is measured from the SAST start of the work date.
+ *
+ * `monitorService` derives `workDate` from `effectiveAt` in SAST. A SAST day
+ * begins at 22:00Z the day before, so between SAST midnight and 02:00 the
+ * derived work date is already tomorrow in UTC terms — and a window measured
+ * from UTC midnight puts `asOf` BEFORE the start of its own work date. That is
+ * a negative age, and it was rejecting every monitor run in those two hours:
+ * 96 failures on the shared database, 48 at UTC hour 22 and 48 at hour 23, and
+ * none at any other hour.
+ */
+describe('history window in SAST', () => {
+  const request = (workDate: string, asOf: string) => ({ projectId: 'p', workDate, asOf, page: 1, limit: 25 });
+
+  it.each([
+    ['22:00:00Z', '2026-08-15'],
+    ['22:30:00Z', '2026-08-15'],
+    ['23:59:59Z', '2026-08-15'],
+  ])('accepts the SAST work date that has already begun at %s', async (time, workDate) => {
+    await expect(getOperationalRosterStatus(request(workDate, `2026-08-14T${time}`))).resolves.toBeDefined();
+    expect(mocks.load).toHaveBeenCalled();
+  });
+
+  it('still refuses a work date that has not begun in SAST either', async () => {
+    // 21:59Z on the 14th is 23:59 SAST, still the 14th. The 15th is genuinely
+    // in the future, and the guard must keep saying so.
+    await expect(getOperationalRosterStatus(request('2026-08-15', '2026-08-14T21:59:00Z')))
+      .rejects.toBeInstanceOf(OperationalStatusRequestError);
+    expect(mocks.load).not.toHaveBeenCalled();
+  });
+
+  it('still refuses a work date past the far edge of the window', async () => {
+    await expect(getOperationalRosterStatus(request('2026-07-01', '2026-08-14T12:00:00Z')))
+      .rejects.toBeInstanceOf(OperationalStatusRequestError);
+    expect(mocks.load).not.toHaveBeenCalled();
+  });
+
+  it('applies the same window to the evidence detail request', async () => {
+    await expect(getOperationalEvidenceDetail({
+      projectId: 'p', staffId: 'staff-1', workDate: '2026-08-15', asOf: '2026-08-14T22:30:00Z',
+    })).resolves.toBeDefined();
   });
 });
