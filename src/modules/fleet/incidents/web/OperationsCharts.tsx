@@ -16,7 +16,8 @@ import { useState } from 'react';
 import { Bar, BarChart, Cell, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { OperationsMetricKey } from '../analytics/aggregateSchema';
 import type { OperationsAnalyticsResponse } from '../analytics/types';
-import { METRIC_GROUPS, metricLabel } from './operationsMetricLabels';
+import { metricLabel } from './operationsMetricLabels';
+import { buildChartPoints, reportedKeys } from './operationsChartData';
 
 const RETAINED_COLOUR = '#8B5CF6';
 const PUBLISHED_COLOUR = '#06B6D4';
@@ -25,29 +26,13 @@ export interface OperationsChartsProps {
   report: OperationsAnalyticsResponse;
 }
 
-/** Every key any month reported, so the picker never offers an empty chart. */
-function reportedKeys(report: OperationsAnalyticsResponse): OperationsMetricKey[] {
-  const seen = new Set<OperationsMetricKey>();
-  for (const month of report.series) for (const value of month.values) seen.add(value.metricKey);
-  return METRIC_GROUPS.flatMap((group) => group.keys).filter((key) => seen.has(key));
-}
-
 export function OperationsCharts({ report }: OperationsChartsProps) {
   const keys = reportedKeys(report);
   const [metricKey, setMetricKey] = useState<OperationsMetricKey | null>(null);
   const selected = metricKey !== null && keys.includes(metricKey) ? metricKey : keys[0];
   if (selected === undefined) return null;
 
-  const data = report.series.map((month) => {
-    const value = month.values.find((candidate) => candidate.metricKey === selected);
-    return {
-      month: month.monthStart.slice(0, 7),
-      // A month that did not report the key is plotted as null, not zero — a
-      // gap in the line is the honest rendering of a figure nobody published.
-      value: value === undefined ? null : value.numerator,
-      retained: month.monthStart >= report.retainedDetailFrom,
-    };
-  });
+  const data = buildChartPoints(report, selected);
 
   return (
     <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
