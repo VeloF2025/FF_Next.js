@@ -47,7 +47,7 @@ beforeEach(() => {
     // unheld incident here so it never consumes a test's own
     // `mockResolvedValue`; `RetentionHoldPanel.test.tsx` tests the panel.
     if (String(url).includes('/timeline')) return Promise.resolve(ok({ entries: [], nextCursor: null }));
-    if (String(url).includes('/retention-holds')) return Promise.resolve(ok({ holds: [], actions: [], canManage: false }));
+    if (String(url).includes('/retention-holds')) return Promise.resolve(ok({ holds: [], actions: [], canManage: false, canCreate: false }));
     return fetchMock(url as RequestInfo, init);
   });
 });

@@ -15,12 +15,16 @@ export interface IncidentHoldsView {
   holds: RetentionHold[];
   actions: RetentionHoldAction[];
   /**
-   * From the SERVER. A scoped viewer without hold authority sees that the
-   * incident is held and none of the controls; the panel never decides this
+   * From the SERVER, and two separate answers because the service asks two
+   * separate questions: `create` gates placing a hold, `edit` gates reviewing,
+   * extending and releasing one. A viewer without either sees that the
+   * incident is held and none of the controls. The panel never decides this
    * for itself, because a client-side guess about authority is a guess that
-   * can be wrong in the permissive direction.
+   * can be wrong in the permissive direction — and a button whose request the
+   * server refuses is that same guess with extra steps.
    */
   canManage: boolean;
+  canCreate: boolean;
 }
 
 export interface CreateHoldBody {
