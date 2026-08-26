@@ -291,6 +291,23 @@ describe('RetentionHoldPanel', () => {
       expect(sent[0]!.body).toMatchObject({ releaseReason: 'Matter closed' });
     });
 
+    /**
+     * The row owns its note input, so it has to be remounted once the server
+     * confirms — otherwise the next reviewer opens the drawer to somebody
+     * else's note already typed into a live control.
+     */
+    it('clears the note once the server has confirmed the review', async () => {
+      await renderPanel(
+        view(),
+        view({ holds: [hold({ nextReviewAt: '2027-02-01T00:00:00.000Z', lastReviewedAt: '2026-08-26T00:00:00.000Z' })] }),
+      );
+      fireEvent.change(screen.getByTestId('hold-note-legal'), { target: { value: 'Still live' } });
+      fireEvent.change(screen.getByTestId('hold-next-review-legal'), { target: { value: '2027-02-01' } });
+      await act(async () => { screen.getByTestId('hold-review-legal').click(); });
+      await flush();
+      expect((screen.getByTestId('hold-note-legal') as HTMLInputElement).value).toBe('');
+    });
+
     /** Same conversion as create, on the path a hold spends most of its life on. */
     it('sends a review date as a strict ISO instant', async () => {
       await renderPanel();

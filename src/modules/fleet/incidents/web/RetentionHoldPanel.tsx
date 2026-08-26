@@ -100,7 +100,12 @@ export function RetentionHoldPanel({ incidentId, refreshKey = 0 }: RetentionHold
         <ul className="space-y-1">
           {holds.map((hold) => (
             <RetentionHoldRow
-              key={hold.id} hold={hold} canManage={view?.canManage === true} pending={pending}
+              // Keyed on what a successful action changes, not on the id
+              // alone: the row owns its note and date inputs, so remounting
+              // is what clears them once the server has confirmed. Keyed on
+              // the id alone they would still hold the last note typed.
+              key={`${hold.id}:${hold.status}:${hold.nextReviewAt}`}
+              hold={hold} canManage={view?.canManage === true} pending={pending}
               onReview={(holdId, body) => { void run(() => retentionHoldApi.review(incidentId, holdId, body)); }}
               onRelease={(holdId, body) => { void run(() => retentionHoldApi.release(incidentId, holdId, body)); }}
             />
