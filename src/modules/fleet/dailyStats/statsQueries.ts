@@ -126,13 +126,6 @@ function iso(value: string | Date | null): string | null {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-const STATS_COLUMNS = `
-  work_date, ignition_seconds, moving_seconds, idle_seconds, distance_km, max_speed_kph, speeding_events, speeding_seconds,
-  harsh_brake_events, harsh_accel_events, harsh_corner_events,
-  first_ignition_at, last_ignition_at, position_count, tracker_silence_seconds,
-  provider, account_ref, coverage_granularity, coverage_ignition, coverage_gforce,
-  coverage_provider_events, coverage_complete, source_watermark, computed_at`;
-
 function mapRow(row: StatsRow): VehicleDayStatsRow {
   return {
     workDate: toWorkDate(row.work_date),
@@ -168,7 +161,12 @@ export async function loadVehicleDayStats(
 ): Promise<VehicleDayStatsRow[]> {
   const rows = await query<StatsRow>(
     `/* fleet-daily-stats:series */
-     SELECT ${STATS_COLUMNS}
+     SELECT work_date, ignition_seconds, moving_seconds, idle_seconds, distance_km,
+            max_speed_kph, speeding_events, speeding_seconds,
+            harsh_brake_events, harsh_accel_events, harsh_corner_events,
+            first_ignition_at, last_ignition_at, position_count, tracker_silence_seconds,
+            provider, account_ref, coverage_granularity, coverage_ignition, coverage_gforce,
+            coverage_provider_events, coverage_complete, source_watermark, computed_at
      FROM fleet_vehicle_daily_stats
      WHERE vehicle_id = $1
        AND work_date >= $2::date
@@ -243,7 +241,12 @@ export async function loadFleetDayOverview(workDate: string): Promise<FleetOverv
     `/* fleet-daily-stats:overview */
      SELECT v.id, v.registration, v.make, v.model, v.status,
             (s.vehicle_id IS NOT NULL) AS has_stats,
-            ${STATS_COLUMNS.split(',').map((c) => `s.${c.trim()}`).join(', ')}
+            s.work_date, s.ignition_seconds, s.moving_seconds, s.idle_seconds, s.distance_km,
+            s.max_speed_kph, s.speeding_events, s.speeding_seconds,
+            s.harsh_brake_events, s.harsh_accel_events, s.harsh_corner_events,
+            s.first_ignition_at, s.last_ignition_at, s.position_count, s.tracker_silence_seconds,
+            s.provider, s.account_ref, s.coverage_granularity, s.coverage_ignition, s.coverage_gforce,
+            s.coverage_provider_events, s.coverage_complete, s.source_watermark, s.computed_at
      FROM fleet_vehicles v
      JOIN fleet_vehicle_trackers tr ON tr.vehicle_id = v.id AND tr.is_active
      LEFT JOIN fleet_vehicle_daily_stats s
