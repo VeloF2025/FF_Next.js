@@ -1413,6 +1413,48 @@ behaviour is **undocumented** — those numbers became their default without bei
 them. Better than the unbounded retries they had before, but it is an assumption: if either
 starts throttling unexpectedly, check that tuning first. See the breaker section above.
 
+## The ROSTER-driven half of Driver Oversight has never been configured
+
+Checked against the shared database 2026-08-26. `fleet_operational_monitor_runs` took 569 runs in
+the last 24 hours with `roster_evaluated_count = 0` on **every** one, and
+`fleet_operational_assignments`, `fleet_project_operational_sites` and `fleet_authorized_locations`
+are all empty — as are aggregates and retention items.
+
+Nothing is broken. The roster-driven detectors — presence, `late`, `wrong_site`, `left_early`,
+`evidence_mismatch` and the rest of the attendance-based set — evaluate the operational roster; the
+roster comes from assignments; an assignment needs an operational site; and none has ever been
+created.
+
+**Do not read this as "Fleet produces no incidents".** The TELEMATICS detectors shipped in plan PR4
+(#2624), run off vehicle GPS rather than the roster, and need no assignments: on 2026-08-26 they
+opened the first real incident on the system, `INC-THEF-20260825-AE3413`, a `critical`
+`theft_after_hours_movement` against a vehicle (no `staff_id`) with a null `work_date`. The two
+halves have independent inputs and must be reasoned about separately — a claim about one was false
+about the other within a day of being written.
+
+The path exists and works: `/fleet/assignments` → select a project → the **Operational sites** row
+appears (it is gated on a project being selected, which is why the page looks like a dead end until
+one is) → pick a reviewed source from the already-populated AOI list → **Add site**. Then assign
+staff or a team.
+
+**Check this before trusting any oversight number, or before building more read path over it:**
+
+```sql
+SELECT count(*) FROM fleet_operational_assignments;
+SELECT sum(roster_evaluated_count) FROM fleet_operational_monitor_runs;
+```
+
+Creating the first roster is not a neutral act — the eight roster-driven rules (of 14 enabled
+overall; the other six are the vehicle-telemetry set above, of which `accident_sos` is a
+documented no-op stub, so five actually fire) begin evaluating named staff and notifying four
+oversight members within minutes. Same family as the geofence buttons with no `onClick` and the
+reminder cron nobody registered: built, merged, never switched on — except now only the
+roster-driven half.
+
+Operational procedures for the analytics and retention half — schedules, the coverage gate, going
+live with deletion, readback queries and rollback — are in
+[`docs/operations/fleet-analytics-retention-runbook.md`](../../docs/operations/fleet-analytics-retention-runbook.md).
+
 ## Operational analytics aggregates
 
 `fleet_operational_monthly_aggregates` is **internal** and is NOT a publishable anonymous dataset,
