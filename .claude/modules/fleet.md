@@ -1813,19 +1813,17 @@ measured over 30 days on 2026-08-25 (`coverage.ts` carries the same numbers with
 
 ### Detectors — thresholds and status
 
-Migration 529 seeds `version 1`. **The detectors themselves (plan PR4) are NOT on master**:
-`produceSourceEventIncident` has no non-test constructor of a `source_event` request — the
-dispatcher in `incidentProducer.ts` routes to it, but nothing in the application builds one — so no
-telematics incident is opened today.
-`vehicleDetectors/` currently holds the after-hours calendar, the rule queries and their tests.
+Migration 529 seeds `version 1`. **The detectors shipped in plan PR4 (#2624)** and run as a second
+phase inside the existing `*/5` `fleet-operational-monitor` tick, under the same lock — no new cron
+entry. `accident_sos` is the exception and remains a documented stub with no source.
 
 | Type | Severity after 529 | Threshold (529 default) | Status |
 |---|---|---|---|
-| `accident_sos` | `critical` + WhatsApp | — | **Stub. No source exists on any feed** — see the open items |
-| `theft_after_hours_movement` | `critical` + WhatsApp | ≥500 m displacement, ≥2 fixes, inside the after-hours window, `after_hours_exempt = false` | Rule shipped, detector pending PR4 |
-| `severe_driving` | `high`, no WhatsApp, in the 08:15 summary | `harsh_linear_g` 0.350, `harsh_lateral_g` 0.350, **`harsh_min_speed_kph` 20**, `speed_over_limit_kph` 15 | as above |
-| `prolonged_unauthorized_stop` | `high` | `unauthorized_stop_minutes` 45, `known_site_radius_meters` 500 | as above |
-| `lost_contact_moving` | `high` | `lost_contact_minutes` 30, used as a FLOOR: `max(rule, 3 × observed p90 gap)` | as above — in practice a **7-vehicle** detector |
+| `accident_sos` | `critical` + WhatsApp | — | **Stub (shipped as one). No source exists on any feed** — see the open items |
+| `theft_after_hours_movement` | `critical` + WhatsApp | ≥500 m displacement, ≥2 fixes, inside the after-hours window, `after_hours_exempt = false` | Live (PR4) |
+| `severe_driving` | `high`, no WhatsApp, in the 08:15 summary | `harsh_linear_g` 0.350, `harsh_lateral_g` 0.350, **`harsh_min_speed_kph` 20**, `speed_over_limit_kph` 15 | Live (PR4) |
+| `prolonged_unauthorized_stop` | `high` | `unauthorized_stop_minutes` 45, `known_site_radius_meters` 500 | Live (PR4) |
+| `lost_contact_moving` | `high` | `lost_contact_minutes` 30, used as a FLOOR: `max(rule, 3 × observed p90 gap)` | Live (PR4) — in practice a **7-vehicle** detector |
 | `dangerous_area_entry` | `high` | `known_site_radius_meters` | **Deferred — no dangerous-area table exists** |
 
 Three numbers that are decisions, not defaults:
@@ -1848,7 +1846,7 @@ Three numbers that are decisions, not defaults:
 |---|---|---|
 | Incident queue (in-app + email) | Every incident, always | `incidentNotifications.ts` |
 | Fleet Alerts WhatsApp **group** | Only `requiresMandatoryIncidentWhatsApp` = `severity === 'critical' && producerKind === 'source_event'` — i.e. `accident_sos` and `theft_after_hours_movement` | `incidentGroupDelivery.ts`, JID from `FLEET_ALERTS_WA_GROUP_JID` |
-| 08:15 morning summary | The four `high` types (`include_in_morning_summary = true`) | `incidentSummaryPhase.ts`; the vehicle contribution is plan PR8, **not shipped** |
+| 08:15 morning summary | The four `high` types (`include_in_morning_summary = true`) | `incidentSummaryPhase.ts`; the vehicle contribution is `vehicleSummaryPhase.ts`, shipped in PR8 (#2626) |
 
 `requiresMandatoryIncidentWhatsApp` ignores `whatsapp_enabled`, so **severity is the only lever**
 that keeps a detector off WhatsApp — which is why 529 had to land before any detector does.
@@ -1931,9 +1929,10 @@ window start and inventing one here would be a second definition of where a wind
   portal", not a bug. The vehicle query is an `EXISTS` semi-join over positions, so such a vehicle is
   ABSENT from stats rather than reported as a day of zeros. Any UI over this table must render
   "no data" for them, never 0 km. Count them from the register before quoting a fleet-wide figure.
-- **Recurrence is not advanced for source events.** `produceSourceEventIncident` dedups on
-  `(incident_type, source_event_id)` only; a vehicle firing the same detector on ten consecutive
-  days opens ten unrelated incidents and no escalation notices the pattern.
+- **Recurrence is not advanced for source events.** Dedup is `(incident_type, source_event_id)` only
+  and `condition_last_seen_at` is never advanced for a source event, so a still-true condition looks
+  like a one-off in the queue: a vehicle firing the same detector on ten consecutive days opens ten
+  unrelated incidents and no escalation notices the pattern.
 - **Acceptance criterion 1 is outstanding**: one Cartrack vehicle's `distance_km` within 5 % of the
   provider portal's own figure for the same day. Everything shipped so far is unit-level evidence
   against an in-memory engine driven by the real SQL — it cannot catch a column mismatch the fake
