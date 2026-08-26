@@ -19,6 +19,7 @@ import {
   IncidentProducerConfigurationError, IncidentProducerValidationError,
   evaluateConditionClearing, produceIncident, resolveScheduledIncidentType,
 } from '../incidentProducer';
+import { buildAssignmentIdentity, computeObservationFingerprint } from '../observationFingerprint';
 import type {
   IncidentAssignmentContext, IncidentEvaluation, IncidentRule, IncidentRuleReference,
   IncidentSourceEvent, ScheduledIncidentProducerRequest,
@@ -128,6 +129,20 @@ describe('new scheduled detection', () => {
     expect(repo.recordObservation).toHaveBeenCalledTimes(1);
     expect(repo.recordObservation.mock.calls[0]![0]).toMatchObject({ incidentId: INCIDENT, observationFingerprint: 'fp-1' });
     expect(repo.touchIncidentLastSeen).not.toHaveBeenCalled();
+  });
+
+  it('records the observation against the STATUS rule, which is what observations.rule_id references', async () => {
+    // Pinned because the source-event path had to stop writing a rule id here:
+    // migration 510 points observations.rule_id at fleet_operational_status_rules,
+    // so the scheduled path's status rule is the only id that may be written.
+    repo.findActiveIncident.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord());
+
+    await produceIncident(scheduledRequest());
+
+    expect(repo.recordObservation.mock.calls[0]![0]).toMatchObject({
+      ruleId: 'status-rule-1', ruleVersion: 4, monitorRunId: null, sourceEventId: null,
+    });
   });
 
   it('permits recurrence after a prior terminal closure (no active row found for this staff/type/date)', async () => {
@@ -317,5 +332,55 @@ describe('source events', () => {
     settings.loadEffectiveIncidentRule.mockResolvedValueOnce(null);
 
     await expect(produceIncident(sourceEvent())).rejects.toThrow(IncidentProducerConfigurationError);
+  });
+
+  it('records the observation with no rule reference, because the incident rule is not a status rule', async () => {
+    // The production defect: observations.rule_id is an FK to
+    // fleet_operational_status_rules (migration 510), and this path wrote the
+    // INCIDENT rule's id — an id that never exists in that table — so every real
+    // source event died on
+    // fleet_operational_incident_observations_rule_id_fkey and no incident opened.
+    // The incident row still carries incidentRuleId/Version, so null here loses nothing.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent());
+
+    const observation = repo.recordObservation.mock.calls[0]![0];
+    expect(observation).toHaveProperty('ruleId', null);
+    expect(observation).toHaveProperty('ruleVersion', null);
+    expect(observation).toMatchObject({ sourceEventId: 'evt-1', monitorRunId: null });
+    // The incident itself keeps the rule identity, which is why nulling the
+    // observation columns is lossless rather than a downgrade.
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({
+      incidentRuleId: 'rule-1', incidentRuleVersion: 1, statusRuleId: null, statusRuleVersion: null,
+    });
+  });
+
+  it('keeps the observation fingerprint keyed on the incident rule, so dedup is unchanged by the null columns', async () => {
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent());
+
+    const expected = computeObservationFingerprint({
+      incidentType: 'accident_sos', ruleId: 'rule-1', ruleVersion: 1,
+      assignmentIdentity: buildAssignmentIdentity(STAFF, 'vehicle-1', ASSIGNMENT),
+      reasonCodes: [], freshnessBucket: null, siteId: 'site-1', projectId: 'project-1',
+      vehicleId: 'vehicle-1', conditionActive: true,
+    });
+    expect(repo.recordObservation.mock.calls[0]![0]).toMatchObject({ observationFingerprint: expected });
+
+    // Same context, different event id: the fingerprint is stable, and a redelivery
+    // of the SAME event short-circuits to 'unchanged' before any observation insert.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+    await produceIncident(sourceEvent({ sourceEventId: 'evt-2' }));
+    expect(repo.recordObservation.mock.calls[1]![0]).toMatchObject({ observationFingerprint: expected });
+
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos', sourceEventId: 'evt-1' }));
+    const redelivered = await produceIncident(sourceEvent());
+    expect(redelivered).toEqual({ outcome: 'unchanged', incidentId: INCIDENT, requiresInitialNotification: false });
+    expect(repo.recordObservation).toHaveBeenCalledTimes(2);
   });
 });
