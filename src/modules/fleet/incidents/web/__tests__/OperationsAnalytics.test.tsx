@@ -10,8 +10,13 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ report: vi.fn(), drillDown: vi.fn(), replace: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  report: vi.fn(), drillDown: vi.fn(), replace: vi.fn(), can: vi.fn(), permissionsLoading: { value: false },
+}));
 vi.mock('@/lib/logger', () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
+vi.mock('@/hooks/usePermission', () => ({
+  usePermission: () => ({ can: mocks.can, isLoading: mocks.permissionsLoading.value }),
+}));
 vi.mock('next/router', () => ({ useRouter: () => ({ replace: mocks.replace, query: {}, pathname: '/fleet/analytics' }) }));
 vi.mock('../operationsAnalyticsApi', async () => {
   const actual = await vi.importActual<typeof import('../operationsAnalyticsApi')>('../operationsAnalyticsApi');
@@ -52,8 +57,18 @@ async function renderSection(response: OperationsAnalyticsResponse = report()) {
   await flush();
 }
 
+const fetchMock = vi.fn();
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.can.mockReturnValue(true);
+  mocks.permissionsLoading.value = false;
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue({ ok: true, status: 200, blob: async () => new Blob(['xlsx']) });
+  vi.stubGlobal('fetch', fetchMock);
+  vi.stubGlobal('URL', Object.assign(URL, {
+    createObjectURL: vi.fn(() => 'blob:operations'), revokeObjectURL: vi.fn(),
+  }));
   window.history.replaceState({}, '', '/fleet/analytics');
   mocks.report.mockResolvedValue(report());
   mocks.drillDown.mockResolvedValue({ mode: 'retained_detail', values: [], incidentIds: [], nextCursor: null });
@@ -156,12 +171,32 @@ describe('OperationsAnalytics', () => {
    * against a hardcoded range: the file a manager downloads must carry the same
    * question as the screen they downloaded it from.
    */
-  it('links the export to exactly what the screen asked for', async () => {
+  it('asks the export for exactly what the screen asked for', async () => {
     await renderSection();
     const asked = mocks.report.mock.calls.at(-1)?.[0] as OperationsAnalyticsResponse['filters'];
-    const link = screen.getByTestId('operations-export') as HTMLAnchorElement;
-    expect(link.getAttribute('href')).toBe(operationsExportUrl(asked));
-    expect(link.getAttribute('href')).toContain('/api/fleet/analytics/operations/export?');
+    const button = screen.getByTestId('operations-export');
+    expect(button.getAttribute('data-export-url')).toBe(operationsExportUrl(asked));
+
+    await act(async () => { button.click(); });
+    await flush();
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toBe(operationsExportUrl(asked));
+  });
+
+  /**
+   * It was a link, and a link to a refused export navigates the reader off the
+   * screen and onto the raw `{"success":false,…}` envelope. The refusal has to
+   * land in the error box, in the server's own words.
+   */
+  it('renders a refused export in the error box instead of navigating to raw JSON', async () => {
+    await renderSection();
+    fetchMock.mockResolvedValue({
+      ok: false, status: 400,
+      json: async () => ({ success: false, error: { code: 'BAD_REQUEST', message: 'op_sevrity is not a filter this endpoint accepts' } }),
+    });
+    await act(async () => { screen.getByTestId('operations-export').click(); });
+    await flush();
+    expect((await screen.findByTestId('operations-error')).textContent)
+      .toContain('op_sevrity is not a filter this endpoint accepts');
   });
 
   it('re-asks and re-links when a filter changes', async () => {
@@ -171,7 +206,7 @@ describe('OperationsAnalytics', () => {
     await flush();
     await waitFor(() => expect(mocks.report.mock.calls.length).toBeGreaterThan(before));
     expect(mocks.report.mock.calls.at(-1)?.[0]).toMatchObject({ severity: 'critical' });
-    expect((screen.getByTestId('operations-export') as HTMLAnchorElement).getAttribute('href'))
+    expect(screen.getByTestId('operations-export').getAttribute('data-export-url'))
       .toContain('op_severity=critical');
   });
 
@@ -195,6 +230,88 @@ describe('OperationsAnalytics', () => {
    * disciplinary rating — not as a feature and not as a turn of phrase that
    * would invite one.
    */
+  /**
+   * An `op_` key this client does not shape — a typo, or a filter added to the
+   * endpoint before the picker — must reach the server, because the server is
+   * what says "op_sevrity is not a filter this endpoint accepts". Dropping it
+   * substitutes a silently WIDER report for that sentence.
+   */
+  it('passes an unshaped op_ key through to the API', async () => {
+    window.history.replaceState({}, '', '/fleet/analytics?op_sevrity=high');
+    await renderSection();
+    expect(mocks.report.mock.calls.at(-1)?.[2]).toEqual({ op_sevrity: 'high' });
+  });
+
+  it('keeps an unshaped op_ key on the URL rather than erasing it', async () => {
+    window.history.replaceState({}, '', '/fleet/analytics?op_sevrity=high');
+    await renderSection();
+    expect(mocks.replace.mock.calls.at(-1)?.[0] as string).toContain('op_sevrity=high');
+  });
+
+  it('renders the server refusal an unshaped key earned', async () => {
+    window.history.replaceState({}, '', '/fleet/analytics?op_sevrity=high');
+    mocks.report.mockRejectedValue(new IncidentApiError(
+      'op_sevrity is not a filter this endpoint accepts; the ones it does are: op_start, op_end', 400, 'BAD_REQUEST',
+    ));
+    render(<OperationsAnalytics />);
+    await flush();
+    expect((await screen.findByTestId('operations-error')).textContent).toContain('op_sevrity is not a filter');
+  });
+
+  /** Gated on the same permission the endpoints behind it are gated on. */
+  it('renders nothing at all without fleet.incidents view', async () => {
+    mocks.can.mockReturnValue(false);
+    render(<OperationsAnalytics />);
+    await flush();
+    expect(screen.queryByTestId('operations-analytics')).toBeNull();
+    expect(document.body.textContent ?? '').not.toMatch(/cannot view|403|forbidden/i);
+  });
+
+  it('renders nothing while the permissions are still loading', async () => {
+    mocks.permissionsLoading.value = true;
+    render(<OperationsAnalytics />);
+    await flush();
+    expect(screen.queryByTestId('operations-analytics')).toBeNull();
+  });
+
+  /**
+   * A timing metric's numerator is a structural zero — the calculator observes
+   * a duration for it and never bumps a tally — so printing it in the count
+   * column reports "0 acknowledgements" for a month that had several.
+   */
+  it('leaves a timing metric out of the count column rather than printing its zero', async () => {
+    await renderSection(report({
+      cards: [value({ metricKey: 'timing.acknowledgement', numerator: 0, histogram: { sampleCount: 12, buckets: [] } })],
+    }));
+    const row = (await screen.findByTestId('operations-breakdown')).querySelector('tbody tr');
+    const cells = [...(row?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent);
+    expect(cells[0]).toContain('Time to acknowledge');
+    expect(cells[1]).toBe('');
+    expect(cells[4]).toContain('12 samples');
+  });
+
+  /** An empty answer is not a count of zero, and must not read as one. */
+  it('says an empty answer is not a zero', async () => {
+    await renderSection(report({ cards: [] }));
+    const empty = await screen.findByTestId('operations-empty');
+    expect(empty.textContent).toMatch(/not a count of zero/i);
+  });
+
+  /**
+   * The drawer answers ONE filter set. Left open across a filter change it
+   * shows the incidents behind the previous question under the new one.
+   */
+  it('closes the drill-down when a filter changes', async () => {
+    await renderSection();
+    await act(async () => { screen.getByTestId('operations-drilldown-open').click(); });
+    await flush();
+    expect(screen.getByTestId('operations-drilldown')).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId('operations-filter-severity'), { target: { value: 'critical' } });
+    await flush();
+    expect(screen.queryByTestId('operations-drilldown')).toBeNull();
+  });
+
   it('ranks and scores nobody', async () => {
     await renderSection(report({
       cards: [

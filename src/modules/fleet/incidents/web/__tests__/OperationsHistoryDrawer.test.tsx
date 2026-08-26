@@ -90,7 +90,7 @@ describe('OperationsHistoryDrawer', () => {
     const more = await screen.findByTestId('operations-drilldown-more');
     await act(async () => { more.click(); });
     await flush();
-    expect(mocks.drillDown).toHaveBeenLastCalledWith(FILTERS, INCIDENT, expect.anything());
+    expect(mocks.drillDown).toHaveBeenLastCalledWith(FILTERS, INCIDENT, expect.anything(), undefined);
   });
 
   it('offers no next page when the server gave no cursor', async () => {
@@ -117,5 +117,17 @@ describe('OperationsHistoryDrawer', () => {
     await flush();
     expect(screen.getAllByTestId(`operations-incident-${INCIDENT}`)).toHaveLength(1);
     expect(screen.getByTestId(`operations-incident-${second}`)).toBeTruthy();
+  });
+
+  /**
+   * An unshaped `op_` key must reach the drill-down too, or a filter the report
+   * was refused over would be quietly honoured here.
+   */
+  it('carries unshaped op_ keys through to the drill-down request', async () => {
+    render(<OperationsHistoryDrawer filters={FILTERS} extras={{ op_sevrity: 'high' }} onClose={() => undefined} />);
+    await flush();
+    expect(mocks.drillDown).toHaveBeenLastCalledWith(
+      FILTERS, null, expect.anything(), { op_sevrity: 'high' },
+    );
   });
 });

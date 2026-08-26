@@ -18,13 +18,15 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
-import { AlertTriangle, Download, ListTree } from 'lucide-react';
+import { AlertTriangle, ListTree } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { usePermission } from '@/hooks/usePermission';
 import { IncidentApiError, isIncidentApiAbort } from './incidentApi';
 import {
-  operationsAnalyticsApi, operationsExportUrl, operationsQueryString, parseOperationsUrlFilters,
+  operationsAnalyticsApi, operationsQueryString, parseOperationsUrlExtras, parseOperationsUrlFilters,
 } from './operationsAnalyticsApi';
 import { OperationsCharts } from './OperationsCharts';
+import { OperationsExportButton } from './OperationsExportButton';
 import { OperationsFilters } from './OperationsFilters';
 import { OperationsHistoryDrawer } from './OperationsHistoryDrawer';
 import { OperationsOverview } from './OperationsOverview';
@@ -40,7 +42,10 @@ function defaultRange(): { start: string; end: string } {
 
 export function OperationsAnalytics() {
   const router = useRouter();
+  const { can, isLoading: permissionsLoading } = usePermission();
   const [filters, setFilters] = useState<Filters>(defaultRange);
+  const [extras, setExtras] = useState<Record<string, string>>({});
+  const [exportError, setExportError] = useState<string | null>(null);
   const [report, setReport] = useState<OperationsAnalyticsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,16 +57,20 @@ export function OperationsAnalytics() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setFilters((current) => parseOperationsUrlFilters(window.location.search, current));
+    // Kept rather than discarded. See `parseOperationsUrlExtras`: an `op_` key
+    // this client does not shape is a question the server answers in words, and
+    // dropping it here would replace that sentence with a silently wider report.
+    setExtras(parseOperationsUrlExtras(window.location.search));
     setMounted(true);
   }, []);
 
-  const query = operationsQueryString(filters);
+  const query = operationsQueryString(filters, extras);
 
   useEffect(() => {
     if (!mounted) return undefined;
     const controller = new AbortController();
     setLoading(true);
-    operationsAnalyticsApi.report(filters, controller.signal)
+    operationsAnalyticsApi.report(filters, controller.signal, extras)
       .then((result) => { setReport(result); setError(null); })
       .catch((cause: unknown) => {
         if (isIncidentApiAbort(cause)) return;
@@ -89,6 +98,8 @@ export function OperationsAnalytics() {
 
   const onFiltersChange = useCallback((next: Filters) => {
     setFilters(next);
+    // The previous export failure described the previous question.
+    setExportError(null);
     // Closed on any filter change: the drawer answers one filter set, and
     // leaving it open would show the incidents behind the previous question.
     setDrilling(false);
@@ -101,6 +112,14 @@ export function OperationsAnalytics() {
     return `The nightly aggregation last finished as "${lastRunStatus ?? 'never run'}", so months before the `
       + 'retention boundary may be incomplete or out of date. Those figures are missing, not zero.';
   }, [report]);
+
+  // Gated client-side on the same permission every endpoint behind this section
+  // is gated on. Hidden rather than rendered-and-refused: a reader without
+  // Fleet incidents has no use for a 403 box appended to the vehicle scorecard,
+  // and the endpoints remain the authority either way.
+  if (permissionsLoading || !can('fleet.incidents', 'view')) return null;
+
+  const shownError = error ?? exportError;
 
   return (
     <section className="space-y-4" data-testid="operations-analytics">
@@ -119,24 +138,19 @@ export function OperationsAnalytics() {
           >
             <ListTree className="w-4 h-4" /> Incidents behind these figures
           </button>
-          <a
-            data-testid="operations-export" href={operationsExportUrl(filters)}
-            className="px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] flex items-center gap-1.5"
-          >
-            <Download className="w-4 h-4" /> Export
-          </a>
+          <OperationsExportButton filters={filters} extras={extras} onError={setExportError} />
         </div>
       </div>
 
       <OperationsFilters filters={filters} onChange={onFiltersChange} />
 
-      {error !== null && (
+      {shownError !== null && (
         <div
           data-testid="operations-error" role="alert"
           className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 flex items-start gap-3"
         >
           <AlertTriangle className="w-5 h-5 text-red-700 shrink-0" />
-          <span className="text-red-700 text-sm">{error}</span>
+          <span className="text-red-700 text-sm">{shownError}</span>
         </div>
       )}
 
@@ -173,7 +187,9 @@ export function OperationsAnalytics() {
 
           <OperationsOverview cards={report.cards} />
           <OperationsCharts report={report} />
-          {drilling && <OperationsHistoryDrawer filters={filters} onClose={() => setDrilling(false)} />}
+          {drilling && (
+            <OperationsHistoryDrawer filters={filters} extras={extras} onClose={() => setDrilling(false)} />
+          )}
         </>
       )}
     </section>

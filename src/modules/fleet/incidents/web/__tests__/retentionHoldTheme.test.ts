@@ -33,7 +33,7 @@ const UNDER_TEST = [
   // theme as near-invisible text on a black-on-black card. Exactly the failure
   // this file was written for, on the disclosures that most need to be read.
   'OperationsAnalytics.tsx', 'OperationsOverview.tsx', 'OperationsHistoryDrawer.tsx',
-  'OperationsCharts.tsx', 'OperationsFilters.tsx',
+  'OperationsCharts.tsx', 'OperationsFilters.tsx', 'OperationsExportButton.tsx',
 ];
 
 /**

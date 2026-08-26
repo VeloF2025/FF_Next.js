@@ -10,7 +10,7 @@ import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 
-const mocks = vi.hoisted(() => ({ report: vi.fn() }));
+const mocks = vi.hoisted(() => ({ report: vi.fn(), can: vi.fn() }));
 
 vi.mock('next/router', () => ({
   useRouter: () => ({ replace: vi.fn(), query: {}, pathname: '/fleet/analytics' }),
@@ -23,6 +23,9 @@ vi.mock('@/components/module-page', () => ({
 }));
 vi.mock('@/services/core/NotificationService', () => ({ notificationService: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/lib/logger', () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
+vi.mock('@/hooks/usePermission', () => ({
+  usePermission: () => ({ can: mocks.can, isLoading: false }),
+}));
 vi.mock('@/modules/fleet/incidents/web/operationsAnalyticsApi', async () => {
   const actual = await vi.importActual<typeof import('@/modules/fleet/incidents/web/operationsAnalyticsApi')>(
     '@/modules/fleet/incidents/web/operationsAnalyticsApi',
@@ -43,6 +46,7 @@ async function flush(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.can.mockReturnValue(true);
   window.history.replaceState({}, '', '/fleet/analytics');
   global.fetch = vi.fn().mockResolvedValue({
     ok: true, status: 200, json: async () => ({ success: true, data: scorecard }),
@@ -73,6 +77,18 @@ describe('/fleet/analytics', () => {
    * If the Operations section ever wrote a bare filter name, this is where the
    * two filter sets would start reading each other's values.
    */
+  /**
+   * The scorecard is not gated on `fleet.incidents`. A reader without it must
+   * keep the page they already had, minus the section they may not see.
+   */
+  it('keeps the scorecard when the viewer lacks fleet.incidents', async () => {
+    mocks.can.mockReturnValue(false);
+    render(<FleetAnalyticsPage />);
+    await flush();
+    expect(screen.getByText(/Vehicle Scorecard/)).toBeTruthy();
+    expect(screen.queryByTestId('operations-analytics')).toBeNull();
+  });
+
   it('leaves the scorecard filters untouched by the Operations request', async () => {
     render(<FleetAnalyticsPage />);
     await flush();

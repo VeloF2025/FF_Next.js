@@ -15,15 +15,18 @@ import { useEffect, useState } from 'react';
 import { log } from '@/lib/logger';
 import { IncidentApiError, isIncidentApiAbort } from './incidentApi';
 import { operationsAnalyticsApi } from './operationsAnalyticsApi';
+import type { OperationsQueryExtras } from './operationsAnalyticsApi';
 import { metricLabel } from './operationsMetricLabels';
 import type { OperationsDrillDownResponse, OperationsFilters } from '../analytics/types';
 
 export interface OperationsHistoryDrawerProps {
   filters: OperationsFilters;
+  /** Unshaped `op_` keys from the URL, carried so the server judges them here too. */
+  extras?: OperationsQueryExtras;
   onClose: () => void;
 }
 
-export function OperationsHistoryDrawer({ filters, onClose }: OperationsHistoryDrawerProps) {
+export function OperationsHistoryDrawer({ filters, extras, onClose }: OperationsHistoryDrawerProps) {
   const [page, setPage] = useState<OperationsDrillDownResponse | null>(null);
   const [incidentIds, setIncidentIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +36,7 @@ export function OperationsHistoryDrawer({ filters, onClose }: OperationsHistoryD
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    operationsAnalyticsApi.drillDown(filters, cursor, controller.signal)
+    operationsAnalyticsApi.drillDown(filters, cursor, controller.signal, extras)
       .then((result) => {
         setPage(result);
         // Appended rather than replaced: paging through a long list must not
@@ -58,7 +61,7 @@ export function OperationsHistoryDrawer({ filters, onClose }: OperationsHistoryD
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [filters, cursor]);
+  }, [filters, cursor, extras]);
 
   return (
     <div

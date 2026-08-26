@@ -17,7 +17,7 @@
  * Envelope handling is `incidentApi`'s — one `{success,data}` decoder and one
  * `IncidentApiError` classification across the whole incident domain.
  */
-import { incidentRequest } from './incidentApi';
+import { IncidentApiError, incidentRequest } from './incidentApi';
 import type {
   OperationsAnalyticsResponse, OperationsDrillDownResponse, OperationsFilters,
 } from '../analytics/types';
@@ -48,8 +48,38 @@ const FILTER_PARAMS = [
   ['op_outcome', 'outcome'],
 ] as const satisfies readonly (readonly [string, keyof OperationsFilters])[];
 
+/** The `op_` names this client shapes into typed filter fields. */
+const SHAPED_OP_KEYS: ReadonlySet<string> = new Set([
+  ...FILTER_PARAMS.map(([name]) => name), 'op_evidence',
+]);
+
+/**
+ * `op_` parameters this client does not shape, carried verbatim.
+ *
+ * A typo — `op_sevrity=high` — is a reader asking a question this endpoint does
+ * not answer, and the server says so in words. Dropping the key here would
+ * substitute a silently WIDER answer for that sentence: the screen would render
+ * every severity and never mention that the filter the URL asked for was
+ * discarded. So unknown keys are passed through and the server's 400 is what
+ * the reader sees.
+ */
+export type OperationsQueryExtras = Readonly<Record<string, string>>;
+
+export function parseOperationsUrlExtras(source: string | URLSearchParams): Record<string, string> {
+  const params = typeof source === 'string'
+    ? new URLSearchParams(source.startsWith('?') ? source.slice(1) : source)
+    : source;
+  const extras: Record<string, string> = {};
+  for (const [name, value] of params) {
+    if (name.startsWith('op_') && !SHAPED_OP_KEYS.has(name)) extras[name] = value;
+  }
+  return extras;
+}
+
 /** `?op_start=…&…`, with unset filters absent rather than sent empty. */
-export function operationsQueryString(filters: OperationsFilters): string {
+export function operationsQueryString(
+  filters: OperationsFilters, extras: OperationsQueryExtras = {},
+): string {
   const params = new URLSearchParams();
   for (const [name, field] of FILTER_PARAMS) {
     const value = filters[field];
@@ -58,6 +88,12 @@ export function operationsQueryString(filters: OperationsFilters): string {
   // Boolean rather than string, so it cannot be folded into the loop above.
   if (filters.evidenceAvailable !== undefined) {
     params.set('op_evidence', String(filters.evidenceAvailable));
+  }
+  // Appended last, and never allowed to overwrite a shaped name: an extra is by
+  // definition a key this client does not know, and one that collided with a
+  // known one would be a filter quietly replaced rather than reported.
+  for (const [name, value] of Object.entries(extras)) {
+    if (!SHAPED_OP_KEYS.has(name)) params.append(name, value);
   }
   return `?${params.toString()}`;
 }
@@ -96,14 +132,53 @@ export function parseOperationsUrlFilters(
  * rather than a fetch because the browser's own download handling is what turns
  * the response into a file.
  */
-export function operationsExportUrl(filters: OperationsFilters): string {
-  return `${EXPORT_PATH}${operationsQueryString(filters)}`;
+export function operationsExportUrl(
+  filters: OperationsFilters, extras: OperationsQueryExtras = {},
+): string {
+  return `${EXPORT_PATH}${operationsQueryString(filters, extras)}`;
+}
+
+/**
+ * The export as bytes, or the server's own sentence.
+ *
+ * A plain link was the wrong shape. The endpoint answers a rejected filter with
+ * a JSON envelope, and a browser following a link to that renders the raw
+ * envelope in a tab — the reader leaves the screen and lands on
+ * `{"success":false,...}`. Fetching it instead keeps the 400 on the page, in
+ * the same error box the report's own failures use, with the same words.
+ */
+export async function fetchOperationsExport(
+  filters: OperationsFilters, extras: OperationsQueryExtras = {},
+): Promise<Blob> {
+  const url = operationsExportUrl(filters, extras);
+  // Rethrown as a typed error rather than swallowed: the caller renders it and
+  // logs it, so a network failure is reported once, in the words the screen
+  // shows, instead of twice or not at all.
+  const response = await fetch(url, { credentials: 'same-origin' }).catch(() => {
+    throw new IncidentApiError('Fleet operations export request failed', 0, 'NETWORK_ERROR');
+  });
+  if (response.ok) return response.blob();
+  // Same envelope decoder shape as `incidentRequest`: the message is the
+  // server's, never a generic "export failed" that hides which filter it was.
+  // A body that is not an envelope still fails below, with the status.
+  const body: unknown = await response.json().catch(() => null);
+  if (isRecord(body) && isRecord(body.error) && typeof body.error.message === 'string') {
+    const code = typeof body.error.code === 'string' ? body.error.code : 'EXPORT_FAILED';
+    throw new IncidentApiError(body.error.message, response.status, code);
+  }
+  throw new IncidentApiError('The operations export could not be produced', response.status, 'EXPORT_FAILED');
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 export const operationsAnalyticsApi = {
-  report(filters: OperationsFilters, signal?: AbortSignal): Promise<OperationsAnalyticsResponse> {
+  report(
+    filters: OperationsFilters, signal?: AbortSignal, extras: OperationsQueryExtras = {},
+  ): Promise<OperationsAnalyticsResponse> {
     return incidentRequest<OperationsAnalyticsResponse>(
-      `${ANALYTICS_PATH}${operationsQueryString(filters)}`, { signal },
+      `${ANALYTICS_PATH}${operationsQueryString(filters, extras)}`, { signal },
     );
   },
 
@@ -114,8 +189,9 @@ export const operationsAnalyticsApi = {
    */
   drillDown(
     filters: OperationsFilters, cursor?: string | null, signal?: AbortSignal,
+    extras: OperationsQueryExtras = {},
   ): Promise<OperationsDrillDownResponse> {
-    const query = operationsQueryString(filters);
+    const query = operationsQueryString(filters, extras);
     const paged = cursor ? `${query}&cursor=${encodeURIComponent(cursor)}` : query;
     return incidentRequest<OperationsDrillDownResponse>(`${DRILL_DOWN_PATH}${paged}`, { signal });
   },
