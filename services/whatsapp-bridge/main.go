@@ -1536,15 +1536,26 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 			},
 		}
 
-		_, err = client.SendMessage(context.Background(), groupJID, msg)
+		sendResp, err := client.SendMessage(context.Background(), groupJID, msg)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Failed to send: " + err.Error()})
 			return
 		}
 
-		fmt.Printf("Document sent to %s: %s\n", req.GroupJID, req.Filename)
-		json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "Document sent", "filename": req.Filename})
+		retryPersisted := persistMessageForRetry(client, groupJID, sendResp.ID, msg) == nil
+		if !retryPersisted {
+			fmt.Printf("WARNING: document %s accepted but retry persistence failed (message_id=%s)\n", req.Filename, sendResp.ID)
+		}
+		fmt.Printf("Document accepted for %s: %s (message_id=%s retry_persisted=%t)\n", req.GroupJID, req.Filename, sendResp.ID, retryPersisted)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":    true,
+			"accepted":   true,
+			"message":    "Document accepted by WhatsApp; delivery receipt pending",
+			"message_id": sendResp.ID,
+			"filename":   req.Filename,
+			"retry_persisted": retryPersisted,
+		})
 	})
 
 	// Handler: /send-message - Sender-compatible endpoint
@@ -1909,6 +1920,32 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	}()
 }
 
+// configureWhatsAppClient enables durable retry lookup without enabling
+// UseRetryMessageStore. The pinned whatsmeow release has a cleanup bug in that
+// mode which executes old-event deletion on every send. We persist documents
+// explicitly and use the callback only when the in-memory cache misses.
+func configureWhatsAppClient(client *whatsmeow.Client) {
+	client.GetMessageForRetry = func(_ types.JID, to types.JID, id types.MessageID) *waProto.Message {
+		format, plaintext, err := client.Store.EventBuffer.GetOutgoingEvent(context.Background(), to, types.JID{}, id)
+		if err != nil || format != "wa" {
+			return nil
+		}
+		msg := &waProto.Message{}
+		if err = proto.Unmarshal(plaintext, msg); err != nil {
+			return nil
+		}
+		return msg
+	}
+}
+
+func persistMessageForRetry(client *whatsmeow.Client, to types.JID, id types.MessageID, msg *waProto.Message) error {
+	plaintext, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return client.Store.EventBuffer.AddOutgoingEvent(context.Background(), to, id, "wa", plaintext)
+}
+
 func main() {
 	// Set up logger - reduced logging to prevent rate limiting
 	logger := waLog.Stdout("Client", "WARN", true)
@@ -1964,6 +2001,7 @@ func main() {
 		logger.Errorf("Failed to create WhatsApp client")
 		return
 	}
+	configureWhatsAppClient(client)
 
 	// Set bridge client for direct sending (replaces external sender service)
 	SetBridgeClient(client)
