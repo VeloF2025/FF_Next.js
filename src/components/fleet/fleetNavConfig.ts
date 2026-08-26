@@ -7,6 +7,8 @@
  *   /fleet/vehicles                     → Vehicles → List
  *   /fleet/vehicles/[id]                → Vehicles (detail)
  *   /fleet/vehicles/[id]/check-in-history → Vehicles (detail sub-page)
+ *   /fleet/vehicles/[id]/stats          → Vehicles (detail sub-page)
+ *   /fleet/daily-stats                  → Vehicles → Daily stats
  *   /fleet/portal                       → Vehicles → Portal
  *   /fleet/import                       → Vehicles → Import
  *   /fleet/drivers                      → Operations → Drivers
@@ -46,6 +48,7 @@ export const TABS: Tab[] = [
         section: 'Fleet',
         items: [
           { label: 'Vehicle List', href: '/fleet/vehicles' },
+          { label: 'Daily stats', href: '/fleet/daily-stats' },
           { label: 'Vehicle Portal', href: '/fleet/portal' },
           { label: 'Import', href: '/fleet/import' },
         ],
@@ -146,8 +149,9 @@ export function getActiveTabId(
   // Analytics
   if (pathname.startsWith('/fleet/analytics')) return 'analytics';
 
-  // Vehicles — list, detail pages, vehicle portal, and bulk import
+  // Vehicles — list, detail pages, the fleet-wide day stats table, vehicle portal, bulk import
   if (pathname.startsWith('/fleet/vehicles') ||
+      pathname.startsWith('/fleet/daily-stats') ||
       pathname.startsWith('/fleet/portal') ||
       pathname.startsWith('/fleet/import')) {
     return 'vehicles';
