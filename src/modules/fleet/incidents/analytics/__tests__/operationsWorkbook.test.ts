@@ -11,6 +11,10 @@ import { describe, expect, it } from 'vitest';
 import { NOT_RETAINED } from '../operationsWorkbook';
 import { PROJECT, open, report, rowStartingWith, rowsOf, value } from './workbookFixtures';
 
+function metadataWarningRow(workbook: Awaited<ReturnType<typeof open>>): string[] | undefined {
+  return rowsOf(workbook, 'Metadata').find((row) => row[0] === 'Warning');
+}
+
 describe('buildOperationsWorkbook', () => {
   it('always carries Summary and Metadata', async () => {
     const workbook = await open(report());
@@ -190,8 +194,23 @@ describe('buildOperationsWorkbook', () => {
       const workbook = await open(report({
         freshness: { aggregatesThrough: null, lastRunStatus: 'failed' },
       }));
-      const text = rowsOf(workbook, 'Metadata').flat().join('\n');
-      expect(text).toMatch(/fail|incomplete|out of date/i);
+      const warningRow = rowStartingWith(workbook, 'Metadata', 'Warning');
+      expect(warningRow.join(' ')).toMatch(/fail|incomplete|out of date/i);
+    });
+
+    it('still warns when the run succeeded but left no recorded aggregation boundary', async () => {
+      const workbook = await open(report({
+        freshness: { aggregatesThrough: null, lastRunStatus: 'succeeded' },
+      }));
+      const warningRow = rowStartingWith(workbook, 'Metadata', 'Warning');
+      expect(warningRow.join(' ')).toMatch(/fail|incomplete|out of date/i);
+    });
+
+    it('carries no Warning row once the run succeeded and a boundary was recorded', async () => {
+      const workbook = await open(report({
+        freshness: { aggregatesThrough: '2026-07-01', lastRunStatus: 'succeeded' },
+      }));
+      expect(metadataWarningRow(workbook)).toBeUndefined();
     });
   });
 });
