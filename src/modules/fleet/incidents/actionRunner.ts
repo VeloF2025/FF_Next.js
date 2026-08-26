@@ -32,7 +32,7 @@ const STALE_STATUS_MONITOR_MINUTES = 15; // 3x the 5-min cadence: absorbs one mi
 interface DueEscalationRow extends Record<string, unknown> {
   id: string; incident_reference: string; incident_type: IncidentType; severity: IncidentSeverity;
   project_id: string | null; staff_name_snapshot: string | null; project_name_snapshot: string | null;
-  operational_site_name_snapshot: string | null; escalation_level: number;
+  operational_site_name_snapshot: string | null; vehicle_registration_snapshot: string | null; escalation_level: number;
   opened_at: string; next_escalation_at: string | null; source_event_id: string | null;
   acknowledgement_target_minutes: number; reminder_interval_minutes: number; maximum_escalation_level: number;
 }
@@ -51,6 +51,7 @@ async function findDueEscalations(effectiveAt: string): Promise<DueEscalationRow
     `/* fleet-incident-actions:due-escalations */
      SELECT i.id, i.incident_reference, i.incident_type, i.severity, i.project_id,
        i.staff_name_snapshot, i.project_name_snapshot, i.operational_site_name_snapshot,
+       i.vehicle_registration_snapshot,
        i.escalation_level, i.opened_at, i.next_escalation_at, i.source_event_id,
        r.acknowledgement_target_minutes, r.reminder_interval_minutes, r.maximum_escalation_level
      FROM fleet_operational_incidents i
@@ -111,7 +112,8 @@ async function runEscalationPhase(request: IncidentActionRunnerRequest, runId: s
         incidentId: row.id, incidentReference: row.incident_reference, incidentType: row.incident_type,
         severity: row.severity, producerKind: producerKindOf(row), projectId: row.project_id, staffName: row.staff_name_snapshot,
         projectName: row.project_name_snapshot, operationalSiteName: row.operational_site_name_snapshot,
-        escalationLevel: outcome.newLevel,
+        escalationLevel: outcome.newLevel, vehicleRegistration: row.vehicle_registration_snapshot ?? null,
+        detectedAt: row.opened_at,
       }));
     } catch (error) {
       recordPhaseError(totals, '[fleet-incident-actions] escalation failed for one incident', { incidentId: row.id }, error);
