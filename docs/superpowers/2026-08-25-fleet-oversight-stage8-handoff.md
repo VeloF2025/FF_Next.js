@@ -97,8 +97,9 @@ Blocked until a roster exists. Five of the seven PRs ship with no browser eviden
 | dev.fibreflow.app | Running `master`; none of the seven PRs deployed |
 | Migrations 518 / 521 / 527 | ✅ applied on shared DB |
 | Migration 530 | ❌ not applied, not merged |
-| Operational roster | ❌ 0 sites, 0 assignments — the feature is starved |
-| Incidents produced | ❌ 0 all-time |
+| Operational roster | ❌ 0 sites, 0 assignments — the roster-driven half is starved |
+| Incidents — roster-driven | ❌ none; roster is empty |
+| Incidents — telematics (PR4, #2624) | ✅ LIVE; 1 critical `theft_after_hours_movement` open as of 2026-08-26 |
 | Live retention (deletion) | ✅ OFF (`live_retention_enabled = false`) and the cron wrapper has no switch |
 | Monitor cron | ✅ running every few minutes, evaluating nobody |
 | Aggregation cron | ✅ running nightly, writing 0 rows (correctly) |

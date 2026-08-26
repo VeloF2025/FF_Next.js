@@ -1413,16 +1413,23 @@ behaviour is **undocumented** — those numbers became their default without bei
 them. Better than the unbounded retries they had before, but it is an assumption: if either
 starts throttling unexpectedly, check that tuning first. See the breaker section above.
 
-## Driver Oversight is switched on and producing nothing
+## The ROSTER-driven half of Driver Oversight has never been configured
 
-Checked against the shared database 2026-08-25. `fleet_operational_incidents` holds **zero rows,
-all time**, and so does every table downstream of it — observations, aggregates, retention items.
+Checked against the shared database 2026-08-26. `fleet_operational_monitor_runs` took 569 runs in
+the last 24 hours with `roster_evaluated_count = 0` on **every** one, and
+`fleet_operational_assignments`, `fleet_project_operational_sites` and `fleet_authorized_locations`
+are all empty — as are aggregates and retention items.
 
-Nothing is broken. `fleet_operational_monitor_runs` has 2153 rows and is still running every few
-minutes, with `roster_evaluated_count = 0` on **every** successful one. The detector evaluates the
-operational roster; the roster comes from assignments; an assignment needs an operational site; and
-`fleet_project_operational_sites`, `fleet_operational_assignments` and `fleet_authorized_locations`
-are all empty. The feature has never been configured.
+Nothing is broken. The roster-driven detectors — presence, `late`, `wrong_site`, `left_early`,
+`evidence_mismatch` and the rest of the attendance-based set — evaluate the operational roster; the
+roster comes from assignments; an assignment needs an operational site; and none has ever been
+created.
+
+**Do not read this as "Fleet produces no incidents".** The TELEMATICS detectors shipped in plan PR4
+(#2624), run off vehicle GPS rather than the roster, and need no assignments: on 2026-08-26 they
+opened the first real incident on the system, a `critical` `theft_after_hours_movement` with a null
+`work_date`. The two halves have independent inputs and must be reasoned about separately — a claim
+about one was false about the other within a day of being written.
 
 The path exists and works: `/fleet/assignments` → select a project → the **Operational sites** row
 appears (it is gated on a project being selected, which is why the page looks like a dead end until

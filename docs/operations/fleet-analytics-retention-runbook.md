@@ -9,23 +9,34 @@ aggregate read path, read `.claude/modules/fleet-analytics-disclosure.md`** —
 it records what the anonymity guarantee does and does not cover, and several of
 its weaker items are still open.
 
-## Read this first: the pipeline is currently producing nothing
+## Read this first: the ROSTER-driven half is producing nothing
 
-Measured on the shared database 2026-08-25:
+Measured on the shared database 2026-08-26:
 
 | Table | Rows |
 |---|---|
-| `fleet_operational_monitor_runs` | 2153, and still running every few minutes |
-| `fleet_operational_incidents` | **0, all time** |
-| `fleet_operational_monthly_aggregates` | **0** |
+| `fleet_operational_monitor_runs` | 569 in the last 24h alone, still running every few minutes |
+| `roster_evaluated_count`, summed over those runs | **0** |
 | `fleet_operational_assignments` | **0** |
 | `fleet_project_operational_sites` | **0** |
 | `fleet_authorized_locations` | **0** |
+| `fleet_operational_monthly_aggregates` | **0** |
+| `fleet_operational_incidents` | **1** — see below |
 
-`roster_evaluated_count` is `0` on every successful monitor run. Nothing is
-broken: the detector evaluates the operational roster, the roster is built from
-assignments, assignments require an operational site, and no site has ever been
-created. Everything downstream is correctly empty.
+Nothing is broken. The roster-driven detectors — presence, `late`, `wrong_site`,
+`left_early`, `evidence_mismatch` and the rest of the attendance-based set —
+evaluate the operational roster; the roster is built from assignments;
+assignments require an operational site; and no site has ever been created. That
+half is correctly empty and will stay empty until someone creates one.
+
+**The telematics detectors are a separate matter and they are live.** They shipped
+in plan PR4 (#2624) and run off vehicle GPS, not off the roster, so they need no
+assignments at all. As of 2026-08-26 they have produced their first incident: one
+`theft_after_hours_movement`, `critical`, still `open`, with a null `work_date`.
+
+Read the two halves separately. "No incidents" was true of this feature on
+2026-08-25 and is not true now, and the reason is not that the roster gap was
+fixed.
 
 **Consequence for this runbook:** the aggregation job succeeds nightly and
 writes nothing, and the retention job has nothing to purge. Neither can be
