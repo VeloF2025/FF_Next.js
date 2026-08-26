@@ -20,6 +20,13 @@ describe('status service validation and privacy', () => {
     { projectId: 'p', workDate: '2026-01-01', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 },
     { projectId: 'p', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', page: 0, limit: 25 },
     { projectId: 'p', workDate: '2026-08-14', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 101 },
+    // `validDate` accepts years 0000-0099 (`setUTCFullYear` sets the exact
+    // year given), but `sastStartOfWorkDate` builds its instant with
+    // `Date.UTC`, which maps those same years to 1900-1999 — its own
+    // round-trip check then throws a bare `Error` that must still surface as
+    // an `OperationalStatusRequestError`, not escape as an uncaught 500.
+    { projectId: 'p', workDate: '0099-12-31', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 },
+    { projectId: 'p', workDate: '0001-01-01', asOf: '2026-08-14T12:00:00Z', page: 1, limit: 25 },
   ])('rejects invalid or out-of-bounds request %#', async (request) => {
     await expect(getOperationalRosterStatus(request)).rejects.toBeInstanceOf(OperationalStatusRequestError);
     expect(mocks.load).not.toHaveBeenCalled();
