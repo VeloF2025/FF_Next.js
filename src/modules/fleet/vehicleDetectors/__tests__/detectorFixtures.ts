@@ -15,11 +15,18 @@ import type {
 
 export const VEHICLE_ID = 'a1a1a1a1-1111-4111-8111-111111111111';
 
-/** Migration 529's seeded version 1, field for field. */
+/**
+ * Migration 529's seeded version 1, field for field.
+ *
+ * The window is 21:00 -> 05:00, which is what 529 actually seeds — NOT the
+ * 18:00 -> 06:00 the plan first proposed. PR4's dry run measured 9.14
+ * theft events/day at 18:00 against 3.86 at 21:00, and the seed moved. A
+ * fixture holding the old numbers would be a test of a rule nobody runs.
+ */
 export const RULE: VehicleOperationalRule = {
   id: 'rule-1', version: 1, timezone: 'Africa/Johannesburg',
   effectiveFrom: '2026-08-01T00:00:00.000Z', effectiveTo: null,
-  afterHoursStartTime: '18:00:00', afterHoursEndTime: '06:00:00',
+  afterHoursStartTime: '21:00:00', afterHoursEndTime: '05:00:00',
   weekendsAreAfterHours: true, publicHolidaysAreAfterHours: true,
   theftDisplacementMeters: 500, theftMinPositions: 2,
   harshLinearG: 0.35, harshLateralG: 0.35, harshMinSpeedKph: 20, speedOverLimitKph: 15,
@@ -35,7 +42,7 @@ export const VEHICLE: DetectorVehicle = {
 /** A `cartrack/velocity` fix: every column populated, g structurally zero (6 of 7 vehicles). */
 export function position(overrides: Partial<DetectorPosition> = {}): DetectorPosition {
   return {
-    recordedAt: '2026-08-18T18:10:00.000Z',
+    recordedAt: '2026-08-18T19:10:00.000Z',
     providerEventId: 'ct-1',
     provider: 'cartrack',
     accountRef: 'velocity',

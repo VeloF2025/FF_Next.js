@@ -24,10 +24,10 @@ import { RULE, VEHICLE, VEHICLE_ID, latOffset, position } from './detectorFixtur
 const NOW = '2026-08-18T19:00:00.000Z';
 const OTHER_VEHICLE = { vehicleId: 'b2b2b2b2-2222-4222-8222-222222222222', registration: 'XYZ', afterHoursExempt: false };
 
-/** Three after-hours fixes 600 m apart: exactly one theft event. */
+/** Three after-hours fixes (21:10 SAST) 600 m apart: exactly one theft event. */
 function theftNight() {
   return [0, 1, 2].map((i) => position({
-    recordedAt: new Date(Date.parse('2026-08-18T16:10:00.000Z') + i * 60_000).toISOString(),
+    recordedAt: new Date(Date.parse('2026-08-18T19:10:00.000Z') + i * 60_000).toISOString(),
     providerEventId: `ct-${i}`,
     lat: latOffset(-26.1, i === 0 ? 0 : 600),
     speedKph: 60,

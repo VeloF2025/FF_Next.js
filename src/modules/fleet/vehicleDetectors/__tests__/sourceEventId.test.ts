@@ -18,7 +18,7 @@ describe('buildSourceEventId', () => {
   it('is stable across ticks for the same occurrence', () => {
     const ids = [0, 5, 10].map((minutes) => {
       vi.setSystemTime(new Date(Date.parse('2026-08-18T19:00:00.000Z') + minutes * 60_000));
-      return buildSourceEventId('theft_after_hours_movement', VEHICLE_ID, '2026-08-18T18:00:00');
+      return buildSourceEventId('theft_after_hours_movement', VEHICLE_ID, '2026-08-18T21:00:00');
     });
     vi.useRealTimers();
 
@@ -31,13 +31,13 @@ describe('buildSourceEventId', () => {
   });
 
   it('separates two windows for the same vehicle', () => {
-    expect(buildSourceEventId('theft_after_hours_movement', VEHICLE_ID, '2026-08-18T18:00:00'))
-      .not.toBe(buildSourceEventId('theft_after_hours_movement', VEHICLE_ID, '2026-08-19T18:00:00'));
+    expect(buildSourceEventId('theft_after_hours_movement', VEHICLE_ID, '2026-08-18T21:00:00'))
+      .not.toBe(buildSourceEventId('theft_after_hours_movement', VEHICLE_ID, '2026-08-19T21:00:00'));
   });
 
   it('separates two detectors that bucket on the same instant', () => {
-    expect(buildSourceEventId('lost_contact_moving', VEHICLE_ID, '2026-08-18T18:00:00'))
-      .not.toBe(buildSourceEventId('prolonged_unauthorized_stop', VEHICLE_ID, '2026-08-18T18:00:00'));
+    expect(buildSourceEventId('lost_contact_moving', VEHICLE_ID, '2026-08-18T21:00:00'))
+      .not.toBe(buildSourceEventId('prolonged_unauthorized_stop', VEHICLE_ID, '2026-08-18T21:00:00'));
   });
 
   it('refuses an empty bucket key, which would collapse every occurrence into one incident', () => {
@@ -51,33 +51,33 @@ describe('buildSourceEventId', () => {
 
 describe('afterHoursWindowKey', () => {
   it('buckets an evening instant on its own calendar night', () => {
-    // 18:10 SAST = 16:10Z.
-    expect(afterHoursWindowKey('2026-08-18T16:10:00.000Z', RULE)).toBe('2026-08-18T18:00:00');
+    // 21:10 SAST = 19:10Z.
+    expect(afterHoursWindowKey('2026-08-18T19:10:00.000Z', RULE)).toBe('2026-08-18T21:00:00');
   });
 
   it('buckets a small-hours instant on the PREVIOUS night — the window wraps midnight', () => {
     // 02:30 SAST on the 19th = 00:30Z on the 19th.
-    expect(afterHoursWindowKey('2026-08-19T00:30:00.000Z', RULE)).toBe('2026-08-18T18:00:00');
+    expect(afterHoursWindowKey('2026-08-19T00:30:00.000Z', RULE)).toBe('2026-08-18T21:00:00');
   });
 
   it('crosses a month boundary without an off-by-one day', () => {
     // 01:00 SAST on 2026-09-01 = 23:00Z on 2026-08-31.
-    expect(afterHoursWindowKey('2026-08-31T23:00:00.000Z', RULE)).toBe('2026-08-31T18:00:00');
+    expect(afterHoursWindowKey('2026-08-31T23:00:00.000Z', RULE)).toBe('2026-08-31T21:00:00');
     // 23:00 SAST on 2026-08-31 = 21:00Z the same day.
-    expect(afterHoursWindowKey('2026-08-31T21:00:00.000Z', RULE)).toBe('2026-08-31T18:00:00');
+    expect(afterHoursWindowKey('2026-08-31T21:00:00.000Z', RULE)).toBe('2026-08-31T21:00:00');
   });
 
   it('resolves the key in SAST, not UTC — one night, two UTC dates', () => {
     // 22:30 UTC is already 00:30 the NEXT day in Johannesburg, and both instants
     // belong to the SAME night. A UTC read would split them across two buckets
     // and open a second incident at midnight, every time.
-    expect(afterHoursWindowKey('2026-08-18T21:30:00.000Z', RULE)).toBe('2026-08-18T18:00:00');
-    expect(afterHoursWindowKey('2026-08-18T22:30:00.000Z', RULE)).toBe('2026-08-18T18:00:00');
+    expect(afterHoursWindowKey('2026-08-18T21:30:00.000Z', RULE)).toBe('2026-08-18T21:00:00');
+    expect(afterHoursWindowKey('2026-08-18T22:30:00.000Z', RULE)).toBe('2026-08-18T21:00:00');
   });
 
   it('normalises an HH:MM rule to one spelling of the bucket', () => {
-    const shortForm = { ...RULE, afterHoursStartTime: '18:00' };
+    const shortForm = { ...RULE, afterHoursStartTime: '21:00' };
 
-    expect(afterHoursWindowKey('2026-08-18T16:10:00.000Z', shortForm)).toBe('2026-08-18T18:00:00');
+    expect(afterHoursWindowKey('2026-08-18T19:10:00.000Z', shortForm)).toBe('2026-08-18T21:00:00');
   });
 });

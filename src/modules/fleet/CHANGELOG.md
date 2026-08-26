@@ -45,46 +45,47 @@ a defect; the module headers say so rather than letting the other eleven look
 broken.
 
 **Dry run over 7 days of real positions (2026-08-18 -> 08-25, producer replaced
-by a counter, one `READ ONLY` transaction, 5-minute ticks replayed):**
+by a counter, one `READ ONLY` transaction, 5-minute ticks replayed). It changed
+the seed, which is why it is recorded here rather than in a comment:**
 
-| detector | total | per day | worst day | vehicles |
-|---|---|---|---|---|
-| `theft_after_hours_movement` | 64 | **9.14** | 12 | 14 |
-| `severe_driving` | 8 | 1.14 | 3 | 1 |
-| `prolonged_unauthorized_stop` | 19 | 2.71 | 8 | 2 |
-| `lost_contact_moving` | 20 | 2.86 | 5 | 3 |
+| detector | 18:00 window (as planned) | 21:00 window (**as seeded**) |
+|---|---|---|
+| `theft_after_hours_movement` | 64 total, **9.14/day**, 14 vehicles | 27 total, **3.86/day**, 13 vehicles |
+| `severe_driving` | 8 total, 1.14/day, 1 vehicle | — |
+| `prolonged_unauthorized_stop` | 19 total, 2.71/day, 2 vehicles | — |
+| `lost_contact_moving` | 20 total, 2.86/day, 3 vehicles | — |
 
-The three non-critical detectors are inside acceptance criterion 3's <= 5/day at
-the seeded defaults, so **no default in this module was tuned**.
+The three non-critical detectors sit inside acceptance criterion 3's <= 5/day at
+the seeded thresholds, so **no default in this module was tuned.**
 
-**`theft_after_hours_movement` at 9.14/day is a WhatsApp-bearing finding, and it
-is not a code defect.** Every event is real after-hours movement: 14 of 18
-vehicles drove after 18:00 in the week, and the hourly distribution of
-ignition-on moving fixes shows it is the evening shoulder, not the night —
-vehicle-days with movement per SAST hour are 40 (18:00), 28 (19:00), 18 (20:00),
-then 7, 7, 3 for 21:00-23:00 and 2, 2, 0, 0, 1 for 00:00-04:00. Two levers exist,
-both outside this PR's code: `fleet_vehicles.after_hours_exempt` (migration 529,
-which is exactly what it is for) and a rule version moving
-`after_hours_start_time` later. **Neither the crontab entry nor WhatsApp delivery
-(PR5) may be enabled until one of them is applied.** `scripts/fleet-detectors-dryrun.ts`
-takes `DRYRUN_AFTER_HOURS_START` and `DRYRUN_ONLY` so the effect of a proposed
-window can be measured before it is versioned. **Measured, not guessed:** the
-same 7 days replayed with `after_hours_start_time = 21:00` give **27 events,
-3.86/day across 13 vehicles** — but 19 of those 27 fall on the Saturday and
-Sunday (11 and 8), because `weekends_are_after_hours` makes all weekend daytime
-work after-hours. Weekday nights past 21:00 are 8 events over 5 days, 1.6/day.
-So a later window alone lands inside the ceiling on weekdays and the WEEKEND is
-the residual: whichever crews work Saturdays need `after_hours_exempt`, or the
-weekend flag needs rethinking. Both are rule/data decisions for the operator,
-not code.
+**What moved instead was migration 529's seeded after-hours window, from
+18:00-06:00 to 21:00-05:00** (`41c59db75`, PR3). At 18:00 the theft detector was
+opening 9.14 WhatsApp-bearing incidents a day on 14 of 18 vehicles, and none of
+them was a false positive — it was the evening shoulder. Vehicle-days with
+ignition-on moving fixes per SAST hour: 40 (18:00), 28 (19:00), 18 (20:00), then
+7, 7, 3 across 21:00-23:00 and 2, 2, 0, 0, 1 across 00:00-04:00. Moving the
+window to 21:00 removes the commute and keeps the night.
 
-**Caveat on the dry run's `severe_driving` figure:** migrations 528 and 529 are
-not applied to the shared database yet, so the run used 529's seeded defaults,
-treated every vehicle as non-exempt, and had no `provider_event_type` column —
-meaning severe_driving was measured on its **g fallback only**. The provider-event
-path (`HARSH_BRAKING` / `HARSH_CORNERING`), which is the primary one and fires on
-the six of seven vehicles whose g is structurally zero, is not represented in the
-8 events above. Re-run after 528 lands.
+**The residual is the weekend, and it is a data decision, not a threshold.** Of
+the 27 events at the seeded window, 19 fall on the Saturday and Sunday (11 and
+8), because `weekends_are_after_hours` makes all weekend daytime work
+after-hours. Weekday nights past 21:00 are 8 events over 5 days — 1.6/day.
+So before the crontab entry or PR5's WhatsApp delivery is enabled, the crews that
+work Saturdays need `fleet_vehicles.after_hours_exempt` set (which is exactly
+what that column is for), or the weekend flag needs revisiting.
+`scripts/fleet-detectors-dryrun.ts` takes `DRYRUN_AFTER_HOURS_START` and
+`DRYRUN_ONLY` so any further proposal is measured before it is versioned rather
+than after.
+
+**Caveat on the dry run's `severe_driving` figure:** at the time of the run,
+migrations 528 and 529 were not yet applied to the shared database, so it used
+529's defaults from the file, treated every vehicle as non-exempt, and had no
+`provider_event_type` column — meaning severe_driving was measured on its **g
+fallback only**. Its PRIMARY path (`HARSH_BRAKING` / `HARSH_CORNERING`), which is
+the one that fires on the six of seven vehicles whose g is structurally zero, is
+not represented in those 8 events. Both migrations land with the next dev deploy;
+the column then has to ACCUMULATE data (it is nullable with no backfill, so only
+positions ingested after the deploy carry it) before a re-run means anything.
 
 **Files:** `src/modules/fleet/vehicleDetectors/{sourceEventId,theftDetector,severeDrivingDetector,unauthorizedStopDetector,lostContactDetector,accidentSosDetector,detectorQueries,vehicleProjectResolver,vehicleDetectorService,types,afterHours}.ts`,
 `pages/api/cron/fleet-operational-monitor.ts`, `scripts/fleet-detectors-dryrun.ts`,

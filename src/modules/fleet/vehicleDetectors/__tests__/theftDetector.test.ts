@@ -14,10 +14,10 @@ import { describe, expect, it } from 'vitest';
 import { detectTheftAfterHoursMovement } from '../theftDetector';
 import { RULE, VEHICLE_ID, context, latOffset, position } from './detectorFixtures';
 
-// 18:10 SAST = 16:10Z; 20:00 SAST = 18:00Z. Both inside the 18:00->06:00 window.
-const NIGHT_A = '2026-08-18T16:10:00.000Z';
+// 21:10 SAST = 19:10Z, inside the seeded 21:00->05:00 window.
+const NIGHT_A = '2026-08-18T19:10:00.000Z';
 // The second fix, one minute on: where the displacement first clears the threshold.
-const NIGHT_A_SECOND_FIX = '2026-08-18T16:11:00.000Z';
+const NIGHT_A_SECOND_FIX = '2026-08-18T19:11:00.000Z';
 const BASE_LAT = -26.1;
 
 function movingNight(meters: number, count: number, startIso = NIGHT_A) {
@@ -37,7 +37,7 @@ describe('detectTheftAfterHoursMovement', () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.occurredAt).toBe(NIGHT_A_SECOND_FIX);
     expect(events[0]?.sourceEventId)
-      .toBe(`theft_after_hours_movement:${VEHICLE_ID}:2026-08-18T18:00:00`);
+      .toBe(`theft_after_hours_movement:${VEHICLE_ID}:2026-08-18T21:00:00`);
     expect(events[0]?.metadata.displacementMeters).toBe(599); // haversine, not the flat-earth 600
     expect(events[0]?.metadata.positionsInWindow).toBe(2);
   });
@@ -86,13 +86,13 @@ describe('detectTheftAfterHoursMovement', () => {
     }));
 
     expect(events).toHaveLength(1);
-    // Bucketed by the calendar night, so a Saturday morning belongs to Friday 18:00.
-    expect(events[0]?.sourceEventId).toContain('2026-08-21T18:00:00');
+    // Bucketed by the calendar night, so a Saturday morning belongs to Friday 21:00.
+    expect(events[0]?.sourceEventId).toContain('2026-08-21T21:00:00');
   });
 
   it('opens one incident per night, not one per qualifying fix', () => {
     const nightA = movingNight(600, 5);
-    const nightB = movingNight(600, 5, '2026-08-19T16:10:00.000Z');
+    const nightB = movingNight(600, 5, '2026-08-19T19:10:00.000Z');
 
     const events = detectTheftAfterHoursMovement(context({ positions: [...nightA, ...nightB] }));
 
