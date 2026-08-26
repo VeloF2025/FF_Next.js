@@ -11,6 +11,8 @@
  * and the old one deletable at the next purge, so the section warns, demands a
  * dry run to point at, and refuses to send without one.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -194,5 +196,109 @@ describe('RetentionAnalyticsSection', () => {
     await flush();
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.queryByTestId('retention-save')).toBeNull();
+  });
+
+  /**
+   * The dark-only amber-900/20 + amber-300 this pair replaced measured
+   * ~1.02:1 against a light background — invisible, not merely faint.
+   * `CheckInSummary.tsx` proves the fix reads correctly in both themes for
+   * the same amber-family warning, so the shorten warning is asserted
+   * against that exact token set rather than a fresh judgement call.
+   */
+  describe('shorten-warning contrast (source parity with CheckInSummary.tsx)', () => {
+    const proven = readFileSync(
+      resolve(__dirname, '../../../check-in/components/CheckInSummary.tsx'), 'utf8',
+    );
+    const section = readFileSync(resolve(__dirname, '../RetentionAnalyticsSection.tsx'), 'utf8');
+
+    it.each([
+      'bg-amber-50', 'dark:bg-amber-900/20', 'text-amber-700', 'dark:text-amber-400',
+    ])('uses the proven %s pair, not a dark-only token', (token) => {
+      expect(proven).toContain(token);
+      expect(section).toContain(token);
+    });
+
+    it('does not regress to the dark-only amber-300/amber-900 pair with no light variant', () => {
+      expect(section).not.toMatch(/border-amber-700\b/);
+      expect(section).not.toMatch(/\btext-amber-300\b/);
+    });
+  });
+
+  describe('blank retention months', () => {
+    it('shows no shorten warning while the field is blank', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Retention months'), { target: { value: '' } });
+      await flush();
+      expect(screen.queryByTestId('retention-shorten-warning')).toBeNull();
+    });
+
+    it('disables save while retention months is blank', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Retention months'), { target: { value: '' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).toBeDisabled();
+    });
+
+    it('never sends a request with retentionMonths blank or zero', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Retention months'), { target: { value: '' } });
+      withReason();
+      await act(async () => { screen.getByTestId('retention-save').click(); });
+      await flush();
+      expect(mocks.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('server-mirrored floors', () => {
+    it('disables save when the anonymity threshold drops below the server floor of 5', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Anonymity threshold'), { target: { value: '4' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).toBeDisabled();
+    });
+
+    it('allows the anonymity threshold at exactly the server floor of 5', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Anonymity threshold'), { target: { value: '5' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).not.toBeDisabled();
+    });
+
+    it('disables save when the hold review reminder lead exceeds the maximum hold review days', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Hold review reminder lead days'), { target: { value: '91' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).toBeDisabled();
+    });
+
+    it('allows the hold review reminder lead exactly at the maximum hold review days', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Hold review reminder lead days'), { target: { value: '90' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).not.toBeDisabled();
+    });
+  });
+
+  describe('the integer guard in `valid`', () => {
+    it('disables save when a field is left blank', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Retention batch size'), { target: { value: '' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).toBeDisabled();
+    });
+
+    it('disables save when a field holds a fractional value', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Retention batch size'), { target: { value: '1.5' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).toBeDisabled();
+    });
   });
 });

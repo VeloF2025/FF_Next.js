@@ -17,6 +17,10 @@
  * run to point at, and will not send without one. The server enforces the same
  * rule; doing it here as well means the manager finds out while they are still
  * looking at the form.
+ *
+ * `liveRetentionEnabled` is pass-through only: this section shows whether live
+ * retention is armed but has no control that arms it. That switch is a
+ * separate, unreviewed-here surface and is deliberately out of scope.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { log } from '@/lib/logger';
@@ -25,19 +29,24 @@ import { retentionSettingsApi } from './retentionSettingsApi';
 import type { AnalyticsRetentionSettingsChangeRequest } from './retentionSettingsApi';
 import type { RetentionPolicy } from '../analytics/types';
 
-/** Every number this form exposes, with the policy field it edits. */
+/**
+ * Every number this form exposes, with the policy field it edits and the
+ * floor migration 518's own CHECK constraints enforce (`retentionSettingsValidation.ts`).
+ * Mirroring the server's mins here means a manager finds out about an invalid
+ * number from the input itself, not a 500 naming a constraint.
+ */
 const FIELDS = [
-  ['retentionMonths', 'Retention months'],
-  ['anonymityMinContributors', 'Anonymity threshold'],
-  ['recalculationWindowMonths', 'Recalculation window months'],
-  ['retentionBatchSize', 'Retention batch size'],
-  ['maximumHoldReviewDays', 'Maximum hold review days'],
-  ['holdReviewReminderLeadDays', 'Hold review reminder lead days'],
-  ['aggregationRunHourSast', 'Aggregation run hour (SAST)'],
-  ['aggregationRunMinuteSast', 'Aggregation run minute (SAST)'],
-  ['retentionRunHourSast', 'Retention run hour (SAST)'],
-  ['retentionRunMinuteSast', 'Retention run minute (SAST)'],
-] as const satisfies readonly (readonly [keyof RetentionPolicy, string])[];
+  ['retentionMonths', 'Retention months', 1],
+  ['anonymityMinContributors', 'Anonymity threshold', 5],
+  ['recalculationWindowMonths', 'Recalculation window months', 1],
+  ['retentionBatchSize', 'Retention batch size', 1],
+  ['maximumHoldReviewDays', 'Maximum hold review days', 1],
+  ['holdReviewReminderLeadDays', 'Hold review reminder lead days', 1],
+  ['aggregationRunHourSast', 'Aggregation run hour (SAST)', 0],
+  ['aggregationRunMinuteSast', 'Aggregation run minute (SAST)', 0],
+  ['retentionRunHourSast', 'Retention run hour (SAST)', 0],
+  ['retentionRunMinuteSast', 'Retention run minute (SAST)', 0],
+] as const satisfies readonly (readonly [keyof RetentionPolicy, string, number])[];
 
 type EditableField = (typeof FIELDS)[number][0];
 type Draft = Record<EditableField, string>;
@@ -46,13 +55,19 @@ function draftFrom(policy: RetentionPolicy): Draft {
   return Object.fromEntries(FIELDS.map(([field]) => [field, String(policy[field])])) as Draft;
 }
 
-function NumberField({ field, label, value, onChange }: {
-  field: string; label: string; value: string; onChange: (value: string) => void;
+/** A blank or non-integer field is never "valid at 0" — it is simply not entered yet. */
+function isValidWhole(raw: string, min: number): boolean {
+  const trimmed = raw.trim();
+  return trimmed !== '' && Number.isInteger(Number(trimmed)) && Number(trimmed) >= min;
+}
+
+function NumberField({ field, label, value, min, onChange }: {
+  field: string; label: string; value: string; min: number; onChange: (value: string) => void;
 }) {
   return (
     <label className="mr-3 inline-block text-sm">{label}
       <input
-        aria-label={label} id={field} type="number" min={0} value={value}
+        aria-label={label} id={field} type="number" min={min} value={value}
         onChange={(event) => onChange(event.target.value)}
         className="ml-2 w-20 rounded border px-2 py-1"
       />
@@ -85,13 +100,19 @@ export function RetentionAnalyticsSection({ canEdit }: { canEdit: boolean }) {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const requested = draft ? Number(draft.retentionMonths) : null;
-  const shortening = policy !== null && requested !== null
-    && Number.isFinite(requested) && requested < policy.retentionMonths;
+  // A blank retentionMonths field is not "requesting 0 months" — `Number('')`
+  // coerces to 0, which would otherwise both warn about a shortening to zero
+  // and let a 0 slip into the request the server 400s on.
+  const requested = draft && isValidWhole(draft.retentionMonths, 1) ? Number(draft.retentionMonths) : null;
+  const shortening = policy !== null && requested !== null && requested < policy.retentionMonths;
 
   const valid = policy !== null && draft !== null
     && changeReason.trim().length > 0
-    && FIELDS.every(([field]) => Number.isInteger(Number(draft[field])))
+    && FIELDS.every(([field, , min]) => isValidWhole(draft[field], min))
+    // Same rule DriverInputSection enforces client-side for its own pair
+    // (historyWindowDays >= recentWindowDays): the server's floor on
+    // holdReviewReminderLeadDays is `maximumHoldReviewDays`, not a fixed number.
+    && Number(draft.holdReviewReminderLeadDays) <= Number(draft.maximumHoldReviewDays)
     // The server refuses this too; refusing here means the manager finds out
     // while they are still looking at the number they just changed.
     && (!shortening || dryRunId.trim().length > 0);
@@ -142,16 +163,20 @@ export function RetentionAnalyticsSection({ canEdit }: { canEdit: boolean }) {
 
       {policy && draft && canEdit && (
         <div className="space-y-2 rounded border p-3">
-          {FIELDS.map(([field, label]) => (
+          {FIELDS.map(([field, label, min]) => (
             <NumberField
-              key={field} field={field} label={label} value={draft[field]}
+              key={field} field={field} label={label} value={draft[field]} min={min}
               onChange={(value) => setDraft({ ...draft, [field]: value })}
             />
           ))}
 
           {shortening && (
-            <div data-testid="retention-shorten-warning" className="rounded border border-amber-700 bg-amber-900/20 p-2 text-sm">
-              <p className="text-amber-300">
+            // Same amber pair CheckInSummary.tsx uses for its offline banner: the
+            // dark-only amber-900/20 + amber-300 this replaced measured ~1.02:1 in
+            // light mode — effectively invisible. bg-amber-50/text-amber-700 in
+            // light, dark:bg-amber-900/20/dark:text-amber-400 in dark, both pass.
+            <div data-testid="retention-shorten-warning" className="rounded border border-amber-200 bg-amber-50 p-2 text-sm dark:border-amber-800 dark:bg-amber-900/20">
+              <p className="text-amber-700 dark:text-amber-400">
                 Shortening retention from {policy.retentionMonths} to {requested} months makes every terminal
                 incident between the two cutoffs deletable at the next purge. Review a dry run first, then
                 name it below.
