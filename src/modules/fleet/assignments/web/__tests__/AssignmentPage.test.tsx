@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   options: vi.fn(), roster: vi.fn(), listSites: vi.fn(), update: vi.fn(), history: vi.fn(),
 }));
-const permissions = vi.hoisted(() => ({ canEditRules: false }));
+const permissions = vi.hoisted(() => ({ canEditRules: false, granted: new Set<string>() }));
 
 vi.mock('@/components/layout/AppLayout', () => ({ AppLayout: ({ children }: { children: ReactNode }) => children }));
 vi.mock('@/components/module-page', () => ({ ModulePage: ({ children }: { children: ReactNode }) => children }));
@@ -20,8 +20,16 @@ vi.mock('@/modules/fleet/assignments/web/AssignmentEditor', () => ({
 }));
 vi.mock('@/modules/fleet/assignments/web/ProjectSiteManager', () => ({ ProjectSiteManager: () => null }));
 vi.mock('@/modules/fleet/assignments/web/ConflictReview', () => ({ ConflictReview: () => null }));
-vi.mock('@/hooks/usePermission', () => ({ usePermission: () => ({ can: (key: string, action: string) => key === 'fleet.operations-rules' && action === 'edit' && permissions.canEditRules, isLoading: false }) }));
+vi.mock('@/hooks/usePermission', () => ({ usePermission: () => ({ can: (key: string, action: string) => {
+  if (key === 'fleet.operations-rules' && action === 'edit') return permissions.canEditRules;
+  return permissions.granted.has(`${key}:${action}`);
+}, isLoading: false }) }));
 vi.mock('@/modules/fleet/operations/web/StatusRulesDialog', () => ({ StatusRulesDialog: () => null }));
+// Rendered, not stubbed away: the whole point is which `canEdit` it receives.
+vi.mock('@/modules/fleet/operations/web/VehicleRulesDialog', () => ({
+  VehicleRulesDialog: ({ open, canEdit }: { open: boolean; canEdit: boolean }) =>
+    open ? <span data-testid="vehicle-rules-can-edit">{String(canEdit)}</span> : null,
+}));
 vi.mock('@/modules/fleet/assignments/web/AssignmentFilters', () => ({
   AssignmentFilters: ({ onChange }: { onChange: (value: Record<string, unknown>) => void }) =>
     <button onClick={() => onChange({ from: '2026-08-17', to: '2026-08-21', projectId: 'project-1', siteId: 'site-1', source: '', unassignedScheduled: false })}>Choose project</button>,
@@ -49,6 +57,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.history.replaceState({}, '', '/fleet/assignments');
   permissions.canEditRules = false;
+  permissions.granted.clear();
   api.options.mockResolvedValue({ staff: [], teams: [], projects: [], sites: [{ id: 'site-1', label: 'Site One', projectId: 'project-1' }, { id: 'site-2', label: 'Site Two', projectId: 'project-1' }], vehicles: [], siteSources: [] });
   api.roster.mockResolvedValue({ items: [assignment], total: 1 });
   api.listSites.mockResolvedValue([]);
@@ -65,6 +74,34 @@ describe('AssignmentPage manager actions', () => {
   it('shows Status Rules to users with rule edit permission', () => {
     permissions.canEditRules = true; render(<AssignmentPage />);
     expect(screen.getByRole('button', { name: 'Status Rules' })).toBeInTheDocument();
+  });
+
+  it('hides Vehicle Rules from users without view permission', () => {
+    render(<AssignmentPage />);
+    expect(screen.queryByRole('button', { name: 'Vehicle Rules' })).not.toBeInTheDocument();
+  });
+
+  it('shows Vehicle Rules on VIEW, so the audit trail is not hidden behind the write grant', () => {
+    permissions.granted.add('fleet.vehicle-rules:view');
+    render(<AssignmentPage />);
+    expect(screen.getByRole('button', { name: 'Vehicle Rules' })).toBeInTheDocument();
+  });
+
+  it('gates the version-creating editor on CREATE, not on view', () => {
+    // The API gates its POST on 'create'. A reader who can open the dialog must
+    // not be shown a form whose submit the server will refuse.
+    permissions.granted.add('fleet.vehicle-rules:view');
+    render(<AssignmentPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Vehicle Rules' }));
+    expect(screen.getByTestId('vehicle-rules-can-edit')).toHaveTextContent('false');
+  });
+
+  it('opens the editor for a user who holds create', () => {
+    permissions.granted.add('fleet.vehicle-rules:view');
+    permissions.granted.add('fleet.vehicle-rules:create');
+    render(<AssignmentPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Vehicle Rules' }));
+    expect(screen.getByTestId('vehicle-rules-can-edit')).toHaveTextContent('true');
   });
 
   it('moves a roster assignment with the manager-entered reason and coverage dates', async () => {

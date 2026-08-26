@@ -208,8 +208,8 @@ Rollback: `DROP TABLE IF EXISTS` both, `ALTER TABLE fleet_vehicle_positions DROP
 fleet_vehicle_operational_rules            -- modelled 1:1 on fleet_operational_status_rules
   id UUID PK, version INTEGER NOT NULL UNIQUE, timezone TEXT NOT NULL,
   effective_from TIMESTAMPTZ NOT NULL, effective_to TIMESTAMPTZ,
-  after_hours_start_time TIME NOT NULL DEFAULT '18:00',
-  after_hours_end_time   TIME NOT NULL DEFAULT '06:00',
+  after_hours_start_time TIME NOT NULL DEFAULT '21:00',
+  after_hours_end_time   TIME NOT NULL DEFAULT '05:00',
   weekends_are_after_hours BOOLEAN NOT NULL DEFAULT true,
   public_holidays_are_after_hours BOOLEAN NOT NULL DEFAULT true,
   theft_displacement_meters INTEGER NOT NULL DEFAULT 500,
@@ -224,14 +224,47 @@ fleet_vehicle_operational_rules            -- modelled 1:1 on fleet_operational_
   known_site_radius_meters INTEGER NOT NULL DEFAULT 500,
   change_reason TEXT, created_by UUID REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
+**After-hours window retuned 2026-08-26 (PR4 dry run).** The original 18:00–06:00 seed fired
+`theft_after_hours_movement` **9.1 times a day** against real position history — an alert volume
+nobody would read, and far outside acceptance criterion 3's ≤5/day. Hein's decision: seed
+**21:00–05:00**, weekends and public holidays still counted. The column DEFAULTs carry it, so the
+seed row and the defaults cannot drift; changing it later is a new rule version through the dialog,
+not a migration.
+
 Plus, copied from 498: `version > 0`; `btrim(timezone) <> ''`; `effective_to IS NULL OR effective_to > effective_from`; all thresholds non-negative; `change_reason IS NULL OR btrim(change_reason) <> ''`; `EXCLUDE USING gist (tstzrange(effective_from, COALESCE(effective_to,'infinity'),'[)') WITH &&)`; `CREATE UNIQUE INDEX … ON (( true )) WHERE effective_to IS NULL`. Seed `version 1` with `now()`.
 
 Also in 529:
 - `ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS after_hours_exempt BOOLEAN NOT NULL DEFAULT false;` (additive, defaulted, safe against running prod code).
-- **Re-version the four non-critical telematics incident rules** — close `version 1` and insert `version 2` for `severe_driving`, `prolonged_unauthorized_stop`, `lost_contact_moving`, `dangerous_area_entry` with `severity='high'`, `whatsapp_enabled=false`, `immediate_notification=false`, `include_in_morning_summary=true`. This is the *only* way to stop `requiresMandatoryIncidentWhatsApp` from blasting WhatsApp for them. `accident_sos` and `theft_after_hours_movement` keep `version 1` (`critical`, WA on). Write this as an explicit `UPDATE … SET effective_to = now() WHERE incident_type = ANY(...) AND effective_to IS NULL;` followed by the `INSERT`, inside `BEGIN/COMMIT`, so the gist exclusion constraint is satisfied at commit.
-- `access_permissions` + `role_permissions` rows for `fleet.vehicle-stats` (`/fleet/vehicles/[id]/stats`, view for viewer/manager/PM/admin/super_admin) and `fleet.vehicle-rules` (view+create+edit for admin/super_admin only), `ON CONFLICT DO NOTHING` — same shape as 498.
+- **Re-version the four non-critical telematics incident rules IN PLACE, behind a guard.** `severity='high'`, `whatsapp_enabled=false`, `immediate_notification=false`, `include_in_morning_summary=true` for `severe_driving`, `prolonged_unauthorized_stop`, `lost_contact_moving`, `dangerous_area_entry`. Severity is the *only* lever that stops `requiresMandatoryIncidentWhatsApp` blasting WhatsApp for them. `accident_sos` and `theft_after_hours_movement` are untouched (`critical`, WA on).
 
-Rollback 529: drop the table, drop the column, delete the two permission keys and their role rows, and **restore the incident rules by deleting `version 2` and clearing `effective_to` on `version 1`** — the rollback must state this explicitly or a rollback silently leaves the fleet with no effective rule for four types, which makes the producer throw.
+  **REVISED 2026-08-25 after six review rounds.** The close-and-insert shape this section originally specified does not survive contact with the table. Five successive versions of it were each defeated by a state the previous one had not enumerated: an operator's own version 2; a closed version 2 in the history; a **pending** open row, which cannot be closed at all because `effective_to = now()` is earlier than its own `effective_from` and fails `fleet_operational_incident_rules_range_order`; a row that activates between two statements' clock reads under `psql -f`; and a **closed-but-still-effective** predecessor left behind by `versionIncidentRule`. "Which row is the current rule" has more states than a migration can enumerate — that is a design problem, not five bugs.
+
+  The shipped shape has no state machine:
+
+  ```sql
+  DO $$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM fleet_operational_incidents
+                WHERE incident_type = ANY(the four)) THEN
+      RAISE EXCEPTION '529: operational incidents already exist ...';
+    END IF;
+
+    UPDATE fleet_operational_incident_rules
+       SET severity = 'high', whatsapp_enabled = false, immediate_notification = false,
+           include_in_morning_summary = true,
+           change_reason = <prose, prior marker stripped> || ' | 529:reversioned{wa=..,imm=..,morn=..}'
+     WHERE severity = 'critical' AND incident_type = ANY(the four);
+  END $$;
+  ```
+
+  Every row of those four types — open, pending, closed, historical. No version arithmetic, no close/insert, no clock read, no constraint interaction, identical in every execution mode. Idempotent by the `severity = 'critical'` filter, which also leaves an operator's deliberate non-critical row alone.
+
+  **Why rewriting in place is legitimate here:** versioning exists so an incident can say which rule judged it, and these four rules have never judged anything — nothing calls the telematics detectors until PR4, strictly after this migration. Rows that never governed an incident carry no history worth preserving; editing them corrects a seed that was wrong the day 510 wrote it. The guard **proves** that at apply time rather than asserting it, and it is the **first statement in the file**, above every `CREATE`, so a fired guard leaves nothing behind. It sits inside the same `DO` block as the `UPDATE` because as two statements it would only stop the `UPDATE` under `ON_ERROR_STOP` — which `scripts/run-pending-migrations.sh:127` passes but a hand-run `psql -f` does not.
+
+  The marker carries the row's **prior** flag values, because the filter constrains severity and nothing else: an operator may hold a critical row with WhatsApp deliberately off, and restoring 510's seed shape on rollback would silently re-arm it. Any marker already present is stripped before a new one is appended, so a re-run never accumulates two.
+- `access_permissions` + `role_permissions` rows for `fleet.vehicle-stats` (route `/fleet/vehicles`, view for viewer/manager/PM/admin/super_admin) and `fleet.vehicle-rules` (route `/fleet/assignments`, view+create+edit for admin/super_admin only), `ON CONFLICT DO NOTHING` — same shape as 498. **Routes are the parent pages, not the dynamic child** (`/fleet/vehicles`, not `/fleet/vehicles/[id]/stats`): `access_permissions.route` is matched against a concrete path by the nav/permission layer, and a `[id]` placeholder never matches one. Corrected here to what 529 actually seeds.
+
+Rollback 529 (**REVISED** with the above): 529 inserts no rows and closes none, so there is nothing to delete and nothing to reopen — only the flags to put back. It restores rows that are **still `high`** and whose `change_reason` **ends with** the marker, parsing the prior `whatsapp_enabled` / `immediate_notification` / `include_in_morning_summary` back out of it with `regexp_match`, then strips the marker (which is what makes a second rollback a no-op). Severity is the one value the filter pins, so it alone comes from a constant. The `WHERE severity = 'high'` is load-bearing: a row an operator has taken back to `critical` is theirs, marker or not. The `$` anchor is load-bearing too — prose that merely *contains* the marker must not be rewritten; prose that *ends* with the exact literal is an accepted, documented residual risk. Then it drops the table, the column and both permission keys, all inside one `BEGIN/COMMIT` because `psql -f` autocommits statement by statement.
 
 ---
 
@@ -389,16 +422,22 @@ Each must fail at least one named test. Mutate the **new guard**, never the test
 **Ships:** `529_*.sql` + rollback, `vehicleDetectors/vehicleRuleQueries.ts`, `afterHours.ts`, `holidayQueries.ts`, `pages/api/fleet/vehicle-rules/index.ts`, `operations/web/VehicleRulesDialog.tsx`, tests.
 
 **Tests:**
-1. `vehicleRuleQueries.test.ts` — a new version closes the current one in the same transaction; `effectiveFrom` in the past is refused; two concurrent version creations do not both succeed (the one-open partial unique index and the gist exclusion are the enforcement, not the code).
-2. `afterHours.test.ts` — 17:59/18:00/05:59/06:00 SAST boundaries; a Saturday 10:00 is after-hours; 2026-04-27 (Freedom Day) from `public_holidays` is after-hours; the window **wraps midnight** (18:00→06:00 is one window spanning two calendar days, not two windows). Fixture holidays come from the real seeded table, not a hand-written list.
-3. `tests/migrations/529_*.test.ts` — real Postgres: the gist exclusion rejects an overlapping version; `after_hours_exempt` defaults `false` on an existing row; **after the migration, `SELECT` on `fleet_operational_incident_rules WHERE effective_to IS NULL` returns exactly 14 rows, one per type**, and the four re-versioned types have `severity='high'`; the rollback restores `version 1` as the open row for those four.
-4. `migrationContract.test.ts` — the incident-type list touched by 529's `UPDATE` is exactly the four the plan names, checked against a TS constant.
+1. `vehicleRuleQueries.test.ts` — a new version closes the current one in the same transaction; `effectiveFrom` in the past is refused; the next version number comes from the open row (v1→v2, v2→v3, v7→v8), not a constant; two concurrent version creations do not both succeed (the one-open partial unique index and the gist exclusion are the enforcement, not the code).
+2. `afterHours.test.ts` — 20:59/21:00/04:59/05:00 SAST boundaries; a Saturday 10:00 is after-hours; 2026-04-27 (Freedom Day) from `public_holidays` is after-hours; the window **wraps midnight** (21:00→05:00 is one window spanning two calendar days, not two windows). Fixture holidays come from the real seeded table, not a hand-written list.
+3. `tests/migrations/529_*.test.ts` — real Postgres, as a **7-state × 2-mode matrix**. States: the 510 seed; an operator's active version 2 still critical; an operator's active version 2 deliberately not critical; a closed version 2 in the history; a pending open version 2 still critical; a pending open version 2 already lowered; a closed-but-still-effective predecessor with a future successor. Modes: the runner (one query, `psql -1`) and `psql -f` statement by statement.
 
-**Mutation targets:** change the after-hours window to a non-wrapping comparison; drop the holiday lookup; set the four re-versioned rules to `critical` (test 3 must catch it, because that would silently arm WhatsApp).
+   Every assertion goes through the predicate `loadEffectiveIncidentRule` actually uses — `effective_from <= now() AND (effective_to IS NULL OR effective_to > now())` — **not** "the open row". Those differ, and the difference is the state that survived five rounds. Per state and mode: all four types end effectively `high`; the two emergency types stay `critical` + WA; exactly 14 open rules with no type at zero or two; a second run is a no-op; the rollback puts everything back `critical`.
+
+   Plus: guard tests in both modes (an incident of a telematics type ⇒ `P0001` and **nothing** applied — no rules, no table, no column, no permission rows; an unrelated type passes through); marker tests (prior flags recorded with `wa ≠ imm`, restored exactly rather than as the seed shape, `NULL` prose round-trips to `NULL`, prose containing the marker mid-string untouched, no double marker after a manual re-critical and a re-run); and the vehicle rules table's own constraints (gist rejects an overlap, the one-open index rejects a second open row with the gist dropped, concurrent creation leaves one winner, `after_hours_exempt` defaults false on a pre-existing row, grants hold under `SET ROLE fibreflow_user`).
+4. `migrationContract.test.ts` — the incident-type list is exactly the four the plan names, checked against a TS constant; the guard precedes every `CREATE`; the marker constants and the timezone the API validates against are shared with the seed.
+5. API tests — `withPermission('fleet.vehicle-rules', 'create')` on POST and `'view'` on GET; every refusal names its field.
+6. Dialog tests — opening the dialog is gated on `view`, the version-creating editor on `create`; a future-dated open version reads "Pending from …", not "Current".
+
+**Mutation targets:** change the after-hours window to a non-wrapping comparison; drop the holiday lookup; set the re-versioned rules to `critical` (must be caught, because that silently arms WhatsApp); remove the guard; split the guard and the `UPDATE` into two statements; drop the `$` anchor from the rollback's marker match; restore 510's seed constants instead of the marker values; drop the rollback's `WHERE severity = 'high'`; drop the marker-strip so a re-run doubles it.
 
 **Gates:** `ci:quick`; migration test; blind `/review`; browser check of the rules dialog in **both themes** (a `getByText()` assertion passes on invisible text — this repo has been bitten).
 
-**Rollback:** `rollback_529_*.sql`, which must restore the incident rule versions as described in §3.2. Verify by re-running test 3's assertion against the live DB after rollback.
+**Rollback:** `rollback_529_*.sql`, which restores the incident rules as described in §3.2. Verify by re-running test 3's effective-rule assertion against the live DB after rollback.
 
 ---
 
@@ -526,7 +565,7 @@ Registering any crontab line is a deployment action requiring separate approval.
 
 **R1 — Pipeline/loop bugs are invisible to reading.** The trips builder shipped a straddler bug that six reviewers read past; it understated fleet distance 1.6% at one batch size and 4.4% at another, with every row passing every constraint. The same shape is present here: a batched fold with a watermark and a lookback. **Mitigation is mechanical, not editorial** — every batch-processing PR (PR1, PR2, PR9) carries a batch-size-variation test that compares row hashes across at least four batch sizes including 1 and the production constant, plus an idempotence test over an overlapping window. A PR in this set without that test does not merge.
 
-**R2 — DATE / timezone.** node-postgres parses a `DATE` (OID 1082) into a JS `Date` at *local* midnight; `toISOString()` on it shifts backwards across the date line in SAST and reports the 1st as the last day of the previous month. `work_date` is a `DATE`, so every read path must go through `toWorkDate`. Every write path must derive the day through `sastDateString`/`toWorkDate`, never `date_trunc` (which uses the session timezone) and never UTC arithmetic. The 18:00→06:00 after-hours window **wraps midnight** and spans two `work_date` values — the naive `start <= t && t <= end` comparison is always false and would silently disable the theft detector entirely.
+**R2 — DATE / timezone.** node-postgres parses a `DATE` (OID 1082) into a JS `Date` at *local* midnight; `toISOString()` on it shifts backwards across the date line in SAST and reports the 1st as the last day of the previous month. `work_date` is a `DATE`, so every read path must go through `toWorkDate`. Every write path must derive the day through `sastDateString`/`toWorkDate`, never `date_trunc` (which uses the session timezone) and never UTC arithmetic. The 21:00→05:00 after-hours window **wraps midnight** and spans two `work_date` values — the naive `start <= t && t <= end` comparison is always false and would silently disable the theft detector entirely.
 
 **R3 — Conditional tagged-template SQL is broken in this repo.** `${cond ? sql\`AND x\` : sql\`\`}` produces a malformed query through both the webpack shim and the `@/lib/db-pool` tag. Every optional filter is two whole explicit query branches (`loadPositions` in `tripRepository.ts` is the reference). Pinned by a `sqlLiterals.test.ts` copied from `trips/__tests__/`.
 
@@ -545,7 +584,7 @@ Registering any crontab line is a deployment action requiring separate approval.
 ## 8. Acceptance (restated as verifiable steps)
 
 1. `/fleet/vehicles/<id>/stats` renders for all 18 tracked vehicles; for one Cartrack vehicle, one day's `distance_km` is within 5% of the Cartrack portal's own figure for that vehicle/day. Verified in browser, both themes, with the portal figure recorded in the PR description.
-2. A staged after-hours drive (>500 m, ≥2 fixes, after 18:00 SAST, on a non-exempt vehicle) opens a `theft_after_hours_movement` incident and posts to the Fleet Alerts group within 10 minutes (two 5-minute ticks). Verified end to end on production after the cron is approved.
+2. A staged after-hours drive (>500 m, ≥2 fixes, after 21:00 SAST, on a non-exempt vehicle) opens a `theft_after_hours_movement` incident and posts to the Fleet Alerts group within 10 minutes (two 5-minute ticks). Verified end to end on production after the cron is approved.
 3. After one week of tuning, ≤5 non-critical vehicle incidents per day fleet-wide, and the 08:15 summary appears in the group every day including days with zero incidents.
 
 ---
