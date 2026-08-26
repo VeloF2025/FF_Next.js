@@ -9,7 +9,19 @@ vi.mock('@/modules/fleet/incidents/cronLock', () => lock);
 const monitor = vi.hoisted(() => ({ runOperationalMonitor: vi.fn() }));
 vi.mock('@/modules/fleet/incidents/monitorService', () => monitor);
 
-const detectors = vi.hoisted(() => ({ runVehicleDetectors: vi.fn() }));
+// Both exports the route uses. `vehicleDetectorPhaseFailure` is the shape the
+// route reports when the phase could not run at all — mocking only
+// `runVehicleDetectors` left it undefined, and the "a throwing detector phase
+// does not fail the tick" test then 500'd for the mock's reason rather than
+// the route's.
+const detectors = vi.hoisted(() => ({
+  runVehicleDetectors: vi.fn(),
+  vehicleDetectorPhaseFailure: vi.fn(() => ({
+    status: 'failed' as const, vehiclesEvaluated: 0, eventsDetected: 0, incidentsOpened: 0,
+    incidentsUnchanged: 0, incidentsSuppressedByRule: 0, notificationsAccepted: 0,
+    notificationsFailed: 0, detectorFailures: 0, producerFailures: 0,
+  })),
+}));
 vi.mock('@/modules/fleet/vehicleDetectors/vehicleDetectorService', () => detectors);
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -34,7 +46,8 @@ const RUN_RESULT = {
 
 const DETECTOR_RESULT = {
   status: 'succeeded' as const, vehiclesEvaluated: 18, eventsDetected: 2, incidentsOpened: 1,
-  incidentsUnchanged: 1, detectorFailures: 0, producerFailures: 0,
+  incidentsUnchanged: 1, incidentsSuppressedByRule: 0, notificationsAccepted: 3,
+  notificationsFailed: 0, detectorFailures: 0, producerFailures: 0,
 };
 
 beforeEach(() => {

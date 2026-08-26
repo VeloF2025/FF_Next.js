@@ -202,7 +202,8 @@ async function produceSourceEventIncident(request: SourceEventProducerRequest): 
     const createInput: CreateIncidentInput = {
       incidentType: request.incidentType, severity, staffId, projectId: request.projectId ?? null,
       operationalSiteId: request.operationalSiteId ?? null, vehicleId, operationalAssignmentId, workDate: null,
-      staffNameSnapshot: null, projectNameSnapshot: null, operationalSiteNameSnapshot: null, vehicleRegistrationSnapshot: null,
+      staffNameSnapshot: null, projectNameSnapshot: null, operationalSiteNameSnapshot: null,
+      vehicleRegistrationSnapshot: request.vehicleRegistrationSnapshot ?? null,
       sourceEventId, statusRuleId: null, statusRuleVersion: null, incidentRuleId: rule.id, incidentRuleVersion: rule.version,
       evidenceSnapshot, detectedAt: request.occurredAt,
       linkedHsReference: request.linkedHsReference ?? null, linkedMaintenanceReference: request.linkedMaintenanceReference ?? null,

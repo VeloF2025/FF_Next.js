@@ -36,6 +36,7 @@ import { runWithCronLock } from '@/modules/fleet/incidents/cronLock';
 import { runOperationalMonitor } from '@/modules/fleet/incidents/monitorService';
 import {
   runVehicleDetectors,
+  vehicleDetectorPhaseFailure,
   type VehicleDetectorPhaseResult,
 } from '@/modules/fleet/vehicleDetectors/vehicleDetectorService';
 
@@ -59,10 +60,7 @@ async function runDetectorPhase(now: string): Promise<VehicleDetectorPhaseResult
       { err: err instanceof Error ? err.message : String(err) },
       MODULE,
     );
-    return {
-      status: 'failed', vehiclesEvaluated: 0, eventsDetected: 0, incidentsOpened: 0,
-      incidentsUnchanged: 0, detectorFailures: 0, producerFailures: 0,
-    };
+    return vehicleDetectorPhaseFailure();
   }
 }
 

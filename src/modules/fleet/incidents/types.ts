@@ -53,6 +53,16 @@ export interface IncidentSourceEvent {
   occurredAt: string;
   staffId?: string | null;
   vehicleId?: string | null;
+  /**
+   * The vehicle's registration AS IT READ when the event was detected.
+   *
+   * Snapshot, like the scheduled path's `vehicleRegistrationSnapshot`: a
+   * registration can be reassigned or corrected, and a historical incident must
+   * keep saying which vehicle it was actually about. It is also the only human
+   * label a vehicle incident has — nothing else on a source event names the
+   * thing that moved.
+   */
+  vehicleRegistrationSnapshot?: string | null;
   projectId?: string | null;
   operationalSiteId?: string | null;
   operationalAssignmentId?: string | null;

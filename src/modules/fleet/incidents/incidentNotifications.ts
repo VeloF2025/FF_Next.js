@@ -79,12 +79,21 @@ export interface OpenedNotificationInput {
   producerKind: IncidentProducerKind; rule: IncidentRule; projectId: string | null;
   staffName: string | null; projectName: string | null; operationalSiteName: string | null;
   detectedAt: string; reasonCodes: readonly string[];
+  /**
+   * Optional: a telematics source event has no staff member, and this is the
+   * only human label it carries. Absent for every scheduled detection, whose
+   * body is unchanged.
+   */
+  vehicleRegistration?: string | null;
   /** Optional: `produceIncident` (Task 3) does not return this on its result, so a caller resolving straight off that result has none to pass. Included in metadata only when known. */
   incidentReference?: string;
 }
 
 function openedBody(input: OpenedNotificationInput): string {
-  const who = input.staffName ?? 'Unknown staff';
+  // A vehicle incident has no staff member. Falling through to "Unknown staff"
+  // would send a WhatsApp naming nobody and nothing, which is indistinguishable
+  // from a bug at the receiving end.
+  const who = input.staffName ?? input.vehicleRegistration ?? 'Unknown staff';
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
   const reason = input.reasonCodes.length > 0 ? input.reasonCodes.slice(0, 3).join(', ') : 'review required';
   return `${who} — ${where} — ${reason}`;

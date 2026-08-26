@@ -17,9 +17,16 @@ source-event identity, project attribution, the position reads, and the
 orchestration phase. No migration, no UI, no new cron entry: the phase runs
 inside the existing `*/5` `fleet-operational-monitor` tick, AFTER
 `runOperationalMonitor`, under the same advisory lock, with its own try/catch and
-its own counters. Dedup and recurrence come free from
-`produceIncident`'s `source_event` path — a repeat `sourceEventId` answers
-`unchanged`.
+its own counters. A newly opened incident is notified here, exactly as
+`monitorService` does on `opened`.
+
+**Dedup comes free from `produceIncident`'s `source_event` path — recurrence does
+NOT.** A repeat `sourceEventId` answers `unchanged` and touches nothing, so
+`condition_last_seen_at` stays at the open instant: a vehicle still stopped in
+the same place three hours later looks, to the manager queue, exactly like one
+that stopped once. Recorded as a known limitation for a later slice, because
+"still true" for a bucketed source event is a different question from "seen
+again" for a roster detection.
 
 **Two types are deliberately not implemented, and neither is a TODO:**
 
@@ -69,13 +76,23 @@ window to 21:00 removes the commute and keeps the night.
 **The residual is the weekend, and it is a data decision, not a threshold.** Of
 the 27 events at the seeded window, 19 fall on the Saturday and Sunday (11 and
 8), because `weekends_are_after_hours` makes all weekend daytime work
-after-hours. Weekday nights past 21:00 are 8 events over 5 days — 1.6/day.
-So before the crontab entry or PR5's WhatsApp delivery is enabled, the crews that
-work Saturdays need `fleet_vehicles.after_hours_exempt` set (which is exactly
-what that column is for), or the weekend flag needs revisiting.
+after-hours. Weekday nights past 21:00 are 8 events over 5 days — 1.6/day. The
+crews that work Saturdays need `fleet_vehicles.after_hours_exempt` set (which is
+exactly what that column is for), or the weekend flag needs revisiting.
 `scripts/fleet-detectors-dryrun.ts` takes `DRYRUN_AFTER_HOURS_START` and
 `DRYRUN_ONLY` so any further proposal is measured before it is versioned rather
 than after.
+
+**Be precise about what "not live yet" means.** WhatsApp for a critical
+telematics incident is not waiting on PR5: `sendIncidentOpenedNotification` fires
+the mandatory per-recipient DM on OPEN today, and the action runner escalates
+after that. PR5 adds the GROUP post and a DM fallback — it does not switch the
+channel on. What actually gates all of this is that neither cron is installed:
+`scripts/cron-fleet-operational-monitor.sh` (which the detectors ride) and
+`scripts/cron-fleet-incident-actions.sh` (escalation and the 08:15 summary) are
+both recorded here as unscheduled pending deployment approval. Registering either
+is a deployment action requiring separate approval, and the exemptions above
+should be set first.
 
 **Caveat on the dry run's `severe_driving` figure:** at the time of the run,
 migrations 528 and 529 were not yet applied to the shared database, so it used

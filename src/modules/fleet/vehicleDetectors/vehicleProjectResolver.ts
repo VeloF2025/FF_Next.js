@@ -11,8 +11,24 @@
  * returns the closest within 500 m. Only the `project_aoi` kind carries a
  * project — `fleet_vehicle_parking_locations` has a vehicle and no project at
  * all — so a parking hit resolves to NULL rather than to something adjacent.
- * Null is a first-class answer here: an unattributed incident is visible to
- * everyone with fleet scope, which is the safe direction.
+ *
+ * ## What NULL actually means for visibility — the opposite of "everyone"
+ *
+ * `isProjectOwnedByScope` (`incidents/reviewScope.ts`) returns FALSE for a null
+ * project unless the viewer's scope is unrestricted: "incidents with no project
+ * require oversight access" is the design's rule, not an accident. So a
+ * projectless incident is visible to admins and oversight members ONLY, and a
+ * project manager never sees it at all.
+ *
+ * That is the safe direction for a wrong attribution — a PM is not shown an
+ * incident that is not theirs — but it is NOT "visible to everyone with fleet
+ * scope", and the consequence is real: most telematics events happen on a road,
+ * not inside a project AOI, so MOST vehicle incidents will be projectless and
+ * therefore admin/oversight-only. If the fleet's own managers are expected to
+ * work this queue, they need oversight membership
+ * (`fleet_operational_incident_oversight_members`) — nothing in this file can
+ * grant it, and widening attribution to "the nearest project" instead would
+ * hand each incident to whichever PM happened to be closest.
  */
 
 import { log } from '@/lib/logger';

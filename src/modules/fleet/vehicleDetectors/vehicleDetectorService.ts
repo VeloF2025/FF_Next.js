@@ -3,10 +3,19 @@
  *
  * Runs every detector over every actively-tracked vehicle for one tick and
  * hands what they saw to the EXISTING incident producer. It creates nothing
- * itself: dedup, recurrence and the observation fingerprint all come free from
+ * itself: DEDUP and the observation fingerprint come free from
  * `produceIncident`'s `source_event` path, which returns `unchanged` when a
  * `sourceEventId` has been seen before. That is why `sourceEventId.ts` is the
  * load-bearing file in this slice and this one is orchestration.
+ *
+ * RECURRENCE does NOT come free, and the difference matters. The scheduled path
+ * calls `touchIncidentLastSeen` and appends an observation when it sees a
+ * condition again; the source-event path returns `unchanged` and touches
+ * nothing, so `condition_last_seen_at` stays at the open instant and a vehicle
+ * still stopped in the same place three hours later looks, to the queue, exactly
+ * like one that stopped once. Known limitation, deliberately not fixed here:
+ * "still true" for a bucketed source event is a different question from "seen
+ * again" for a roster detection, and answering it needs its own slice.
  *
  * ## Isolation, at three levels
  *
@@ -24,18 +33,38 @@
  * `runOperationalMonitor` under the same lock, and a detector fault must not
  * mark the roster monitor's run failed.
  *
- * ## Why every detector reads a fresh window every tick
+ * ## An opened incident is NOTIFIED here, not left to escalate into one
  *
- * There is no watermark here, deliberately. A watermark makes sense for a
- * builder whose output is a row per day; these detectors ask "is this condition
- * TRUE NOW", and re-asking over an overlapping window is exactly how a
- * still-present condition stays one incident. The window is sized so a stop or
- * an after-hours run cannot fall out of it mid-condition.
+ * `produceIncident` deliberately never notifies — delivery happens after its
+ * transaction commits, and `requiresInitialNotification` is how it says so.
+ * Without the call below a new telematics incident would be SILENT until the
+ * action runner escalated it, which for a critical type means the first thing
+ * anyone hears is an escalation WhatsApp minutes later — guaranteed, because
+ * nobody knew there was anything to acknowledge. So this phase does exactly
+ * what `monitorService` does on `opened`: resolve the incident rule, call
+ * `sendIncidentOpenedNotification`, and count the delivery. The mandatory
+ * WhatsApp leg then fires once, on open, for the two types 529 leaves
+ * `critical` — which is the designed behaviour, not a side effect.
+ *
+ * The incident rule is loaded for a second reason: `enabled` and
+ * `createsIncident`. The producer's source-event path reads a rule only for its
+ * severity, so without this check disabling `severe_driving` would do nothing.
+ *
+ * ## No watermark, deliberately
+ *
+ * A watermark suits a builder whose output is a row per day; these detectors ask
+ * "is this condition TRUE NOW", and re-asking over an overlapping window is
+ * exactly how a still-present condition stays one incident.
  */
 
 import { log } from '@/lib/logger';
 import { produceIncident } from '../incidents/incidentProducer';
-import type { IncidentType, SanitizedIncidentMetadata } from '../incidents/types';
+import { sendIncidentOpenedNotification } from '../incidents/incidentNotifications';
+import { loadEffectiveIncidentRule } from '../incidents/settingsRepository';
+import type { IncidentRule, IncidentType } from '../incidents/types';
+import {
+  emitDetectedEvent, loadIncidentRules, type EmitterDeps, type RegisteredDetector,
+} from './detectedEventEmitter';
 import { accidentSosDetector } from './accidentSosDetector';
 import {
   loadDetectorVehicles, loadGapP90Seconds, loadLastPosition, loadPositionWindow,
@@ -48,7 +77,7 @@ import { unauthorizedStopDetector } from './unauthorizedStopDetector';
 import { loadEffectiveVehicleRule } from './vehicleRuleQueries';
 import { resolveVehicleProjectId } from './vehicleProjectResolver';
 import type {
-  DetectedVehicleEvent, VehicleDetector, VehicleDetectorContext, VehicleOperationalRule,
+  DetectedVehicleEvent, VehicleDetectorContext, VehicleOperationalRule,
 } from './types';
 
 const MODULE = 'FleetVehicleDetectors';
@@ -57,9 +86,19 @@ const MODULE = 'FleetVehicleDetectors';
  * How far back each tick looks.
  *
  * Long enough that the longest condition a detector tracks cannot start outside
- * it while still being true inside it: a 45-minute stop, an after-hours window
- * that runs 18:00→06:00, and a theft anchor that must stay loaded for the whole
- * night. Twelve hours covers all three with room, and bounds the read.
+ * it while still being true inside it: a 45-minute stop, the seeded after-hours
+ * window of 21:00→05:00 (eight hours, per migration 529 as shipped), and a theft
+ * anchor that must stay loaded for the whole night. Twelve hours covers all
+ * three with room, and bounds the read.
+ *
+ * KNOWN AND ACCEPTED under-detection: a weekend or public holiday is one
+ * after-hours BUCKET of up to 24 hours (`weekends_are_after_hours`), which is
+ * wider than this 12-hour load. A vehicle whose Saturday displacement only
+ * exceeds the threshold more than 12 hours after that bucket's first loaded fix
+ * measures its displacement from a later anchor and can therefore under-report.
+ * It fails in the quiet direction — a missed alert, never a false one — and
+ * widening the load to 24 h would double the per-tick read for all eighteen
+ * vehicles to fix a case no dry-run day exhibited. Revisit if one does.
  */
 export const WINDOW_HOURS = 12;
 
@@ -74,13 +113,6 @@ export const CADENCE_SAMPLE_HOURS = 24;
  * 4x the worst measured case: a ceiling against a backfill, not a page size.
  */
 export const MAX_POSITIONS_PER_VEHICLE = 6_000;
-
-/** One detector as the phase registers it: its id, the incident type it opens, and the run. */
-export interface RegisteredDetector {
-  id: string;
-  incidentType: IncidentType;
-  run: VehicleDetector;
-}
 
 /**
  * `dangerous_area_entry` is absent because there is no dangerous-area geofence
@@ -103,20 +135,22 @@ export interface VehicleDetectorPhaseResult {
   eventsDetected: number;
   incidentsOpened: number;
   incidentsUnchanged: number;
+  /** Suppressed because their incident rule is disabled or set not to create incidents. */
+  incidentsSuppressedByRule: number;
+  notificationsAccepted: number;
+  notificationsFailed: number;
   detectorFailures: number;
   producerFailures: number;
 }
 
 /** Seams, so the phase can be exercised without a database. Production passes none of them. */
-export interface VehicleDetectorDeps {
+export interface VehicleDetectorDeps extends EmitterDeps {
   loadVehicles: typeof loadDetectorVehicles;
   loadWindow: typeof loadPositionWindow;
   loadLast: typeof loadLastPosition;
   loadGapP90: typeof loadGapP90Seconds;
   loadRule: (asOf: string) => Promise<VehicleOperationalRule | null>;
   loadHolidayDates: (from: string, to: string) => Promise<ReadonlySet<string>>;
-  resolveProjectId: (lat: number | null, lon: number | null) => Promise<string | null>;
-  produce: typeof produceIncident;
   detectors: readonly RegisteredDetector[];
 }
 
@@ -128,7 +162,9 @@ const DEFAULT_DEPS: VehicleDetectorDeps = {
   loadRule: loadEffectiveVehicleRule,
   loadHolidayDates: loadHolidays,
   resolveProjectId: (lat, lon) => resolveVehicleProjectId(lat, lon),
+  loadIncidentRule: loadEffectiveIncidentRule,
   produce: produceIncident,
+  notifyOpened: sendIncidentOpenedNotification,
   detectors: DETECTORS,
 };
 
@@ -149,64 +185,22 @@ function holidayRange(nowIso: string): { from: string; to: string } {
   return { from: hoursBefore(nowIso, 48).slice(0, 10), to: hoursBefore(nowIso, -24).slice(0, 10) };
 }
 
+/**
+ * A zeroed result. Exported as `vehicleDetectorPhaseFailure` so the cron route
+ * cannot drift from this shape — it built its own literal once, and adding a
+ * counter broke the build rather than the route only because tsc caught it.
+ */
 function emptyResult(status: VehicleDetectorPhaseStatus): VehicleDetectorPhaseResult {
   return {
     status, vehiclesEvaluated: 0, eventsDetected: 0, incidentsOpened: 0,
-    incidentsUnchanged: 0, detectorFailures: 0, producerFailures: 0,
+    incidentsUnchanged: 0, incidentsSuppressedByRule: 0, notificationsAccepted: 0,
+    notificationsFailed: 0, detectorFailures: 0, producerFailures: 0,
   };
 }
 
-/**
- * `metadata` must be flat primitives — `SanitizedIncidentMetadata`. A nested
- * object reaches `evidence_snapshot` as something no reader can render, and
- * TypeScript alone does not catch it once a detector builds metadata
- * dynamically, so this drops any non-primitive rather than storing it.
- */
-export function sanitizeMetadata(metadata: SanitizedIncidentMetadata): SanitizedIncidentMetadata {
-  const clean: SanitizedIncidentMetadata = {};
-  for (const [key, value] of Object.entries(metadata)) {
-    if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      clean[key] = value;
-      continue;
-    }
-    log.warn('[fleet-detectors] dropped a non-primitive metadata field', { key }, MODULE);
-  }
-  return clean;
-}
-
-async function produceOne(
-  detector: RegisteredDetector, event: DetectedVehicleEvent, vehicleId: string,
-  deps: VehicleDetectorDeps, result: VehicleDetectorPhaseResult,
-): Promise<void> {
-  try {
-    const projectId = await deps.resolveProjectId(event.lat, event.lon);
-    const outcome = await deps.produce({
-      producerKind: 'source_event',
-      incidentType: detector.incidentType,
-      sourceEventId: event.sourceEventId,
-      occurredAt: event.occurredAt,
-      // Never a staff id. These detectors observe a VEHICLE; the producer's
-      // scheduled path is the one that requires a staff identity, and handing it
-      // one here would attribute a machine reading to a person.
-      staffId: null,
-      vehicleId,
-      projectId,
-      metadata: sanitizeMetadata(event.metadata),
-    });
-    if (outcome.outcome === 'opened') result.incidentsOpened += 1;
-    else result.incidentsUnchanged += 1;
-  } catch (error) {
-    result.producerFailures += 1;
-    log.error(
-      '[fleet-detectors] producing an incident failed',
-      { detector: detector.id, vehicleId, error: error instanceof Error ? error.message : String(error) },
-      MODULE,
-    );
-  }
-}
-
 async function runForVehicle(
-  ctx: VehicleDetectorContext, deps: VehicleDetectorDeps, result: VehicleDetectorPhaseResult,
+  ctx: VehicleDetectorContext, rules: Map<IncidentType, IncidentRule>,
+  deps: VehicleDetectorDeps, result: VehicleDetectorPhaseResult,
 ): Promise<void> {
   for (const detector of deps.detectors) {
     let events: DetectedVehicleEvent[];
@@ -225,8 +219,17 @@ async function runForVehicle(
       continue;
     }
     result.eventsDetected += events.length;
+    if (events.length === 0) continue;
+
+    // Configured off is not an error — it is an operator's decision, and the
+    // producer's source-event path would otherwise honour only the severity.
+    const rule = rules.get(detector.incidentType);
+    if (!rule || !rule.enabled || !rule.createsIncident) {
+      result.incidentsSuppressedByRule += events.length;
+      continue;
+    }
     for (const event of events) {
-      await produceOne(detector, event, ctx.vehicle.vehicleId, deps, result);
+      await emitDetectedEvent(detector, event, ctx.vehicle, rule, deps, result);
     }
   }
 }
@@ -252,6 +255,7 @@ export async function runVehicleDetectors(
   const vehicles = await deps.loadVehicles();
   if (vehicles.length === 0) return emptyResult('skipped');
 
+  const incidentRules = await loadIncidentRules(deps, request.now);
   const range = holidayRange(request.now);
   const holidays = await deps.loadHolidayDates(range.from, range.to);
   const windowFrom = hoursBefore(request.now, WINDOW_HOURS);
@@ -270,7 +274,7 @@ export async function runVehicleDetectors(
       result.vehiclesEvaluated += 1;
       await runForVehicle(
         { vehicle, positions, lastPosition, gapP90Seconds, rule, holidays, now: request.now },
-        deps, result,
+        incidentRules, deps, result,
       );
     } catch (error) {
       vehicleFailures += 1;
@@ -286,4 +290,9 @@ export async function runVehicleDetectors(
     result.status = result.vehiclesEvaluated === 0 ? 'failed' : 'partial';
   }
   return result;
+}
+
+/** The result the cron route reports when the phase could not even run. */
+export function vehicleDetectorPhaseFailure(): VehicleDetectorPhaseResult {
+  return emptyResult('failed');
 }

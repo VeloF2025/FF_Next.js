@@ -18,8 +18,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/logger', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 
-import { runVehicleDetectors, sanitizeMetadata, type VehicleDetectorDeps } from '../vehicleDetectorService';
-import { RULE, VEHICLE, VEHICLE_ID, latOffset, position } from './detectorFixtures';
+import { runVehicleDetectors, type VehicleDetectorDeps } from '../vehicleDetectorService';
+import { sanitizeMetadata } from '../detectedEventEmitter';
+import { INCIDENT_RULE, RULE, VEHICLE, VEHICLE_ID, latOffset, position } from './detectorFixtures';
+
+const DELIVERED = { delivered: 2, suppressed: 0, failed: 0 };
 
 const NOW = '2026-08-18T19:00:00.000Z';
 const OTHER_VEHICLE = { vehicleId: 'b2b2b2b2-2222-4222-8222-222222222222', registration: 'XYZ', afterHoursExempt: false };
@@ -43,7 +46,9 @@ function deps(overrides: Partial<VehicleDetectorDeps> = {}): Partial<VehicleDete
     loadRule: vi.fn(async () => RULE),
     loadHolidayDates: vi.fn(async () => new Set<string>()),
     resolveProjectId: vi.fn(async () => null),
+    loadIncidentRule: vi.fn(async () => INCIDENT_RULE),
     produce: vi.fn(async () => ({ outcome: 'opened' as const, incidentId: 'inc-1', requiresInitialNotification: true })),
+    notifyOpened: vi.fn(async () => ({ ...DELIVERED })),
     ...overrides,
   };
 }
@@ -62,6 +67,7 @@ describe('runVehicleDetectors — the producer contract', () => {
       incidentType: 'theft_after_hours_movement',
       staffId: null,
       vehicleId: VEHICLE_ID,
+      vehicleRegistrationSnapshot: 'ABC 123 GP',
       projectId: null,
     });
     expect(result).toMatchObject({ status: 'succeeded', incidentsOpened: 1, eventsDetected: 1 });
@@ -114,6 +120,86 @@ describe('runVehicleDetectors — the producer contract', () => {
   });
 });
 
+describe('runVehicleDetectors — the opened notification', () => {
+  it('notifies on a newly opened incident, naming the vehicle', async () => {
+    const notifyOpened = vi.fn(async () => ({ ...DELIVERED }));
+
+    const result = await runVehicleDetectors({ now: NOW }, deps({ notifyOpened }));
+
+    expect(notifyOpened).toHaveBeenCalledTimes(1);
+    expect(notifyOpened.mock.calls[0]?.[0]).toMatchObject({
+      incidentId: 'inc-1',
+      incidentType: 'theft_after_hours_movement',
+      producerKind: 'source_event',
+      severity: 'critical',
+      staffName: null,
+      vehicleRegistration: 'ABC 123 GP',
+    });
+    expect(result).toMatchObject({ notificationsAccepted: 2, notificationsFailed: 0 });
+  });
+
+  it('does NOT notify again on a second tick over the same data', async () => {
+    const notifyOpened = vi.fn(async () => ({ ...DELIVERED }));
+    const produce = vi.fn(async () => ({
+      outcome: 'unchanged' as const, incidentId: 'inc-1', requiresInitialNotification: false,
+    }));
+
+    await runVehicleDetectors({ now: NOW }, deps({ produce, notifyOpened }));
+
+    expect(notifyOpened).not.toHaveBeenCalled();
+  });
+
+  it('does not notify when the producer says no initial notification is required', async () => {
+    const notifyOpened = vi.fn(async () => ({ ...DELIVERED }));
+    const produce = vi.fn(async () => ({
+      outcome: 'opened' as const, incidentId: 'inc-1', requiresInitialNotification: false,
+    }));
+
+    const result = await runVehicleDetectors({ now: NOW }, deps({ produce, notifyOpened }));
+
+    expect(notifyOpened).not.toHaveBeenCalled();
+    expect(result.incidentsOpened).toBe(1);
+  });
+
+  it('counts a failed delivery without failing the incident', async () => {
+    const notifyOpened = vi.fn(async () => ({ delivered: 0, suppressed: 0, failed: 1 }));
+
+    const result = await runVehicleDetectors({ now: NOW }, deps({ notifyOpened }));
+
+    expect(result).toMatchObject({ incidentsOpened: 1, notificationsFailed: 1, status: 'succeeded' });
+  });
+
+  it('opens nothing for a type whose incident rule is disabled', async () => {
+    const produce = vi.fn();
+    const loadIncidentRule = vi.fn(async () => ({ ...INCIDENT_RULE, enabled: false }));
+
+    const result = await runVehicleDetectors({ now: NOW }, deps({ loadIncidentRule, produce }));
+
+    expect(produce).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ incidentsSuppressedByRule: 1, incidentsOpened: 0, status: 'succeeded' });
+  });
+
+  it('opens nothing for a rule configured not to create incidents', async () => {
+    const produce = vi.fn();
+    const loadIncidentRule = vi.fn(async () => ({ ...INCIDENT_RULE, createsIncident: false }));
+
+    await runVehicleDetectors({ now: NOW }, deps({ loadIncidentRule, produce }));
+
+    expect(produce).not.toHaveBeenCalled();
+  });
+
+  it('opens nothing when no incident rule is effective for the type', async () => {
+    const produce = vi.fn();
+
+    const result = await runVehicleDetectors({ now: NOW }, deps({
+      loadIncidentRule: vi.fn(async () => null), produce,
+    }));
+
+    expect(produce).not.toHaveBeenCalled();
+    expect(result.incidentsSuppressedByRule).toBe(1);
+  });
+});
+
 describe('runVehicleDetectors — isolation', () => {
   it('isolates a throwing detector and reports the phase partial', async () => {
     const good = vi.fn(async () => []);
@@ -142,7 +228,7 @@ describe('runVehicleDetectors — isolation', () => {
   });
 
   it('isolates a refused producer call', async () => {
-    const produce = vi.fn(async () => { throw new Error('No effective incident rule'); });
+    const produce = vi.fn(async () => { throw new Error('incident insert rejected'); });
 
     const result = await runVehicleDetectors({ now: NOW }, deps({ produce }));
 

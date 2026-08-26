@@ -9,6 +9,7 @@
  * `prolonged_unauthorized_stop` and `lost_contact_moving` have one.
  */
 
+import type { IncidentRule } from '../../incidents/types';
 import type {
   DetectorPosition, DetectorVehicle, VehicleDetectorContext, VehicleOperationalRule,
 } from '../types';
@@ -87,3 +88,18 @@ export function context(overrides: Partial<VehicleDetectorContext> = {}): Vehicl
 export function latOffset(baseLat: number, meters: number): number {
   return baseLat + meters / 111_320;
 }
+
+/**
+ * The `fleet_operational_incident_rules` row a telematics type carries after
+ * migration 529 has re-versioned it: `high`, WhatsApp off. `theft_after_hours_movement`
+ * and `accident_sos` are the two 529 leaves `critical` — override `severity`
+ * for those.
+ */
+export const INCIDENT_RULE: IncidentRule = {
+  id: 'incident-rule-1', incidentType: 'theft_after_hours_movement', version: 1,
+  effectiveFrom: '2026-08-01T00:00:00.000Z', effectiveTo: null,
+  enabled: true, createsIncident: true, severity: 'critical', immediateNotification: true,
+  channels: { inApp: true, email: true, whatsapp: true }, includeInMorningSummary: false,
+  acknowledgementTargetMinutes: 5, reminderIntervalMinutes: 15, maximumEscalationLevel: 3,
+  evidenceRequiredOutcomes: [],
+};

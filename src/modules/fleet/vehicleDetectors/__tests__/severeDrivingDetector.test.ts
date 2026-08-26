@@ -147,3 +147,32 @@ describe('the window g gate', () => {
     expect(detectSevereDriving(context({ positions: [atThreshold] }))).toEqual([]);
   });
 });
+
+describe('precedence between the two evidence paths', () => {
+  it('reports ONE event for a fix that satisfies both, and the provider wins', () => {
+    // The firmware says cornering; the g columns say braking. Both are "true"
+    // for this fix, and it is one event. Reporting it twice would open two
+    // incidents under two bucket keys, and reporting the g verdict would
+    // contradict the device that measured it.
+    const positions = [position({
+      providerEventType: 'HARSH_CORNERING', linearG: -0.9, lateralG: 0, speedKph: 80,
+    })];
+
+    const events = detectSevereDriving(context({ positions }));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.metadata.harshKind).toBe('cornering');
+    expect(events[0]?.metadata.evidence).toBe('provider_event');
+  });
+
+  it('still takes the g path for a fix the provider did not name, in the same window', () => {
+    const positions = [
+      position({ providerEventId: 'a', providerEventType: 'HARSH_CORNERING', linearG: -0.9, speedKph: 80 }),
+      position({ providerEventId: 'b', providerEventType: 'PERIODIC_EVENT', linearG: -0.9, speedKph: 80 }),
+    ];
+
+    const events = detectSevereDriving(context({ positions }));
+
+    expect(events.map((e) => e.metadata.evidence)).toEqual(['provider_event', 'g_force']);
+  });
+});
