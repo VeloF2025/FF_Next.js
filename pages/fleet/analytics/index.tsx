@@ -17,6 +17,7 @@ import {
   Calendar, Droplets,
 } from 'lucide-react';
 import type { ScorecardReport, VehicleScorecard } from '@/modules/fleet/types';
+import { OperationsAnalytics } from '@/modules/fleet/incidents/web/OperationsAnalytics';
 
 type PeriodKey = '1m' | '3m' | '6m' | '12m' | 'custom';
 type SortKey = 'registration' | 'totalKm' | 'fuelCost' | 'costPerKm' | 'litresPer100km' | 'checkInCount' | 'complianceRate' | 'avgKmPerDay';
@@ -319,6 +320,13 @@ export default function FleetAnalyticsPage() {
               <RefreshCw className="w-8 h-8 text-[var(--ff-primary)] animate-spin" />
             </div>
           )}
+
+          {/* Stage 8 task 9. Appended below the vehicle scorecard rather than
+              woven into it: the two share no filter state, no request and no
+              permission, and the seam is deliberately this one line. */}
+          <div className="pt-2 border-t border-[var(--ff-border-light)]">
+            <OperationsAnalytics />
+          </div>
         </div>
       </ModulePage>
     </AppLayout>
