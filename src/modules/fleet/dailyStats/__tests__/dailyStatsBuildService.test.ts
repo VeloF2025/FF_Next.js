@@ -548,3 +548,71 @@ describe('a tracker whose clock runs ahead of the server', () => {
     expect(logger.log.error).not.toHaveBeenCalled();
   });
 });
+
+describe('what the watermark advances to', () => {
+  const at = (day: string, seconds: number) => new Date(dayStart(day) + seconds * 1_000).toISOString();
+
+  const fix = (n: number, recordedAt: string) => ({
+    id: `w-${String(n).padStart(4, '0')}`,
+    vehicle_id: ALPHA,
+    recorded_at: recordedAt,
+    provider_event_id: `ct-w-${n}`,
+    provider: 'cartrack',
+    account_ref: 'velocity',
+    ignition: true,
+    lat: -26.2,
+    lon: 28.0,
+    speed_kph: 40,
+    is_speeding: false,
+    odometer_km: 5_000 + n * 0.2,
+    linear_g: 0,
+    lateral_g: 0,
+    provider_event_type: 'PERIODIC_EVENT',
+  });
+
+  it('takes the newest SOURCE WATERMARK, not the last row, when a trip-only day trails', async () => {
+    // PR1's fold emits a row for a day whose only content is a trip, and that row's
+    // source_watermark is NULL — there were no positions to name one. It sorts last by work_date,
+    // so reading the mark off the final row yields null and the watermark never advances at all:
+    // the vehicle refolds the same window every tick, silently, for as long as a trip trails its
+    // last fix. The reduce takes the newest non-null instead.
+    const fake = useDb(new FakeDb());
+    fake.seedPositions([fix(1, at(DAYS[1], 8 * 3_600)), fix(2, at(DAYS[1], 8 * 3_600 + 120))]);
+    fake.trips.push({
+      vehicle_id: ALPHA,
+      ignition_on_at: at(DAYS[2], 1 * 3_600),
+      ignition_off_at: at(DAYS[2], 3 * 3_600),
+    });
+
+    await buildDailyStats(at(DAYS[2], 18 * 3_600));
+
+    // The trailing day exists and carries no watermark of its own.
+    expect(fake.statsRow(ALPHA, DAYS[2])).toBeDefined();
+    expect(fake.statsRow(ALPHA, DAYS[2])!.source_watermark).toBeNull();
+    // The mark still moved, to the last day that actually had a fix.
+    expect(fake.watermarks.get(ALPHA)?.last_position_at)
+      .toBe(new Date(at(DAYS[1], 8 * 3_600 + 120)).toISOString());
+  });
+
+  it('restamps computed_at when a day is refolded', async () => {
+    // computed_at answers "when did we last look at this day", which is what tells an operator a
+    // stalled row from a quiet one. It is assigned from now() rather than EXCLUDED, so it is the
+    // one column the EXCLUDED-completeness check cannot see; dropped from the SET list, a row
+    // would keep the timestamp of whichever partial fold first inserted it.
+    const fake = useDb(new FakeDb());
+    fake.seedPositions([fix(1, at(DAYS[2], 8 * 3_600)), fix(2, at(DAYS[2], 8 * 3_600 + 120))]);
+    const now = at(DAYS[2], 18 * 3_600);
+
+    await buildDailyStats(now);
+    const first = String(fake.statsRow(ALPHA, DAYS[2])!.computed_at);
+
+    fake.seedPositions([fix(3, at(DAYS[2], 8 * 3_600 + 240))]);
+    await buildDailyStats(now);
+    const second = String(fake.statsRow(ALPHA, DAYS[2])!.computed_at);
+
+    expect(first).toBeTruthy();
+    expect(second).not.toBe(first);
+    // Non-vacuity: the refold really did rewrite the row, so a changed stamp means something.
+    expect(Number(fake.statsRow(ALPHA, DAYS[2])!.position_count)).toBe(3);
+  });
+});

@@ -77,6 +77,13 @@ function excludedAssignments(text: string): string[] {
   return [...set[1]!.matchAll(/(\w+)\s*=\s*EXCLUDED\.(\w+)/gi)].map((m) => m[1]!);
 }
 
+/** Columns a DO UPDATE assigns from `now()` rather than from EXCLUDED. */
+function nowAssignments(text: string): string[] {
+  const set = /DO UPDATE SET([\s\S]*)$/i.exec(text);
+  if (!set) return [];
+  return [...set[1]!.matchAll(/(\w+)\s*=\s*now\(\)/gi)].map((m) => m[1]!);
+}
+
 function conflictAction(text: string): 'update' | 'nothing' | 'none' {
   if (/ON CONFLICT[^]*?DO NOTHING/i.test(text)) return 'nothing';
   if (/ON CONFLICT[^]*?DO UPDATE/i.test(text)) return 'update';
@@ -109,6 +116,19 @@ export class FakeDb {
   /** Every statement tag executed, in order — used to pin upsert-before-watermark ordering. */
   executed: { tag: string; params: readonly unknown[] }[] = [];
 
+  private tick = 0;
+
+  /**
+   * `now()`, as a value that always moves.
+   *
+   * Two statements in the same millisecond would otherwise stamp identical instants, and a test
+   * asserting that a refold RESTAMPED a row could not tell "updated" from "left alone".
+   */
+  private nowValue(): string {
+    this.tick += 1;
+    return new Date(Date.parse('2026-08-25T00:00:00.000Z') + this.tick).toISOString();
+  }
+
   constructor(private readonly options: FakeDbOptions = {}) {}
 
   registerVehicle(vehicleId: string): void {
@@ -125,11 +145,18 @@ export class FakeDb {
     return this.dailyStats.get(`${vehicleId}|${workDate}`);
   }
 
-  /** A stable digest of a stats row, for the batch-invariance comparison. */
+  /**
+   * A stable digest of a stats row's METRICS, for the batch-invariance comparison.
+   *
+   * `computed_at` is excluded on purpose: it records when the row was written, not what the
+   * vehicle did, and it legitimately differs between two runs over identical input. Including it
+   * would make the invariance sweep fail for the one reason that is not a defect.
+   */
   statsHashes(): Map<string, string> {
     const out = new Map<string, string>();
     for (const [key, row] of this.dailyStats) {
-      const stable = Object.keys(row).sort().map((k) => `${k}=${String(row[k])}`).join(';');
+      const stable = Object.keys(row).filter((k) => k !== 'computed_at').sort()
+        .map((k) => `${k}=${String(row[k])}`).join(';');
       out.set(key, stable);
     }
     return out;
@@ -283,7 +310,8 @@ export class FakeDb {
     const key = `${String(incoming.vehicle_id)}|${String(incoming.work_date)}`;
     const existing = this.dailyStats.get(key);
     if (!existing) {
-      this.dailyStats.set(key, { ...incoming });
+      // computed_at is not in the INSERT column list; it carries DEFAULT now() in migration 528.
+      this.dailyStats.set(key, { ...incoming, computed_at: this.nowValue() });
       return [];
     }
     const action = conflictAction(text);
@@ -291,6 +319,9 @@ export class FakeDb {
     // Only the columns the statement actually assigns are replaced. A column dropped from the SET
     // list keeps its stale value here exactly as it would in Postgres.
     for (const col of excludedAssignments(text)) existing[col] = incoming[col];
+    // `col = now()` assignments are read out of the SET list too, so dropping one changes what a
+    // test sees rather than only what the SQL says.
+    for (const col of nowAssignments(text)) existing[col] = this.nowValue();
     return [];
   }
 

@@ -4,7 +4,10 @@
  * invariance) is covered in src/modules/fleet/dailyStats/__tests__; the lock's acquire/release/
  * destroy discipline is covered in cronLock.test.ts.
  */
-vi.mock('@/lib/logger', () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
+const logger = vi.hoisted(() => ({
+  log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+vi.mock('@/lib/logger', () => logger);
 
 const lock = vi.hoisted(() => ({ runWithCronLock: vi.fn() }));
 vi.mock('@/modules/fleet/incidents/cronLock', () => lock);
@@ -84,6 +87,33 @@ describe('POST /api/cron/fleet-daily-stats', () => {
     expect(build.buildDailyStats).not.toHaveBeenCalled();
     expect(res._getStatusCode()).toBe(200);
     expect(res._getJSONData().data).toMatchObject({ skipped: true });
+  });
+
+  it('logs the error NAME, never its message, so a connection string cannot reach the log', async () => {
+    // This handler is the outer boundary: it catches anything, including a pool-construction
+    // failure whose message embeds the database URL. Cron output goes to a plaintext file on the
+    // deploy host, so logging `error.message` here would write a credential to disk on every
+    // failing tick — the same class of leak that already cost this repo a rotation.
+    //
+    // The sentinel below is deliberately NOT shaped like a real connection string: the point is
+    // that the MESSAGE does not reach the log, and a realistic-looking secret in a tracked test
+    // file would trip the repo's own secret scanner for no added coverage.
+    const sentinel = 'MESSAGE-SHOULD-NOT-BE-LOGGED-a1b2c3';
+    build.buildDailyStats.mockRejectedValue(new TypeError(`pool init failed: ${sentinel}`));
+    lock.runWithCronLock.mockImplementation(async (_l: string, work: () => Promise<unknown>) => {
+      await work();
+      return { ran: true, result: undefined };
+    });
+
+    const res = await run(AUTH);
+
+    expect(res._getStatusCode()).toBe(500);
+    expect(logger.log.error).toHaveBeenCalled();
+    const logged = JSON.stringify(logger.log.error.mock.calls);
+    expect(logged).not.toContain(sentinel);
+    // Non-vacuity: something about the error IS recorded, so the assertion above is not passing
+    // merely because nothing was logged at all.
+    expect(logged).toContain('TypeError');
   });
 
   it('returns 500 when the build throws', async () => {
