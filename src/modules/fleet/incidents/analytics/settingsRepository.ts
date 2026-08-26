@@ -15,7 +15,8 @@ import { queryOne, transaction } from '@/lib/db-pool';
 import type { RetentionHoldCategory } from './aggregateSchema';
 import type { RetentionPolicy } from './types';
 import {
-  RetentionSettingsValidationError, assertShorteningIsAcknowledged, validateRetentionSettingsChange,
+  ACKNOWLEDGEMENT_MAX_AGE_DAYS, RetentionSettingsValidationError, requireDryRunAcknowledgement,
+  validateRetentionSettingsChange,
 } from './retentionSettingsValidation';
 import type { AnalyticsRetentionSettingsChangeRequest } from './retentionSettingsValidation';
 
@@ -128,20 +129,34 @@ export async function versionAnalyticsRetentionSettings(
       );
     }
 
-    const dryRunId = assertShorteningIsAcknowledged(
-      current.retention_months, request.retentionMonths, request.acknowledgedDryRunId,
+    const dryRunId = requireDryRunAcknowledgement(
+      { retentionMonths: current.retention_months, liveRetentionEnabled: current.live_retention_enabled },
+      request,
     );
     if (dryRunId !== null) {
-      // Scoped to `dry_run = true`. A LIVE run is not an acknowledgement of a
-      // shortening — it is deletion that has already happened.
+      /**
+       * Three clauses, and the gate is worth nothing without all three.
+       *
+       *   `dry_run = true` — a LIVE run is not an acknowledgement of anything,
+       *     it is the deletion itself.
+       *   `policy_months = $2` — a dry run at 24 months says nothing about
+       *     what a 6-month policy would delete. Without this clause any run
+       *     ever performed, at any window, would arm the change.
+       *   `started_at > now() - 14 days` — a run from last quarter describes a
+       *     dataset that no longer exists; incidents have aged past the cutoff
+       *     since, and they are exactly the ones this change would delete.
+       */
       const reviewed = await txn.queryOne<{ id: string }>(
         `/* fleet-analytics-settings:acknowledged-dry-run */
-         SELECT id FROM fleet_operational_retention_runs WHERE id = $1::uuid AND dry_run = true`,
-        [dryRunId],
+         SELECT id FROM fleet_operational_retention_runs
+          WHERE id = $1::uuid AND dry_run = true AND policy_months = $2
+            AND started_at > now() - ($3 || ' days')::interval`,
+        [dryRunId, request.retentionMonths, String(ACKNOWLEDGEMENT_MAX_AGE_DAYS)],
       );
       if (!reviewed) {
         throw new RetentionSettingsValidationError(
-          `acknowledgedDryRunId ${dryRunId} does not name a dry retention run`,
+          `acknowledgedDryRunId ${dryRunId} does not name a dry retention run at `
+          + `${request.retentionMonths} months started within the last ${ACKNOWLEDGEMENT_MAX_AGE_DAYS} days`,
         );
       }
     }

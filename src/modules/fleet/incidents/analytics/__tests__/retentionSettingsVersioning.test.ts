@@ -20,10 +20,20 @@ import type { AnalyticsRetentionSettingsChangeRequest } from '../settingsReposit
 const ACTOR = '11111111-1111-4111-8111-111111111111';
 const DRY_RUN = '99999999-9999-4999-8999-999999999999';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * Relative to the clock, not a literal. `effectiveFrom` may no longer be
+ * backdated, so a hard-coded 2026-09-01 would be a fixture that quietly starts
+ * failing the day it goes past — and the failure would look like a bug in the
+ * rule rather than in the fixture.
+ */
+const PAST = new Date(Date.now() - 30 * DAY_MS).toISOString();
+const FUTURE = new Date(Date.now() + 7 * DAY_MS).toISOString();
+
 /** The open version the transaction locks, as migration 518's defaults describe it. */
 const CURRENT = {
   version: 4,
-  effective_from: '2026-01-01T00:00:00.000Z',
+  effective_from: PAST,
   retention_months: 12,
   anonymity_min_contributors: 5,
   recalculation_window_months: 3,
@@ -43,7 +53,7 @@ const CURRENT = {
 
 function request(over: Partial<AnalyticsRetentionSettingsChangeRequest> = {}): AnalyticsRetentionSettingsChangeRequest {
   return {
-    effectiveFrom: '2026-09-01T00:00:00.000Z',
+    effectiveFrom: FUTURE,
     retentionMonths: 12,
     anonymityMinContributors: 5,
     recalculationWindowMonths: 3,
@@ -126,6 +136,29 @@ describe('versionAnalyticsRetentionSettings', () => {
   });
 
   /**
+   * A version may be scheduled forward but never backdated. The settings row
+   * is the record of what was in force when a purge ran, so one claiming to
+   * have been effective last month rewrites the justification for deletions
+   * that already happened.
+   *
+   * `../driver/settingsRepository.ts` has the same gap and is deliberately NOT
+   * fixed here — a second table with its own tests is a second review.
+   */
+  it('refuses an effectiveFrom in the past', async () => {
+    happyPath();
+    const backdated = new Date(Date.now() - 60 * 1000).toISOString();
+    await expect(versionAnalyticsRetentionSettings(request({ effectiveFrom: backdated }), ACTOR))
+      .rejects.toThrow(/past|backdat/i);
+  });
+
+  it('accepts an effectiveFrom scheduled forward', async () => {
+    happyPath();
+    await expect(versionAnalyticsRetentionSettings(
+      request({ effectiveFrom: new Date(Date.now() + 90 * DAY_MS).toISOString() }), ACTOR,
+    )).resolves.toBeDefined();
+  });
+
+  /**
    * Every one of these mirrors a CHECK in migration 518. They are validated
    * here so a caller gets a sentence naming the field rather than a 23514
    * naming a constraint, and so the rule is visible to a reader of the code.
@@ -195,15 +228,43 @@ describe('versionAnalyticsRetentionSettings', () => {
     });
 
     it('accepts a shortening backed by a real dry run', async () => {
-      const { calls } = transactionReturning([CURRENT, { id: DRY_RUN }, { ...CURRENT, version: 5, retention_months: 6 }]);
+      transactionReturning([CURRENT, { id: DRY_RUN }, { ...CURRENT, version: 5, retention_months: 6 }]);
       const created = await versionAnalyticsRetentionSettings(
         request({ retentionMonths: 6, acknowledgedDryRunId: DRY_RUN }), ACTOR,
       );
       expect(created.retentionMonths).toBe(6);
-      // The lookup is scoped to dry runs — a LIVE run is not an acknowledgement
-      // of anything, it is the deletion itself.
+    });
+
+    /**
+     * Three clauses, and the gate is worth nothing without all three. Without
+     * `dry_run`, a LIVE run — the deletion itself — would arm the change.
+     * Without `policy_months`, a dry run at 24 months would authorise a cut to
+     * 6, though it says nothing about what a 6-month policy deletes. Without
+     * the age bound, a run from last quarter would, though incidents have aged
+     * past the cutoff since and they are exactly the ones this would delete.
+     *
+     * Dropping any one clause from the SQL fails this test.
+     */
+    it('looks up the dry run scoped to dry, to the months asked for, and to the last 14 days', async () => {
+      const { calls } = transactionReturning([CURRENT, { id: DRY_RUN }, { ...CURRENT, version: 5, retention_months: 6 }]);
+      await versionAnalyticsRetentionSettings(
+        request({ retentionMonths: 6, acknowledgedDryRunId: DRY_RUN }), ACTOR,
+      );
       const lookup = calls.find((call) => /retention_runs/i.test(call.sql));
-      expect(lookup?.sql).toMatch(/dry_run/i);
+      expect(lookup?.sql).toMatch(/dry_run\s*=\s*true/i);
+      expect(lookup?.sql).toMatch(/policy_months\s*=\s*\$2/i);
+      expect(lookup?.sql).toMatch(/started_at\s*>\s*now\(\)\s*-/i);
+      // The months bound to that clause are the ones being ASKED for, not the
+      // ones in force: the dry run has to describe the policy about to apply.
+      expect(lookup?.params[1]).toBe(6);
+      expect(lookup?.params[2]).toBe('14');
+    });
+
+    it('says what would make the acknowledgement acceptable', async () => {
+      transactionReturning([CURRENT, null]);
+      await expect(versionAnalyticsRetentionSettings(
+        request({ retentionMonths: 6, acknowledgedDryRunId: DRY_RUN }), ACTOR,
+      )).rejects.toThrow(/6 months.*14 days/i);
     });
 
     /** Lengthening adds no eligibility and needs no ceremony. */
@@ -215,6 +276,65 @@ describe('versionAnalyticsRetentionSettings', () => {
     it('lets an unchanged window through', async () => {
       happyPath();
       await expect(versionAnalyticsRetentionSettings(request({ retentionMonths: 12 }), ACTOR)).resolves.toBeDefined();
+    });
+  });
+
+  /**
+   * `liveRetentionEnabled` false→true is the switch that ARMS deletion. Until
+   * it flips the purge reports and deletes nothing; flipping it makes every
+   * incident already past the cutoff deletable at the next run — on a first
+   * arming, the entire backlog. It is a bigger irreversible step than
+   * shortening the window by a month, and it had no gate at all.
+   */
+  describe('arming live retention', () => {
+    const armed = { ...CURRENT, live_retention_enabled: true };
+
+    it('refuses to arm without a dry run to point at', async () => {
+      happyPath();
+      await expect(versionAnalyticsRetentionSettings(request({ liveRetentionEnabled: true }), ACTOR))
+        .rejects.toBeInstanceOf(RetentionSettingsValidationError);
+    });
+
+    it('says a dry run at the requested months, within 14 days, is what is wanted', async () => {
+      happyPath();
+      await expect(versionAnalyticsRetentionSettings(request({ liveRetentionEnabled: true }), ACTOR))
+        .rejects.toThrow(/12 months.*14 days/i);
+    });
+
+    /**
+     * A run that is live, at other months, or older than the window fails the
+     * repository's lookup and comes back as no row — which is the same
+     * refusal, for each of the three reasons.
+     */
+    it('refuses a dry-run id the scoped lookup does not find', async () => {
+      transactionReturning([CURRENT, null]);
+      await expect(versionAnalyticsRetentionSettings(
+        request({ liveRetentionEnabled: true, acknowledgedDryRunId: DRY_RUN }), ACTOR,
+      )).rejects.toBeInstanceOf(RetentionSettingsValidationError);
+    });
+
+    it('arms once a recent dry run at the same months is named', async () => {
+      const { calls } = transactionReturning([
+        CURRENT, { id: DRY_RUN }, { ...CURRENT, version: 5, live_retention_enabled: true },
+      ]);
+      const created = await versionAnalyticsRetentionSettings(
+        request({ liveRetentionEnabled: true, acknowledgedDryRunId: DRY_RUN }), ACTOR,
+      );
+      expect(created.liveRetentionEnabled).toBe(true);
+      expect(calls.find((call) => /retention_runs/i.test(call.sql))?.params[1]).toBe(12);
+    });
+
+    /** Disarming deletes nothing and needs no ceremony. */
+    it('lets live retention be turned off freely', async () => {
+      transactionReturning([armed, { ...armed, version: 5, live_retention_enabled: false }]);
+      await expect(versionAnalyticsRetentionSettings(request({ liveRetentionEnabled: false }), ACTOR))
+        .resolves.toBeDefined();
+    });
+
+    it('lets an already-armed policy be saved unchanged', async () => {
+      transactionReturning([armed, { ...armed, version: 5 }]);
+      await expect(versionAnalyticsRetentionSettings(request({ liveRetentionEnabled: true }), ACTOR))
+        .resolves.toBeDefined();
     });
   });
 
