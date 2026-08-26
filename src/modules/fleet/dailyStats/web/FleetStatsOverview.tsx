@@ -66,7 +66,7 @@ export default function FleetStatsOverview({ result }: FleetStatsOverviewProps) 
                 <th className="px-3 py-2 text-right font-medium">Ignition</th>
                 <th className="px-3 py-2 text-right font-medium">Moving</th>
                 <th className="px-3 py-2 text-right font-medium">Max speed</th>
-                <th className="px-3 py-2 text-right font-medium">Speeding</th>
+                <th className="px-3 py-2 text-right font-medium">Speeding events</th>
               </tr>
             </thead>
             <tbody>

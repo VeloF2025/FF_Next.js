@@ -31,13 +31,16 @@ import type { CoverageGranularity, VehicleDayStats } from './types';
 export const MAX_WINDOW_DAYS = 90;
 export const DEFAULT_WINDOW_DAYS = 30;
 
-/** One stored vehicle-day, as the API returns it. */
+/**
+ * One stored vehicle-day, as the API returns it.
+ *
+ * `unattributed_seconds` is deliberately NOT selected. It is a GENERATED column and a
+ * cartrack/velocity-only residual — a feed too coarse to measure ignition fails
+ * `coverage_ignition` and stores 0 there — so on the feeds where a reader would most want an
+ * explanation for near-zero moving time it says nothing. `tracker_silence_seconds` is the number
+ * that actually explains those days, and it is rendered.
+ */
 export interface VehicleDayStatsRow extends VehicleDayStats {
-  /**
-   * Measured ignition time that could not be classified as moving or idling. GENERATED in the
-   * database; surfaced because near-zero moving time beside real distance is unreadable without it.
-   */
-  unattributedSeconds: number;
   computedAt: string;
 }
 
@@ -79,7 +82,6 @@ interface StatsRow extends Record<string, unknown> {
   ignition_seconds: string | null;
   moving_seconds: string | null;
   idle_seconds: string | null;
-  unattributed_seconds: string | null;
   distance_km: string | null;
   max_speed_kph: string | null;
   speeding_events: string | null;
@@ -125,8 +127,7 @@ function iso(value: string | Date | null): string | null {
 }
 
 const STATS_COLUMNS = `
-  work_date, ignition_seconds, moving_seconds, idle_seconds, unattributed_seconds,
-  distance_km, max_speed_kph, speeding_events, speeding_seconds,
+  work_date, ignition_seconds, moving_seconds, idle_seconds, distance_km, max_speed_kph, speeding_events, speeding_seconds,
   harsh_brake_events, harsh_accel_events, harsh_corner_events,
   first_ignition_at, last_ignition_at, position_count, tracker_silence_seconds,
   provider, account_ref, coverage_granularity, coverage_ignition, coverage_gforce,
@@ -138,7 +139,6 @@ function mapRow(row: StatsRow): VehicleDayStatsRow {
     ignitionSeconds: num(row.ignition_seconds),
     movingSeconds: num(row.moving_seconds),
     idleSeconds: num(row.idle_seconds),
-    unattributedSeconds: num(row.unattributed_seconds),
     distanceKm: num(row.distance_km),
     maxSpeedKph: nullableNum(row.max_speed_kph),
     speedingEvents: num(row.speeding_events),

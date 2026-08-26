@@ -177,4 +177,18 @@ describe('loadFleetDayOverview', () => {
     const [, params] = mocks.query.mock.calls[0]!;
     expect(params).toEqual(['2026-08-24']);
   });
+
+  it('joins the stats table on the LEFT — an inner join deletes the silent vehicle', async () => {
+    await loadFleetDayOverview('2026-08-24');
+    // Pinned as SQL TEXT as well as behaviour. The behaviour test above passes with an inner join
+    // too, because a faithful double returns whatever rows it is given: only the query itself
+    // decides whether a vehicle with no row for the day is in the result set at all, and a
+    // tracker that reported nothing is precisely the line this table exists to show.
+    const sql = String(mocks.query.mock.calls[0]?.[0] ?? '');
+    expect(sql).toMatch(/LEFT JOIN fleet_vehicle_daily_stats/);
+    // And the day predicate belongs to the JOIN, not to WHERE: moving it to WHERE turns the outer
+    // join back into an inner one by filtering the null-extended rows out again.
+    expect(sql).toMatch(/LEFT JOIN fleet_vehicle_daily_stats s\s+ON s\.vehicle_id = v\.id AND s\.work_date = \$1::date/);
+    expect(sql).not.toMatch(/WHERE[\s\S]*s\.work_date/);
+  });
 });

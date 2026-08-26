@@ -21,13 +21,19 @@ export interface VehicleStatsCoverage {
   daysWithData: number;
   daysExpected: number;
   daysPartial: number;
-  daysIgnitionMeasurable: number;
+}
+
+/** The day still in progress, never folded into the window's rows or coverage numbers. */
+export interface VehicleStatsToday {
+  workDate: string;
+  stats: VehicleDayStatsRow | null;
 }
 
 export interface VehicleDailyStatsResult {
   vehicle: VehicleIdentity;
   window: { startWorkDate: string; endWorkDate: string; days: number };
   days: VehicleDayStatsRow[];
+  today: VehicleStatsToday | null;
   coverage: VehicleStatsCoverage;
 }
 

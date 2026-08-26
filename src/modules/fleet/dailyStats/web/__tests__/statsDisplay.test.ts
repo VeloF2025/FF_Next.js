@@ -5,8 +5,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  MISSING_TEXT, UNMEASURABLE_TEXT, coverageState, datesInWindow, distanceValue, harshValue,
-  ignitionTimeValue, maxSpeedValue, speedingSecondsValue, sumOverMeasurableDays,
+  MISSING_TEXT, NO_IGNITION_OBSERVED, UNMEASURABLE_TEXT, coverageState, datesInWindow,
+  distanceValue, harshValue, ignitionTimeValue, ignitionWindowValue, maxSpeedValue,
+  speedingSecondsValue, sumOverMeasurableDays, trackerSilenceValue,
 } from '../statsDisplay';
 import { cartrackDay, netstarDay } from './fixtures';
 
@@ -52,6 +53,20 @@ describe('speeding duration', () => {
     expect(speedingSecondsValue(netstarDay()).kind).toBe('unmeasurable');
   });
 
+  it('is unmeasurable for a NON-ZERO duration on a feed that fails coverage_ignition', () => {
+    // Migration 528's own worked example: an ituran/avis-shaped day of ~35-minute gaps carrying
+    // one 60 s pair whose closing fix was speeding stores 60 s beside coverage_ignition = false
+    // and ignition_seconds = 0. Rendering "1m" asserts a measurement the feed cannot support —
+    // the flag says "do not trust the duration", not "the duration is zero".
+    const ituranDay = netstarDay({
+      provider: 'ituran', accountRef: 'avis', speedingEvents: 1, speedingSeconds: 60,
+    });
+    const value = speedingSecondsValue(ituranDay);
+    expect(value.kind).toBe('unmeasurable');
+    expect(value.text).toBe(UNMEASURABLE_TEXT);
+    expect(value.text).not.toBe('1m');
+  });
+
   it('is a real zero when the feed could measure it and there were no events', () => {
     expect(speedingSecondsValue(cartrackDay({ speedingEvents: 0, speedingSeconds: 0 })).text)
       .toBe('0m');
@@ -72,6 +87,35 @@ describe('harsh counts', () => {
     // coverageGforce false, coverageProviderEvents true: the events are real and the g columns
     // cannot see them.
     expect(harshValue(cartrackDay(), 3)).toEqual({ kind: 'value', text: '3' });
+  });
+});
+
+describe('the observations that survive a coverage failure', () => {
+  it('reports the largest unobserved stretch even on a feed that cannot measure ignition', () => {
+    // This is the number that EXPLAINS the em dashes beside it, so suppressing it there would
+    // hide the evidence exactly where it matters most.
+    const value = trackerSilenceValue(netstarDay());
+    expect(value.kind).toBe('value');
+    expect(value.text).toBe('2h 0m');
+    expect(value.title).toMatch(/LARGEST unobserved stretch/);
+  });
+
+  it('reports first and last ignition as SAST clock times, with the caveat', () => {
+    const value = ignitionWindowValue(cartrackDay());
+    // 04:10Z and 15:00Z are 06:10 and 17:00 in Johannesburg.
+    expect(value.text).toBe('06:10–17:00');
+    expect(value.title).toMatch(/Not a duration/);
+  });
+
+  it('says no ignition was observed rather than printing 00:00', () => {
+    const value = ignitionWindowValue(netstarDay());
+    expect(value.text).toBe(UNMEASURABLE_TEXT);
+    expect(value.title).toBe(NO_IGNITION_OBSERVED);
+  });
+
+  it('is "No data" for a day with no row at all', () => {
+    expect(trackerSilenceValue(null).text).toBe(MISSING_TEXT);
+    expect(ignitionWindowValue(null).text).toBe(MISSING_TEXT);
   });
 });
 

@@ -10,8 +10,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import FleetMapDayRoute from '../FleetMapDayRoute';
 import type { RouteLeg } from '../FleetMapDayRoute';
 
-const layers = vi.hoisted(() => ({ polylines: vi.fn(), circles: vi.fn() }));
+const layers = vi.hoisted(() => ({
+  polylines: vi.fn(), circles: vi.fn(), map: { fitBounds: vi.fn() },
+}));
 vi.mock('react-leaflet', () => ({
+  useMap: () => layers.map,
   Polyline: (props: Record<string, unknown>) => { layers.polylines(props); return null; },
   CircleMarker: (props: { children?: React.ReactNode }) => {
     layers.circles(props);
@@ -55,6 +58,21 @@ describe('a trip closed by tracker silence', () => {
     expect(props.pathOptions.dashArray).toBe('8 6');
     const end = layers.circles.mock.calls[1]![0] as StyledProps;
     expect(end.pathOptions.fillOpacity).toBe(0);
+  });
+});
+
+describe('framing the day', () => {
+  it('fits the map to the route’s own points, not the live map’s fixed Gauteng view', () => {
+    render(<FleetMapDayRoute legs={[leg(), leg({ id: 'leg-2', path: [[-25.7, 28.2]] })]} />);
+    expect(layers.map.fitBounds).toHaveBeenCalledWith(
+      [[-26.2, 28.0], [-26.1, 28.1], [-25.7, 28.2]],
+      { padding: [24, 24] },
+    );
+  });
+
+  it('does not call fitBounds with an empty set — Leaflet throws on that', () => {
+    render(<FleetMapDayRoute legs={[]} />);
+    expect(layers.map.fitBounds).not.toHaveBeenCalled();
   });
 });
 

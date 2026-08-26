@@ -67,17 +67,17 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); });
 
 describe('the SAST 30-day window', () => {
-  it('ends on the SAST day, which at 22:30 UTC is already tomorrow', async () => {
+  it('ends on YESTERDAY in SAST, which at 22:30 UTC is already today’s date', async () => {
     vi.setSystemTime(new Date('2026-08-25T22:30:00.000Z'));
     await call({ id: VEHICLE });
-    // 00:30 on the 26th in Johannesburg. A UTC window ends on the 25th and loses a whole day.
-    expect(paramsFor('fleet-daily-stats:series')).toEqual([VEHICLE, '2026-07-28', '2026-08-26']);
+    // 00:30 on the 26th in Johannesburg, so yesterday is the 25th. A UTC clock says the 24th.
+    expect(paramsFor('fleet-daily-stats:series')).toEqual([VEHICLE, '2026-07-27', '2026-08-25']);
   });
 
-  it('spans 30 inclusive days by default', async () => {
+  it('spans 30 inclusive complete days by default', async () => {
     vi.setSystemTime(new Date('2026-08-25T09:00:00.000Z'));
     await call({ id: VEHICLE });
-    expect(paramsFor('fleet-daily-stats:series')).toEqual([VEHICLE, '2026-07-27', '2026-08-25']);
+    expect(paramsFor('fleet-daily-stats:series')).toEqual([VEHICLE, '2026-07-26', '2026-08-24']);
   });
 
   it('honours an explicit endDate', async () => {
@@ -120,7 +120,8 @@ describe('validation', () => {
 describe('coverage is expected days, not elapsed days', () => {
   it('counts only from the vehicle’s first fix', async () => {
     vi.setSystemTime(new Date('2026-08-25T09:00:00.000Z'));
-    // First seen on the 21st: the 24 days before the tracker existed are not missing data.
+    // First seen on the 21st: the days before the tracker existed are not missing data. The
+    // window ends on the 24th (yesterday), so 21–24 inclusive is four expected days.
     mocks.queryOne.mockImplementation(async (sql: string) => (
       String(sql).includes('first-position')
         ? { first_at: '2026-08-21T06:00:00.000Z' }
@@ -128,7 +129,7 @@ describe('coverage is expected days, not elapsed days', () => {
     ));
     mocks.query.mockResolvedValue([statsRow]);
     const res = await call({ id: VEHICLE });
-    expect(res.body.data.coverage.daysExpected).toBe(5);
+    expect(res.body.data.coverage.daysExpected).toBe(4);
     expect(res.body.data.coverage.daysWithData).toBe(1);
   });
 
@@ -148,6 +149,62 @@ describe('coverage is expected days, not elapsed days', () => {
     const res = await call({ id: VEHICLE, endDate: '2026-08-25' });
     expect(res.body.data.days).toHaveLength(1);
     expect(res.body.data.days[0].workDate).toBe('2026-08-20');
+  });
+});
+
+describe('today is separate from the window', () => {
+  it('returns today on its own line and keeps it out of days and coverage', async () => {
+    vi.setSystemTime(new Date('2026-08-25T09:00:00.000Z'));
+    mocks.query.mockImplementation(async (_sql: string, params: unknown[]) => (
+      // The one-day window over today.
+      params[1] === '2026-08-25'
+        ? [{ ...statsRow, work_date: '2026-08-25', coverage_complete: false }]
+        : [statsRow]
+    ));
+    const res = await call({ id: VEHICLE });
+
+    expect(res.body.data.today.workDate).toBe('2026-08-25');
+    expect(res.body.data.today.stats.workDate).toBe('2026-08-25');
+    // The whole point: a day still running is coverage_complete = false for reasons that say
+    // nothing about the tracker, so counting it would leave a healthy vehicle amber every
+    // morning until midnight.
+    expect(res.body.data.days).toHaveLength(1);
+    expect(res.body.data.days[0].workDate).toBe('2026-08-20');
+    expect(res.body.data.coverage.daysWithData).toBe(1);
+    expect(res.body.data.coverage.daysPartial).toBe(0);
+  });
+
+  it('returns a null today row when the fold has not produced one yet', async () => {
+    vi.setSystemTime(new Date('2026-08-25T09:00:00.000Z'));
+    mocks.query.mockResolvedValue([]);
+    const res = await call({ id: VEHICLE });
+    expect(res.body.data.today).toEqual({ workDate: '2026-08-25', stats: null });
+  });
+
+  it('has no in-progress line at all for a historical window', async () => {
+    vi.setSystemTime(new Date('2026-08-25T09:00:00.000Z'));
+    const res = await call({ id: VEHICLE, endDate: '2026-06-30' });
+    expect(res.body.data.today).toBeNull();
+    // And it did not go looking for one.
+    const windows = mocks.query.mock.calls
+      .filter(([sql]) => String(sql).includes('fleet-daily-stats:series'))
+      .map(([, params]) => (params as string[])[2]);
+    expect(windows).toEqual(['2026-06-30']);
+  });
+});
+
+describe('the payload carries nothing it does not render', () => {
+  it('drops daysIgnitionMeasurable and unattributed seconds', async () => {
+    mocks.query.mockResolvedValue([statsRow]);
+    const res = await call({ id: VEHICLE, endDate: '2026-08-25' });
+    // Both were shipped in the first cut and rendered nowhere. A payload field with no reader is
+    // a contract nobody honours — the measurable-day count is derived client-side from the rows
+    // themselves, and unattributed seconds are 0 on exactly the feeds that would need them.
+    expect(res.body.data.coverage).not.toHaveProperty('daysIgnitionMeasurable');
+    expect(res.body.data.days[0]).not.toHaveProperty('unattributedSeconds');
+    const seriesSql = String(mocks.query.mock.calls
+      .find(([sql]) => String(sql).includes('fleet-daily-stats:series'))?.[0] ?? '');
+    expect(seriesSql).not.toMatch(/unattributed_seconds/);
   });
 });
 

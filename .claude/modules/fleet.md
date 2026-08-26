@@ -575,6 +575,67 @@ in `MyHub.tsx`/`tiles.tsx`, not a new dashboard. `hub-summary.ts` adds
 upload queue exists in PR 7 — text submits first, files upload after and can retry
 independently without discarding the accepted explanation.
 
+## Vehicle-day stats read path (migration 528, PR6)
+
+The read side of `fleet_vehicle_daily_stats`. It builds nothing: `src/modules/fleet/dailyStats/statsQueries.ts`
+plus three routes, `pages/fleet/vehicles/[id]/stats.tsx`, `pages/fleet/daily-stats.tsx`, and
+`src/modules/fleet/dailyStats/web/*`. PR2's build service is the only writer; until it runs every
+page renders its empty state, which is the correct answer rather than a broken one.
+
+| Route | Notes |
+|---|---|
+| `GET /api/fleet/vehicles/[id]/daily-stats` | `days` (1–90, clamped, default 30) and `endDate` (default **yesterday** SAST). Returns the window's stored rows, `today` on its own line, and a coverage ratio. |
+| `GET /api/fleet/vehicles/[id]/day-route` | `date` required. Trips for that SAST day; **raw positions only when `includePositions=1`** — see the disclosure note below. |
+| `GET /api/fleet/daily-stats/overview` | `date`, default **yesterday** SAST. Every active vehicle with an active tracker, LEFT JOINed to that day's row. |
+
+All three gate on `fleet.vehicle-stats:view`, seeded by migration 529 (PR #2619). Until 529 is
+applied nobody holds the key and only `super_admin` reaches them — that fail-closed order is
+deliberate; do not relax the gate to make a page render.
+
+### `includePositions=1` returns a full day of raw movement — by design
+
+`fleet.vehicle-stats:view` is enough to pull **every recorded fix for one vehicle on one SAST
+day** (capped at 5,000 rows, bounded to the requested day, never a range): timestamp, coordinates,
+speed and ignition. That is a heavier disclosure than any other Fleet read gated on this key — a
+trip list is a movement summary, this is the movement itself, and 529 grants the key to `viewer`,
+`manager`, `project_manager`, `admin` and `super_admin`.
+
+It is deliberate: the route map cannot draw the road actually driven from trip endpoints alone,
+and a straight line between two points is a picture of a journey that did not happen. **Hein's
+call.** The mitigations are that it is opt-in per request (`positions` is `null`, not `[]`, when
+not asked for), scoped to one vehicle and one day, and never widened to a range. Anyone
+broadening `fleet.vehicle-stats` to a larger audience is inheriting this, not just a statistics
+page — revisit the flag first.
+
+### What the read path refuses to render
+
+Migration 528 refuses to STORE a statistic its feed cannot support; `dailyStats/web/statsDisplay.ts`
+is the single place that refuses to RENDER one. The failure mode is a plausible number in the
+right column, not a missing one.
+
+| Condition | Rendered as |
+|---|---|
+| `coverage_ignition = false` | ignition / moving / idle **and the speeding duration** are `—` with "not measurable on this feed". Never `0`. The duration is disqualified at ANY value, not only at zero — 528's own worked example stores 60 s beside `coverage_ignition = false`. |
+| `coverage_complete = false` | a third state, "Partial", with its own badge. Keeps its real numbers; never collapses into complete or into no-data. |
+| No row for the day | "No data" on a row the table invents so a dead tracker cannot look like a short month. The row is invented; no digit is rendered in any cell. |
+| Harsh counts without `coverage_gforce` **or** `coverage_provider_events` | `—`. Never per-provider: six of seven cartrack/velocity vehicles report constant-zero g and still fire `HARSH_*` events. |
+| `tracker_silence_seconds`, `first/last_ignition_at` | Rendered even when `coverage_ignition = false` — they are OBSERVATIONS, not measurements, and the silence is the number that explains the em dashes beside it. Labelled with that caveat. |
+| Today | Its own "Today (in progress)" line, excluded from `days` and from every coverage number. A running day is `coverage_complete = false` for reasons that say nothing about the tracker. |
+
+Coverage is **days with data / days expected**, where expected counts from the vehicle's first
+`fleet_vehicle_positions` fix — a tracker fitted last week has not missed the weeks before it
+existed. A day whose trips all closed `close_reason = 'timeout'` says so above the map and draws
+those legs dashed with a hollow end marker: they end where the signal died, not where the vehicle
+stopped.
+
+`unattributed_seconds` is deliberately **not** selected. It is a cartrack/velocity-only residual —
+a feed too coarse to measure ignition fails `coverage_ignition` and stores 0 — so it says nothing
+on the feeds where a reader would most want it.
+
+`FleetMap` carries one optional `dayRoute` prop rendering `FleetMapDayRoute.tsx`. Historical points
+are never `LiveVehicle` rows: that would style them with the live grammar (fill = movement state,
+white ring = GPS freshness) and assert a freshness that does not exist.
+
 ## Tracking (Live GPS)
 
 Vehicle position history lands in `fleet_vehicle_positions` via two provider-blind ingestion

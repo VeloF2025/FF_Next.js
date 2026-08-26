@@ -52,7 +52,7 @@ export function formatKm(km: number): string {
 /** Ignition, moving and idle seconds all stand or fall on the same flag. */
 export function ignitionTimeValue(
   row: VehicleDayStatsRow | null,
-  field: 'ignitionSeconds' | 'movingSeconds' | 'idleSeconds' | 'unattributedSeconds',
+  field: 'ignitionSeconds' | 'movingSeconds' | 'idleSeconds',
 ): StatValue {
   if (row === null) return missing;
   if (!row.coverageIgnition) return unmeasurable;
@@ -72,18 +72,23 @@ export function maxSpeedValue(row: VehicleDayStatsRow | null): StatValue {
 }
 
 /**
- * Speeding duration, which has its own trap in both directions.
+ * Speeding duration, which shares the fold's attribution ceiling with ignition time.
  *
- * 0 seconds beside a non-zero event count is a feed too coarse to measure the stretch, not an
- * event of no duration — and `coverageIgnition === false` is the signal for it. The reverse
- * (seconds with no events) is normal on the second day of an overspeed that crossed SAST
- * midnight, since the rising edge is counted once on the day it began.
+ * `coverageIgnition === false` disqualifies the DURATION outright, whatever its value. Migration
+ * 528's own comment says to read the flag as "do not trust the duration", never as "the duration
+ * is zero" — and the worked example there is a non-zero one: an ituran/avis day of ~35-minute
+ * gaps stores 60 s beside `coverage_ignition = false` and `ignition_seconds = 0`, because those
+ * seconds accrue per interval while the flag judges the day's MEDIAN gap. Rendering that 60 s as
+ * "1m" states a measurement the feed cannot support, exactly as a 0 would.
+ *
+ * The event COUNT is unaffected and still rendered: it comes from rising edges of the provider's
+ * own flag, not from the fold's attribution. Note a single day's count does not answer "did this
+ * vehicle speed on this date" — a stretch crossing SAST midnight is counted once, on the day it
+ * began, so the second day carries seconds with no events.
  */
 export function speedingSecondsValue(row: VehicleDayStatsRow | null): StatValue {
   if (row === null) return missing;
-  if (row.speedingSeconds === 0 && row.speedingEvents > 0 && !row.coverageIgnition) {
-    return unmeasurable;
-  }
+  if (!row.coverageIgnition) return unmeasurable;
   return { kind: 'value', text: formatDuration(row.speedingSeconds) };
 }
 
@@ -92,6 +97,52 @@ export function harshValue(row: VehicleDayStatsRow | null, count: number): StatV
   if (row === null) return missing;
   if (!row.coverageGforce && !row.coverageProviderEvents) return unmeasurable;
   return { kind: 'value', text: String(count) };
+}
+
+export const NO_IGNITION_OBSERVED = 'no ignition was observed on this day';
+export const SILENCE_TITLE =
+  'the LARGEST unobserved stretch of the day, including the hours before the first fix and after '
+  + 'the last — an observation about the feed, not a measurement of the vehicle';
+export const IGNITION_WINDOW_TITLE =
+  'observations: a fix asserted ignition at these instants. Not a duration — a two-hour feed can '
+  + 'say when the vehicle first moved without being able to say for how long';
+
+/**
+ * The largest unobserved stretch of the day.
+ *
+ * Survives `coverageIgnition === false` because it is not derived from ignition at all: it is the
+ * biggest hole in the observation record, and it is largest exactly on the feeds that cannot
+ * measure ignition. Suppressing it there would hide the number that explains the em dashes.
+ */
+export function trackerSilenceValue(row: VehicleDayStatsRow | null): StatValue {
+  if (row === null) return missing;
+  return { kind: 'value', text: formatDuration(row.trackerSilenceSeconds), title: SILENCE_TITLE };
+}
+
+/**
+ * First and last ignition as clock times.
+ *
+ * An OBSERVATION rather than a measurement, so it also survives `coverageIgnition === false` — see
+ * migration 528's comment on `first_ignition_at`. Absent instants are an em dash saying no
+ * ignition was observed, never 00:00.
+ */
+export function ignitionWindowValue(row: VehicleDayStatsRow | null): StatValue {
+  if (row === null) return missing;
+  if (row.firstIgnitionAt === null || row.lastIgnitionAt === null) {
+    return { kind: 'unmeasurable', text: UNMEASURABLE_TEXT, title: NO_IGNITION_OBSERVED };
+  }
+  return {
+    kind: 'value',
+    text: `${sastClock(row.firstIgnitionAt)}–${sastClock(row.lastIgnitionAt)}`,
+    title: IGNITION_WINDOW_TITLE,
+  };
+}
+
+/** An instant as a SAST wall clock time. The fleet's day is a South African day. */
+export function sastClock(at: string): string {
+  return new Date(at).toLocaleTimeString('en-ZA', {
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Johannesburg',
+  });
 }
 
 export type CoverageState = 'missing' | 'partial' | 'complete';

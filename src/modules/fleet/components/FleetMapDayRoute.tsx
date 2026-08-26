@@ -12,8 +12,8 @@
  */
 'use client';
 
-import { Fragment } from 'react';
-import { CircleMarker, Polyline, Popup, Tooltip } from 'react-leaflet';
+import { Fragment, useEffect, useMemo } from 'react';
+import { CircleMarker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 
 export interface RouteLeg {
   id: string;
@@ -25,6 +25,22 @@ export interface RouteLeg {
   endLabel: string;
 }
 
+/**
+ * Frame the day rather than leaving the viewer on the default Gauteng view.
+ *
+ * A route can be one depot-to-site hop or a province-wide day, and the live map's fixed centre and
+ * zoom fits neither. Guarded on emptiness: `fitBounds([])` throws inside Leaflet, and a day with
+ * no plottable trip is exactly when that would happen.
+ */
+function FitRouteBounds({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (points.length === 0) return;
+    map.fitBounds(points, { padding: [24, 24] });
+  }, [map, points]);
+  return null;
+}
+
 const SOLID = { color: '#2563eb', weight: 4, opacity: 0.85 };
 const DASHED = { color: '#d97706', weight: 4, opacity: 0.85, dashArray: '8 6' };
 
@@ -33,8 +49,12 @@ export interface FleetMapDayRouteProps {
 }
 
 export default function FleetMapDayRoute({ legs }: FleetMapDayRouteProps) {
+  // Memoised because it is an effect dependency: a fresh array every render would re-fit the map
+  // on every render and fight the user's own pan and zoom.
+  const points = useMemo(() => legs.flatMap((leg) => leg.path), [legs]);
   return (
     <>
+      <FitRouteBounds points={points} />
       {legs.map((leg) => {
         const timedOut = leg.closeReason === 'timeout';
         const start = leg.path[0];

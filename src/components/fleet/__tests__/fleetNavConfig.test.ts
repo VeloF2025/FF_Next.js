@@ -58,6 +58,16 @@ describe('getActiveTabId', () => {
     expect(getActiveTabId('/fleet/import', {})).toBe('vehicles');
   });
 
+  // Same class again: a page reachable from the nav but with no matcher highlights Dashboard
+  // while the user is standing on it.
+  it('resolves /fleet/daily-stats to vehicles, not dashboard', () => {
+    expect(getActiveTabId('/fleet/daily-stats', {})).toBe('vehicles');
+  });
+
+  it('resolves a vehicle stats sub-page to vehicles', () => {
+    expect(getActiveTabId('/fleet/vehicles/abc-123/stats', {})).toBe('vehicles');
+  });
+
   it('resolves nested detail routes to their parent tab', () => {
     expect(getActiveTabId('/fleet/vehicles/abc-123', {})).toBe('vehicles');
     expect(getActiveTabId('/fleet/vehicles/abc-123/check-in-history', {})).toBe('vehicles');
@@ -103,6 +113,16 @@ describe('TABS', () => {
     expect(hrefs).toContain('/fleet/incidents');
     const dashboard = TABS.find((tab) => tab.id === 'dashboard');
     expect(dashboard?.href).toBe('/fleet');
+  });
+
+  it('exposes the fleet-wide daily stats table under Vehicles', () => {
+    // The page is otherwise reachable only by typing the URL: nothing links to it from the
+    // per-vehicle page, which goes the other way.
+    const vehicles = TABS.find((tab) => tab.id === 'vehicles');
+    const hrefs = vehicles ? allHrefs([vehicles]) : [];
+    expect(hrefs).toContain('/fleet/daily-stats');
+    expect(vehicles?.items?.flatMap((s) => s.items).find((i) => i.href === '/fleet/daily-stats')?.label)
+      .toBe('Daily stats');
   });
 
   it('exposes Assignments under Operations', () => {

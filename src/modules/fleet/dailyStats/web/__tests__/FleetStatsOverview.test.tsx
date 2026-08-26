@@ -66,6 +66,13 @@ describe('per-feed honesty', () => {
   });
 });
 
+describe('column naming', () => {
+  it('names the count column "Speeding events" — it is a count, not a duration', () => {
+    render(<FleetStatsOverview result={result()} />);
+    expect(screen.getByRole('columnheader', { name: 'Speeding events' })).toBeVisible();
+  });
+});
+
 describe('the empty fleet', () => {
   it('says no vehicle carries a tracker instead of showing an empty grid', () => {
     render(<FleetStatsOverview result={result({

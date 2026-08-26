@@ -60,14 +60,82 @@ describe('the unmeasurable cell', () => {
     renderTable();
     const row = screen.getByTestId('stats-row-2026-08-21');
     const dashes = within(row).getAllByText(UNMEASURABLE_TEXT);
-    // Ignition, moving, idle, speeding duration and harsh — five columns this feed cannot answer.
-    expect(dashes).toHaveLength(5);
+    // Ignition, moving, idle, speeding time, harsh and the ignition window — six columns this
+    // feed cannot answer.
+    expect(dashes).toHaveLength(6);
     dashes.forEach((cell) => {
       expect(cell).toBeVisible();
       expect(cell).toHaveAttribute('data-state', 'unmeasurable');
     });
-    // And the distance it CAN answer is still there.
+    // And the two things it CAN answer are still there: distance, and the silence that explains
+    // every dash beside it.
     expect(within(row).getByText('61.4 km')).toBeVisible();
+    expect(within(row).getByText('2h 0m')).toBeVisible();
+  });
+});
+
+describe('the day still in progress', () => {
+  it('is its own labelled row above the window, never inside it', () => {
+    render(
+      <VehicleStatsTable
+        days={[cartrackDay()]}
+        endWorkDate="2026-08-22"
+        startWorkDate="2026-08-19"
+        today={{ workDate: '2026-08-23', stats: cartrackDay({
+          workDate: '2026-08-23', coverageComplete: false, distanceKm: 12.5,
+        }) }}
+      />,
+    );
+    const row = screen.getByTestId('stats-row-today-2026-08-23');
+    expect(row).toBeVisible();
+    // Not judged as partial: coverage_complete is false because the day is not over, which says
+    // nothing about the tracker.
+    expect(row).toHaveAttribute('data-coverage', 'in_progress');
+    expect(within(row).getByText('In progress')).toBeVisible();
+    expect(within(row).getByText(/Today \(in progress\)/)).toBeVisible();
+    expect(within(row).getByText('12.5 km')).toBeVisible();
+    // And it is NOT one of the window's own rows.
+    expect(screen.queryByTestId('stats-row-2026-08-23')).toBeNull();
+  });
+
+  it('is absent when the caller asked a historical question', () => {
+    render(
+      <VehicleStatsTable days={[cartrackDay()]} endWorkDate="2026-08-22" startWorkDate="2026-08-19" />,
+    );
+    expect(screen.queryByText(/Today \(in progress\)/)).toBeNull();
+  });
+
+  it('shows today with no row yet as "No data", not as zeros', () => {
+    render(
+      <VehicleStatsTable
+        days={[]}
+        endWorkDate="2026-08-22"
+        startWorkDate="2026-08-22"
+        today={{ workDate: '2026-08-23', stats: null }}
+      />,
+    );
+    const row = screen.getByTestId('stats-row-today-2026-08-23');
+    within(row).getAllByRole('cell').slice(2).forEach((cell) => {
+      expect(cell.textContent).not.toMatch(/\d/);
+    });
+  });
+});
+
+describe('the observation columns', () => {
+  it('names the duration column "Speeding time", not "Speeding"', () => {
+    renderTable();
+    expect(screen.getByRole('columnheader', { name: 'Speeding time' })).toBeVisible();
+  });
+
+  it('shows the longest silence and the ignition window with their caveats', () => {
+    renderTable([cartrackDay()]);
+    const row = screen.getByTestId('stats-row-2026-08-20');
+    expect(within(row).getByText('8m')).toBeVisible();
+    expect(within(row).getByText('06:10–17:00')).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: 'Longest silence' }))
+      .toHaveAttribute('title', expect.stringContaining('LARGEST unobserved stretch'));
+    expect(screen.getByRole('columnheader', { name: 'Ignition window' }))
+      .toHaveAttribute('title', expect.stringContaining('Not a duration'));
   });
 });
 

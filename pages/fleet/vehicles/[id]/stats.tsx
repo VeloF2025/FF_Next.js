@@ -94,8 +94,8 @@ export default function VehicleStatsPage() {
               {result?.vehicle.registration ?? 'Vehicle'} — day statistics
             </h1>
             <p className="text-[var(--ff-text-secondary)]">
-              Last {WINDOW_DAYS} days, SAST. A day with no row was never observed — it is not a day
-              of zeros.
+              Last {WINDOW_DAYS} complete days, SAST, with today shown separately while it is still
+              running. A day with no row was never observed — it is not a day of zeros.
             </p>
           </div>
         </div>
@@ -128,6 +128,7 @@ export default function VehicleStatsPage() {
               onSelectDate={selectDate}
               selectedDate={selectedDate}
               startWorkDate={result.window.startWorkDate}
+              today={result.today}
             />
             {selectedDate === null && (
               <p className="text-sm text-[var(--ff-text-secondary)]">
