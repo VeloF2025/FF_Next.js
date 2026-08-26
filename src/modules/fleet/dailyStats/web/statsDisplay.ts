@@ -99,6 +99,19 @@ export function harshValue(row: VehicleDayStatsRow | null, count: number): StatV
   return { kind: 'value', text: String(count) };
 }
 
+/**
+ * Why one day's event count does not answer "did this vehicle speed on this date".
+ *
+ * The rising edge of the provider's `is_speeding` flag is FOLD-GLOBAL, not per-day, so a stretch
+ * crossing SAST midnight is counted once — on the day it began — while both days carry the
+ * seconds that fell in them. Summing across days is therefore correct; reading a single day's
+ * count as "did it speed today" is not. Shared by the card and the overview cell so the two
+ * cannot drift into telling a reader different things about the same number.
+ */
+export const SPEEDING_EVENTS_TITLE =
+  'rising edges of the provider’s own speeding flag: counted once per stretch, and a stretch '
+  + 'straddling SAST midnight counts on its first day only';
+
 export const NO_IGNITION_OBSERVED = 'no ignition was observed on this day';
 export const SILENCE_TITLE =
   'the LARGEST unobserved stretch of the day, including the hours before the first fix and after '

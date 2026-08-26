@@ -13,7 +13,7 @@ import { cartrackDay, netstarDay } from './fixtures';
 
 const fullCoverage = {
   firstPositionWorkDate: '2026-01-01', daysWithData: 30, daysExpected: 30,
-  daysPartial: 0, daysIgnitionMeasurable: 30,
+  daysPartial: 0,
 };
 
 function card(label: string) {
@@ -40,7 +40,7 @@ describe('a feed that cannot', () => {
   it('renders ignition, moving and idle as an em dash — never as 0', () => {
     render(
       <VehicleStatsCards
-        coverage={{ ...fullCoverage, daysIgnitionMeasurable: 0, daysPartial: 30 }}
+        coverage={{ ...fullCoverage, daysPartial: 30 }}
         days={[netstarDay(), netstarDay({ workDate: '2026-08-22' })]}
         windowDays={30}
       />,
@@ -74,7 +74,7 @@ describe('the empty window', () => {
       <VehicleStatsCards
         coverage={{
           firstPositionWorkDate: null, daysWithData: 0, daysExpected: 0,
-          daysPartial: 0, daysIgnitionMeasurable: 0,
+          daysPartial: 0,
         }}
         days={[]}
         windowDays={30}
@@ -90,7 +90,7 @@ describe('the partial-coverage window', () => {
   it('counts partial days separately and shows how many days a total came from', () => {
     render(
       <VehicleStatsCards
-        coverage={{ ...fullCoverage, daysWithData: 12, daysPartial: 8, daysIgnitionMeasurable: 4 }}
+        coverage={{ ...fullCoverage, daysWithData: 12, daysPartial: 8 }}
         days={[cartrackDay(), netstarDay(), netstarDay({ workDate: '2026-08-23' })]}
         windowDays={30}
       />,

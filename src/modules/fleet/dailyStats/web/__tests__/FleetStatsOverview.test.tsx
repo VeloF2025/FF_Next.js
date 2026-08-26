@@ -4,10 +4,12 @@
  * The line worth reading is the vehicle that reported NOTHING, so the two things guarded here are
  * that it survives into the table at all and that it carries no numbers when it does.
  */
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import FleetStatsOverview from '../FleetStatsOverview';
-import { MISSING_TEXT, UNMEASURABLE_TEXT } from '../statsDisplay';
+import { MISSING_TEXT, SPEEDING_EVENTS_TITLE, UNMEASURABLE_TEXT } from '../statsDisplay';
 import { cartrackDay, netstarDay } from './fixtures';
 import type { FleetOverviewResult } from '../vehicleStatsApi';
 
@@ -70,6 +72,25 @@ describe('column naming', () => {
   it('names the count column "Speeding events" — it is a count, not a duration', () => {
     render(<FleetStatsOverview result={result()} />);
     expect(screen.getByRole('columnheader', { name: 'Speeding events' })).toBeVisible();
+  });
+
+  it('explains on the cell that the count is per stretch, not per day', () => {
+    // A count of 0 on a day a vehicle demonstrably sped is normal: the stretch began yesterday
+    // and was counted there. Without the caveat on the number itself, a reader takes one day's
+    // count as the answer to "did this vehicle speed on this date", which it is not.
+    render(<FleetStatsOverview result={result()} />);
+    const cell = within(screen.getByTestId('overview-row-v2')).getAllByRole('cell').at(-1)!;
+    expect(cell).toHaveAttribute('title', SPEEDING_EVENTS_TITLE);
+    expect(SPEEDING_EVENTS_TITLE).toMatch(/once per stretch/);
+    expect(SPEEDING_EVENTS_TITLE).toMatch(/first day only/);
+  });
+
+  it('shares that wording with the vehicle card rather than keeping a second copy', () => {
+    // Two hand-written copies of a caveat drift, and the reader then gets two different accounts
+    // of the same number depending on which page they are on.
+    const cardsSource = readFileSync(resolve(__dirname, '../VehicleStatsCards.tsx'), 'utf8');
+    expect(cardsSource).toContain('SPEEDING_EVENTS_TITLE');
+    expect(cardsSource).not.toMatch(/counted once per stretch'/);
   });
 });
 

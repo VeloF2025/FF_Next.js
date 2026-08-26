@@ -10,6 +10,7 @@ import {
   COVERAGE_CLASS,
   COVERAGE_LABEL,
   COVERAGE_TITLE,
+  SPEEDING_EVENTS_TITLE,
   coverageState,
   distanceValue,
   ignitionTimeValue,
@@ -104,7 +105,11 @@ export default function FleetStatsOverview({ result }: FleetStatsOverviewProps) 
                       value={
                         row === null
                           ? { kind: 'missing', text: 'No data', title: COVERAGE_TITLE.missing }
-                          : { kind: 'value', text: String(row.speedingEvents) }
+                          : {
+                              kind: 'value',
+                              text: String(row.speedingEvents),
+                              title: SPEEDING_EVENTS_TITLE,
+                            }
                       }
                     />
                   </tr>

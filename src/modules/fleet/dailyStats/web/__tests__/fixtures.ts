@@ -12,7 +12,7 @@ export function cartrackDay(overrides: Partial<VehicleDayStatsRow> = {}): Vehicl
   return {
     workDate: '2026-08-20',
     ignitionSeconds: 27_000, movingSeconds: 21_600, idleSeconds: 4_800,
-    unattributedSeconds: 600, distanceKm: 143.25, maxSpeedKph: 118.4,
+    distanceKm: 143.25, maxSpeedKph: 118.4,
     speedingEvents: 3, speedingSeconds: 540,
     harshBrakeEvents: 2, harshAccelEvents: 0, harshCornerEvents: 1,
     firstIgnitionAt: '2026-08-20T04:10:00.000Z', lastIgnitionAt: '2026-08-20T15:00:00.000Z',
@@ -30,7 +30,7 @@ export function cartrackDay(overrides: Partial<VehicleDayStatsRow> = {}): Vehicl
 export function netstarDay(overrides: Partial<VehicleDayStatsRow> = {}): VehicleDayStatsRow {
   return cartrackDay({
     workDate: '2026-08-21',
-    ignitionSeconds: 0, movingSeconds: 0, idleSeconds: 0, unattributedSeconds: 0,
+    ignitionSeconds: 0, movingSeconds: 0, idleSeconds: 0,
     distanceKm: 61.4, maxSpeedKph: 96.2,
     speedingEvents: 1, speedingSeconds: 0,
     harshBrakeEvents: 0, harshAccelEvents: 0, harshCornerEvents: 0,

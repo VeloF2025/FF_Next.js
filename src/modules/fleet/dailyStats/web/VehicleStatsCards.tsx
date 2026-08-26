@@ -10,6 +10,7 @@
 import type { VehicleDayStatsRow } from '../statsQueries';
 import type { VehicleStatsCoverage } from './vehicleStatsApi';
 import {
+  SPEEDING_EVENTS_TITLE,
   UNMEASURABLE_TEXT,
   UNMEASURABLE_TITLE,
   formatDuration,
@@ -128,12 +129,8 @@ export default function VehicleStatsCards({ days, coverage, windowDays }: Vehicl
       <StatCard
         label="Speeding events"
         value={days.length === 0 ? UNMEASURABLE_TEXT : String(speedingEvents)}
-        hint={
-          days.length === 0
-            ? UNMEASURABLE_TITLE
-            : 'rising edges of the provider’s own speeding flag, counted once per stretch'
-        }
-        title={days.length === 0 ? UNMEASURABLE_TITLE : undefined}
+        hint={days.length === 0 ? UNMEASURABLE_TITLE : SPEEDING_EVENTS_TITLE}
+        title={days.length === 0 ? UNMEASURABLE_TITLE : SPEEDING_EVENTS_TITLE}
       />
 
       <StatCard
