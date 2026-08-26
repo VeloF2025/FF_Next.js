@@ -6,6 +6,74 @@ Format: `## [Commit Hash] - YYYY-MM-DD - Author - Type`
 
 ---
 
+## [PR 9] - 2026-08-26 - Feature
+
+**feat(fleet): vehicle-day stats backfill, module docs, and the deferrals stated**
+
+PR9 of the vehicle-first plan
+(`docs/superpowers/plans/2026-08-25-fleet-vehicle-day-stats-and-telematics-detectors.md`).
+No migration, no schema change, no new endpoint.
+
+`scripts/fleet-daily-stats-backfill.ts` drains the vehicle-day build by running
+the SAME `buildDailyStats` / `buildStatsForVehicle` the 15-minute cron runs,
+under the same `fleet-daily-stats` advisory lock, until no vehicle holds
+backlog or `--max-passes` (default 50) is spent. It refuses to start when
+migration 528 is not applied on the target database, and exits non-zero when a
+vehicle failed or backlog outlived the ceiling. All logic lives in
+`src/modules/fleet/dailyStats/backfillRunner.ts` — a `scripts/` file is
+invisible to the test suite and to `tsc` — and a test reads that file's source
+and fails if it grows fold arithmetic or SQL of its own. This is the trips
+backfill's divergence bug being designed out rather than re-lived.
+
+`--vehicle <id> --refold-day <YYYY-MM-DD>` rebuilds exactly one vehicle-day
+whole (its own SAST midnight to the next, lead-in read from before it). This is
+the repair PR2 deferred here for the horizon the build never goes back past:
+`min(watermark - 6h, yesterday 00:00 SAST)`, which only moves forward. It
+requires a vehicle, refuses a day that has not closed, and cannot rewind the
+watermark. There is deliberately **no `--from` sweep** — the build service
+exposes no window start, so a range would be a second definition of where a
+window opens; loop refolds in the shell instead.
+
+**One real bug found while testing the refold**, not by reading it: the reads
+are inclusive at `windowEnd`, so a window closing at the next midnight also
+returned the fix recorded exactly at it and wrote the one-position sliver of a
+row it opened on the FOLLOWING day — silently replacing that day's complete
+row. Folding that fix is correct (it is the day's lead-OUT, the mirror of the
+lead-in); writing its day is not. `daysReadyToWrite` gained a `lastWindowDay`
+bound, set only for a caller-supplied window.
+
+**Docs:** `.claude/modules/fleet.md` gains a "Vehicle-day stats & detectors
+(vehicle-first PR1–PR9)" section — data model, the four fold contracts,
+coverage semantics with PR1's supersession of PR0's "idle is computable on all
+four feeds", the detector table with 529's thresholds, the 21:00–05:00
+after-hours decision and why 18:00–06:00 was rejected (9.1 alerts/day), the
+channel matrix, the cron matrix with installed-or-not, the first-drain
+procedure, and backfill usage.
+
+**Deferrals and gaps, stated rather than smoothed over:**
+`dangerous_area_entry` is **deferred** — no dangerous-area table exists, and the
+known-site tables are the opposite of hazards. `accident_sos` remains a
+**stub**: no panic/SOS/impact field exists on any of the three feeds (all 57
+Cartrack event fields enumerated and cleared), the one open lead is Cartrack's
+undocumented `input_state` bitfield, and SOS must not be synthesised from
+g-force. The telematics detectors shipped
+in PR4 (#2624) while this branch was open, so this PR's module doc records them
+as live; `accident_sos` remains a stub with no source. **Recurrence is not advanced
+for source events** — dedup is `(incident_type, source_event_id)` only, so ten
+consecutive days of the same detector open ten unrelated incidents. Untracked
+vehicles produce **no row at all** (an `EXISTS` semi-join), so any UI must
+render "no data" for them, never 0 km. The `*/15` daily-stats crontab line is
+**not installed**, pending deployment approval; do the documented `curl -m 3000`
+first drain before installing it.
+
+**Files:** `scripts/fleet-daily-stats-backfill.ts`,
+`src/modules/fleet/dailyStats/backfillRunner.ts`,
+`src/modules/fleet/dailyStats/dailyStatsBuildService.ts` (window override),
+`src/modules/fleet/dailyStats/dailyStatsWindow.ts` (`lastWindowDay`),
+`src/modules/fleet/dailyStats/__tests__/backfillRunner.test.ts`,
+`src/modules/fleet/dailyStats/__tests__/refoldWindow.test.ts`,
+`.claude/modules/fleet.md`, `src/modules/fleet/.claude.md`.
+
 ## [PR 4] - 2026-08-25 - Feature
 
 **feat(fleet): telematics incident detectors, wired to the existing producer**

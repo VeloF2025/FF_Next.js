@@ -101,6 +101,11 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - `dangerous_area_entry` is DEFERRED, not stubbed: no dangerous-area geofence table exists, and no code path references it
 - Vehicle-day stats (`src/modules/fleet/dailyStats/`, PR6) render through `web/statsDisplay.ts` ONLY — `coverage_ignition = false` makes ignition/moving/idle AND the speeding duration an em dash at any value, `coverage_complete = false` is a third "Partial" state, a missing row is "No data": never a 0 for any of the three
 - `GET /api/fleet/vehicles/[id]/day-route?includePositions=1` returns a full SAST day of raw fixes to any holder of `fleet.vehicle-stats:view` — deliberate (Hein's call, the route map needs it), opt-in, one vehicle and one day, capped at 5,000 rows. Widening that permission inherits this disclosure; see `.claude/modules/fleet.md`
+- Vehicle-day stats build (`dailyStats/`, mig 528): a row is a FULL REPLACEMENT, so a build window may only open at a SAST midnight — a part-day window overwrites a complete row with a plausible smaller one
+- `coverage_gforce` is per vehicle-day (`linear_g <> 0 OR lateral_g <> 0`), never per provider: 6 of 7 `cartrack/velocity` vehicles report constant ZERO, not null
+- The build never refolds a fix older than `min(watermark - 6h, yesterday 00:00 SAST)`; the repair is `scripts/fleet-daily-stats-backfill.ts --vehicle <id> --refold-day <YYYY-MM-DD>`, never a widened lookback
+- The backfill must stay the SAME code path as the cron — a test fails if `backfillRunner.ts` imports anything outside its allowlist or grows SQL of its own
+- Severity, not `whatsapp_enabled`, is what keeps a telematics type off WhatsApp: `requiresMandatoryIncidentWhatsApp` is `critical && source_event` and ignores the flag entirely
 - Migration 511 and its number are unapplied; migration numbering churned (490→496→499→503→506→507→510→511) as master advanced — always re-check the free number before adding a new Fleet migration
 
 ## Common Issues
