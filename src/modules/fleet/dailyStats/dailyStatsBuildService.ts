@@ -100,16 +100,38 @@ export const POSITION_BATCH_SIZE = DAY_FOLD_POSITION_BATCH_SIZE;
  */
 export const MAX_BATCHES_PER_VEHICLE = 20;
 
+/**
+ * A window supplied by the caller instead of derived from the watermark.
+ *
+ * The ONE reason this exists: the repository header names a horizon this job never goes back
+ * past -- `min(watermark - 6h, yesterday 00:00 SAST)`, which only moves forward -- and names
+ * PR9's backfill as the repair for a fix that lands older than it. That repair is this: the same
+ * fold, the same upsert, the same lead-in query, pointed at a window the watermark would never
+ * reopen. It is not a second code path, and there is deliberately no third caller.
+ *
+ * `start` must be a SAST midnight and `end` the next one, for exactly the reason the derived
+ * window is snapped: a vehicle-day row is a full replacement, so a window covering part of a day
+ * overwrites a complete row with a partial one. `backfillRunner.refoldWindow` is the only
+ * constructor and pins both edges; nothing here re-derives them.
+ */
+export interface BuildWindow {
+  start: string;
+  end: string;
+}
+
 export interface DailyStatsBuildOptions {
   positionBatchSize: number;
   maxBatchesPerVehicle: number;
   foldOptions: Partial<DayFoldOptions>;
+  /** Null (the normal case) derives the window from the vehicle's watermark. */
+  windowOverride: BuildWindow | null;
 }
 
 export const DEFAULT_BUILD_OPTIONS: DailyStatsBuildOptions = {
   positionBatchSize: POSITION_BATCH_SIZE,
   maxBatchesPerVehicle: MAX_BATCHES_PER_VEHICLE,
   foldOptions: {},
+  windowOverride: null,
 };
 
 export interface VehicleStatsBuildResult {
@@ -126,7 +148,8 @@ export async function buildStatsForVehicle(
   vehicleId: string, nowMs: number, options: DailyStatsBuildOptions,
 ): Promise<VehicleStatsBuildResult> {
   const watermark = await readWatermark(vehicleId);
-  const windowStart = windowStartFor(watermark, nowMs);
+  const override = options.windowOverride;
+  const windowStart = override === null ? windowStartFor(watermark, nowMs) : override.start;
   const watermarkDay = watermark === null ? null : sastDay(Date.parse(watermark));
   const firstWindowDay = windowStart === null ? null : sastDay(Date.parse(windowStart));
 
@@ -136,7 +159,10 @@ export async function buildStatsForVehicle(
   // One instant, used for three things that must agree: the top bound on every read, the fold's
   // tail-gap arithmetic, and the assertion inside it that the window covers the last fix. Derived
   // once so a clock-skewed tracker cannot fall between two slightly different answers.
-  const windowEnd = windowEndFor(nowMs);
+  // An overridden window ends at ITS OWN closing midnight, not at the run instant: a day being
+  // refolded is already closed, and judging it against `now` would charge it the silence of every
+  // hour since. The derived case is `now` for the mirror-image reason -- see `windowEndFor`.
+  const windowEnd = override === null ? windowEndFor(nowMs) : override.end;
   const fold = createDayFold({ ...options.foldOptions, leadIn, windowEnd });
 
   let cursor: PositionCursor | null = null;
@@ -171,7 +197,11 @@ export async function buildStatsForVehicle(
 
   fold.addTrips(await loadTripsForWindow(vehicleId, windowStart, windowEnd));
 
-  const ready = daysReadyToWrite(fold.result(), drained, firstWindowDay);
+  // The last day a caller-supplied window covers. Derived from the window's own closing instant
+  // minus a millisecond, so the midnight that ENDS the window belongs to the day it closes rather
+  // than opening a fresh one. Null for the derived window, where today is writable by design.
+  const lastWindowDay = override === null ? null : sastDay(Date.parse(override.end) - 1);
+  const ready = daysReadyToWrite(fold.result(), drained, firstWindowDay, lastWindowDay);
   for (const day of ready) {
     await upsertDayStats(vehicleId, day);
   }

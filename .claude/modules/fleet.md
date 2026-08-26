@@ -1734,3 +1734,206 @@ Migration numbering: at spike time max on `origin/master` was **527**. **528** i
 `528_fleet_vehicle_daily_stats.sql` (PR #2617, merged) and **529** by
 `529_fleet_vehicle_operational_rules.sql` (this PR3). Next free is **530** — re-check
 `git ls-tree -r --name-only origin/master scripts/migrations/sql` before claiming one.
+
+---
+
+## Vehicle-day stats & detectors (vehicle-first PR1–PR9)
+
+Plan: `docs/superpowers/plans/2026-08-25-fleet-vehicle-day-stats-and-telematics-detectors.md`.
+Everything below is what is **on master**; where a slice has not shipped it says so rather than
+describing the design as if it runs.
+
+### Data model
+
+| Object | Migration | What it holds |
+|---|---|---|
+| `fleet_vehicle_daily_stats` | 528 | One row per `(vehicle_id, work_date)`. Time (`ignition_seconds`, `moving_seconds`, `idle_seconds`, generated `unattributed_seconds`), motion (`distance_km`, `max_speed_kph`), events (`speeding_events/_seconds`, `harsh_brake/accel/corner_events`), shape (`first/last_ignition_at`, `position_count`, `tracker_silence_seconds`), provenance (`provider`, `account_ref`, `source_watermark`, `computed_at`) and five coverage flags. CHECK-constrained so a feed cannot store a number it cannot measure. |
+| `fleet_daily_stats_watermarks` | 528 | Per vehicle: `last_position_at`, `last_built_at`, `positions_processed`. Advanced with `GREATEST`, so an older window can never rewind it. |
+| `fleet_vehicle_positions.provider_event_type` | 528 | Cartrack's `event_description` vocabulary, which `provider.ts` used to discard. This is where `HARSH_BRAKING` / `HARSH_CORNERING` / `IDLING_*` / `MOTION_*` come from on the six vehicles whose g columns are structurally zero. |
+| `fleet_vehicle_operational_rules` | 529 | Versioned vehicle rule (after-hours window, theft, harsh, speed, stop, contact, idle, site radius). Same `version UNIQUE` + gist-no-overlap + one-open-row shape as `fleet_operational_status_rules`; a change is a new version through the dialog, never a migration. |
+| `fleet_vehicles.after_hours_exempt` | 529 | Per-vehicle opt-out the theft detector reads. |
+
+`work_date` is a `DATE`. Every read goes through `toWorkDate` and every write derives the day
+through `sastDateString` — never `date_trunc` (session timezone) and never `toISOString().slice(0,10)`
+(a UTC answer to a South African question, banned by a test).
+
+### The four fold contracts
+
+Break any of these and every row still passes every constraint — that is why they are stated here.
+
+1. **The read cursor is exclusive on the FIX, not on the instant.** `(recorded_at, id) > ($2, $3)`.
+   164 `(vehicle, recorded_at)` groups over 7 days of production hold more than one row, so a bare
+   `>` silently drops a twin and `>=` re-feeds one into a fold that refuses it.
+2. **The lead-in is a query, not an emulation.** `loadPositionBefore` reads the last fix strictly
+   before the window and seeds it into the fold *without counting it*, which is what measures the
+   interval crossing into the window's first day and suppresses a false rising edge on an overspeed
+   already in progress.
+3. **`windowEnd` is the instant the run read at** (an overridden window ends at its own closing
+   midnight). Charging a still-open day the hours that have not happened reports every vehicle as
+   half-dark all morning; `tailGapMs` still clamps to the day's own end, so a closed day is judged
+   on its full 24 hours.
+4. **Windows only ever open at a SAST midnight.** A vehicle-day row is a full replacement, so a
+   window covering part of a day overwrites a complete row with a partial one — every column
+   plausible, the distance simply smaller than it was. The 6-hour late-arrival lookback is snapped
+   DOWN to the midnight of the day containing it, never applied raw.
+
+A fifth rule belongs to PR9's refold: reads are inclusive at `windowEnd`, so a window closing at
+the next midnight also returns the fix recorded exactly at it. Folding that fix is right — it is
+the day's lead-OUT — but the sliver of a row it opens on the FOLLOWING day must not be written.
+`daysReadyToWrite`'s `lastWindowDay` bound is what stops it, and without that bound a refold of
+one day silently replaced the next day's complete row with a one-position one.
+
+### Coverage semantics
+
+`coverage_*` says what a feed can honestly be asked for. Thresholds are per `provider/account_ref`,
+measured over 30 days on 2026-08-25 (`coverage.ts` carries the same numbers with their evidence).
+
+| feed | vehicles | granularity | `expected_min_fixes` | `max_allowed_gap_seconds` | measured |
+|---|---|---|---|---|---|
+| `cartrack/velocity` | 7 | history | 200 | 3,600 | p10 386 fixes/day, median 1,169, gap median 8 s, p99 298 s |
+| `cartrack/urent` | 3 | history | 4 | 14,400 | p10 5, median 15, gap p90 7,581 s |
+| `netstar/europcar` | 6 | snapshot | 2 | 14,400 | p10 2, median 10, gap p90 9,618 s, **no odometer at all** |
+| `ituran/avis` | 2 | snapshot | 4 | 14,400 | p10 6, median 11, gap p90 7,472 s |
+
+- `coverage_complete = position_count >= expected_min_fixes AND tracker_silence_seconds <= max_allowed_gap_seconds`.
+  Both, always: a count alone marks a legitimately parked snapshot day incomplete.
+- `coverage_gforce = EXISTS(a fix this vehicle-day with linear_g <> 0 OR lateral_g <> 0)` — **per
+  vehicle-day, never per provider**. Six of the seven `cartrack/velocity` vehicles report constant
+  zero, not null, so both `linear_g IS NOT NULL` and `provider = 'cartrack'` are wrong for six of
+  seven and wrong in the direction that lets the harsh-count CHECK pass on structurally zero counts.
+- **`coverage_ignition` means MEASURABLE, and this supersedes PR0's "idle is computable on all four
+  feeds".** Idle-feasible FIXES are not idle SECONDS: attributing an interval needs both ends inside
+  the 300 s attribution ceiling, which only `cartrack/velocity` (8 s median gap) clears. So
+  `coverage_ignition` = ignition asserted on ≥90 % of fixes **AND** the day's median gap ≤ the
+  ceiling; the other three feeds fold to `false` with ignition/moving/idle at 0 rather than
+  publishing a zero that reads as a parked vehicle.
+- Coverage denominators start at a vehicle's first position, never at 30 days: every `netstar`,
+  `ituran` and two `urent` vehicles have exactly 19 of 30 possible days because those feeds went
+  live 2026-08-06/07.
+
+### Detectors — thresholds and status
+
+Migration 529 seeds `version 1`. **The detectors themselves (plan PR4) are NOT on master**:
+`produceSourceEventIncident` still has no caller, so no telematics incident is opened today.
+`vehicleDetectors/` currently holds the after-hours calendar, the rule queries and their tests.
+
+| Type | Severity after 529 | Threshold (529 default) | Status |
+|---|---|---|---|
+| `accident_sos` | `critical` + WhatsApp | — | **Stub. No source exists on any feed** — see the open items |
+| `theft_after_hours_movement` | `critical` + WhatsApp | ≥500 m displacement, ≥2 fixes, inside the after-hours window, `after_hours_exempt = false` | Rule shipped, detector pending PR4 |
+| `severe_driving` | `high`, no WhatsApp, in the 08:15 summary | `harsh_linear_g` 0.350, `harsh_lateral_g` 0.350, **`harsh_min_speed_kph` 20**, `speed_over_limit_kph` 15 | as above |
+| `prolonged_unauthorized_stop` | `high` | `unauthorized_stop_minutes` 45, `known_site_radius_meters` 500 | as above |
+| `lost_contact_moving` | `high` | `lost_contact_minutes` 30, used as a FLOOR: `max(rule, 3 × observed p90 gap)` | as above — in practice a **7-vehicle** detector |
+| `dangerous_area_entry` | `high` | `known_site_radius_meters` | **Deferred — no dangerous-area table exists** |
+
+Three numbers that are decisions, not defaults:
+
+- **`harsh_min_speed_kph = 20`.** Without it the harsh detector is a report on one broken device:
+  19 of 20 braking events ≥ 0.35 g are at ≤ 10 km/h on a single vehicle, and every live
+  `HARSH_BRAKING` sample carries `speed = 6`. With it, expected volume is 0.80 events/day fleet-wide.
+- **`lost_contact_minutes` is scaled per feed.** Effective thresholds are 30 min (`cartrack/velocity`),
+  379 (`cartrack/urent`), 481 (`netstar/europcar`), 374 (`ituran/avis`). Say so rather than letting
+  eleven vehicles look broken. Do **not** restrict it by granularity — `cartrack/urent` is `history`.
+- **After hours is 21:00→05:00, not 18:00→06:00** (Hein, from PR4's dry run). At 18:00–06:00 the
+  theft detector fired 9.1×/day against real history — outside acceptance criterion 3's ≤5/day.
+  Weekends and public holidays still count. The window **wraps midnight** and spans two `work_date`
+  values; the naive `start <= t && t <= end` comparison is always false and silently disables the
+  detector entirely.
+
+### Channels
+
+| Channel | What goes there | Where |
+|---|---|---|
+| Incident queue (in-app + email) | Every incident, always | `incidentNotifications.ts` |
+| Fleet Alerts WhatsApp **group** | Only `requiresMandatoryIncidentWhatsApp` = `severity === 'critical' && producerKind === 'source_event'` — i.e. `accident_sos` and `theft_after_hours_movement` | `incidentGroupDelivery.ts`, JID from `FLEET_ALERTS_WA_GROUP_JID` |
+| 08:15 morning summary | The four `high` types (`include_in_morning_summary = true`) | `incidentSummaryPhase.ts`; the vehicle contribution is plan PR8, **not shipped** |
+
+`requiresMandatoryIncidentWhatsApp` ignores `whatsapp_enabled`, so **severity is the only lever**
+that keeps a detector off WhatsApp — which is why 529 had to land before any detector does.
+An unset `FLEET_ALERTS_WA_GROUP_JID` falls back to per-user DMs, which is also the rollback path.
+Accepted consequence: on a successful group post no DMs are sent, so a recipient who is not in the
+group gets no WhatsApp for that incident (they still get in-app and email).
+
+### Cron matrix
+
+| Wrapper | Endpoint | Schedule | Environment | Installed? |
+|---|---|---|---|---|
+| `cron-fleet-daily-stats.sh` | `/api/cron/fleet-daily-stats` | `*/15 * * * *` | production (:3000) only | **No** — pending deployment approval |
+| `cron-fleet-operational-monitor.sh` | `/api/cron/fleet-operational-monitor` | `*/5 * * * *` | production | Recorded as installed; the detectors will ride this tick when PR4 lands — no new line |
+| `cron-fleet-incident-actions.sh` | `/api/cron/fleet-incident-actions` | per its own wrapper | production | The 08:15 summary rides this — no new line |
+| `cron-fleet-build-trips.sh` | `/api/cron/fleet-build-trips` | `*/15 * * * *` | production | Recorded as installed |
+
+**Exactly one environment.** Cartrack REST polls from dev (:3005) and the portals from prod
+(:3000) against one shared database; two daily-stats instances would fight over the same watermark
+rows. Production, matching where the other fleet jobs run. Verify what is actually installed with
+`crontab -l -u velo` on the host — this table is a record of intent, not of state.
+
+### First drain — do it BEFORE installing the crontab line
+
+The first production tick is not like the ones after it: every vehicle starts with a null
+watermark, so its window opens at the beginning of that vehicle's history (~40 days × 18 vehicles,
+the `cartrack/velocity` seven at ~1,169 fixes/day each). The wrapper's `curl -m 300` gives up long
+before that finishes, the wrapper exits 1 and logs an ERROR, the endpoint keeps running behind it
+holding the advisory lock, and the next scheduled tick skips on that lock. It self-heals, but the
+first hour of logs reads like a broken job.
+
+```bash
+# On the production host, service already running.
+CRON_SECRET="$CRON_SECRET"   # see .claude/credentials.local.md
+curl -sS -f -m 3000 -X POST -H "x-cron-secret: ${CRON_SECRET}" \
+  http://localhost:3000/api/cron/fleet-daily-stats
+```
+
+Repeat until the response reports `"vehiclesWithBacklog": 0` — the per-run ceiling means one call
+need not finish everything, and every call is safe to repeat because the upsert is a full
+replacement. Then install the `*/15` line; from that point a tick costs only what arrived since
+the last one.
+
+### Backfill — `scripts/fleet-daily-stats-backfill.ts`
+
+The same `buildDailyStats` / `buildStatsForVehicle` the cron runs, looped, with a progress readout
+and the same advisory lock (`fleet-daily-stats`) held for the whole run. It refuses to start if
+migration 528 is not applied, and exits non-zero if a vehicle failed or backlog outlived the
+ceiling. Logic lives in `src/modules/fleet/dailyStats/backfillRunner.ts`; the script is a shell.
+
+```bash
+DATABASE_URL=... npx tsx scripts/fleet-daily-stats-backfill.ts                      # drain the fleet
+DATABASE_URL=... npx tsx scripts/fleet-daily-stats-backfill.ts --max-passes 10
+DATABASE_URL=... npx tsx scripts/fleet-daily-stats-backfill.ts --vehicle <uuid>     # drain one vehicle
+DATABASE_URL=... npx tsx scripts/fleet-daily-stats-backfill.ts --vehicle <uuid> --refold-day 2026-08-14
+```
+
+**`--refold-day` is the documented repair for the horizon this job never goes back past.** A run
+reads from `min(watermark - 6h, yesterday 00:00 SAST)` and that horizon only moves forward, so a
+tracker that was dark for days and dumps its buffer on reconnection lands fixes the incremental
+build will never look at again. The refold rebuilds exactly one vehicle-day whole — its own
+midnight to the next, lead-in read from before it — through the same fold and the same
+full-replacement upsert. It requires `--vehicle`, refuses a day that has not closed (that is the
+cron's business), and cannot rewind the watermark (`GREATEST`). A date range would be a loop of
+refolds in the shell; there is deliberately no `--from`, because the build service exposes no
+window start and inventing one here would be a second definition of where a window opens.
+
+### Open items
+
+- **`accident_sos` has no source.** No panic, SOS, impact, crash, tow or jam field exists on any of
+  the three feeds; all 57 Cartrack event fields were enumerated on 2026-08-25 and cleared. The one
+  open lead is Cartrack's undocumented **`input_state` bitfield** (24 distinct values over 24 h) —
+  a question for Cartrack, not a guess. **Do not synthesise SOS from g-force.** Reopening condition:
+  Cartrack documents the bit map.
+- **`dangerous_area_entry` is deferred** — no dangerous-area table exists, and `project_aois` /
+  `fleet_vehicle_parking_locations` are known-GOOD sites, not hazards. It needs its own table and a
+  curation owner before a detector is worth writing.
+- **Untracked vehicles produce no rows at all, deliberately.** Only 18 of 23 *active* vehicles have
+  a feed (see "Live tracking coverage"); across the whole `fleet_vehicles` register the untracked
+  majority are hire/lease vehicles whose tracking belongs to the hire company — "no login for their
+  portal", not a bug. The vehicle query is an `EXISTS` semi-join over positions, so such a vehicle is
+  ABSENT from stats rather than reported as a day of zeros. Any UI over this table must render
+  "no data" for them, never 0 km. Count them from the register before quoting a fleet-wide figure.
+- **Recurrence is not advanced for source events.** `produceSourceEventIncident` dedups on
+  `(incident_type, source_event_id)` only; a vehicle firing the same detector on ten consecutive
+  days opens ten unrelated incidents and no escalation notices the pattern.
+- **Acceptance criterion 1 is outstanding**: one Cartrack vehicle's `distance_km` within 5 % of the
+  provider portal's own figure for the same day. Everything shipped so far is unit-level evidence
+  against an in-memory engine driven by the real SQL — it cannot catch a column mismatch the fake
+  does not model, a missing grant, or the odometer-versus-haversine choice being wrong against
+  reality.
