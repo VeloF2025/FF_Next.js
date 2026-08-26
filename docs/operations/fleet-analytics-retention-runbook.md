@@ -31,8 +31,9 @@ half is correctly empty and will stay empty until someone creates one.
 
 **The telematics detectors are a separate matter and they are live.** They shipped
 in plan PR4 (#2624) and run off vehicle GPS, not off the roster, so they need no
-assignments at all. As of 2026-08-26 they have produced their first incident: one
-`theft_after_hours_movement`, `critical`, still `open`, with a null `work_date`.
+assignments at all. As of 2026-08-26 they have produced their first incident:
+`INC-THEF-20260825-AE3413`, a `theft_after_hours_movement`, `critical`, still `open`, against a
+vehicle (no `staff_id`), with a null `work_date`.
 
 Read the two halves separately. "No incidents" was true of this feature on
 2026-08-25 and is not true now, and the reason is not that the roster gap was
@@ -43,8 +44,9 @@ writes nothing, and the retention job has nothing to purge. Neither can be
 verified against real output until a roster exists. Creating one is data entry
 (`/fleet/assignments` → select a project → *Operational sites* → pick a
 reviewed source → **Add site**), and it is not a step this document authorizes:
-the moment a roster exists, ten enabled rules begin evaluating named staff and
-notifying oversight members.
+the moment a roster exists, the eight roster-driven rules (of 14 enabled overall; the other six
+are the vehicle-telemetry set already live above, of which `accident_sos` is a documented no-op
+stub, so five actually fire) begin evaluating named staff and notifying oversight members.
 
 ## What stage 8 adds
 
