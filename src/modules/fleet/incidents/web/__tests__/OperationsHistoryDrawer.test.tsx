@@ -97,4 +97,25 @@ describe('OperationsHistoryDrawer', () => {
     await open();
     expect(screen.queryByTestId('operations-drilldown-more')).toBeNull();
   });
+
+  /**
+   * The cursor IS an incident id and the server pages inclusively of it, so the
+   * last row of one page arrives again as the first row of the next. Appending
+   * blind renders two <li> under one key — React warns, and a reader counting
+   * down the list to explain a figure counts one incident twice.
+   */
+  it('does not repeat an incident that arrives on two pages', async () => {
+    const second = '66666666-6666-4666-8666-666666666666';
+    mocks.drillDown.mockResolvedValueOnce({
+      mode: 'retained_detail', values: [], incidentIds: [INCIDENT], nextCursor: INCIDENT,
+    });
+    mocks.drillDown.mockResolvedValueOnce({
+      mode: 'retained_detail', values: [], incidentIds: [INCIDENT, second], nextCursor: null,
+    });
+    await open();
+    await act(async () => { (await screen.findByTestId('operations-drilldown-more')).click(); });
+    await flush();
+    expect(screen.getAllByTestId(`operations-incident-${INCIDENT}`)).toHaveLength(1);
+    expect(screen.getByTestId(`operations-incident-${second}`)).toBeTruthy();
+  });
 });

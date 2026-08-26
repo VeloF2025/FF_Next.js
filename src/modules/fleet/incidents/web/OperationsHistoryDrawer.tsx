@@ -38,7 +38,14 @@ export function OperationsHistoryDrawer({ filters, onClose }: OperationsHistoryD
         setPage(result);
         // Appended rather than replaced: paging through a long list must not
         // discard the page the reader is already looking at.
-        setIncidentIds((seen) => (cursor === null ? result.incidentIds : [...seen, ...result.incidentIds]));
+        // Deduplicated on append. The cursor is an incident id and the server
+        // pages inclusively of it, so the last row of one page is the first row
+        // of the next; concatenating blind repeats it, and React then renders
+        // two <li> under one key. A repeated id is also a reader counting the
+        // same incident twice down a list that is meant to explain a figure.
+        setIncidentIds((seen) => (cursor === null
+          ? [...new Set(result.incidentIds)]
+          : [...new Set([...seen, ...result.incidentIds])]));
         setError(null);
       })
       .catch((cause: unknown) => {
