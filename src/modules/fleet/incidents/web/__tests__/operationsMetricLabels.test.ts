@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { OPERATIONS_METRIC_KEYS } from '../../analytics/aggregateSchema';
+import { denominatorKeyFor } from '../../analytics/metricRelations';
 import { HEADLINE_METRICS, METRIC_GROUPS, metricLabel } from '../operationsMetricLabels';
 
 describe('metricLabel', () => {
@@ -46,12 +47,19 @@ describe('HEADLINE_METRICS', () => {
    * missing.
    */
   it('names only metrics the server gives a denominator', () => {
-    const withDenominator = new Set([
-      'presence.confirmed_days', 'presence.unconfirmed_days', 'presence.vehicle_only_days',
-      'input.responses_received', 'input.responses_on_time',
-      'reliability.monitor_runs_completed', 'reliability.notifications_delivered',
-      'reliability.evidence_available', 'reliability.recurrence',
-    ]);
-    for (const key of HEADLINE_METRICS) expect(withDenominator.has(key)).toBe(true);
+    // Asked of `denominatorKeyFor` — the function the SERVER divides by — rather
+    // than a list copied out of it. A hand-kept copy is a test of the copy: add
+    // a denominator relation on one side only and both agree with themselves.
+    for (const key of HEADLINE_METRICS) {
+      expect({ key, denominator: denominatorKeyFor(key) })
+        .toEqual({ key, denominator: expect.any(String) });
+    }
+  });
+
+  /** Guards the guard: an oracle that called everything denominator-bearing would pass vacuously. */
+  it('is asked of an oracle that refuses some keys', () => {
+    const refused = OPERATIONS_METRIC_KEYS.filter((key) => denominatorKeyFor(key) === null);
+    expect(refused.length).toBeGreaterThan(0);
+    expect(refused).toContain('presence.scheduled_days');
   });
 });
