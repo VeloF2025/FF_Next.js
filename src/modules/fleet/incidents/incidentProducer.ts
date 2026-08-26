@@ -223,7 +223,15 @@ async function produceSourceEventIncident(request: SourceEventProducerRequest): 
         projectId: request.projectId ?? null, vehicleId, conditionActive: true,
       }),
       observedAt: request.occurredAt, primaryStatus: request.incidentType, flags: [],
-      ruleId: rule.id, ruleVersion: rule.version, evidenceSnapshot, reasonCodes: [],
+      // `observations.rule_id` is an FK to `fleet_operational_status_rules` (migration
+      // 510) — the roster STATUS rule the scheduled path resolves. A source event has
+      // no status rule; `rule` here is an `fleet_operational_incident_rules` row, and
+      // writing its id here violated that FK on every real source event. Null/null is
+      // the honest value (and satisfies the rule_pair CHECK): the incident row itself
+      // still records `incident_rule_id`/`incident_rule_version`, so nothing is lost.
+      // The fingerprint above deliberately keeps the incident rule identity, so dedup
+      // semantics are unchanged by this.
+      ruleId: null, ruleVersion: null, evidenceSnapshot, reasonCodes: [],
       monitorRunId: null, sourceEventId,
     }, txn);
     return { outcome: 'opened' as const, incidentId: record.id, requiresInitialNotification: true };
