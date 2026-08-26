@@ -242,10 +242,25 @@ describe('nothing reads the base table behind the view', () => {
     }
   });
 
-  it('reads the aggregates through the view in the retention coverage gate', () => {
+  /**
+   * The retention gate no longer reads aggregates at all — migration 530 gave
+   * it a recorded fact to read instead, because counting published rows made a
+   * correctly-aggregated month that published nothing look like a month that
+   * was never aggregated.
+   *
+   * This assertion is kept rather than deleted, re-pointed at the relation the
+   * gate should now name. Its job was never "mentions the view"; it was "the
+   * gate reads the thing it is supposed to read", and dropping it entirely
+   * would let the gate be quietly rewritten against anything at all while the
+   * base-table scan above stayed green.
+   */
+  it('reads recorded coverage, not aggregates, in the retention gate', () => {
     const retention = readFileSync(
       join(REPO_ROOT, 'src', 'modules', 'fleet', 'incidents', 'retention', 'retentionRepository.ts'), 'utf8',
     );
-    expect(retention).toContain(VIEW_NAME);
+    expect(retention).toContain('fleet_operational_aggregate_month_coverage');
+    // And not through the view either: a gate reading both would be two
+    // answers to one question.
+    expect(retention).not.toContain(VIEW_NAME);
   });
 });

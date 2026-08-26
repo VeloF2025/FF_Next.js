@@ -37,10 +37,12 @@ const RETENTION = readFileSync(join(SQL_DIR, '518_fleet_operational_analytics_re
 // 521 is what makes the purge executable as the application role at all; the
 // grant contract itself lives in 521_fleet_retention_delete_grants.test.ts.
 const DELETE_GRANTS = readFileSync(join(SQL_DIR, '521_fleet_retention_delete_grants.sql'), 'utf8');
-// 527 creates the published view. `hasCompleteAggregateCoverage` reads it
-// rather than the base table, so the coverage gate cannot be exercised without
-// it — the view is part of this fixture's schema, not an optional extra.
+// 527 creates the published view, which the analytics read path uses.
 const PUBLISHED_VIEW = readFileSync(join(SQL_DIR, '527_fleet_aggregates_published_view.sql'), 'utf8');
+// 530 creates the coverage table. `hasCompleteAggregateCoverage` reads it
+// rather than counting aggregate rows, so the gate cannot be exercised without
+// it — the table is part of this fixture's schema, not an optional extra.
+const COVERAGE = readFileSync(join(SQL_DIR, '530_fleet_aggregate_month_coverage.sql'), 'utf8');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const STAFF = '22222222-2222-4222-8222-222222222222';
@@ -118,11 +120,15 @@ function urlAsRole(role: string): string {
 /** A role with no grants at all, used to prove the identity seam actually routes. */
 const UNPRIVILEGED_ROLE = 'fleet_retention_seam_probe';
 
+import type { ReleasedAggregate } from '@/modules/fleet/incidents/analytics/suppression';
+
+type Aggregates = typeof import('@/modules/fleet/incidents/analytics/aggregateRepository');
 type Repo = typeof import('@/modules/fleet/incidents/retention/retentionRepository')
   & typeof import('@/modules/fleet/incidents/retention/retentionRunRepository');
 type Purge = typeof import('@/modules/fleet/incidents/retention/incidentPurge');
 type RetentionDb = typeof import('@/modules/fleet/incidents/retention/retentionDb');
 let repo: Repo;
+let aggregates: Aggregates;
 let purge: Purge;
 let retentionDb: RetentionDb;
 let transaction: typeof import('@/lib/db-pool').transaction;
@@ -211,13 +217,49 @@ async function seedActiveHold(incidentId: string): Promise<void> {
   );
 }
 
-async function seedAggregateCoverage(monthStart: string): Promise<void> {
+/** One published aggregate row, as a month with something to publish would have. */
+async function seedAggregateRow(monthStart: string): Promise<void> {
   await db.query(
     `INSERT INTO fleet_operational_monthly_aggregates
        (metric_version, month_start, dimension_level, metric_key, metric_kind, numerator, contributor_count)
      VALUES (1, $1::date, 'organisation', 'incident.late', 'count', 4, 6)`,
     [monthStart],
   );
+}
+
+/**
+ * The recorded fact that a month was aggregated (migration 530) — what the gate
+ * actually reads. `rowCount` is deliberately a parameter: zero is a complete,
+ * valid answer and is the case the old row-counting gate got wrong.
+ */
+async function seedAggregationRun(metricVersion = 1): Promise<string> {
+  // `finished_at` is not optional here: the runs table's `finish_pairing` CHECK
+  // makes `status = 'running'` and `finished_at IS NULL` the same condition, so
+  // a succeeded run without a finish time is rejected.
+  const { rows } = await db.query<{ id: string }>(
+    `INSERT INTO fleet_operational_aggregation_runs (status, metric_version, months_requested, finished_at)
+     VALUES ('succeeded', $1, 1, now()) RETURNING id`,
+    [metricVersion],
+  );
+  return rows[0]!.id;
+}
+
+async function seedAggregateCoverage(monthStart: string, rowCount = 1, metricVersion = 1): Promise<void> {
+  await db.query(
+    `INSERT INTO fleet_operational_aggregate_month_coverage
+       (metric_version, month_start, aggregation_run_id, row_count)
+     VALUES ($1, $2::date, $3, $4)`,
+    [metricVersion, monthStart, await seedAggregationRun(metricVersion), rowCount],
+  );
+}
+
+/** One releasable aggregate, as the calculator would hand it to `replaceMonth`. */
+function releasedRow(monthStart: string, metricVersion: number): ReleasedAggregate {
+  return {
+    monthStart, metricVersion, dimensionLevel: 'project', dimensionProjectId: PROJECT,
+    dimensionSiteId: null, metricKey: 'incident.late', metricKind: 'count',
+    numerator: 4, denominator: null, histogram: null, contributorCount: 6,
+  };
 }
 
 async function count(table: string, where: string, params: unknown[]): Promise<number> {
@@ -246,6 +288,7 @@ beforeAll(async () => {
   await db.query(RETENTION);
   await db.query(DELETE_GRANTS);
   await db.query(PUBLISHED_VIEW);
+  await db.query(COVERAGE);
   // The purge also removes this module's bell notifications; the real table
   // already grants the application DELETE, and the scratch copy mirrors that.
   await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ${SCHEMA}.user_notifications TO fibreflow_user`);
@@ -253,6 +296,7 @@ beforeAll(async () => {
     ...await import('@/modules/fleet/incidents/retention/retentionRepository'),
     ...await import('@/modules/fleet/incidents/retention/retentionRunRepository'),
   };
+  aggregates = await import('@/modules/fleet/incidents/analytics/aggregateRepository');
   purge = await import('@/modules/fleet/incidents/retention/incidentPurge');
   retentionDb = await import('@/modules/fleet/incidents/retention/retentionDb');
   ({ transaction } = await import('@/lib/db-pool'));
@@ -270,8 +314,15 @@ afterAll(async () => {
 beforeEach(async () => {
   delete process.env.FLEET_RETENTION_DATABASE_URL;
   retentionDb.__resetRetentionPoolForTests();
+  // The coverage table and the aggregation runs it references belong here for
+  // the same reason every other table does: the scratch schema outlives the
+  // test, so a coverage row seeded by one case answers the next one's question.
+  // Leaving them out made three cases pass locally against a mocked pool and
+  // fail against real Postgres — one on a duplicate key, two on coverage the
+  // previous test had recorded.
   await db.query(`TRUNCATE fleet_operational_retention_items, fleet_operational_retention_runs,
     fleet_incident_retention_hold_actions, fleet_incident_retention_holds,
+    fleet_operational_aggregate_month_coverage, fleet_operational_aggregation_runs,
     fleet_operational_monthly_aggregates RESTART IDENTITY CASCADE`);
   await db.query(`DELETE FROM fleet_incident_attendance_correction_links`);
   await db.query(`DELETE FROM fleet_incident_driver_submissions`);
@@ -511,7 +562,7 @@ describe('aggregate coverage gate', () => {
     expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(false);
   });
 
-  it('reports coverage once an active aggregate exists for that month and metric version', async () => {
+  it('reports coverage once the month has been recorded for that metric version', async () => {
     await seedAggregateCoverage('2025-01-01');
     expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(true);
   });
@@ -522,10 +573,89 @@ describe('aggregate coverage gate', () => {
     expect(await repo.hasCompleteAggregateCoverage('2025-02-01', 2)).toBe(false);
   });
 
-  it('does not accept a superseded (inactive) aggregate as coverage', async () => {
-    await seedAggregateCoverage('2025-01-01');
-    await db.query(`UPDATE fleet_operational_monthly_aggregates SET is_active = false`);
+  /**
+   * The defect migration 530 closes, against a real database.
+   *
+   * A month can be aggregated fully and correctly and publish NOTHING — the
+   * release rule withholds a metric whose support is empty rather than storing
+   * a roster-sized zero. The previous gate counted published rows, so this
+   * month reported no coverage forever and its identifiable detail could never
+   * be purged. Re-running the job changed nothing, because the correct answer
+   * was still zero rows.
+   */
+  it('reports coverage for a month that was aggregated but published nothing', async () => {
+    await seedAggregateCoverage('2025-01-01', 0);
+    expect(await count('fleet_operational_monthly_aggregates', 'month_start = $1::date', ['2025-01-01'])).toBe(0);
+    expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(true);
+  });
+
+  /**
+   * And the converse, which the row-counting gate got right by accident and
+   * this one gets right on purpose: aggregate rows are not themselves a claim
+   * that the month was aggregated under the version being asked about.
+   */
+  it('does not accept published rows alone as coverage', async () => {
+    await seedAggregateRow('2025-01-01');
     expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(false);
+  });
+
+  /**
+   * A superseded generation must not answer for its version — driven through
+   * `replaceMonth` itself, because the retirement and the coverage delete are
+   * one transaction and the bug lives in the gap between them.
+   *
+   * THE SCENARIO. Version 1 covers January. A bump to version 2 recomputes it:
+   * version 1's rows are retired and the published view stops returning them.
+   * Someone then REVERTS the metric version — a bad definition backed out, a
+   * config rollback — and the nightly job recomputes only the months still
+   * inside its recalculation window. January is not one of them, so
+   * `replaceMonth` is never called for it again.
+   *
+   * Without the coverage delete, January's version-1 coverage row outlives the
+   * rows it attests to, and the gate says yes for a month the published view
+   * answers with nothing — authorising the deletion of identifiable detail
+   * against an aggregate nobody can read. Permanently, because no later run
+   * revisits the month to correct it.
+   */
+  it('does not accept a superseded (inactive) generation as coverage after a version bump', async () => {
+    await aggregates.replaceMonth('2025-01-01', 1, [releasedRow('2025-01-01', 1)], await seedAggregationRun(1));
+    expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(true);
+
+    // The bump. Version 1's rows are retired in the same transaction that
+    // writes version 2's.
+    await aggregates.replaceMonth('2025-01-01', 2, [releasedRow('2025-01-01', 2)], await seedAggregationRun(2));
+
+    const published = await db.query<{ metric_version: number }>(
+      `SELECT metric_version FROM fleet_operational_monthly_aggregates_published
+        WHERE month_start = '2025-01-01'::date`,
+    );
+    expect(published.rows.map((r) => r.metric_version)).toEqual([2]);
+
+    // The revert. Nothing re-aggregates this month, so version 1's answer stays
+    // retired — and its coverage must have gone with it.
+    expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 1)).toBe(false);
+    expect(await repo.hasCompleteAggregateCoverage('2025-01-01', 2)).toBe(true);
+  });
+
+  /**
+   * The same delete, on the path that publishes NOTHING. A bump whose new
+   * definition releases no rows still retires the old one's, so it must still
+   * clear the old one's coverage — the case an early return would skip.
+   */
+  it('clears a superseded version coverage even when the new version publishes nothing', async () => {
+    await aggregates.replaceMonth('2025-03-01', 1, [releasedRow('2025-03-01', 1)], await seedAggregationRun(1));
+    await aggregates.replaceMonth('2025-03-01', 2, [], await seedAggregationRun(2));
+
+    expect(await repo.hasCompleteAggregateCoverage('2025-03-01', 1)).toBe(false);
+    expect(await repo.hasCompleteAggregateCoverage('2025-03-01', 2)).toBe(true);
+  });
+
+  /** And it is scoped: recomputing a version never deletes its own coverage. */
+  it('keeps the coverage of the version being written', async () => {
+    const first = await seedAggregationRun(1);
+    await aggregates.replaceMonth('2025-04-01', 1, [releasedRow('2025-04-01', 1)], first);
+    await aggregates.replaceMonth('2025-04-01', 1, [releasedRow('2025-04-01', 1)], await seedAggregationRun(1));
+    expect(await repo.hasCompleteAggregateCoverage('2025-04-01', 1)).toBe(true);
   });
 });
 

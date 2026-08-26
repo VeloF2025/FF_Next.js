@@ -1,0 +1,28 @@
+-- rollback_530_fleet_aggregate_month_coverage.sql
+--
+-- Reverses 530_fleet_aggregate_month_coverage.sql by dropping the coverage
+-- table. The descriptor after the number matches the forward file's exactly — a
+-- rollback whose name does not match its migration is how the wrong rollback
+-- gets applied silently.
+--
+-- No aggregate row, incident, or piece of evidence is touched. This table holds
+-- only metadata about which months an aggregation run completed; dropping it
+-- destroys the record that they did, never the aggregates themselves.
+--
+-- WHAT APPLYING THIS DOES TO RETENTION
+--
+-- It breaks the deletion gate loudly. `hasCompleteAggregateCoverage` queries
+-- this table, so a purge run after this rollback fails with
+-- `relation "fleet_operational_aggregate_month_coverage" does not exist` rather
+-- than proceeding.
+--
+-- That is the intended behaviour and the reason the query was not written to
+-- tolerate a missing table. A gate that authorises deletion must fail closed
+-- and loudly; one that quietly fell back to counting aggregate rows would
+-- reintroduce the exact defect 530 exists to fix, and would do it invisibly.
+--
+-- Rolling this back therefore means retention stops, not that retention
+-- reverts. Re-apply 530 and let one aggregation run rebuild the coverage rows
+-- for the recalculation window before expecting a purge to do anything.
+
+DROP TABLE IF EXISTS fleet_operational_aggregate_month_coverage;
