@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VehicleRulesDialog } from '../VehicleRulesDialog';
@@ -156,5 +158,58 @@ describe('VehicleRulesDialog', () => {
     fetchMock.mockResolvedValueOnce(response(null, false, 400, 'effectiveFrom must be after the current rule activation'));
     fireEvent.click(screen.getByRole('button', { name: 'Create vehicle rule version' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('effectiveFrom must be after the current rule activation');
+  });
+});
+
+/**
+ * Theme regression pin.
+ *
+ * PR3 shipped this dialog with `text-[var(--ff-text-primary)]` on the modal
+ * surface. StatusRulesDialog — the sibling this was modelled on — sets no text
+ * colour at all and inherits the page's, which is correct in both themes. The
+ * extra class rendered near-white labels on the white surface in LIGHT theme,
+ * unreadable, and was found by a browser check on dev only after the PR merged.
+ *
+ * A rendering test cannot catch it: jsdom computes no stylesheet, so the class
+ * is present-but-inert and every `getByText` passes. What CAN be checked
+ * cheaply is the thing that actually went wrong — this component's colour
+ * classes diverging from the sibling that is known-good in both themes.
+ */
+describe('theme parity with StatusRulesDialog', () => {
+  const read = (file: string) =>
+    readFileSync(resolve(process.cwd(), 'src/modules/fleet/operations/web', file), 'utf8');
+
+  const sibling = read('StatusRulesDialog.tsx');
+  const ours = [read('VehicleRulesDialog.tsx'), read('VehicleRuleForm.tsx')].join('\n');
+
+  /** Every colour-bearing utility in a file: text-*, bg-*, and their arbitrary-value forms. */
+  const colourClasses = (source: string): Set<string> => {
+    const classes = new Set<string>();
+    for (const attr of source.match(/className="[^"]*"/g) ?? []) {
+      for (const token of attr.slice(11, -1).split(/\s+/)) {
+        if (/^(text|bg)-/.test(token)) classes.add(token);
+      }
+    }
+    return classes;
+  };
+
+  it('gives the modal surface the sibling exact class list', () => {
+    const surface = (source: string) =>
+      source.match(/className="(mx-auto max-w-4xl[^"]*)"/)?.[1];
+    expect(surface(ours)).toBeDefined();
+    expect(surface(ours)).toBe(surface(sibling));
+  });
+
+  it('sets no text colour on the surface, so labels inherit the page in both themes', () => {
+    // The exact mechanism of the light-theme bug. Checked against the className
+    // attributes only — prose in a comment naming the retired class must not
+    // fail this, or the fix cannot be explained where it happened.
+    const declared = (ours.match(/className="[^"]*"/g) ?? []).join(' ');
+    expect(declared).not.toMatch(/text-\[var\(--ff-text/);
+  });
+
+  it('uses no colour class the sibling does not', () => {
+    const extra = [...colourClasses(ours)].filter((cls) => !colourClasses(sibling).has(cls));
+    expect(extra).toEqual([]);
   });
 });
