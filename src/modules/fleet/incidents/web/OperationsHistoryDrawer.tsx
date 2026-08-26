@@ -69,7 +69,7 @@ export function OperationsHistoryDrawer({ filters, onClose }: OperationsHistoryD
       </div>
 
       {error !== null && (
-        <p data-testid="operations-drilldown-error" className="text-sm text-red-300">{error}</p>
+        <p data-testid="operations-drilldown-error" role="alert" className="text-sm text-red-700">{error}</p>
       )}
 
       {page?.mode === 'aggregate_only' && (

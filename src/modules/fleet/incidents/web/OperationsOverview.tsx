@@ -27,7 +27,7 @@ function Coverage({ value }: { value: OperationsMetricValue }) {
   // card that says "1 of 3" invisible among them.
   if (value.coverage.months === value.coverage.of) return null;
   return (
-    <p className="text-[10px] text-amber-400">
+    <p className="text-[10px] text-amber-700">
       {value.coverage.months} of {value.coverage.of} months reported this
     </p>
   );

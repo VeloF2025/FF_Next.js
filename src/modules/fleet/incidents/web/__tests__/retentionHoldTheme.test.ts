@@ -1,5 +1,6 @@
 /**
- * The retention-hold panel must not invent its own palette.
+ * The retention-hold panel and the operations analytics section must not invent
+ * their own palettes.
  *
  * FibreFlow renders in a light theme. Tailwind's dark-only steps — `text-red-300`,
  * `bg-amber-900/30`, `border-red-800` — were written for a dark surface and
@@ -23,7 +24,17 @@ const WEB = join(__dirname, '..');
 
 /** The components whose appearance has been reviewed against the real theme. */
 const PROVEN = ['IncidentReviewDrawer.tsx', 'IncidentActionPanel.tsx', 'IncidentTimeline.tsx'];
-const UNDER_TEST = ['RetentionHoldPanel.tsx', 'RetentionHoldRow.tsx', 'RetentionHoldCreateForm.tsx'];
+const UNDER_TEST = [
+  'RetentionHoldPanel.tsx', 'RetentionHoldRow.tsx', 'RetentionHoldCreateForm.tsx',
+  // Stage 8 task 9. Every surface of the operations section that discloses
+  // something — the error box, the freshness warning, the suppression notices,
+  // the coverage flag, the drill-down failure — shipped in dark-only steps
+  // (`bg-red-900/20`, `text-red-400`, `text-amber-400`) that reach this light
+  // theme as near-invisible text on a black-on-black card. Exactly the failure
+  // this file was written for, on the disclosures that most need to be read.
+  'OperationsAnalytics.tsx', 'OperationsOverview.tsx', 'OperationsHistoryDrawer.tsx',
+  'OperationsCharts.tsx', 'OperationsFilters.tsx',
+];
 
 /**
  * Every Tailwind utility that names a palette colour and a numeric step.
@@ -41,7 +52,7 @@ function paletteUtilities(files: string[]): Set<string> {
   return found;
 }
 
-describe('retention hold components use the reviewed palette', () => {
+describe('fleet incident web components use the reviewed palette', () => {
   it('names no colour utility the proven sibling components do not already use', () => {
     const allowed = paletteUtilities(PROVEN);
     const used = [...paletteUtilities(UNDER_TEST)];
@@ -60,7 +71,7 @@ describe('retention hold components use the reviewed palette', () => {
   });
 
   /** And the panel must actually be using some of it, or the pin is vacuous. */
-  it('finds colour utilities in the hold components at all', () => {
+  it('finds colour utilities in the components under test at all', () => {
     expect(paletteUtilities(UNDER_TEST).size).toBeGreaterThan(0);
   });
 });

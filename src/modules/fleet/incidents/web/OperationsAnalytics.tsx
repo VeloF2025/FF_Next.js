@@ -131,9 +131,12 @@ export function OperationsAnalytics() {
       <OperationsFilters filters={filters} onChange={onFiltersChange} />
 
       {error !== null && (
-        <div data-testid="operations-error" className="bg-red-900/20 border border-red-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
-          <span className="text-red-300 text-sm">{error}</span>
+        <div
+          data-testid="operations-error" role="alert"
+          className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 flex items-start gap-3"
+        >
+          <AlertTriangle className="w-5 h-5 text-red-700 shrink-0" />
+          <span className="text-red-700 text-sm">{error}</span>
         </div>
       )}
 
@@ -152,11 +155,11 @@ export function OperationsAnalytics() {
           </p>
 
           {freshnessWarning !== null && (
-            <p data-testid="operations-freshness" className="text-xs text-amber-400">{freshnessWarning}</p>
+            <p data-testid="operations-freshness" className="text-xs text-amber-700">{freshnessWarning}</p>
           )}
 
           {report.suppressionNotices.length > 0 && (
-            <ul data-testid="operations-notices" className="text-xs text-amber-400 space-y-1">
+            <ul data-testid="operations-notices" className="text-xs text-amber-700 space-y-1">
               {report.suppressionNotices.map((notice) => <li key={notice}>{notice}</li>)}
             </ul>
           )}
