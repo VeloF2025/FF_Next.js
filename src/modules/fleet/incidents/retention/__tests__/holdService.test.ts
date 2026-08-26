@@ -276,11 +276,37 @@ describe('listIncidentHoldsForViewer', () => {
     const result = await listIncidentHoldsForViewer(INCIDENT, { userId: 'pm', staffId: null, role: 'project_manager' });
     expect(result.holds).toHaveLength(1);
     expect(result.canManage).toBe(false);
+    expect(result.canCreate).toBe(false);
   });
 
   it('reports manage authority for a hold manager', async () => {
     const result = await listIncidentHoldsForViewer(INCIDENT, actor);
     expect(result.canManage).toBe(true);
+    expect(result.canCreate).toBe(true);
+  });
+
+  /**
+   * `create` and `edit` are separate actions on `fleet.retention-holds`, and
+   * `createRetentionHold` checks `create` while review and release check
+   * `edit`. A grant of one and not the other is expressible, so a single flag
+   * would tell the UI to offer a Place-hold button the service then refuses.
+   */
+  it('answers create and edit authority separately', async () => {
+    permissions.userHasPermission.mockImplementation(
+      async (_user: string, _key: string, action: string) => action === 'edit',
+    );
+    const result = await listIncidentHoldsForViewer(INCIDENT, actor);
+    expect(result.canManage).toBe(true);
+    expect(result.canCreate).toBe(false);
+  });
+
+  it('reports create authority without edit authority', async () => {
+    permissions.userHasPermission.mockImplementation(
+      async (_user: string, _key: string, action: string) => action === 'create',
+    );
+    const result = await listIncidentHoldsForViewer(INCIDENT, actor);
+    expect(result.canManage).toBe(false);
+    expect(result.canCreate).toBe(true);
   });
 
   // A released hold stays visible until the incident itself is purged.
