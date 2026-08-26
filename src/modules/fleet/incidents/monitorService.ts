@@ -214,6 +214,9 @@ async function processStaffMember(
           severity: rule.severity, producerKind: 'scheduled_detection', rule, projectId: item.projectId,
           staffName: item.staffName, projectName: item.projectName, operationalSiteName: item.operationalSiteName,
           detectedAt: request.effectiveAt, reasonCodes: item.reasonCodes,
+          // Scheduled detections carry no vehicle snapshot (see the null at
+          // vehicleRegistrationSnapshot above) and never reach the group post.
+          vehicleRegistration: null,
         });
         totals.notificationsAccepted += delivery.delivered;
         totals.notificationsFailed += delivery.failed;

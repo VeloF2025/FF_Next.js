@@ -6,7 +6,12 @@ vi.mock('@/lib/logger', () => logger);
 const bus = vi.hoisted(() => ({ notify: vi.fn() }));
 vi.mock('@/modules/notifications/services/notificationBus', () => bus);
 
-const wa = vi.hoisted(() => ({ deliverWhatsApp: vi.fn() }));
+// sendWhatsAppGroup and logDelivery are mocked even though most of this file
+// exercises the DM path: the module under test imports the group path too, and
+// a mock missing them turns a group post into a TypeError that the group
+// module's own catch swallows into the fallback — every DM assertion below
+// would then pass for the wrong reason on a machine that has the JID set.
+const wa = vi.hoisted(() => ({ deliverWhatsApp: vi.fn(), sendWhatsAppGroup: vi.fn(), logDelivery: vi.fn() }));
 vi.mock('@/modules/notifications/services/whatsappDelivery', () => wa);
 
 const idem = vi.hoisted(() => ({ claimNotification: vi.fn(), releaseNotificationClaim: vi.fn() }));
@@ -44,11 +49,18 @@ function rule(overrides: Partial<IncidentRule> = {}): IncidentRule {
   };
 }
 
+// This file pins the per-user DM leg, which only runs when no group is
+// configured. A developer or CI box with FLEET_ALERTS_WA_GROUP_JID exported
+// would otherwise silently exercise the group path instead — see the
+// both-modes tests at the end for the configured case.
 beforeEach(() => {
   vi.clearAllMocks();
+  delete process.env.FLEET_ALERTS_WA_GROUP_JID;
   recipients.resolveIncidentRecipients.mockResolvedValue({ userIds: [PM, OVERSIGHT], failed: false });
   bus.notify.mockResolvedValue({ delivered: 2, suppressed: 0, failed: 0 });
   wa.deliverWhatsApp.mockResolvedValue(undefined);
+  wa.sendWhatsAppGroup.mockResolvedValue(undefined);
+  wa.logDelivery.mockResolvedValue(undefined);
   idem.claimNotification.mockResolvedValue(true);
   idem.releaseNotificationClaim.mockResolvedValue(undefined);
 });
@@ -101,7 +113,7 @@ describe('sendIncidentOpenedNotification', () => {
     expect(result).toEqual({ delivered: 0, suppressed: 0, failed: 1 });
   });
 
-  it('sends WhatsApp directly to every recipient for a critical source-event incident, in addition to notify()', async () => {
+  it('DMs every recipient for a critical source-event incident when no Fleet Alerts group is configured, in addition to notify()', async () => {
     await sendIncidentOpenedNotification({
       ...baseInput, producerKind: 'source_event', severity: 'critical',
       incidentType: 'accident_sos', rule: rule({ incidentType: 'accident_sos', severity: 'critical', channels: { inApp: true, email: true, whatsapp: true } }),
@@ -202,6 +214,7 @@ describe('sendEscalationNotification', () => {
     severity: 'high' as const, producerKind: 'scheduled_detection' as const,
     projectId: PROJECT, staffName: 'Jane Driver', projectName: 'Project One',
     operationalSiteName: 'Site One', escalationLevel: 2,
+    vehicleRegistration: 'JX 12 AB GP', detectedAt: '2026-08-18T08:00:00.000Z',
   };
 
   it('uses the incident id + escalation level idempotency key', async () => {
@@ -241,13 +254,23 @@ describe('sendEscalationNotification', () => {
     expect(wa.deliverWhatsApp).not.toHaveBeenCalled();
   });
 
-  it('sends mandatory WhatsApp directly to every recipient for a critical source-event escalation, in addition to notify()', async () => {
+  it('DMs every recipient for a critical source-event escalation when no Fleet Alerts group is configured', async () => {
     await sendEscalationNotification({ ...input, severity: 'critical', producerKind: 'source_event', incidentType: 'accident_sos' });
 
     expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({ event_type: 'fleet.operational_incident_escalated' }));
     expect(wa.deliverWhatsApp).toHaveBeenCalledTimes(2);
     expect(wa.deliverWhatsApp).toHaveBeenCalledWith(PM, expect.anything(), null);
     expect(wa.deliverWhatsApp).toHaveBeenCalledWith(OVERSIGHT, expect.anything(), null);
+  });
+
+  it('posts to the group instead of DMing when a Fleet Alerts group IS configured', async () => {
+    process.env.FLEET_ALERTS_WA_GROUP_JID = '120363000000000000@g.us';
+
+    const result = await sendEscalationNotification({ ...input, severity: 'critical', producerKind: 'source_event' });
+
+    expect(wa.sendWhatsAppGroup).toHaveBeenCalledTimes(1);
+    expect(wa.deliverWhatsApp).not.toHaveBeenCalled();
+    expect(result.failed).toBe(0);
   });
 
   it('counts a mandatory WhatsApp delivery failure on escalation without throwing', async () => {

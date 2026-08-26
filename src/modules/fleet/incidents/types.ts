@@ -61,6 +61,13 @@ export interface IncidentSourceEvent {
    * keep saying which vehicle it was actually about. It is also the only human
    * label a vehicle incident has — nothing else on a source event names the
    * thing that moved.
+   *
+   * Optional here, unlike `OpenedNotificationInput.vehicleRegistration`, which
+   * PR5 made required so a caller cannot silently ship "not recorded" into an
+   * accident alert. The asymmetry is deliberate and the hole is still closed:
+   * `vehicleId` on this interface is itself optional, so requiring only the
+   * registration would be incoherent — and a detector that forgets it fails to
+   * compile at the notification call one line later.
    */
   vehicleRegistrationSnapshot?: string | null;
   projectId?: string | null;
