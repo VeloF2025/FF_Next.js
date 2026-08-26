@@ -26,6 +26,8 @@ import {
   buildIncidentResolvedIdempotencyKey,
   buildMonitorFailedIdempotencyKey,
   buildMorningSummaryIdempotencyKey,
+  buildVehicleMorningSummaryIdempotencyKey,
+  sendVehicleMorningSummaryNotification,
   sendEscalationNotification,
   sendIncidentOpenedNotification,
   sendMonitorFailedNotification,
@@ -438,5 +440,45 @@ describe('sendMonitorFailedNotification', () => {
       .toBe(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-20'));
     expect(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-20'))
       .not.toBe(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-21'));
+  });
+});
+
+// PR8. The roster summary renders a null project as the literal `unassigned`, and vehicle
+// incidents are projectless too — so if the vehicle summary reused that builder the two
+// digests would produce the SAME key for the same recipient and date, and claimNotification
+// would silently drop whichever ran second. These must never collide, for any project id.
+describe('vehicle morning-summary keys never collide with the roster summary', () => {
+  const WORK_DATE = '2026-08-30';
+
+  it('uses a distinct namespace from the roster summary, including its unassigned bucket', () => {
+    const vehicleKey = buildVehicleMorningSummaryIdempotencyKey(PM, WORK_DATE);
+    expect(vehicleKey).toBe(`fleet-vehicle-morning-summary:${PM}:${WORK_DATE}`);
+    for (const projectId of [null, PROJECT, 'unassigned', '']) {
+      expect(buildMorningSummaryIdempotencyKey(PM, projectId, WORK_DATE)).not.toBe(vehicleKey);
+    }
+  });
+
+  it('cannot be confused by prefix either way', () => {
+    const rosterKey = buildMorningSummaryIdempotencyKey(PM, null, WORK_DATE);
+    const vehicleKey = buildVehicleMorningSummaryIdempotencyKey(PM, WORK_DATE);
+    expect(vehicleKey.startsWith('fleet-morning-summary:')).toBe(false);
+    expect(rosterKey.startsWith('fleet-vehicle-morning-summary:')).toBe(false);
+  });
+
+  it('separates recipients and work dates', () => {
+    expect(buildVehicleMorningSummaryIdempotencyKey(PM, WORK_DATE))
+      .not.toBe(buildVehicleMorningSummaryIdempotencyKey(PM, '2026-08-29'));
+    expect(buildVehicleMorningSummaryIdempotencyKey(PM, WORK_DATE))
+      .not.toBe(buildVehicleMorningSummaryIdempotencyKey(INCIDENT, WORK_DATE));
+  });
+
+  it('sends a zero-incident summary rather than nothing', async () => {
+    bus.notify.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
+
+    await sendVehicleMorningSummaryNotification({ recipientUserId: PM, workDate: WORK_DATE, items: [] });
+
+    const payload = bus.notify.mock.calls[0]?.[0];
+    expect(payload?.body).toContain('No vehicle incidents');
+    expect(payload?.metadata?.summaryScope).toBe('vehicle');
   });
 });

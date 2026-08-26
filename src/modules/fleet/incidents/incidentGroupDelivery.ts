@@ -42,14 +42,16 @@ const MODULE = 'FleetIncidentGroupDelivery';
 /** Distinct from `sendMandatoryWhatsApp`'s per-user `${eventType}:whatsapp`. Reusing that triple would find the claim already taken and suppress the group post entirely instead of deduplicating it. */
 const GROUP_CLAIM_SUFFIX = 'wa_group';
 
-export interface FleetAlertsGroupIncident {
+/**
+ * Everything `postToFleetAlertsGroup` actually needs: claim identity, the
+ * recipients the claim is anchored on, and the fallback path. Split out of
+ * `FleetAlertsGroupIncident` so a non-incident post — PR8's daily vehicle
+ * summary — can use the same claim/fallback bookkeeping without inventing a
+ * fake incident type and detection instant to satisfy the type.
+ */
+export interface FleetAlertsGroupPost {
+  /** Log/claim subject. An incident id for an incident post; a synthetic per-subject reference (e.g. `vehicle-morning-summary:<date>`) for anything else. */
   incidentId: string;
-  incidentReference: string | null;
-  incidentType: IncidentType;
-  vehicleRegistration: string | null;
-  projectName: string | null;
-  /** ISO instant; rendered as SAST wall-clock in the message. */
-  detectedAt: string;
   /** Notification event type — the first element of the claim namespace. */
   eventType: string;
   /** The same idempotency key the in-app/email fan-out used for this transition. */
@@ -57,6 +59,15 @@ export interface FleetAlertsGroupIncident {
   recipientUserIds: readonly string[];
   /** The EXISTING per-user `deliverWhatsApp` path, injected by the caller so the claim/release bookkeeping stays in one place. Returns its failure count. */
   deliverToRecipients: () => Promise<number>;
+}
+
+export interface FleetAlertsGroupIncident extends FleetAlertsGroupPost {
+  incidentReference: string | null;
+  incidentType: IncidentType;
+  vehicleRegistration: string | null;
+  projectName: string | null;
+  /** ISO instant; rendered as SAST wall-clock in the message. */
+  detectedAt: string;
 }
 
 function sastTimestamp(iso: string): string {
@@ -118,7 +129,7 @@ function claimHolder(userIds: readonly string[]): string | null {
  * silence the retry.
  */
 export async function postToFleetAlertsGroup(
-  incident: FleetAlertsGroupIncident, message: string,
+  incident: FleetAlertsGroupPost, message: string,
 ): Promise<number> {
   const logContext = { incidentId: incident.incidentId, eventType: incident.eventType };
   const groupJid = process.env.FLEET_ALERTS_WA_GROUP_JID?.trim();

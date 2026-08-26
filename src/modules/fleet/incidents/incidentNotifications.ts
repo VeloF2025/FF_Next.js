@@ -347,6 +347,53 @@ export async function sendMorningSummaryNotification(input: MorningSummaryGroupI
   }, { recipientUserId: input.recipientUserId, projectId: input.projectId, workDate: input.workDate });
 }
 
+// -- Vehicle morning summary (PR8) ------------------------------------------
+
+/**
+ * Reuses the registered `fleet.operational_morning_summary` event — the vehicle
+ * summary is the same kind of daily digest to the same audience, and a second
+ * event would need a second channel-preference default nobody would keep in step.
+ */
+export const VEHICLE_MORNING_SUMMARY_EVENT = 'fleet.operational_morning_summary';
+
+/**
+ * Its own key namespace, and NOT `buildMorningSummaryIdempotencyKey(user, null, date)`.
+ * That builder renders a null project as the literal `unassigned`, which the roster
+ * summary already emits for its projectless bucket — so a shared namespace would make
+ * the two summaries collide on the same recipient and date, and claimNotification would
+ * silently suppress whichever ran second. See `vehicleSummaryPhase.ts`.
+ */
+export function buildVehicleMorningSummaryIdempotencyKey(recipientUserId: string, workDate: string): string {
+  return `fleet-vehicle-morning-summary:${recipientUserId}:${workDate}`;
+}
+
+export interface VehicleMorningSummaryInput {
+  recipientUserId: string;
+  workDate: string;
+  items: { incidentType: IncidentType; count: number }[];
+}
+
+/** Vehicle incidents carry no staff and no project, so this payload has neither — the vehicle registration lives in the group message only. */
+export async function sendVehicleMorningSummaryNotification(input: VehicleMorningSummaryInput): Promise<NotifyResult> {
+  const totalCount = input.items.reduce((sum, item) => sum + item.count, 0);
+  const breakdown = input.items.map((item) => `${humanizeCode(item.incidentType)}: ${item.count}`).join(', ');
+  return safeNotify({
+    event_type: VEHICLE_MORNING_SUMMARY_EVENT,
+    title: `Fleet vehicle incident summary — ${input.workDate}`,
+    body: totalCount === 0
+      ? `No vehicle incidents recorded for ${input.workDate}.`
+      : `${totalCount} vehicle incident(s) — ${breakdown}`,
+    action_url: '/fleet/incidents',
+    source_module: 'fleet-incidents',
+    metadata: {
+      summaryScope: 'vehicle', workDate: input.workDate, totalCount,
+      items: input.items.map((item) => ({ incidentType: item.incidentType, count: item.count })),
+    },
+    recipient_user_ids: [input.recipientUserId],
+    idempotency_key: buildVehicleMorningSummaryIdempotencyKey(input.recipientUserId, input.workDate),
+  }, { recipientUserId: input.recipientUserId, workDate: input.workDate });
+}
+
 // -- Monitor health -----------------------------------------------------------
 
 /**
