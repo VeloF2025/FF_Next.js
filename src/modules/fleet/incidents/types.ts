@@ -53,6 +53,28 @@ export interface IncidentSourceEvent {
   occurredAt: string;
   staffId?: string | null;
   vehicleId?: string | null;
+  /**
+   * The vehicle's registration AS IT READ when the event was detected.
+   *
+   * Snapshot, like the scheduled path's `vehicleRegistrationSnapshot`: a
+   * registration can be reassigned or corrected, and a historical incident must
+   * keep saying which vehicle it was actually about. It is also the only human
+   * label a vehicle incident has — nothing else on a source event names the
+   * thing that moved.
+   *
+   * Optional here, unlike `OpenedNotificationInput.vehicleRegistration`, which
+   * PR5 made required so a caller cannot silently ship "not recorded" into an
+   * accident alert. The asymmetry is deliberate: `vehicleId` on this interface
+   * is itself optional, so requiring only the registration would be incoherent.
+   *
+   * What actually closes the hole is a TEST, not the type system — a caller can
+   * satisfy the required notification field with a literal `null` and compile
+   * perfectly well. `incidentProducer.test.ts` pins that a supplied registration
+   * reaches `CreateIncidentInput`, and `vehicleDetectorService.test.ts` pins
+   * that the detectors supply one. Do not read the required field on the
+   * notification side as a compile-time guarantee here.
+   */
+  vehicleRegistrationSnapshot?: string | null;
   projectId?: string | null;
   operationalSiteId?: string | null;
   operationalAssignmentId?: string | null;

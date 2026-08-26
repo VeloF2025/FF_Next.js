@@ -97,6 +97,29 @@ describe('sendIncidentOpenedNotification', () => {
     }));
   });
 
+  it('names the VEHICLE in the body when the incident has no staff member', async () => {
+    // A telematics incident never has one, and "Unknown staff — Unassigned
+    // project — review required" is indistinguishable from a bug at the
+    // receiving end. Asserted on the rendered body, not on the input.
+    await sendIncidentOpenedNotification({
+      ...baseInput, incidentType: 'theft_after_hours_movement', producerKind: 'source_event',
+      staffName: null, projectName: null, operationalSiteName: null,
+      vehicleRegistration: 'ABC 123 GP', reasonCodes: [],
+    });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'ABC 123 GP — Unassigned project — review required',
+    }));
+  });
+
+  it('keeps naming the staff member when both are known', async () => {
+    await sendIncidentOpenedNotification({ ...baseInput, vehicleRegistration: 'ABC 123 GP' });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'Jane Driver — Site One — attendance_late',
+    }));
+  });
+
   it('omits coordinates, raw GPS data, and disciplinary language from the payload', async () => {
     await sendIncidentOpenedNotification(baseInput);
 
@@ -225,6 +248,28 @@ describe('sendEscalationNotification', () => {
     expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
       event_type: 'fleet.operational_incident_escalated',
       idempotency_key: `fleet-incident-escalated:${INCIDENT}:2`,
+    }));
+  });
+
+  it('names the VEHICLE in the escalation body when there is no staff member', async () => {
+    // These are exactly the incidents that DO escalate: a vehicle cannot
+    // acknowledge, so a telematics incident reaches level 1 by construction.
+    await sendEscalationNotification({
+      ...input, incidentType: 'theft_after_hours_movement', producerKind: 'source_event',
+      staffName: null, projectName: null, operationalSiteName: null,
+      vehicleRegistration: 'ABC 123 GP',
+    });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'ABC 123 GP — Unassigned project — still unacknowledged at escalation level 2',
+    }));
+  });
+
+  it('keeps naming the staff member in an escalation when both are known', async () => {
+    await sendEscalationNotification(input);
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'Jane Driver — Site One — still unacknowledged at escalation level 2',
     }));
   });
 

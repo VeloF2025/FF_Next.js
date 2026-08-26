@@ -86,14 +86,17 @@ export interface OpenedNotificationInput {
   producerKind: IncidentProducerKind; rule: IncidentRule; projectId: string | null;
   staffName: string | null; projectName: string | null; operationalSiteName: string | null;
   detectedAt: string; reasonCodes: readonly string[];
-  /** Vehicle registration snapshot for the Fleet Alerts group message (PR5). Required, not optional: an optional field lets a source-event caller forget it and silently ship "not recorded" into an accident alert. Scheduled detections pass null. */
+  /** Vehicle registration snapshot for the Fleet Alerts group message (PR5). Required, not optional: an optional field lets a source-event caller forget it and silently ship "not recorded" into an accident alert. Scheduled detections pass null; PR4's detectors pass the registration they loaded, which is also what `openedBody` names when there is no staff member. */
   vehicleRegistration: string | null;
   /** Optional: `produceIncident` (Task 3) does not return this on its result, so a caller resolving straight off that result has none to pass. Included in metadata only when known. */
   incidentReference?: string;
 }
 
 function openedBody(input: OpenedNotificationInput): string {
-  const who = input.staffName ?? 'Unknown staff';
+  // A vehicle incident has no staff member. Falling through to "Unknown staff"
+  // would send a WhatsApp naming nobody and nothing, which is indistinguishable
+  // from a bug at the receiving end.
+  const who = input.staffName ?? input.vehicleRegistration ?? 'Unknown staff';
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
   const reason = input.reasonCodes.length > 0 ? input.reasonCodes.slice(0, 3).join(', ') : 'review required';
   return `${who} — ${where} — ${reason}`;
@@ -245,7 +248,11 @@ export async function sendEscalationNotification(input: EscalationNotificationIn
     }, MODULE);
     return { ...NO_RECIPIENT_RESULT };
   }
-  const who = input.staffName ?? 'Unknown staff';
+  // Same fallback as `openedBody`, and for the same reason: a telematics
+  // incident has no staff member, so an escalation about one would otherwise
+  // read "Unknown staff — Unassigned project" and name nothing at all. These are
+  // exactly the incidents that escalate, because a vehicle cannot acknowledge.
+  const who = input.staffName ?? input.vehicleRegistration ?? 'Unknown staff';
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
   const escalatedIdempotencyKey = buildIncidentEscalatedIdempotencyKey(input.incidentId, input.escalationLevel);
   const payload: NotifyPayload = {

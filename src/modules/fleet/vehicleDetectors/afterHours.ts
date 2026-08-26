@@ -24,7 +24,15 @@ import type { VehicleOperationalRule } from './types';
 /** Weekend days as `Intl` reports them for `en-CA` with `weekday: 'short'`. */
 const WEEKEND_DAYS = new Set(['Sat', 'Sun']);
 
-interface ZonedParts {
+/**
+ * A calendar date and a time of day, both already resolved into a timezone.
+ *
+ * Exported (with `zonedDateParts`) because `sourceEventId.ts` needs exactly the
+ * same resolution to bucket a theft event by its after-hours night. A second
+ * `Intl` formatter there would be a second place for the "22:30 UTC is already
+ * tomorrow in Johannesburg" trap to come back.
+ */
+export interface ZonedParts {
   /** `YYYY-MM-DD` in the rule's zone — the key a holiday set is built on. */
   date: string;
   /** Seconds since local midnight. */
@@ -44,7 +52,7 @@ export function secondsOfDay(clockTime: string): number {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
-function zonedParts(instantIso: string, timeZone: string): ZonedParts {
+export function zonedDateParts(instantIso: string, timeZone: string): ZonedParts {
   const at = new Date(instantIso);
   if (Number.isNaN(at.getTime())) throw new Error(`Not an instant: ${instantIso}`);
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -75,7 +83,7 @@ export function isAfterHours(
   rule: VehicleOperationalRule,
   holidays: ReadonlySet<string>,
 ): boolean {
-  const at = zonedParts(instantIso, rule.timezone);
+  const at = zonedDateParts(instantIso, rule.timezone);
   if (rule.weekendsAreAfterHours && WEEKEND_DAYS.has(at.weekday)) return true;
   if (rule.publicHolidaysAreAfterHours && holidays.has(at.date)) return true;
 
