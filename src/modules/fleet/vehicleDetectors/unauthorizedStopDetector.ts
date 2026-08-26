@@ -19,7 +19,7 @@
 
 import { haversineDistanceM } from '@/lib/geo';
 import { findNearestPlace, type NearestPlace } from '../trips/placeResolver';
-import { buildSourceEventId } from './sourceEventId';
+import { buildSourceEventId, calendarDayKey } from './sourceEventId';
 import type { DetectedVehicleEvent, DetectorPosition, VehicleDetectorContext } from './types';
 
 const DETECTOR_ID = 'prolonged_unauthorized_stop';
@@ -71,12 +71,15 @@ export function medianGapSeconds(positions: readonly DetectorPosition[]): number
 }
 
 export interface StopCandidate {
+  /** The first qualifying fix IN THE WINDOW — a floor on the real start, not the real start. */
   startedAt: string;
   endedAt: string;
   minutes: number;
   lat: number;
   lon: number;
   positionCount: number;
+  /** The run began at the window's oldest fix, so the true stop is older than this. */
+  startClampedToWindow: boolean;
 }
 
 /**
@@ -102,6 +105,7 @@ export function findProlongedStops(ctx: VehicleDetectorContext): StopCandidate[]
       stops.push({
         startedAt: anchor.recordedAt, endedAt: last.recordedAt,
         minutes: Math.round(ms / 60_000), lat: anchor.lat, lon: anchor.lon, positionCount: count,
+        startClampedToWindow: anchor.recordedAt === ctx.positions[0]?.recordedAt,
       });
     }
   };
@@ -147,11 +151,22 @@ export async function detectUnauthorizedStops(
     events.push({
       detectorId: DETECTOR_ID,
       occurredAt: stop.startedAt,
-      sourceEventId: buildSourceEventId(DETECTOR_ID, ctx.vehicle.vehicleId, stop.startedAt),
+      // The SAST DAY, not the observed start instant. A stop that began before
+      // the window opened is anchored on the window's own moving edge, so the
+      // instant slides forward every tick and mints a new incident each time.
+      // See `calendarDayKey` for the measured repro and for what this guarantees
+      // instead: at most one such incident per vehicle per SAST day.
+      sourceEventId: buildSourceEventId(
+        DETECTOR_ID, ctx.vehicle.vehicleId, calendarDayKey(stop.startedAt, ctx.rule),
+      ),
       lat: stop.lat,
       lon: stop.lon,
       metadata: {
         vehicleRegistration: ctx.vehicle.registration,
+        observedStartAt: stop.startedAt,
+        // True when the stop extends past the window's oldest fix, i.e. it began
+        // earlier than `stoppedMinutes` says and this is a floor, not a total.
+        startClampedToWindow: stop.startClampedToWindow,
         stoppedMinutes: stop.minutes,
         thresholdMinutes: ctx.rule.unauthorizedStopMinutes,
         positionsInStop: stop.positionCount,

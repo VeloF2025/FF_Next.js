@@ -248,7 +248,11 @@ export async function sendEscalationNotification(input: EscalationNotificationIn
     }, MODULE);
     return { ...NO_RECIPIENT_RESULT };
   }
-  const who = input.staffName ?? 'Unknown staff';
+  // Same fallback as `openedBody`, and for the same reason: a telematics
+  // incident has no staff member, so an escalation about one would otherwise
+  // read "Unknown staff — Unassigned project" and name nothing at all. These are
+  // exactly the incidents that escalate, because a vehicle cannot acknowledge.
+  const who = input.staffName ?? input.vehicleRegistration ?? 'Unknown staff';
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
   const escalatedIdempotencyKey = buildIncidentEscalatedIdempotencyKey(input.incidentId, input.escalationLevel);
   const payload: NotifyPayload = {

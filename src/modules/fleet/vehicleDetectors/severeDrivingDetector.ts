@@ -28,10 +28,18 @@
  * check passes for a vehicle whose g columns can never fire, and the fallback
  * would then be silently dead rather than visibly absent.
  *
- *   -linear_g > harshLinearG   `linear_g` is SIGNED; negative is braking.
- *   lateral_g > harshLateralG  already an unsigned magnitude (min 0.000 over
- *                              237,419 rows) — `abs()` is a no-op and treating a
- *                              negative as possible is a bug.
+ *   -linear_g > harshLinearG   BRAKING. `linear_g` is SIGNED and negative is
+ *                              braking, so the sign is negated, not dropped.
+ *   +linear_g > harshLinearG   ACCELERATION — the same magnitude with the
+ *                              opposite sign, checked second so a braking fix
+ *                              can never be reported as acceleration. The
+ *                              provider vocabulary has no HARSH_ACCELERATION
+ *                              event (PR0 saw none in 55,009), so this branch is
+ *                              the ONLY way an acceleration event can be
+ *                              detected at all today.
+ *   lateral_g > harshLateralG  CORNERING. Already an unsigned magnitude (min
+ *                              0.000 over 237,419 rows) — `abs()` is a no-op and
+ *                              treating a negative as possible is a bug.
  *   speed_kph >= harshMinSpeedKph   without this the detector is a report on one
  *                              broken device: 19 of its 20 braking events at
  *                              >= 0.35 g were at <= 10 km/h.

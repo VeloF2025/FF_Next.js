@@ -64,10 +64,15 @@ export interface IncidentSourceEvent {
    *
    * Optional here, unlike `OpenedNotificationInput.vehicleRegistration`, which
    * PR5 made required so a caller cannot silently ship "not recorded" into an
-   * accident alert. The asymmetry is deliberate and the hole is still closed:
-   * `vehicleId` on this interface is itself optional, so requiring only the
-   * registration would be incoherent — and a detector that forgets it fails to
-   * compile at the notification call one line later.
+   * accident alert. The asymmetry is deliberate: `vehicleId` on this interface
+   * is itself optional, so requiring only the registration would be incoherent.
+   *
+   * What actually closes the hole is a TEST, not the type system — a caller can
+   * satisfy the required notification field with a literal `null` and compile
+   * perfectly well. `incidentProducer.test.ts` pins that a supplied registration
+   * reaches `CreateIncidentInput`, and `vehicleDetectorService.test.ts` pins
+   * that the detectors supply one. Do not read the required field on the
+   * notification side as a compile-time guarantee here.
    */
   vehicleRegistrationSnapshot?: string | null;
   projectId?: string | null;

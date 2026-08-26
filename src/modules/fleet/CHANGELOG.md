@@ -43,6 +43,18 @@ again" for a roster detection.
   from g-force — the type is `critical`, so a derived guess is a false emergency
   on WhatsApp.
 
+**`prolonged_unauthorized_stop` buckets on the SAST calendar DAY, not the stop's
+start instant.** The instant is not a stable key: the detection window slides
+forward every tick, so a stop older than the 12-hour window is anchored on the
+window's own moving edge and mints a fresh `sourceEventId` each tick — measured
+at four ticks over thirteen hours, four ids, which at the real five-minute
+cadence is twelve incidents an hour for one parked vehicle. The guarantee is now
+exact: **at most one such incident per vehicle per SAST day** (a vehicle parked
+Friday to Monday opens three or four, not one every tick). The cost, stated
+rather than hidden: two genuinely separate unauthorized stops on one day are one
+incident. A location grid was considered as a finer bucket and rejected — a grid
+edge between two anchors 50 m apart reintroduces the duplicate it would replace.
+
 **Two detectors are seven-vehicle detectors by construction.**
 `prolonged_unauthorized_stop` requires a feed that samples during a stop (median
 gap <= 300 s) and `lost_contact_moving` scales its threshold to `max(rule floor,
@@ -82,6 +94,15 @@ exactly what that column is for), or the weekend flag needs revisiting.
 `scripts/fleet-detectors-dryrun.ts` takes `DRYRUN_AFTER_HOURS_START` and
 `DRYRUN_ONLY` so any further proposal is measured before it is versioned rather
 than after.
+
+**A third gate, easy to miss: at least one ACTIVE oversight member.** Most
+telematics incidents are projectless (a road is not inside a project AOI), and
+`resolveIncidentRecipients` resolves a projectless incident to the oversight
+roster. With `fleet_operational_incident_oversight_members` empty there is no
+recipient at all: `sendIncidentOpenedNotification` returns
+`NO_RECIPIENT_RESULT`, logs, and nobody is told — the incident still opens and
+sits in a queue only an admin can see. Confirm the roster is populated before
+either cron is registered.
 
 **Be precise about what "not live yet" means.** WhatsApp for a critical
 telematics incident is not waiting on PR5: `sendIncidentOpenedNotification` fires

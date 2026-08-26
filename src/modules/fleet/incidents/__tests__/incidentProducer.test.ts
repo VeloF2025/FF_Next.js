@@ -289,6 +289,30 @@ describe('source events', () => {
     expect(repo.recordObservation).toHaveBeenCalledTimes(1);
   });
 
+  it('writes the vehicle registration snapshot the caller supplied', async () => {
+    // The one human label a vehicle incident carries: the source-event path
+    // hardcoded null here, so a telematics WhatsApp named neither a person (it
+    // has none) nor a vehicle. Pinned at the producer layer because the
+    // detector's own test can only prove what it PASSED, not what was stored.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent({ vehicleRegistrationSnapshot: 'ABC 123 GP' }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({
+      vehicleId: 'vehicle-1', vehicleRegistrationSnapshot: 'ABC 123 GP',
+    });
+  });
+
+  it('stores null when the caller supplies no registration, never undefined', async () => {
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent());
+
+    expect(repo.createIncident.mock.calls[0]![0]).toHaveProperty('vehicleRegistrationSnapshot', null);
+  });
+
   it('throws a configuration error when no effective rule exists for the source-event type', async () => {
     settings.loadEffectiveIncidentRule.mockResolvedValueOnce(null);
 

@@ -20,7 +20,9 @@
  *                                per vehicle per night however the window slides.
  *   severe_driving               the fix's `provider_event_id`, which is already
  *                                unique per event within its feed.
- *   prolonged_unauthorized_stop  the stop's start instant.
+ *   prolonged_unauthorized_stop  the SAST calendar day the stop was observed to
+ *                                start in — NOT the observed start instant, which
+ *                                slides. See `calendarDayKey`.
  *   lost_contact_moving          the last known fix's instant, which stops moving
  *                                the moment contact is lost — that is the point.
  *   accident_sos                 no source; the detector is a stub.
@@ -32,12 +34,17 @@ import type { VehicleDetectorId, VehicleOperationalRule } from './types';
 /**
  * `${detectorId}:${vehicleId}:${bucketKey}`.
  *
- * The separator is `:` and the parts are never escaped, which is safe because
- * `detectorId` is a closed union, `vehicleId` is a UUID, and every bucket key
- * below is an ISO instant or a provider id — none of which can introduce a
- * colon that would let two different buckets collide on one string. A future
- * bucket key that could is a bug; the empty-key guard is here because an empty
- * one silently collapses every occurrence for a vehicle into a single incident.
+ * The parts are joined with `:` and never escaped, and several of them CONTAIN
+ * colons (an ISO instant does, and a provider id may). That is harmless because
+ * the id is never parsed — it is an opaque equality key, matched whole against
+ * `fleet_operational_incidents.source_event_id`. Two different occurrences
+ * cannot collide on one string regardless: `detectorId` is a closed union with a
+ * fixed prefix, `vehicleId` is a fixed-width UUID, and what follows is one
+ * detector's own key space. Do not add a parser; if a caller ever needs the
+ * parts back, they belong in `metadata`, not in a split() on this.
+ *
+ * The empty-key guard is here because an empty key silently collapses every
+ * occurrence for a vehicle into a single incident.
  */
 export function buildSourceEventId(
   detectorId: VehicleDetectorId, vehicleId: string, bucketKey: string,
@@ -70,6 +77,35 @@ export function afterHoursWindowKey(instantIso: string, rule: VehicleOperational
   const clock = normaliseClock(rule.afterHoursStartTime);
   if (at.secondsOfDay >= start) return `${at.date}T${clock}`;
   return `${previousDate(at.date)}T${clock}`;
+}
+
+/**
+ * The `YYYY-MM-DD` calendar day of `instantIso` in the rule's timezone.
+ *
+ * Exists because a sliding window makes an OBSERVED instant an unstable bucket.
+ * `prolonged_unauthorized_stop` anchors a stop on the first qualifying fix it
+ * can see, and for a stop that began before the window opened that fix is the
+ * window's own edge — which moves forward every tick. Bucketing on it minted a
+ * fresh `sourceEventId` per tick: measured at four ticks over thirteen hours,
+ * four ids, and at a five-minute cadence that is twelve incidents an hour for
+ * one parked vehicle.
+ *
+ * A calendar day cannot move as the window slides, so the guarantee is exact
+ * and worth stating plainly: **at most one `prolonged_unauthorized_stop`
+ * incident per vehicle per SAST day.** A vehicle parked Friday through Monday
+ * opens at most four — one each day it is still stopped — rather than one every
+ * five minutes.
+ *
+ * The cost, stated rather than hidden: two genuinely separate unauthorized stops
+ * by one vehicle on one day are ONE incident, and the second is silently
+ * deduped. That is the price of a key that provably cannot move, and it fails
+ * quiet (an under-report) rather than loud. A finer bucket would have to be
+ * derived from something equally stable — the stop's location on a grid was
+ * considered and rejected, because a grid edge between two anchors 50 m apart
+ * reintroduces exactly the duplicate this replaced.
+ */
+export function calendarDayKey(instantIso: string, rule: VehicleOperationalRule): string {
+  return zonedDateParts(instantIso, rule.timezone).date;
 }
 
 /** `HH:MM` or `HH:MM:SS` → `HH:MM:SS`, so one rule cannot produce two spellings of one bucket. */
