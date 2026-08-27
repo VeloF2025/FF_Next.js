@@ -1,5 +1,5 @@
 /**
- * Field Ops QA Centre — operational Zone Delivery register landing page.
+ * Field Ops QA Centre — Project → Zone → PON delivery tree.
  */
 
 import type { NextPage } from 'next';
@@ -7,16 +7,16 @@ import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { constructionQaConfig } from '@/modules/navigation';
-import { ZoneDeliveryRegisterPage } from '@/modules/construction-qa/zone-delivery/components/ZoneDeliveryRegisterPage';
+import { DeliveryTreePage } from '@/modules/construction-qa/delivery-tree/components/DeliveryTreePage';
 
 const FieldOpsIndex: NextPage = () => {
   return (
     <AppLayout>
       <Head>
-        <title>Field Ops | FibreFlow</title>
+        <title>QA Centre | FibreFlow</title>
       </Head>
       <ModulePage config={constructionQaConfig}>
-        <ZoneDeliveryRegisterPage />
+        <DeliveryTreePage />
       </ModulePage>
     </AppLayout>
   );

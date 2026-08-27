@@ -2,7 +2,8 @@
  * Construction QA Module Navigation Configuration
  *
  * Provides tab-based navigation for the Construction QA module:
- * - QA Centre: Operational Zone Delivery register
+ * - QA Centre: Project → Zone → PON delivery tree
+ * - Register: Operational Zone Delivery register
  * - Works QA, OTDR Testing, Snags, Reports: operational follow-up sequence
  */
 
@@ -22,6 +23,14 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       shortLabel: 'QA',
       icon: ClipboardCheck,
       path: '/field-ops',
+      rbacKey: 'construction-qa.qa-centre',
+    },
+    {
+      id: 'register',
+      label: 'Register',
+      shortLabel: 'Register',
+      icon: List,
+      path: '/field-ops/register',
       rbacKey: 'construction-qa.qa-centre',
     },
     {
