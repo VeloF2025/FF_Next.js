@@ -6,9 +6,11 @@
  * `pages/api/cron/fleet-incident-actions.ts` under the
  * `fleet-incident-actions` advisory lock, at least every five minutes.
  *
- * Three independent phases share one tick — escalation always runs,
+ * Five independent phases share one tick — escalation always runs,
  * morning-summary runs at most once per SAST work date (only at/after
- * 08:15), and the health check always runs — each isolated so one phase's
+ * 08:15), the vehicle summary shares that gate under its own claim, the
+ * weekly digest runs at most once per week (Mondays only, at/after 08:30
+ * SAST), and the health check always runs — each isolated so one phase's
  * failure never blocks or hides another's, folding errors into the
  * returned counters instead of aborting the tick.
  */
@@ -24,9 +26,10 @@ import { addMinutesIso, applyDelivery, boundedErrorSummary, MODULE, recordPhaseE
 import type { EscalationTotals, SummaryTotals } from './incidentActionShared';
 import { runMorningSummaryPhase } from './incidentSummaryPhase';
 import { runVehicleMorningSummaryPhase } from './vehicleSummaryPhase';
+import { runWeeklyDigestPhase } from './weeklyDigestPhase';
 import type {
   IncidentActionRunnerRequest, IncidentActionRunnerResult, IncidentProducerKind, IncidentSeverity,
-  IncidentType, VehicleSummaryResult,
+  IncidentType, VehicleSummaryResult, WeeklyDigestResult,
 } from './types';
 
 const STALE_STATUS_MONITOR_MINUTES = 15; // 3x the 5-min cadence: absorbs one missed tick, still catches a real outage promptly
@@ -193,6 +196,17 @@ export async function runIncidentActions(request: IncidentActionRunnerRequest): 
       error: vehicleError instanceof Error ? vehicleError.message : String(vehicleError),
     }, MODULE);
   }
+  // A fifth phase (PR9), isolated on exactly the same terms as the fourth: it has no run row,
+  // its own Monday-08:30 gate and its own claim, so a throw here must reach neither the
+  // escalation/roster counters nor the vehicle summary's, and must not change this run's status.
+  let weeklyDigest: WeeklyDigestResult | null = null;
+  try {
+    weeklyDigest = await runWeeklyDigestPhase(request);
+  } catch (digestError) {
+    log.error('[fleet-incident-actions] weekly digest phase failed', {
+      error: digestError instanceof Error ? digestError.message : String(digestError),
+    }, MODULE);
+  }
   await runStatusMonitorHealthCheck(request.effectiveAt, totals);
 
   const status = (totals.errorCount + summaryTotals.errorCount) > 0 || (totals.notifFailed + summaryTotals.notifFailed) > 0
@@ -213,5 +227,8 @@ export async function runIncidentActions(request: IncidentActionRunnerRequest): 
     // monitor-run row of its own (see vehicleSummaryPhase.ts), so this is where its outcome
     // becomes visible in the cron response.
     vehicleSummary,
+    // Same contract as `vehicleSummary`: reported separately, never folded into the counters
+    // above, because the weekly digest has no monitor-run row of its own.
+    weeklyDigest,
   };
 }

@@ -285,7 +285,7 @@ Two independent cron endpoints, both behind `pages/api/cron/...` and a matching
 | Endpoint | Cadence | Does |
 |---|---|---|
 | `/api/cron/fleet-operational-monitor` | every 5 min | Loads every active project's complete PR 4 roster (one roster-loading *phase*; any one project's load failing fails the whole phase — never a silent partial), runs `incidentProducer` per staff row, sends `opened` notifications after each incident transaction commits. |
-| `/api/cron/fleet-incident-actions` | at least every 5 min | **Four** independent phases in one tick: escalation (always), 08:15 SAST roster morning summary (at most once per SAST work date, skipped entirely before 08:15), 08:15 SAST **vehicle** summary (same gate, guarded by a claim rather than a run row — see Health below), status-monitor health check (always). One phase's failure never blocks or hides another's. |
+| `/api/cron/fleet-incident-actions` | at least every 5 min | **Five** independent phases in one tick: escalation (always), 08:15 SAST roster morning summary (at most once per SAST work date, skipped entirely before 08:15), 08:15 SAST **vehicle** summary (same gate, guarded by a claim rather than a run row — see Health below), **Monday 08:30 SAST weekly digest** (once per week, also claim-guarded and also without a run row — see Weekly digest below), status-monitor health check (always). One phase's failure never blocks or hides another's. |
 
 **Auth is `x-cron-secret: <CRON_SECRET>`** — matching this Fleet module's own
 existing convention (`fleet-parking-check.ts`, `fleet-check-reminders.ts`), fail-
@@ -330,6 +330,41 @@ If the entire external scheduler or host stops and *neither* endpoint executes,
 nothing inside either one can observe that — an outage of that kind requires
 external host/scheduler monitoring, not application code.
 
+### Weekly digest (Monday 08:30 SAST, PR 9)
+
+One WhatsApp text to the Fleet Alerts group every Monday at/after 08:30 SAST, covering the
+completed Monday–Sunday SAST week from `fleet_vehicle_daily_stats` and
+`fleet_operational_incidents`: fleet distance and vehicles-reporting, the four vehicle incident
+counts (`theft_after_hours_movement`, `severe_driving`, `prolonged_unauthorized_stop`,
+`lost_contact_moving`), top 3 by distance, top 3 by harsh events, every vehicle with zero
+reporting days, and a `/fleet/daily-stats` link. Registrations are the only vehicle identity —
+no driver, no coordinates, no raw telematics, the same restraint the daily group posts observe.
+
+`src/modules/fleet/incidents/weeklyDigestPhase.ts` (gate, window, orchestration),
+`weeklyDigestQueries.ts` (the two aggregates) and `weeklyDigestMessage.ts` (pure rendering).
+
+- **Group only — no DM fan-out.** Unlike the daily vehicle summary, nothing is sent per
+  recipient: this is a weekly management read, not an alert. An unset `FLEET_ALERTS_WA_GROUP_JID`
+  therefore has nowhere to fall back to, so the phase warns and skips **without taking the claim** —
+  configuring the JID later in the morning still gets that week's digest out.
+- **No migration and no run row**, for exactly the reason the vehicle summary has none: migration
+  510's run-kind CHECK admits only `status_monitor`/`escalation`/`morning_summary`. The guard is
+  the group post's claim, `fleet-weekly-digest:<weekStartMonday>`. The outcome appears only in
+  `IncidentActionRunnerResult.weeklyDigest` and the log.
+- **The window is `[previous Monday 00:00 SAST, this Monday 00:00 SAST)`.** The `<` is
+  load-bearing and pinned by a test: an inclusive upper bound counts the digest morning itself
+  here and again next week.
+- **Coverage decides what may be counted, never how it is rendered.** Migration 528's
+  `coverage_*` flags mean "we could not see" and "nothing happened" are different claims. Harsh
+  counts sum only over days with `coverage_gforce OR coverage_provider_events`; a vehicle with no
+  such day is excluded from the harsh list entirely rather than ranked as a zero, and a week with
+  no such day anywhere says so. A vehicle whose `coverage_ignition` was false all week shows its
+  distance and says the ignition time is not measurable — never `0.0 h`. Distance itself is not
+  gated: it survives `coverage_ignition = false`.
+- **Tracker fan-out trap.** The vehicle aggregate tests tracker activity with `EXISTS`, not the
+  `JOIN fleet_vehicle_trackers` that `statsQueries.loadFleetDayOverview` uses: over a seven-day
+  LEFT JOIN that join would double the weekly distance of any vehicle with two active trackers.
+
 ### Recipients, notifications, and escalation
 
 `recipientService.resolveIncidentRecipients(projectId)` is the **one** recipient
@@ -351,8 +386,10 @@ keys are exact strings, not implementation detail: `fleet-incident-opened:<id>`,
 `fleet-incident-escalated:<id>:<level>`, `fleet-incident-resolved:<id>:<outcome>`,
 `fleet-morning-summary:<userId>:<projectId|unassigned>:<workDate>`,
 `fleet-monitor-failed:<runKind>:<runId|missing>`,
-`fleet-vehicle-morning-summary:<userId>:<workDate>` (per-recipient) and
-`fleet-vehicle-morning-summary:<workDate>` (the group post's claim).
+`fleet-vehicle-morning-summary:<userId>:<workDate>` (per-recipient),
+`fleet-vehicle-morning-summary:<workDate>` (the group post's claim) and
+`fleet-weekly-digest:<weekStartMonday>` (the weekly digest's group-post claim — the Monday that
+OPENS the week summarised, never the Monday it is sent on).
 
 The vehicle summary reuses the registered `fleet.operational_morning_summary`
 event but **must never** reuse `buildMorningSummaryIdempotencyKey`: that builder
@@ -1941,6 +1978,7 @@ DIFFERENT and currently empty table; it is not consulted here.
 | Incident queue (in-app + email) | Every incident, always | `incidentNotifications.ts` |
 | Fleet Alerts WhatsApp **group** | Only `requiresMandatoryIncidentWhatsApp` = `severity === 'critical' && producerKind === 'source_event'` — i.e. `accident_sos` and `theft_after_hours_movement` | `incidentGroupDelivery.ts`, JID from `FLEET_ALERTS_WA_GROUP_JID` |
 | 08:15 morning summary | The four `high` types (`include_in_morning_summary = true`) | `incidentSummaryPhase.ts`; the vehicle contribution is `vehicleSummaryPhase.ts`, shipped in PR8 (#2626) |
+| Monday 08:30 weekly digest | Four vehicle types, plus `fleet_vehicle_daily_stats` | `weeklyDigestPhase.ts` (PR9); group-only, claim-guarded, no run row |
 
 `requiresMandatoryIncidentWhatsApp` ignores `whatsapp_enabled`, so **severity is the only lever**
 that keeps a detector off WhatsApp — which is why 529 had to land before any detector does.
@@ -1954,7 +1992,7 @@ group gets no WhatsApp for that incident (they still get in-app and email).
 |---|---|---|---|---|
 | `cron-fleet-daily-stats.sh` | `/api/cron/fleet-daily-stats` | `*/15 * * * *` | production (:3000) only | **No** — pending deployment approval |
 | `cron-fleet-operational-monitor.sh` | `/api/cron/fleet-operational-monitor` | `*/5 * * * *` | production | Recorded as installed; the detectors will ride this tick when PR4 lands — no new line |
-| `cron-fleet-incident-actions.sh` | `/api/cron/fleet-incident-actions` | per its own wrapper | production | The 08:15 summary rides this — no new line |
+| `cron-fleet-incident-actions.sh` | `/api/cron/fleet-incident-actions` | per its own wrapper | production | The 08:15 summaries and the Monday 08:30 weekly digest ride this — no new line |
 | `cron-fleet-build-trips.sh` | `/api/cron/fleet-build-trips` | `*/15 * * * *` | production | Recorded as installed |
 
 **Exactly one environment.** Cartrack REST polls from dev (:3005) and the portals from prod

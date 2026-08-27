@@ -131,18 +131,45 @@ function claimHolder(userIds: readonly string[]): string | null {
 export async function postToFleetAlertsGroup(
   incident: FleetAlertsGroupPost, message: string,
 ): Promise<number> {
+  return (await postToFleetAlertsGroupResult(incident, message)).failures;
+}
+
+/**
+ * Why the outcome and not just the failure count: a caller that reports "was this sent?" cannot
+ * derive it from `0`. Zero failures is returned for a post that went out, for one the claim
+ * suppressed, and for a tick with no group JID configured — three different answers to "did
+ * anybody get this?". The daily vehicle summary does not need to tell them apart; the weekly
+ * digest reports a delivered count, and counting a claim-suppressed tick as a delivery would
+ * report the digest as freshly sent on every tick for the rest of the day.
+ */
+export interface FleetAlertsGroupOutcome {
+  /** The message reached the group on THIS call. Never true for a suppressed or skipped post. */
+  posted: boolean;
+  /** Why nothing was posted, when nothing was. `null` when a post was attempted (successfully or not). */
+  skipped: 'no_group_jid' | 'already_claimed' | null;
+  /** Delivery failures to fold into `NotifyResult.failed` — the same number the thin wrapper above returns. */
+  failures: number;
+}
+
+export async function postToFleetAlertsGroupResult(
+  incident: FleetAlertsGroupPost, message: string,
+): Promise<FleetAlertsGroupOutcome> {
   const logContext = { incidentId: incident.incidentId, eventType: incident.eventType };
   const groupJid = process.env.FLEET_ALERTS_WA_GROUP_JID?.trim();
   if (!groupJid) {
     log.warn('[fleet-incident-group] FLEET_ALERTS_WA_GROUP_JID unset — delivering to recipients individually', logContext, MODULE);
-    return incident.deliverToRecipients();
+    // No claim is taken on this path, deliberately: configuring the JID later must not find the
+    // week/day already claimed by the ticks that ran without one and skip the first real post.
+    return { posted: false, skipped: 'no_group_jid', failures: await incident.deliverToRecipients() };
   }
 
   const holder = claimHolder(incident.recipientUserIds);
   const claimEvent = `${incident.eventType}:${GROUP_CLAIM_SUFFIX}`;
   if (holder) {
     try {
-      if (!await claimNotification(holder, claimEvent, incident.idempotencyKey)) return 0;
+      if (!await claimNotification(holder, claimEvent, incident.idempotencyKey)) {
+        return { posted: false, skipped: 'already_claimed', failures: 0 };
+      }
     } catch (claimError) {
       log.error('[fleet-incident-group] group claim failed; posting anyway', {
         ...logContext, error: sanitizedMessage(claimError),
@@ -158,7 +185,7 @@ export async function postToFleetAlertsGroup(
       ...logContext, coveredByGroupPost: [...incident.recipientUserIds],
     }, MODULE);
     await recordGroupDelivery(holder, groupJid, 'sent', null, logContext);
-    return 0;
+    return { posted: true, skipped: null, failures: 0 };
   } catch (error) {
     log.error('[fleet-incident-group] group post failed; falling back to individual delivery', {
       ...logContext, error: sanitizedMessage(error),
@@ -173,7 +200,7 @@ export async function postToFleetAlertsGroup(
       }
     }
     await recordGroupDelivery(holder, groupJid, 'failed', sanitizedMessage(error), logContext);
-    return 1 + await incident.deliverToRecipients();
+    return { posted: false, skipped: null, failures: 1 + await incident.deliverToRecipients() };
   }
 }
 

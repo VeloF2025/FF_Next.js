@@ -184,6 +184,8 @@ export interface IncidentActionRunnerResult {
   notifications: IncidentDeliverySummary;
   /** PR8's vehicle summary. Null before 08:15 SAST, or when that phase threw — it has no monitor-run row, so this is its only report. Required, not optional: `runIncidentActions` always sets it, and an optional field would let a caller read `undefined` as "the phase is not wired up" when it means "it did not run today". */
   vehicleSummary: VehicleSummaryResult | null;
+  /** PR9's weekly digest. Null on every tick that is not a Monday at/after 08:30 SAST, or when that phase threw — it has no monitor-run row either, so this is its only report. Required for the same reason as `vehicleSummary`. */
+  weeklyDigest: WeeklyDigestResult | null;
 }
 
 export type IncidentDeliverySummary = NotifyResult;
@@ -198,6 +200,26 @@ export interface VehicleSummaryResult {
   /** Per-recipient notifications actually delivered — never attempts. */
   delivered: number;
   failed: number;
+}
+
+/**
+ * PR9's Monday 08:30 SAST weekly digest outcome. Like `VehicleSummaryResult` it has no monitor-run
+ * row (migration 510's run-kind CHECK admits only three kinds), so this is its only bookkeeping.
+ */
+export interface WeeklyDigestResult {
+  /** Monday that opens the week summarised, SAST. */
+  weekStart: string;
+  /** Sunday that closes it, inclusive. */
+  weekEnd: string;
+  /** The Monday after `weekEnd` — the exclusive upper bound every query used, and the tick's own date. */
+  weekEndExclusive: string;
+  /** Group posts actually sent by THIS tick: 1 or 0. A claim-suppressed later tick reports 0 because nothing was sent, not because anything failed. */
+  delivered: number;
+  failed: number;
+  /** True only when the group post was attempted and failed. */
+  groupPostFailed: boolean;
+  /** No `FLEET_ALERTS_WA_GROUP_JID` configured. The digest is group-only, so this means nobody was reached — a configuration state, not a failure. */
+  skippedNoGroupJid: boolean;
 }
 
 export interface IncidentListRequest {

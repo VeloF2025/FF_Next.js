@@ -1,11 +1,12 @@
 /**
  * POST /api/cron/fleet-incident-actions
  *
- * Acknowledgement escalation, 08:15 SAST morning summary, and status-monitor
+ * Acknowledgement escalation, the 08:15 SAST roster and vehicle morning
+ * summaries, the Monday 08:30 SAST weekly fleet digest, and status-monitor
  * health checks for Fleet operational incidents (design §9). Thin wiring
  * over `runWithCronLock` (pinned-connection advisory lock, mirroring
  * `pages/api/cron/appeals-vlm.ts`) and `runIncidentActions` (escalation,
- * summary, and health orchestration — see actionRunner.ts).
+ * summaries, digest, and health orchestration — see actionRunner.ts).
  *
  * Auth matches `fleet-operational-monitor.ts` and this Fleet module's own
  * convention — `x-cron-secret`, same as `fleet-parking-check.ts` and
