@@ -29,6 +29,7 @@ export default defineConfig({
       { find: '@/lib/reporting', replacement: path.resolve(__dirname, './src/lib/reporting') },
       { find: '@/lib/actionItems', replacement: path.resolve(__dirname, './src/lib/actionItems') },
       { find: '@/lib/utils',   replacement: path.resolve(__dirname, './src/lib/utils') },
+      { find: '@/lib/chunkReload', replacement: path.resolve(__dirname, './src/lib/chunkReload') },
       { find: '@/lib',         replacement: path.resolve(__dirname, './lib') },
       // Other module aliases
       { find: '@/components',  replacement: path.resolve(__dirname, './src/components') },

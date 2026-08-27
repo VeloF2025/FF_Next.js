@@ -13,6 +13,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 // import { NavigationProvider } from '@/modules/navigation';  // Temporarily disabled
 import { reportWebVitals } from '@/lib/performance';
 import { initErrorTracking } from '@/lib/errorTracking';
+import { installChunkErrorReload } from '@/lib/chunkReload';
 import { VersionChecker } from '@/components/VersionChecker';
 import { DemoModeBanner } from '@/components/DemoModeBanner';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
@@ -43,6 +44,7 @@ function MyApp({ Component, pageProps }: AppProps) {
       enabled: process.env.NODE_ENV === 'production',
       sampleRate: 1.0, // Track 100% of errors
     });
+    return installChunkErrorReload();
   }, []);
 
   return (

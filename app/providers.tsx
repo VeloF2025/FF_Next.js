@@ -11,6 +11,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { initErrorTracking } from '@/lib/errorTracking';
+import { installChunkErrorReload } from '@/lib/chunkReload';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -32,6 +33,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       enabled: process.env.NODE_ENV === 'production',
       sampleRate: 1.0, // Track 100% of errors
     });
+    return installChunkErrorReload();
   }, []);
 
   return (

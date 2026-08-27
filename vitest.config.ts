@@ -247,6 +247,9 @@ export default defineConfig({
       { find: '@/lib/auth', replacement: path.resolve(__dirname, './src/lib/auth') },
       { find: '@/lib/permissions', replacement: path.resolve(__dirname, './src/lib/permissions') },
       { find: '@/lib/logger', replacement: path.resolve(__dirname, './src/lib/logger') },
+      // @/lib/chunkReload lives at src/lib/ — without this it falls through to
+      // the generic @/lib → ./lib fallback and fails to resolve under Vitest.
+      { find: '@/lib/chunkReload', replacement: path.resolve(__dirname, './src/lib/chunkReload') },
       // @/lib/hooks/* lives at src/lib/hooks/ — needed after useStockSync was updated
       // to import from '@/lib/hooks/useOnlineStatus' (bucket B refactor).
       { find: /^@\/lib\/hooks/, replacement: path.resolve(__dirname, './src/lib/hooks') },
