@@ -14,7 +14,7 @@
  */
 
 import { query, queryOne } from '@/lib/db-pool';
-import type { DetectorPosition, DetectorVehicle } from './types';
+import type { DetectorPosition, DetectorVehicle, VehicleDriverAssignment } from './types';
 
 const POSITION_COLUMNS = `recorded_at, provider_event_id, provider, account_ref, ignition,
   lat, lon, speed_kph, linear_g, lateral_g, provider_event_type`;
@@ -150,4 +150,55 @@ export async function loadGapP90Seconds(vehicleId: string, since: string): Promi
     [vehicleId, since],
   );
   return row ? num(row.p90) : null;
+}
+
+interface AssignmentRow extends Record<string, unknown> {
+  id: string;
+  staff_id: string;
+  staff_name: string | null;
+  assignment_start: string;
+  assignment_end: string | null;
+}
+
+/**
+ * Every `vehicle_assignments` row for one vehicle, newest start first —
+ * CLOSED rows included, and `is_active` neither selected nor filtered on.
+ *
+ * A closed row is the history: it names who was driving between two dates, and
+ * an incident is attributed by when it HAPPENED. Every close path writes the
+ * flag and the end date in one statement (all 63 production rows are
+ * `{active, open-ended}` or `{inactive, ended}`), so filtering on the flag
+ * would leave the date bounds unreachable and silently drop every past driver.
+ *
+ * The instant-covering predicate is deliberately NOT in this query. Filtering
+ * here would put the boundary rule (`start <= t`, inclusive end, newest wins)
+ * behind a database call where no test can reach it; `vehicleDriverResolver`
+ * owns it as a pure function instead, and the fleet's assignment history is a
+ * few rows per vehicle — 22 active fleet-wide — so loading them all costs
+ * nothing.
+ *
+ * `assignment_start`/`assignment_end` are DATE columns and are formatted here
+ * rather than returned as Dates: node-postgres parses OID 1082 into a local
+ * Date, which renders one day early once anything serialises it through UTC.
+ */
+export async function loadVehicleDriverAssignments(vehicleId: string): Promise<VehicleDriverAssignment[]> {
+  const rows = await query<AssignmentRow>(
+    `/* fleet-detectors:vehicle-driver */
+     SELECT va.id, va.staff_id,
+            NULLIF(CONCAT_WS(' ', s.first_name, s.last_name), '') AS staff_name,
+            to_char(va.assignment_start, 'YYYY-MM-DD') AS assignment_start,
+            to_char(va.assignment_end, 'YYYY-MM-DD') AS assignment_end
+     FROM vehicle_assignments va
+     LEFT JOIN staff s ON s.id = va.staff_id
+     WHERE va.fleet_vehicle_id = $1::uuid
+     ORDER BY va.assignment_start DESC, va.id`,
+    [vehicleId],
+  );
+  return rows.map((row) => ({
+    assignmentId: row.id,
+    staffId: row.staff_id,
+    staffName: row.staff_name,
+    assignmentStart: row.assignment_start,
+    assignmentEnd: row.assignment_end,
+  }));
 }

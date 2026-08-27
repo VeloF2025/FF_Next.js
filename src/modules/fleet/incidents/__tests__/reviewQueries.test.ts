@@ -20,7 +20,8 @@ const restrictedScope: IncidentScopeFilter = { unrestricted: false, pmUserId: US
 
 const listRow = {
   id: INCIDENT, incident_reference: 'INC-LATE-20260813-ABC123', incident_type: 'late', severity: 'high',
-  lifecycle_status: 'open', staff_id: STAFF, staff_name_snapshot: 'Jane', project_id: null,
+  lifecycle_status: 'open', staff_id: STAFF, staff_name_snapshot: 'Jane',
+  vehicle_registration_snapshot: 'ABC 123 GP', project_id: null,
   project_name_snapshot: null, operational_site_name_snapshot: null, opened_at: '2026-08-13T08:00:00.000Z',
   condition_last_seen_at: '2026-08-13T08:00:00.000Z', condition_cleared_at: null,
   escalation_level: 0, next_escalation_at: null, resolved_at: null, evidence_count: 0,
@@ -49,6 +50,17 @@ describe('listIncidents', () => {
     const result = await listIncidents(baseRequest, unrestrictedScope);
     expect(result.total).toBe(1);
     expect(result.incidents[0]).toMatchObject({ id: INCIDENT, incidentReference: 'INC-LATE-20260813-ABC123', staffName: 'Jane' });
+  });
+
+  it('maps the vehicle registration snapshot onto every queue row', async () => {
+    // A telematics incident is about a vehicle first. The column was already
+    // stored and simply never read, so the queue could not tell a manager
+    // which vehicle an "Unassigned" row was about.
+    db.queryOne.mockResolvedValue({ count: '1' });
+    db.query.mockResolvedValue([listRow]);
+    const result = await listIncidents(baseRequest, unrestrictedScope);
+    expect(result.incidents[0]).toMatchObject({ vehicleRegistration: 'ABC 123 GP' });
+    expect(db.query.mock.calls[0]![0]).toContain('vehicle_registration_snapshot');
   });
 
   it('adds a project-ownership filter only for a restricted scope', async () => {

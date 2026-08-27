@@ -50,6 +50,16 @@
  * `createsIncident`. The producer's source-event path reads a rule only for its
  * severity, so without this check disabling `severe_driving` would do nothing.
  *
+ * ## The incident names a DRIVER when one is assigned
+ *
+ * `vehicleDriverResolver` reads `vehicle_assignments` for the vehicle at the
+ * event instant and the emitter puts that staff id and name on the incident.
+ * That is the ONLY path this resolver runs on: the scheduled/roster path
+ * already carries a staff identity from PR4's roster and must not be touched.
+ * No assignment covering the instant still means null — the pre-attribution
+ * behaviour — and the resolver never throws, so a lookup failure costs the
+ * attribution, never the incident.
+ *
  * ## No watermark, deliberately
  *
  * A watermark suits a builder whose output is a row per day; these detectors ask
@@ -76,6 +86,7 @@ import { theftDetector } from './theftDetector';
 import { unauthorizedStopDetector } from './unauthorizedStopDetector';
 import { loadEffectiveVehicleRule } from './vehicleRuleQueries';
 import { resolveVehicleProjectId } from './vehicleProjectResolver';
+import { resolveVehicleDriver } from './vehicleDriverResolver';
 import type {
   DetectedVehicleEvent, VehicleDetectorContext, VehicleOperationalRule,
 } from './types';
@@ -154,14 +165,24 @@ export interface VehicleDetectorDeps extends EmitterDeps {
   detectors: readonly RegisteredDetector[];
 }
 
-const DEFAULT_DEPS: VehicleDetectorDeps = {
+/**
+ * The production wiring. Exported ONLY so a test can assert these are the real
+ * resolvers and not a stub: every seam below is overridable, so a wrong default
+ * here silently disables attribution or project scoping in production while the
+ * whole suite stays green on its own fakes.
+ *
+ * The resolvers are passed by reference rather than wrapped in an arrow for the
+ * same reason — an arrow makes that identity untestable.
+ */
+export const DEFAULT_DEPS: VehicleDetectorDeps = {
   loadVehicles: loadDetectorVehicles,
   loadWindow: loadPositionWindow,
   loadLast: loadLastPosition,
   loadGapP90: loadGapP90Seconds,
   loadRule: loadEffectiveVehicleRule,
   loadHolidayDates: loadHolidays,
-  resolveProjectId: (lat, lon) => resolveVehicleProjectId(lat, lon),
+  resolveProjectId: resolveVehicleProjectId,
+  resolveDriver: resolveVehicleDriver,
   loadIncidentRule: loadEffectiveIncidentRule,
   produce: produceIncident,
   notifyOpened: sendIncidentOpenedNotification,

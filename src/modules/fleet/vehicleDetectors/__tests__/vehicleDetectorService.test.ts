@@ -3,10 +3,12 @@
  *
  * Three properties are load-bearing and each has its own test:
  *
- *   1. what reaches the producer — `producerKind:'source_event'`, `staffId: null`,
- *      a non-null `vehicleId`, and metadata of flat primitives only. `staffId`
- *      set would send the request down the producer's SCHEDULED path, which
- *      requires a roster assignment and throws without one.
+ *   1. what reaches the producer — `producerKind:'source_event'`, a non-null
+ *      `vehicleId`, metadata of flat primitives only, and the driver
+ *      `vehicle_assignments` names for that vehicle at the event instant
+ *      (`staffId` + `staffNameSnapshot`, both null when no assignment covers
+ *      it). `producerKind` alone selects the producer's branch, so attribution
+ *      never turns a telematics reading into a scheduled roster detection.
  *   2. a second tick over the same data opens nothing — the producer answers
  *      `unchanged`, which only works if the ids are deterministic.
  *   3. isolation — one throwing detector, one failing vehicle load and one
@@ -18,7 +20,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/logger', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 
-import { runVehicleDetectors, type VehicleDetectorDeps } from '../vehicleDetectorService';
+import { DEFAULT_DEPS, runVehicleDetectors, type VehicleDetectorDeps } from '../vehicleDetectorService';
+import { resolveVehicleDriver } from '../vehicleDriverResolver';
+import { resolveVehicleProjectId } from '../vehicleProjectResolver';
 import { sanitizeMetadata } from '../detectedEventEmitter';
 import { INCIDENT_RULE, RULE, VEHICLE, VEHICLE_ID, latOffset, position } from './detectorFixtures';
 
@@ -46,6 +50,7 @@ function deps(overrides: Partial<VehicleDetectorDeps> = {}): Partial<VehicleDete
     loadRule: vi.fn(async () => RULE),
     loadHolidayDates: vi.fn(async () => new Set<string>()),
     resolveProjectId: vi.fn(async () => null),
+    resolveDriver: vi.fn(async () => null),
     loadIncidentRule: vi.fn(async () => INCIDENT_RULE),
     produce: vi.fn(async () => ({ outcome: 'opened' as const, incidentId: 'inc-1', requiresInitialNotification: true })),
     notifyOpened: vi.fn(async () => ({ ...DELIVERED })),
@@ -56,7 +61,7 @@ function deps(overrides: Partial<VehicleDetectorDeps> = {}): Partial<VehicleDete
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe('runVehicleDetectors — the producer contract', () => {
-  it('produces a source event for a VEHICLE, never for a staff member', async () => {
+  it('produces a source event for a VEHICLE, unattributed when no assignment covers the instant', async () => {
     const produce = vi.fn(async () => ({ outcome: 'opened' as const, incidentId: 'inc-1', requiresInitialNotification: true }));
 
     const result = await runVehicleDetectors({ now: NOW }, deps({ produce }));
@@ -66,11 +71,30 @@ describe('runVehicleDetectors — the producer contract', () => {
       producerKind: 'source_event',
       incidentType: 'theft_after_hours_movement',
       staffId: null,
+      staffNameSnapshot: null,
       vehicleId: VEHICLE_ID,
       vehicleRegistrationSnapshot: 'ABC 123 GP',
       projectId: null,
     });
     expect(result).toMatchObject({ status: 'succeeded', incidentsOpened: 1, eventsDetected: 1 });
+  });
+
+  it('attributes the incident to the vehicle\'s driver at the EVENT instant', async () => {
+    // The queue said "Unassigned" for every telematics incident before this,
+    // and a manager cannot request input from a driver the incident does not
+    // name. The resolver is asked about this vehicle at the moment the event
+    // occurred — not "now" — so a stale assignment cannot be back-attributed.
+    const produce = vi.fn(async () => ({ outcome: 'opened' as const, incidentId: 'inc-1', requiresInitialNotification: true }));
+    const resolveDriver = vi.fn(async () => ({ staffId: 'staff-7', staffName: 'Jane Driver' }));
+
+    await runVehicleDetectors({ now: NOW }, deps({ produce, resolveDriver }));
+
+    const produced = produce.mock.calls[0]?.[0] as unknown as { occurredAt: string };
+    expect(resolveDriver).toHaveBeenCalledWith(VEHICLE_ID, produced.occurredAt);
+    expect(produce.mock.calls[0]?.[0]).toMatchObject({
+      producerKind: 'source_event', staffId: 'staff-7', staffNameSnapshot: 'Jane Driver',
+      vehicleId: VEHICLE_ID, vehicleRegistrationSnapshot: 'ABC 123 GP',
+    });
   });
 
   it('passes the resolved project through', async () => {
@@ -136,6 +160,19 @@ describe('runVehicleDetectors — the opened notification', () => {
       vehicleRegistration: 'ABC 123 GP',
     });
     expect(result).toMatchObject({ notificationsAccepted: 2, notificationsFailed: 0 });
+  });
+
+  it('names the attributed driver in the opened notification', async () => {
+    // `openedBody` is `staffName ?? vehicleRegistration ?? 'Unknown staff'`,
+    // so the alert only names the person if this call carries the name.
+    const notifyOpened = vi.fn(async () => ({ ...DELIVERED }));
+    const resolveDriver = vi.fn(async () => ({ staffId: 'staff-7', staffName: 'Jane Driver' }));
+
+    await runVehicleDetectors({ now: NOW }, deps({ notifyOpened, resolveDriver }));
+
+    expect(notifyOpened.mock.calls[0]?.[0]).toMatchObject({
+      staffName: 'Jane Driver', vehicleRegistration: 'ABC 123 GP',
+    });
   });
 
   it('does NOT notify again on a second tick over the same data', async () => {
@@ -261,5 +298,18 @@ describe('sanitizeMetadata', () => {
     });
 
     expect(clean).toEqual({ registration: 'ABC 123 GP', meters: 600, exempt: false, place: null });
+  });
+});
+
+/**
+ * Everything above runs on injected fakes, so the suite cannot tell a correctly
+ * wired production default from a stub that always answers null. In production
+ * that difference is the whole feature: attribution and project scoping simply
+ * stop happening, silently, with every test still green.
+ */
+describe('runVehicleDetectors — the production wiring', () => {
+  it('defaults to the real driver and project resolvers', () => {
+    expect(DEFAULT_DEPS.resolveDriver).toBe(resolveVehicleDriver);
+    expect(DEFAULT_DEPS.resolveProjectId).toBe(resolveVehicleProjectId);
   });
 });

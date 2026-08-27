@@ -271,6 +271,27 @@ describe('condition clearing', () => {
   });
 });
 
+describe('the scheduled path is not touched by vehicle attribution', () => {
+  it('takes its staff identity and name from the ROSTER assignment, never from a vehicle lookup', async () => {
+    // The mutation this exists for: wiring `resolveVehicleDriver` into the
+    // scheduled branch. That path already carries a roster identity resolved
+    // from Attendance/assignment evidence; re-resolving it from
+    // `vehicle_assignments` would silently overwrite the person the roster
+    // named with whoever holds the vehicle. This request names a vehicle AND a
+    // roster driver, so the two answers are distinguishable.
+    repo.findActiveIncident.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord());
+
+    await produceIncident(scheduledRequest({
+      assignment: assignment({ vehicleId: 'vehicle-1', vehicleRegistrationSnapshot: 'ABC 123 GP', staffNameSnapshot: 'Roster Driver' }),
+    }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({
+      staffId: STAFF, staffNameSnapshot: 'Roster Driver', vehicleId: 'vehicle-1',
+    });
+  });
+});
+
 describe('source events', () => {
   beforeEach(() => { settings.loadEffectiveIncidentRule.mockResolvedValue(ruleRecord()); });
 
@@ -317,6 +338,41 @@ describe('source events', () => {
     expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({
       vehicleId: 'vehicle-1', vehicleRegistrationSnapshot: 'ABC 123 GP',
     });
+  });
+
+  it('writes the driver attribution the detector resolved — id AND name snapshot', async () => {
+    // The queue, the escalation mail and the WhatsApp body all read
+    // `staff_name_snapshot`; an incident carrying only `staff_id` still renders
+    // "Unassigned". Pinned here because the detector's own test can prove only
+    // what it PASSED, not what was stored.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent({ staffId: STAFF, staffNameSnapshot: 'Jane Driver' }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({ staffId: STAFF, staffNameSnapshot: 'Jane Driver' });
+  });
+
+  it('stores a null staff snapshot when the event resolved no driver', async () => {
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent({ staffId: null }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({ staffId: null, staffNameSnapshot: null });
+  });
+
+  it('refuses a name with no staff id — a snapshot nobody can be asked about', async () => {
+    // `staff_name_snapshot` is what the queue and every alert render, so a name
+    // stored beside a null `staff_id` would show a manager a driver they cannot
+    // request input from and whose `/my` surface the incident never reaches.
+    // The producer drops the name rather than displaying an unactionable one.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent({ staffId: null, staffNameSnapshot: 'Jane Driver' }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({ staffId: null, staffNameSnapshot: null });
   });
 
   it('stores null when the caller supplies no registration, never undefined', async () => {

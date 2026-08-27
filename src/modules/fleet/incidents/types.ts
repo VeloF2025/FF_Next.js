@@ -52,6 +52,16 @@ export interface IncidentSourceEvent {
   sourceEventId: string;
   occurredAt: string;
   staffId?: string | null;
+  /**
+   * The driver's name AS IT READ when the event was detected, mirroring the
+   * scheduled path's `IncidentAssignmentContext.staffNameSnapshot`.
+   *
+   * The queue and every notification read the snapshot column, never a live
+   * join back to `staff` — so without this an attributed incident would carry
+   * a `staff_id` and still render "Unassigned". Only meaningful alongside
+   * `staffId`; a name with no id names nobody the review flow can act on.
+   */
+  staffNameSnapshot?: string | null;
   vehicleId?: string | null;
   /**
    * The vehicle's registration AS IT READ when the event was detected.
@@ -240,6 +250,8 @@ export interface IncidentListItem {
   lifecycleStatus: IncidentLifecycleStatus;
   staffId: string | null;
   staffName: string | null;
+  /** `vehicle_registration_snapshot` — the queue's only vehicle label. A telematics incident is about a vehicle first, and without this column a vehicle-first row reads as anonymous. */
+  vehicleRegistration: string | null;
   projectId: string | null;
   projectName: string | null;
   operationalSiteName: string | null;

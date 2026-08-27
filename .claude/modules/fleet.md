@@ -1882,6 +1882,58 @@ Three numbers that are decisions, not defaults:
   values; the naive `start <= t && t <= end` comparison is always false and silently disables the
   detector entirely.
 
+### Driver attribution on a telematics incident
+
+A detector observes a vehicle, so until this landed every incident it opened carried
+`staff_id = NULL` and the queue said "Unassigned" for something a person was demonstrably
+driving. `vehicleDriverResolver.ts` now reads `vehicle_assignments` — the driver↔vehicle source
+of truth, 22 active rows in production — and the emitter puts that `staff_id` plus a
+`staff_name_snapshot` on the incident. `fleet_operational_assignments` (the PR4 roster) is a
+DIFFERENT and currently empty table; it is not consulted here.
+
+- **Covering the EVENT instant, not "today".** `assignment_start`/`assignment_end` are `DATE`
+  columns, so the instant is folded to its **SAST calendar date** and compared as `YYYY-MM-DD`
+  strings; both ends are inclusive, and the newest `assignment_start` wins when rows overlap.
+  Comparing a DATE against a timestamptz in SQL would let the session timezone decide, and a
+  22:30 UTC event is already tomorrow in Johannesburg.
+- **`is_active` is NOT the rule — the dates are.** Every close path writes the flag and the end
+  date in one statement, so all 63 production rows are either `{is_active, end IS NULL}` (22) or
+  `{NOT is_active, end IS NOT NULL}` (41). Filtering on the flag would make the date bounds
+  unreachable and discard every closed row — i.e. every historical attribution: an incident
+  predating the current driver's start would resolve to nobody even though a closed row names
+  exactly who was driving. Closed rows are the history this resolver exists to read.
+- **A handover day goes to the INCOMING driver.** A handover ends the leaving driver's row on the
+  same date the incoming driver's row starts (live example: `2026-03-03 → 2026-04-30` closed,
+  `2026-04-30` open), so both cover that one date and the newest start wins. An event on the 25th
+  of March attributes to the *closed* row's driver; an event on the 30th of April attributes to
+  the incoming one. That is the cost of a day-granular table — it cannot say who held the keys at
+  09:00 — and it is named here rather than papered over with a tie-break the data cannot support.
+- **Coverage today:** of the 18 tracked vehicles, 16 have an open assignment (so a *current* event
+  is attributable), 17 have at least one assignment row (so a *historical* event is), and 1 has
+  none at all and stays unattributed.
+- **No assignment covering it stays NULL** — the pre-attribution behaviour. The resolver never
+  throws either: attribution is an enrichment, and losing it must not cost the incident.
+- **Source-event path only.** The scheduled/roster path already carries a staff identity from
+  PR4's evidence; re-resolving it from the vehicle would overwrite the person the roster named.
+  A test in `incidentProducer.test.ts` fails if that mutation is made.
+- **It changes visibility, deliberately.** `staff_id` is what `/my` reads
+  (`driver/driverInputRepository.ts#findDriverIncidents`, ownership predicate `i.staff_id = $1`)
+  and what `driver/requestInputService.ts` refuses to run without — so an attributed incident
+  appears on that driver's own portal and becomes eligible for manager-initiated driver input.
+  That is the point. **Nobody notifies the driver on open**:
+  `recipientService.resolveIncidentRecipients` resolves the project manager plus oversight
+  members only, never the incident's own staff member. Manager-side scoping is unchanged —
+  `reviewQueries.buildWhere` and `reviewScope.isProjectOwnedByScope` key on `project_id` alone.
+  One narrowing side effect is intended: `selfReviewGuard`/`isIncidentSubject` now refuses a
+  manager who is themselves the attributed driver.
+- **The alert names both.** `describeIncidentSubject` renders `Jane Driver (ABC 123 GP)` when a
+  driver and a registration are both known, falling back to one or the other. For a non-critical
+  telematics type the opened/escalation body IS the whole alert — no WhatsApp leg, no other
+  vehicle field — so naming only the newly attributed driver would have made an incident about
+  one of eighteen vehicles unidentifiable.
+- The queue also renders a **Vehicle** column (`vehicle_registration_snapshot`). The column was
+  already stored and simply never read, so a vehicle-first row looked anonymous.
+
 ### Channels
 
 | Channel | What goes there | Where |

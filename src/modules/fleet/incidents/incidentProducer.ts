@@ -202,7 +202,11 @@ async function produceSourceEventIncident(request: SourceEventProducerRequest): 
     const createInput: CreateIncidentInput = {
       incidentType: request.incidentType, severity, staffId, projectId: request.projectId ?? null,
       operationalSiteId: request.operationalSiteId ?? null, vehicleId, operationalAssignmentId, workDate: null,
-      staffNameSnapshot: null, projectNameSnapshot: null, operationalSiteNameSnapshot: null,
+      // Only from the source event's own resolved attribution — never a live
+      // `staff` lookup here, so a historical incident keeps saying who it was
+      // about even after a rename or a reassignment.
+      staffNameSnapshot: staffId ? request.staffNameSnapshot ?? null : null,
+      projectNameSnapshot: null, operationalSiteNameSnapshot: null,
       vehicleRegistrationSnapshot: request.vehicleRegistrationSnapshot ?? null,
       sourceEventId, statusRuleId: null, statusRuleVersion: null, incidentRuleId: rule.id, incidentRuleVersion: rule.version,
       evidenceSnapshot, detectedAt: request.occurredAt,

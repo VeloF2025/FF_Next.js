@@ -16,6 +16,7 @@ import { log } from '@/lib/logger';
 import type { produceIncident } from '../incidents/incidentProducer';
 import type { sendIncidentOpenedNotification } from '../incidents/incidentNotifications';
 import type { IncidentRule, IncidentType, SanitizedIncidentMetadata } from '../incidents/types';
+import type { VehicleDriver } from './vehicleDriverResolver';
 import type { DetectedVehicleEvent, DetectorVehicle, VehicleDetector } from './types';
 
 const MODULE = 'FleetVehicleDetectors';
@@ -30,6 +31,8 @@ export interface RegisteredDetector {
 /** What emitting an event needs. `VehicleDetectorDeps` extends this. */
 export interface EmitterDeps {
   resolveProjectId: (lat: number | null, lon: number | null) => Promise<string | null>;
+  /** The vehicle's driver at the event instant, or null when no assignment covers it. Never throws — see `vehicleDriverResolver`. */
+  resolveDriver: (vehicleId: string, occurredAt: string) => Promise<VehicleDriver | null>;
   loadIncidentRule: (incidentType: IncidentType, asOf: string) => Promise<IncidentRule | null>;
   produce: typeof produceIncident;
   notifyOpened: typeof sendIncidentOpenedNotification;
@@ -67,16 +70,22 @@ export async function emitDetectedEvent(
   rule: IncidentRule, deps: EmitterDeps, result: EmitCounters,
 ): Promise<void> {
   try {
-    const projectId = await deps.resolveProjectId(event.lat, event.lon);
+    const [projectId, driver] = await Promise.all([
+      deps.resolveProjectId(event.lat, event.lon),
+      deps.resolveDriver(vehicle.vehicleId, event.occurredAt),
+    ]);
     const outcome = await deps.produce({
       producerKind: 'source_event',
       incidentType: detector.incidentType,
       sourceEventId: event.sourceEventId,
       occurredAt: event.occurredAt,
-      // Never a staff id. These detectors observe a VEHICLE; the producer's
-      // scheduled path is the one that requires a staff identity, and handing it
-      // one here would attribute a machine reading to a person.
-      staffId: null,
+      // The driver `vehicle_assignments` says held this vehicle at the event
+      // instant, or null when none did — which is what every vehicle incident
+      // carried before attribution existed. This stays the SOURCE-EVENT path:
+      // `producerKind` alone decides which producer branch runs, so a staff id
+      // here never turns a machine reading into a scheduled roster detection.
+      staffId: driver?.staffId ?? null,
+      staffNameSnapshot: driver?.staffName ?? null,
       vehicleId: vehicle.vehicleId,
       vehicleRegistrationSnapshot: vehicle.registration,
       projectId,
@@ -94,7 +103,7 @@ export async function emitDetectedEvent(
     const delivery = await deps.notifyOpened({
       incidentId: outcome.incidentId, incidentType: detector.incidentType,
       severity: rule.severity, producerKind: 'source_event', rule, projectId,
-      staffName: null, projectName: null, operationalSiteName: null,
+      staffName: driver?.staffName ?? null, projectName: null, operationalSiteName: null,
       vehicleRegistration: vehicle.registration,
       detectedAt: event.occurredAt, reasonCodes: [],
     });

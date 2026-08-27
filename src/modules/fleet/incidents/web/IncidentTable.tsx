@@ -4,6 +4,12 @@
  * `IncidentReviewDrawer.tsx`). Status is never colour-only: the overdue and
  * condition badges always carry a text word, colour is a bonus.
  *
+ * The "Vehicle" column renders `vehicle_registration_snapshot` — the registration
+ * as it read when the incident opened. A telematics incident is about a vehicle
+ * first: before this column the queue showed staff and project only, so every
+ * vehicle-first row read as anonymous even when the registration was already
+ * stored on it.
+ *
  * The "Driver input" column (PR7 review I4) is read-only — it renders
  * `incident.driverInput.state`, computed server-side by
  * `../reviewQueries.ts#attachDriverInputSummaries` via the same
@@ -67,6 +73,7 @@ export function IncidentTable({ incidents, canEdit, selected, onToggleSelect, on
           {canEdit && <th scope="col" className="p-2"><span className="sr-only">Select</span></th>}
           <th scope="col" className="p-2">Reference</th>
           <th scope="col" className="p-2">Staff</th>
+          <th scope="col" className="p-2">Vehicle</th>
           <th scope="col" className="p-2">Project / site</th>
           <th scope="col" className="p-2">Type / severity</th>
           <th scope="col" className="p-2">Status</th>
@@ -96,6 +103,7 @@ export function IncidentTable({ incidents, canEdit, selected, onToggleSelect, on
                 </button>
               </td>
               <td className="p-2">{incident.staffName ?? 'Unassigned'}</td>
+              <td className="p-2">{incident.vehicleRegistration ?? 'No vehicle'}</td>
               <td className="p-2">{incident.projectName ?? 'No project'} · {incident.operationalSiteName ?? 'No site'}</td>
               <td className="p-2">{TYPE_LABELS[incident.incidentType]} · {SEVERITY_LABELS[incident.severity]}</td>
               <td className="p-2">{LIFECYCLE_LABELS[incident.lifecycleStatus]}</td>
