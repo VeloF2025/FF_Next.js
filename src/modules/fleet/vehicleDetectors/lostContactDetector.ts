@@ -31,7 +31,7 @@
  * the raw rule value is the honest answer.
  */
 
-import { buildSourceEventId } from './sourceEventId';
+import { buildSourceEventId, calendarDayKey } from './sourceEventId';
 import type { DetectedVehicleEvent, VehicleDetectorContext, VehicleOperationalRule } from './types';
 
 const DETECTOR_ID = 'lost_contact_moving';
@@ -54,9 +54,17 @@ export function effectiveLostContactMinutes(
  * A vehicle that has been silent for three days has nothing inside the
  * detection window at all, and that silence is the entire signal — a
  * window-only read would make the detector go quiet exactly when it should
- * speak. The bucket key is that fix's instant, which stops moving the moment
- * contact is lost, so a still-silent vehicle re-detected on every subsequent
- * tick dedups onto the one incident.
+ * speak.
+ *
+ * The bucket key is the SAST calendar day of that fix, NOT its instant. The
+ * instant stops moving once contact is lost, so it already deduped the
+ * still-silent case — but a FLAPPY unit that reconnects mints a new last-fix
+ * instant on every drop, and MW63YBGP opened four incidents in 48 hours that
+ * way. Policy (Hein, 2026-08-27): at most ONE `lost_contact_moving` incident
+ * per vehicle per SAST calendar day. A calendar day cannot move under the
+ * detector, so the producer's dedup on `source_event_id` enforces the cooldown
+ * with no new state. The stated cost, same as `prolonged_unauthorized_stop`:
+ * a second genuine loss on the same day is silently deduped.
  */
 export function detectLostContact(ctx: VehicleDetectorContext): DetectedVehicleEvent[] {
   const last = ctx.lastPosition;
@@ -74,7 +82,7 @@ export function detectLostContact(ctx: VehicleDetectorContext): DetectedVehicleE
   return [{
     detectorId: DETECTOR_ID,
     occurredAt: last.recordedAt,
-    sourceEventId: buildSourceEventId(DETECTOR_ID, ctx.vehicle.vehicleId, last.recordedAt),
+    sourceEventId: buildSourceEventId(DETECTOR_ID, ctx.vehicle.vehicleId, calendarDayKey(last.recordedAt, ctx.rule)),
     lat: last.lat,
     lon: last.lon,
     metadata: {

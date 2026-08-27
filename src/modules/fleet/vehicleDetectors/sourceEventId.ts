@@ -23,8 +23,12 @@
  *   prolonged_unauthorized_stop  the SAST calendar day the stop was observed to
  *                                start in — NOT the observed start instant, which
  *                                slides. See `calendarDayKey`.
- *   lost_contact_moving          the last known fix's instant, which stops moving
- *                                the moment contact is lost — that is the point.
+ *   lost_contact_moving          the SAST calendar day of the last known fix —
+ *                                the instant alone deduped a still-silent
+ *                                vehicle but let a flappy unit that reconnects
+ *                                mint a fresh instant per drop (MW63YBGP: four
+ *                                incidents in 48 h). One per vehicle per SAST
+ *                                day. See `calendarDayKey`.
  *   accident_sos                 no source; the detector is a stub.
  */
 

@@ -47,7 +47,7 @@ describe('detectLostContact', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]?.occurredAt).toBe(LAST_FIX);
-    expect(events[0]?.sourceEventId).toBe(`lost_contact_moving:${VEHICLE_ID}:${LAST_FIX}`);
+    expect(events[0]?.sourceEventId).toBe(`lost_contact_moving:${VEHICLE_ID}:2026-08-18`);
     expect(events[0]?.metadata.thresholdMinutes).toBe(30);
     expect(events[0]?.metadata.silentMinutes).toBe(45);
   });
@@ -85,5 +85,52 @@ describe('detectLostContact', () => {
     const ids = [45, 90, 600].map((m) => detectLostContact(silentFor(m, 30))[0]?.sourceEventId);
 
     expect(new Set(ids).size).toBe(1);
+  });
+
+  /**
+   * The daily cooldown (Hein, 2026-08-27): a flappy unit that reconnects mints
+   * a new last-fix instant per drop — MW63YBGP opened four incidents in 48 h —
+   * so the bucket is the SAST calendar day of the last fix, and the producer's
+   * dedup on `source_event_id` folds every same-day loss onto one incident.
+   */
+  describe('per-vehicle SAST-day cooldown', () => {
+    function lossAt(recordedAt: string, silentMinutes: number) {
+      const fix = position({ recordedAt, speedKph: 60, ignition: true });
+      return context({
+        lastPosition: fix,
+        gapP90Seconds: 30,
+        now: new Date(Date.parse(recordedAt) + silentMinutes * 60_000).toISOString(),
+      });
+    }
+
+    it('gives a SECOND loss on the same SAST day the SAME id (deduped by the producer)', () => {
+      // Both fixes fall on SAST 2026-08-18; the unit reconnected in between.
+      const first = detectLostContact(lossAt('2026-08-18T06:00:00.000Z', 45))[0];
+      const second = detectLostContact(lossAt('2026-08-18T12:30:00.000Z', 45))[0];
+
+      expect(first?.sourceEventId).toBe(`lost_contact_moving:${VEHICLE_ID}:2026-08-18`);
+      expect(second?.sourceEventId).toBe(first?.sourceEventId);
+    });
+
+    it('gives a DIFFERENT vehicle the same day its own incident', () => {
+      const otherId = 'b2b2b2b2-2222-4222-8222-222222222222';
+      const ctx = lossAt('2026-08-18T12:30:00.000Z', 45);
+      const other = detectLostContact({
+        ...ctx, vehicle: { ...ctx.vehicle, vehicleId: otherId },
+      })[0];
+
+      expect(other?.sourceEventId).toBe(`lost_contact_moving:${otherId}:2026-08-18`);
+      expect(other?.sourceEventId).not.toBe(detectLostContact(ctx)[0]?.sourceEventId);
+    });
+
+    it('buckets a loss straddling SAST midnight into the NEXT day', () => {
+      // 21:50Z = 23:50 SAST (day 18); 22:30Z = 00:30 SAST (day 19). Both are
+      // 2026-08-18 in UTC — a UTC fold would wrongly dedup them.
+      const before = detectLostContact(lossAt('2026-08-18T21:50:00.000Z', 45))[0];
+      const after = detectLostContact(lossAt('2026-08-18T22:30:00.000Z', 45))[0];
+
+      expect(before?.sourceEventId).toBe(`lost_contact_moving:${VEHICLE_ID}:2026-08-18`);
+      expect(after?.sourceEventId).toBe(`lost_contact_moving:${VEHICLE_ID}:2026-08-19`);
+    });
   });
 });
