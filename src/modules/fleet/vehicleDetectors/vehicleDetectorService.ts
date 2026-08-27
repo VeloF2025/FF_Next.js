@@ -50,6 +50,16 @@
  * `createsIncident`. The producer's source-event path reads a rule only for its
  * severity, so without this check disabling `severe_driving` would do nothing.
  *
+ * ## The incident names a DRIVER when one is assigned
+ *
+ * `vehicleDriverResolver` reads `vehicle_assignments` for the vehicle at the
+ * event instant and the emitter puts that staff id and name on the incident.
+ * That is the ONLY path this resolver runs on: the scheduled/roster path
+ * already carries a staff identity from PR4's roster and must not be touched.
+ * No assignment covering the instant still means null — the pre-attribution
+ * behaviour — and the resolver never throws, so a lookup failure costs the
+ * attribution, never the incident.
+ *
  * ## No watermark, deliberately
  *
  * A watermark suits a builder whose output is a row per day; these detectors ask
@@ -76,6 +86,7 @@ import { theftDetector } from './theftDetector';
 import { unauthorizedStopDetector } from './unauthorizedStopDetector';
 import { loadEffectiveVehicleRule } from './vehicleRuleQueries';
 import { resolveVehicleProjectId } from './vehicleProjectResolver';
+import { resolveVehicleDriver } from './vehicleDriverResolver';
 import type {
   DetectedVehicleEvent, VehicleDetectorContext, VehicleOperationalRule,
 } from './types';
@@ -162,6 +173,7 @@ const DEFAULT_DEPS: VehicleDetectorDeps = {
   loadRule: loadEffectiveVehicleRule,
   loadHolidayDates: loadHolidays,
   resolveProjectId: (lat, lon) => resolveVehicleProjectId(lat, lon),
+  resolveDriver: (vehicleId, occurredAt) => resolveVehicleDriver(vehicleId, occurredAt),
   loadIncidentRule: loadEffectiveIncidentRule,
   produce: produceIncident,
   notifyOpened: sendIncidentOpenedNotification,

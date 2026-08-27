@@ -18,7 +18,7 @@ const db = vi.hoisted(() => ({ query: vi.fn(), queryOne: vi.fn() }));
 vi.mock('@/lib/db-pool', () => db);
 
 import {
-  loadDetectorVehicles, loadGapP90Seconds, loadLastPosition, loadPositionWindow,
+  loadDetectorVehicles, loadGapP90Seconds, loadLastPosition, loadPositionWindow, loadVehicleDriverAssignments,
 } from '../detectorQueries';
 
 function row(overrides: Record<string, unknown> = {}) {
@@ -123,5 +123,47 @@ describe('the SQL shape', () => {
   it('interpolates only the pinned column list, never a value', () => {
     const interpolations = source.match(/\$\{[^}]*\}/g) ?? [];
     expect(new Set(interpolations)).toEqual(new Set(['${POSITION_COLUMNS}']));
+  });
+});
+
+describe('loadVehicleDriverAssignments', () => {
+  it('reads the DATE columns as YYYY-MM-DD strings, not Dates', async () => {
+    // node-postgres parses DATE (OID 1082) into a local Date, which renders a
+    // day early once anything serialises it through UTC — and the whole
+    // attribution boundary is a date comparison. `to_char` in Postgres is what
+    // keeps the value a calendar date all the way through.
+    db.query.mockResolvedValue([{
+      id: 'assignment-1', staff_id: 'staff-1', staff_name: 'Jane Driver',
+      is_active: true, assignment_start: '2026-08-01', assignment_end: null,
+    }]);
+
+    const assignments = await loadVehicleDriverAssignments('vehicle-1');
+
+    expect(assignments).toEqual([{
+      assignmentId: 'assignment-1', staffId: 'staff-1', staffName: 'Jane Driver',
+      isActive: true, assignmentStart: '2026-08-01', assignmentEnd: null,
+    }]);
+    const [text, params] = db.query.mock.calls[0]!;
+    expect(text).toContain("to_char(va.assignment_start, 'YYYY-MM-DD')");
+    expect(text).toContain("to_char(va.assignment_end, 'YYYY-MM-DD')");
+    expect(params).toEqual(['vehicle-1']);
+  });
+
+  it('leaves the covering-instant decision to the resolver — no date predicate in SQL', async () => {
+    db.query.mockResolvedValue([]);
+    await loadVehicleDriverAssignments('vehicle-1');
+    const [text] = db.query.mock.calls[0]!;
+    expect(text).toContain('WHERE va.fleet_vehicle_id = $1::uuid');
+    expect(text).not.toContain('assignment_start <=');
+    expect(text).not.toContain('is_active AND');
+  });
+
+  it('treats a NULL is_active as inactive rather than as truthy', async () => {
+    db.query.mockResolvedValue([{
+      id: 'assignment-1', staff_id: 'staff-1', staff_name: null,
+      is_active: null, assignment_start: '2026-08-01', assignment_end: '2026-08-20',
+    }]);
+    const assignments = await loadVehicleDriverAssignments('vehicle-1');
+    expect(assignments[0]).toMatchObject({ isActive: false, staffName: null, assignmentEnd: '2026-08-20' });
   });
 });

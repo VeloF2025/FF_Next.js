@@ -1882,6 +1882,38 @@ Three numbers that are decisions, not defaults:
   values; the naive `start <= t && t <= end` comparison is always false and silently disables the
   detector entirely.
 
+### Driver attribution on a telematics incident
+
+A detector observes a vehicle, so until this landed every incident it opened carried
+`staff_id = NULL` and the queue said "Unassigned" for something a person was demonstrably
+driving. `vehicleDriverResolver.ts` now reads `vehicle_assignments` — the driver↔vehicle source
+of truth, 22 active rows in production — and the emitter puts that `staff_id` plus a
+`staff_name_snapshot` on the incident. `fleet_operational_assignments` (the PR4 roster) is a
+DIFFERENT and currently empty table; it is not consulted here.
+
+- **Covering the EVENT instant, not "today".** `assignment_start`/`assignment_end` are `DATE`
+  columns, so the instant is folded to its **SAST calendar date** and compared as `YYYY-MM-DD`
+  strings; both ends are inclusive, and the newest `assignment_start` wins when rows overlap.
+  Comparing a DATE against a timestamptz in SQL would let the session timezone decide, and a
+  22:30 UTC event is already tomorrow in Johannesburg.
+- **No assignment covering it stays NULL** — the pre-attribution behaviour. The resolver never
+  throws either: attribution is an enrichment, and losing it must not cost the incident.
+- **Source-event path only.** The scheduled/roster path already carries a staff identity from
+  PR4's evidence; re-resolving it from the vehicle would overwrite the person the roster named.
+  A test in `incidentProducer.test.ts` fails if that mutation is made.
+- **It changes visibility, deliberately.** `staff_id` is what `/my` reads
+  (`driver/driverInputRepository.ts#findDriverIncidents`, ownership predicate `i.staff_id = $1`)
+  and what `driver/requestInputService.ts` refuses to run without — so an attributed incident
+  appears on that driver's own portal and becomes eligible for manager-initiated driver input.
+  That is the point. **Nobody notifies the driver on open**:
+  `recipientService.resolveIncidentRecipients` resolves the project manager plus oversight
+  members only, never the incident's own staff member. Manager-side scoping is unchanged —
+  `reviewQueries.buildWhere` and `reviewScope.isProjectOwnedByScope` key on `project_id` alone.
+  One narrowing side effect is intended: `selfReviewGuard`/`isIncidentSubject` now refuses a
+  manager who is themselves the attributed driver.
+- The queue also renders a **Vehicle** column (`vehicle_registration_snapshot`). The column was
+  already stored and simply never read, so a vehicle-first row looked anonymous.
+
 ### Channels
 
 | Channel | What goes there | Where |
