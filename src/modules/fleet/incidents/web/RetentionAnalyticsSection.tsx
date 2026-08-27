@@ -31,22 +31,27 @@ import type { RetentionPolicy } from '../analytics/types';
 
 /**
  * Every number this form exposes, with the policy field it edits and the
- * floor migration 518's own CHECK constraints enforce (`retentionSettingsValidation.ts`).
- * Mirroring the server's mins here means a manager finds out about an invalid
- * number from the input itself, not a 500 naming a constraint.
+ * floor and ceiling migration 518's own CHECK constraints enforce
+ * (`retentionSettingsValidation.ts`). Mirroring the server's bounds here means
+ * a manager finds out about an invalid number from the input itself, not a
+ * 500 naming a constraint.
+ *
+ * `holdReviewReminderLeadDays` has no fixed ceiling of its own — its server
+ * floor is `maximumHoldReviewDays`, enforced separately below — so it carries
+ * the absolute ceiling `maximumHoldReviewDays` itself is bound to (90).
  */
 const FIELDS = [
-  ['retentionMonths', 'Retention months', 1],
-  ['anonymityMinContributors', 'Anonymity threshold', 5],
-  ['recalculationWindowMonths', 'Recalculation window months', 1],
-  ['retentionBatchSize', 'Retention batch size', 1],
-  ['maximumHoldReviewDays', 'Maximum hold review days', 1],
-  ['holdReviewReminderLeadDays', 'Hold review reminder lead days', 1],
-  ['aggregationRunHourSast', 'Aggregation run hour (SAST)', 0],
-  ['aggregationRunMinuteSast', 'Aggregation run minute (SAST)', 0],
-  ['retentionRunHourSast', 'Retention run hour (SAST)', 0],
-  ['retentionRunMinuteSast', 'Retention run minute (SAST)', 0],
-] as const satisfies readonly (readonly [keyof RetentionPolicy, string, number])[];
+  ['retentionMonths', 'Retention months', 1, 120],
+  ['anonymityMinContributors', 'Anonymity threshold', 5, 1000],
+  ['recalculationWindowMonths', 'Recalculation window months', 1, 24],
+  ['retentionBatchSize', 'Retention batch size', 1, 100],
+  ['maximumHoldReviewDays', 'Maximum hold review days', 1, 90],
+  ['holdReviewReminderLeadDays', 'Hold review reminder lead days', 1, 90],
+  ['aggregationRunHourSast', 'Aggregation run hour (SAST)', 0, 23],
+  ['aggregationRunMinuteSast', 'Aggregation run minute (SAST)', 0, 59],
+  ['retentionRunHourSast', 'Retention run hour (SAST)', 0, 23],
+  ['retentionRunMinuteSast', 'Retention run minute (SAST)', 0, 59],
+] as const satisfies readonly (readonly [keyof RetentionPolicy, string, number, number])[];
 
 type EditableField = (typeof FIELDS)[number][0];
 type Draft = Record<EditableField, string>;
@@ -55,19 +60,22 @@ function draftFrom(policy: RetentionPolicy): Draft {
   return Object.fromEntries(FIELDS.map(([field]) => [field, String(policy[field])])) as Draft;
 }
 
+const RETENTION_MONTHS_FIELD = FIELDS.find(([field]) => field === 'retentionMonths')!;
+
 /** A blank or non-integer field is never "valid at 0" — it is simply not entered yet. */
-function isValidWhole(raw: string, min: number): boolean {
+function isValidWhole(raw: string, min: number, max: number): boolean {
   const trimmed = raw.trim();
-  return trimmed !== '' && Number.isInteger(Number(trimmed)) && Number(trimmed) >= min;
+  return trimmed !== '' && Number.isInteger(Number(trimmed))
+    && Number(trimmed) >= min && Number(trimmed) <= max;
 }
 
-function NumberField({ field, label, value, min, onChange }: {
-  field: string; label: string; value: string; min: number; onChange: (value: string) => void;
+function NumberField({ field, label, value, min, max, onChange }: {
+  field: string; label: string; value: string; min: number; max: number; onChange: (value: string) => void;
 }) {
   return (
     <label className="mr-3 inline-block text-sm">{label}
       <input
-        aria-label={label} id={field} type="number" min={min} value={value}
+        aria-label={label} id={field} type="number" min={min} max={max} value={value}
         onChange={(event) => onChange(event.target.value)}
         className="ml-2 w-20 rounded border px-2 py-1"
       />
@@ -103,12 +111,13 @@ export function RetentionAnalyticsSection({ canEdit }: { canEdit: boolean }) {
   // A blank retentionMonths field is not "requesting 0 months" — `Number('')`
   // coerces to 0, which would otherwise both warn about a shortening to zero
   // and let a 0 slip into the request the server 400s on.
-  const requested = draft && isValidWhole(draft.retentionMonths, 1) ? Number(draft.retentionMonths) : null;
+  const requested = draft && isValidWhole(draft.retentionMonths, RETENTION_MONTHS_FIELD[2], RETENTION_MONTHS_FIELD[3])
+    ? Number(draft.retentionMonths) : null;
   const shortening = policy !== null && requested !== null && requested < policy.retentionMonths;
 
   const valid = policy !== null && draft !== null
     && changeReason.trim().length > 0
-    && FIELDS.every(([field, , min]) => isValidWhole(draft[field], min))
+    && FIELDS.every(([field, , min, max]) => isValidWhole(draft[field], min, max))
     // Same rule DriverInputSection enforces client-side for its own pair
     // (historyWindowDays >= recentWindowDays): the server's floor on
     // holdReviewReminderLeadDays is `maximumHoldReviewDays`, not a fixed number.
@@ -163,9 +172,9 @@ export function RetentionAnalyticsSection({ canEdit }: { canEdit: boolean }) {
 
       {policy && draft && canEdit && (
         <div className="space-y-2 rounded border p-3">
-          {FIELDS.map(([field, label, min]) => (
+          {FIELDS.map(([field, label, min, max]) => (
             <NumberField
-              key={field} field={field} label={label} value={draft[field]} min={min}
+              key={field} field={field} label={label} value={draft[field]} min={min} max={max}
               onChange={(value) => setDraft({ ...draft, [field]: value })}
             />
           ))}

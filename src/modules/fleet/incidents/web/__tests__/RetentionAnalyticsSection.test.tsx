@@ -284,6 +284,57 @@ describe('RetentionAnalyticsSection', () => {
     });
   });
 
+  /**
+   * Every field mirrors the server's CHECK ceiling too (migration 518), not
+   * just its floor. `retentionMonths` exercises the one that matters most:
+   * blowing past 120 would otherwise 500 on save naming a constraint instead
+   * of disabling the button.
+   */
+  describe('server-mirrored ceilings', () => {
+    it('disables save when retention months exceeds the server ceiling of 120', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Retention months'), { target: { value: '121' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).toBeDisabled();
+    });
+
+    it('allows retention months at exactly the server ceiling of 120', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Retention months'), { target: { value: '120' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).not.toBeDisabled();
+    });
+  });
+
+  /**
+   * `isValidWhole`'s `trimmed !== ''` clause is the only thing stopping a
+   * blank min-0 field (the two SAST hour/minute fields floor at 0, not 1)
+   * from validating as 0 — `Number('')` coerces to 0, which is itself a
+   * legal value. Without that clause, a blank hour would silently save the
+   * aggregation run at midnight instead of disabling save. Regressed once in
+   * round-1 review; this is the missing regression test.
+   */
+  describe('blank min-0 field (aggregation run hour)', () => {
+    it('disables save when aggregation run hour is left blank, not treated as midnight', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Aggregation run hour (SAST)'), { target: { value: '' } });
+      withReason();
+      await flush();
+      expect(screen.getByTestId('retention-save')).toBeDisabled();
+    });
+
+    it('never sends a request with aggregation run hour blank', async () => {
+      await renderSection();
+      fireEvent.change(screen.getByLabelText('Aggregation run hour (SAST)'), { target: { value: '' } });
+      withReason();
+      await act(async () => { screen.getByTestId('retention-save').click(); });
+      await flush();
+      expect(mocks.save).not.toHaveBeenCalled();
+    });
+  });
+
   describe('the integer guard in `valid`', () => {
     it('disables save when a field is left blank', async () => {
       await renderSection();
