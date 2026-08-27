@@ -34,6 +34,17 @@ const driverInputSettings = {
   driverResponseReceivedChannels: { inApp: true, email: true, whatsapp: false },
 };
 
+/** Migration 518's defaults, for the PR8 section the dialog now also mounts. */
+const retentionPolicy = {
+  version: 1, effectiveFrom: '2026-08-01T00:00:00.000Z', retentionMonths: 12,
+  anonymityMinContributors: 5, recalculationWindowMonths: 3, retentionBatchSize: 100,
+  maximumHoldReviewDays: 90, holdReviewReminderLeadDays: 14,
+  aggregationRunHourSast: 1, aggregationRunMinuteSast: 0,
+  retentionRunHourSast: 3, retentionRunMinuteSast: 30,
+  aggregateFreshnessWarningHours: 36, retentionFreshnessWarningHours: 48,
+  permittedHoldCategories: ['legal'], metricVersion: 1, liveRetentionEnabled: false,
+};
+
 function ok(data: unknown, status = 200): Response { return { ok: true, status, json: async () => ({ success: true, data }) } as Response; }
 function fail(status: number, code: string, message: string): Response { return { ok: false, status, json: async () => ({ success: false, error: { code, message } }) } as Response; }
 async function flush(): Promise<void> { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); }
@@ -53,6 +64,10 @@ function routeFetch(): { rules: IncidentRule[]; members: OversightMembership[]; 
   fetchMock.mockImplementation((input, init) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
+    // The dialog also mounts the PR8 analytics/retention section, which loads
+    // on its own request. Answered explicitly so these tests never depend on
+    // fallthrough; `RetentionAnalyticsSection.test.tsx` tests that section.
+    if (url.includes('/settings/retention-analytics')) return Promise.resolve(ok(retentionPolicy));
     if (url.includes('/settings/driver-input') && method === 'GET') return Promise.resolve(ok(state.driverInput));
     if (url.includes('/settings/driver-input') && method === 'POST') {
       const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
