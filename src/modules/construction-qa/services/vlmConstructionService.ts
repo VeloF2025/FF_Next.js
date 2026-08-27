@@ -11,7 +11,11 @@ import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { getChecklist } from '../types/construction.types';
 import type { Discipline, VlmStepResult, VlmOverallResult } from '../types';
-import { recordCorrectExtraction, getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
+// getVlmFewShotExamples / buildVlmFewShotPrompt intentionally not imported —
+// see the fewShotSection comment below. recordCorrectExtraction stays: it still
+// writes the learning signal, which remains useful even though this module no
+// longer reads it back into the prompt.
+import { recordCorrectExtraction } from '@/services/vlmLearningService';
 import { VLM_API_URL, VLM_MODEL, VLM_MAX_TOKENS_OCR } from '@/lib/vlm';
 import { vlmProxyKeyParam } from '@/lib/vlm/photoProxyAuth';
 import { buildPhotoPrompt } from './constructionQaPrompt';
@@ -92,22 +96,34 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
 
     const checklist = getChecklist(discipline);
 
-    // Fetch few-shot correction examples for prompt enhancement (non-blocking on failure)
-    let fewShotSection = '';
-    try {
-      const fewShotExamples = await getVlmFewShotExamples({
-        module: 'construction_qa',
-        analysisType: 'construction_photo_qa',
-        context: { discipline },
-        maxExamples: 3,
-        prioritizeCanonical: true,
-      });
-      fewShotSection = buildVlmFewShotPrompt(fewShotExamples, 'markdown');
-    } catch (fewShotErr) {
-      log.warn('Few-shot retrieval failed, continuing without', {
-        error: (fewShotErr as Error).message,
-      }, MODULE);
-    }
+    // Few-shot examples are deliberately NOT sent for construction QA.
+    //
+    // They measurably hurt. Benchmarked on 150 representative civil photos
+    // (scripts/vlm-bench, pack civil-rep), same prompt and scorer, few-shot the
+    // only variable:
+    //
+    //   base prompt     66.0, 65.3   mean 65.7
+    //   with few-shot   62.7, 62.0   mean 62.4
+    //
+    // Repeat runs of an unchanged pack vary by ~0.7, so the 3.3-point loss is
+    // well outside noise. The mechanism reproduced exactly in both pairs: step 1
+    // recall collapsed 0.316 -> 0.053 and step 5 over-prediction worsened.
+    //
+    // The cause is the content. Every one of the 3,675 correction rows for this
+    // module is one-directional -- "2 - During Photo" -> 5 or 7 -- and carries no
+    // image and no description of what the photo showed. Three context-free
+    // "don't say 2" pairs suppress step 2 and take step 1 with it.
+    //
+    // Worse for optical: getVlmFewShotExamples filters on module and
+    // analysisType but NOT discipline, and every correction row is civil, so
+    // optical classification was being fed civil step labels for a completely
+    // different checklist.
+    //
+    // Re-enable only with examples that carry image context and point in more
+    // than one direction, and only after re-running civil-rep to show it helps.
+    // This is scoped to construction QA; ~13 other services still use few-shot
+    // and are unmeasured -- do not generalise this to them.
+    const fewShotSection = '';
 
     // Process each photo
     for (const photo of photos) {
