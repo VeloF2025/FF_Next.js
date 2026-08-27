@@ -56,11 +56,10 @@ anywhere in Ekurhuleni; tightening the circles produces the opposite failure on 
 ### The velocity source and the refresh chain
 
 Migration 531 adds a source row of its own — `fno_atlas_sources.source_url =
-'fibreflow://project_aois'`, name *Velocity project site AOIs* — and everything under it is owned
-by `refresh_velocity_site_aois()`. **Do not hand-edit rows under that source**; the next refresh
-overwrites them. The active-uniqueness index is `(source_id, site_code, area_name) WHERE
-retired_at IS NULL`, so the separate source is what keeps these rows from colliding with the
-OneMap ingest under `fibreflow://onemap_properties`.
+'fibreflow://project_aois'`, name *Velocity project site AOIs*, id pinned to
+`e0f1c0de-0000-4000-8000-000000000531` — and everything under it is owned by
+`refresh_velocity_site_aois()`. **Do not hand-edit rows under that source**; the next refresh
+overwrites them.
 
 The chain runs nightly, in this order, inside `scripts/cron/refresh-project-aois.ts` (03:15 SAST):
 
@@ -71,28 +70,57 @@ poles  --refresh_project_aois()-->  project_aois.aoi (convex hull, scored ok/sus
 
 - Only `aoi_status = 'ok'` hulls are mirrored. 523's scoring exists because one pole 145 km out
   inflated a geofence 63x for months.
-- `site_code` is the **project UUID**, not `project_code` — the only identifier that cannot be
-  edited out from under a live operational site. `area_name` is the project name, so a rename
-  writes a new row and the sweep removes the old one.
 - The 300 m buffer is a measured value, not a knob. Of the trimmed on-site clock-ins the raw pole
   hull covers 301 of 325 and the buffer covers 324; Themb'elihle goes from 6 of 17 to 17 of 17.
   Re-measure before changing it.
-- The mirror runs **after** the cron's zero-AOI guard. An empty pole refresh would otherwise sweep
-  every site's geometry away before anything noticed.
-- A stale row (project lost `ok`, lost its poles, was deleted or renamed) is deleted — **unless an
-  operational site references it**, in which case it is retired instead. The FK is NO ACTION, so
-  deleting a referenced row raises 23503 and aborts the whole refresh. Every Fleet consumer
-  already filters `retired_at IS NULL`, so a retired row leaves the evidence path exactly as a
-  deleted one would.
+- The mirror runs behind **two** guards. The cron's existing zero-AOI guard counts rows in
+  `project_aois`; the mirror's own guard counts rows scored `ok`. They are not the same check —
+  a night on which every hull scores `distorted` leaves the first guard happy with a full table
+  while the mirror would retire every site's geometry. Neither guard is best-effort: the mirror
+  throws and the cron goes red.
 
-### Linking a new project's operational site
+### Identity: one live row per project, forever
 
-Create the site with `project_aoi_id` pointing at that project's row under the velocity source:
+**`site_code` is the project UUID and it is the identity.** `area_name` is data, not key.
+
+Migration 531 adds `ux_fno_atlas_velocity_site_aois_active_site` — unique on `site_code`,
+partial on `retired_at IS NULL AND source_id = <the pinned velocity id>` — and the refresh
+upserts on it. Deliberately scoped to the velocity source: a table-wide `(source_id, site_code)`
+index would silently forbid the OneMap ingest from holding two live rows for one `site_code`
+under different `area_name`s, which its own index explicitly supports.
+
+Two consequences, and both exist to stop a linked site losing its geometry in silence:
+
+- **A rename updates the row in place.** With `area_name` in the key (the table's default
+  identity), renaming a project would insert a *second* row and leave the linked site pointing at
+  the first — which the sweep then retires. Every Fleet consumer joins `retired_at IS NULL`, so
+  the site's geometry resolves to nothing and the monitor stops judging it without saying so.
+- **A `distorted → ok` round trip revives the same row.** The refresh un-retires before it
+  upserts, for the same reason: a retired row is not in the partial index, so a plain upsert would
+  insert a new one and strand the link on the old.
+
+If you are changing this function, the number to watch is *sites whose linked AOI is live* — not
+the row count. The tests assert it directly.
+
+### Stale rows are retired, never deleted
+
+`fleet_project_operational_sites.project_aoi_id` is a plain FK with **NO ACTION**, so deleting a
+referenced row raises 23503 and aborts the whole refresh. Choosing delete-vs-retire from an
+`EXISTS` check does *not* fix that — the check and the delete read different snapshots, so a site
+linked between them still aborts the run. The sweep therefore retires unconditionally: no FK
+race, no snapshot window, and a retired row is inert and tiny. Revival is what stops retirement
+accumulating garbage.
+
+### Linking a project's operational site
+
+Migration 531 already repointed **Lawley** off the OneMap ingest AOI onto its velocity AOI
+(guarded by `ST_Covers`, so the move can only ever widen what counts as on-site — measured on
+2026-08-27: velocity 10.786 km², OneMap 7.715 km², 0.000000 km² of the old polygon falls
+outside). For a new project:
 
 ```sql
 SELECT a.id, a.area_name FROM fno_atlas_project_aois a
-  JOIN fno_atlas_sources s ON s.id = a.source_id
- WHERE s.source_url = 'fibreflow://project_aois'
+ WHERE a.source_id = 'e0f1c0de-0000-4000-8000-000000000531'
    AND a.site_code = '<project uuid>' AND a.retired_at IS NULL;
 ```
 

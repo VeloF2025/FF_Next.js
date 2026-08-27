@@ -222,12 +222,31 @@ async function main(): Promise<void> {
     throw new Error('refresh produced zero AOIs — every clock-in would record no project');
   }
 
-  // Mirror the freshly rebuilt hulls into the Fleet monitor's site geometry.
+  // The mirror's OWN guard, and it is not the same as the one above.
   //
-  // AFTER the zero-AOI guard, not before: the mirror's stale sweep removes any
-  // site AOI whose project no longer has an `ok` hull, so an empty refresh
-  // would propagate straight through and strip every Fleet site's geometry
-  // before anything noticed. The guard has to fire first.
+  // The zero-AOI guard counts rows in `project_aois`. The mirror consumes only
+  // rows scored `ok`, and its sweep retires every site AOI whose project is
+  // not in that set — so a night on which every hull is scored `distorted`
+  // (one bad pole import is enough; see 523) leaves the guard above perfectly
+  // happy with a full table and still strips every Fleet site's geometry.
+  //
+  // Guarding on the `ok` count rather than on a percentage of the previous
+  // run: it needs no prior state, it is the exact input the mirror reads, and
+  // "nothing is ok tonight" is never a legitimate reason to blank the Fleet
+  // monitor. A partial collapse is a real signal too, but it is also a real
+  // shape — projects do get imported and re-scored — so it belongs in the
+  // distortion alerter below, which already reports it.
+  const okAois = await sql.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM project_aois WHERE aoi_status = 'ok'`,
+    [],
+  );
+  if (Number(okAois[0]?.n ?? 0) === 0) {
+    throw new Error(
+      'no project AOI is scored ok — refusing to refresh Velocity site AOIs, which would retire every Fleet site geometry',
+    );
+  }
+
+  // Mirror the freshly rebuilt hulls into the Fleet monitor's site geometry.
   //
   // Deliberately NOT best-effort like the distortion alerter below. A failure
   // here leaves the Fleet operational monitor judging drivers against stale

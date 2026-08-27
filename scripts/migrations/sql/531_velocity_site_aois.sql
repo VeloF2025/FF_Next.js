@@ -35,39 +35,67 @@
 -- one it misses is 312 m out. Themb'elihle is the case that forces the
 -- buffer: 6 of 17 inside the raw hull, 17 of 17 at 300 m.
 --
--- WHY A SEPARATE SOURCE ROW
+-- IDENTITY: ONE ROW PER PROJECT, FOREVER
 --
--- The active-uniqueness index on `fno_atlas_project_aois` is
--- (source_id, site_code, area_name) WHERE retired_at IS NULL. The 29 active
--- rows already in the table came from the OneMap ingest under source
+-- A site AOI's identity is (velocity source, project). NOT the project name.
+--
+-- This is the whole reason for the extra unique index below. The table's own
+-- active-uniqueness index is (source_id, site_code, area_name) WHERE
+-- retired_at IS NULL, so with `area_name` in the key a renamed project would
+-- INSERT a second row rather than update the first — and an operational site
+-- linked to the original would be left pointing at a row this function then
+-- retires. `evidenceQueries`, `rosterQueries`, `mapOverlayService` and
+-- `projectSiteQueries` all join `retired_at IS NULL`, so the site's geometry
+-- would silently resolve to nothing and the monitor would stop judging that
+-- site without saying so. The same orphaning happened on any
+-- distorted -> ok round trip.
+--
+-- So `site_code` is the project UUID (stable across renames, and the only
+-- identifier that cannot be edited out from under a live site), and the
+-- refresh keys on it: a rename UPDATES `area_name` in place, and a project
+-- returning to `ok` REVIVES its existing row rather than inserting a new one.
+-- The linked site keeps pointing at the same id through both.
+--
+-- WHY A SEPARATE SOURCE ROW, WITH A PINNED ID
+--
+-- The 29 active rows already in the table came from the OneMap ingest under
 -- `fibreflow://onemap_properties`. Writing under that source would let a
 -- refresh here collide with — or silently overwrite — an ingest row. A source
--- of our own makes the two sets disjoint by construction, and makes
--- "everything this function owns" expressible as a single predicate, which is
--- exactly what the stale-row sweep below needs.
+-- of our own makes the two sets disjoint by construction.
 --
--- WHY STALE ROWS ARE SOMETIMES RETIRED RATHER THAN DELETED
+-- Its UUID is pinned as a literal because the uniqueness index below is
+-- scoped to it. A table-wide (source_id, site_code) index would have been
+-- simpler, but it would also silently forbid the OneMap ingest from holding
+-- two live rows for one site_code under different area_names — a shape its
+-- own (source_id, site_code, area_name) index explicitly supports. Narrowing
+-- another writer's contract as a side effect of this migration is not on.
+--
+-- The function asserts the resolved source id matches the literal, so if this
+-- INSERT ever lands on a pre-existing row with a different id the refresh
+-- fails loudly instead of writing rows outside its own index.
+--
+-- WHY STALE ROWS ARE RETIRED, NEVER DELETED
 --
 -- `fleet_project_operational_sites.project_aoi_id` is a plain FK with NO
 -- ACTION. Deleting a row a site references does not orphan it — it raises
--- 23503 and aborts the whole refresh. That is not hypothetical: linking these
--- AOIs to operational sites is the entire point of creating them, so the
--- referenced case is the NORMAL case. A referenced stale row is therefore
--- retired instead. Every Fleet consumer already joins
--- `retired_at IS NULL` (evidenceQueries, rosterQueries, mapOverlayService,
--- projectSiteQueries), so retiring removes it from evidence just as a delete
--- would, without breaking the reference or the nightly job.
+-- 23503 and aborts the whole refresh. Deciding delete-vs-retire from an
+-- EXISTS check does not fix that: the check and the delete see different
+-- snapshots, so a site inserted between them still aborts the run.
 --
--- Unreferenced stale rows are deleted outright, as designed.
+-- The sweep therefore RETIRES, always. There is no FK race and no snapshot
+-- window. A retired row is inert — every Fleet consumer filters
+-- `retired_at IS NULL` — and one row per project is not worth a delete.
+-- Revival (above) is what stops retirement accumulating garbage.
 
 -- ---------------------------------------------------------------------------
--- (a) The source row.
+-- (a) The source row, with a pinned id.
 -- ---------------------------------------------------------------------------
 -- `source_url` is the table's unique key, so it — not the display name — is
--- what the function resolves on and what makes this INSERT repeatable.
+-- what makes this INSERT repeatable.
 INSERT INTO fno_atlas_sources (
-  source_name, source_url, source_type, access_method, terms_notes, priority, is_active
+  id, source_name, source_url, source_type, access_method, terms_notes, priority, is_active
 ) VALUES (
+  'e0f1c0de-0000-4000-8000-000000000531',
   'Velocity project site AOIs',
   'fibreflow://project_aois',
   'manual',
@@ -85,6 +113,18 @@ ON CONFLICT (source_url) DO UPDATE
       is_active     = EXCLUDED.is_active,
       updated_at    = NOW();
 
+-- One live row per project under this source, and nothing else constrained.
+-- Verified against production before writing this: no (source_id, site_code)
+-- pair is duplicated among live rows anywhere in the table, and this source
+-- has no rows at all yet, so the index builds clean.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_fno_atlas_velocity_site_aois_active_site
+  ON fno_atlas_project_aois (site_code)
+  WHERE retired_at IS NULL
+    AND source_id = 'e0f1c0de-0000-4000-8000-000000000531'::uuid;
+
+COMMENT ON INDEX ux_fno_atlas_velocity_site_aois_active_site IS
+  'Identity for Velocity site AOIs: one live row per project (site_code = project UUID) under source fibreflow://project_aois. Deliberately scoped to that source so the OneMap ingest keeps its own (source_id, site_code, area_name) identity.';
+
 -- ---------------------------------------------------------------------------
 -- (b) The refresh.
 -- ---------------------------------------------------------------------------
@@ -95,11 +135,15 @@ AS $$
 DECLARE
   n integer;
   swept integer;
+  revived integer;
   src_id uuid;
   -- The buffer is a data decision measured against the clock-in record (see
   -- the header), not a tuning knob. Re-measure before changing it.
   buffer_m CONSTANT float8 := 300.0;
   v_source_url CONSTANT text := 'fibreflow://project_aois';
+  -- Must equal the literal in the uniqueness index predicate above. The
+  -- assertion below is what makes a mismatch loud instead of silent.
+  v_source_id CONSTANT uuid := 'e0f1c0de-0000-4000-8000-000000000531';
 BEGIN
   SELECT id INTO src_id FROM fno_atlas_sources WHERE source_url = v_source_url;
   IF src_id IS NULL THEN
@@ -107,7 +151,31 @@ BEGIN
       'refresh_velocity_site_aois: no fno_atlas_sources row for %, so every row would be written under a NULL source and share one uniqueness slot with the ingest',
       v_source_url;
   END IF;
+  IF src_id <> v_source_id THEN
+    RAISE EXCEPTION
+      'refresh_velocity_site_aois: source % resolved to % but the uniqueness index is scoped to %; rows would be written outside their own index',
+      v_source_url, src_id, v_source_id;
+  END IF;
 
+  -- Step 1 — REVIVE. A project that has returned to `ok` gets its EXISTING
+  -- row back, so an operational site linked to it keeps working. Without this
+  -- the upsert below would insert a second row (a retired row is not in the
+  -- partial index) and strand the link on the retired one.
+  UPDATE fno_atlas_project_aois a
+     SET retired_at = NULL,
+         updated_at = NOW()
+   WHERE a.source_id = src_id
+     AND a.retired_at IS NOT NULL
+     AND EXISTS (
+       SELECT 1
+       FROM project_aois pa
+       JOIN projects pr ON pr.id = pa.project_id
+       WHERE pa.aoi_status = 'ok'
+         AND pa.project_id::text = a.site_code
+     );
+  GET DIAGNOSTICS revived = ROW_COUNT;
+
+  -- Step 2 — UPSERT on the project's identity.
   WITH eligible AS (
     SELECT
       pa.project_id,
@@ -133,8 +201,6 @@ BEGIN
     )
     SELECT
       src_id,
-      -- site_code is the project UUID, not project_code: it is the only
-      -- identifier that cannot be edited out from under an operational site.
       e.project_id::text,
       e.project_name,
       'velocity_site_aoi',
@@ -151,10 +217,15 @@ BEGIN
       ),
       NOW(), NOW()
     FROM eligible e
-    -- The index is partial, so its predicate has to be reproduced here or
-    -- Postgres cannot pick it as the arbiter.
-    ON CONFLICT (source_id, site_code, area_name) WHERE retired_at IS NULL
+    -- The arbiter is the identity index: site_code alone, scoped to this
+    -- source. Its predicate has to be reproduced verbatim or Postgres cannot
+    -- infer it. `area_name` is UPDATED here, never part of the key — that is
+    -- what makes a rename an update instead of an orphaning insert.
+    ON CONFLICT (site_code)
+      WHERE retired_at IS NULL
+        AND source_id = 'e0f1c0de-0000-4000-8000-000000000531'::uuid
     DO UPDATE SET
+      area_name      = EXCLUDED.area_name,
       geom           = EXCLUDED.geom,
       point_count    = EXCLUDED.point_count,
       confidence     = EXCLUDED.confidence,
@@ -165,67 +236,47 @@ BEGIN
   )
   SELECT COUNT(*) INTO n FROM upserted;
 
-  -- Stale sweep. A row is stale when this source has no matching CURRENT
-  -- (site_code, area_name) pair — which covers a project losing `ok` status,
-  -- losing its poles, being deleted, AND being renamed (the rename writes a
-  -- new row under the new area_name, and this removes the old one).
-  --
-  -- Retire-or-delete is decided per row and written once: both branches read
-  -- the same `stale` CTE, so the predicate cannot drift between them, and
-  -- they touch disjoint rows so the two writes cannot conflict.
-  WITH stale AS (
-    SELECT
-      a.id,
-      EXISTS (
-        SELECT 1 FROM fleet_project_operational_sites s WHERE s.project_aoi_id = a.id
-      ) AS referenced
-    FROM fno_atlas_project_aois a
-    WHERE a.source_id = src_id
-      AND a.retired_at IS NULL
-      AND NOT EXISTS (
-        SELECT 1
-        FROM project_aois pa
-        JOIN projects pr ON pr.id = pa.project_id
-        WHERE pa.aoi_status = 'ok'
-          AND pa.project_id::text = a.site_code
-          AND pr.project_name::text = a.area_name
-      )
-  ), retired AS (
-    UPDATE fno_atlas_project_aois a
-       SET retired_at = NOW(), updated_at = NOW()
-      FROM stale
-     WHERE a.id = stale.id AND stale.referenced
-    RETURNING a.id
-  ), deleted AS (
-    DELETE FROM fno_atlas_project_aois a
-     USING stale
-     WHERE a.id = stale.id AND NOT stale.referenced
-    RETURNING a.id
-  )
-  -- A data-modifying WITH still needs its result consumed, or neither branch
-  -- runs. The count also names what happened for anyone reading the log at
-  -- DEBUG; the return value stays "rows written", which is what the cron
-  -- reports.
-  SELECT COUNT(*) INTO swept
-    FROM (SELECT id FROM retired UNION ALL SELECT id FROM deleted) x;
-  RAISE DEBUG 'refresh_velocity_site_aois: % written, % swept', n, swept;
+  -- Step 3 — RETIRE, always. Never DELETE: see the header. A row is stale
+  -- when its project no longer has an `ok` hull — which covers losing `ok`,
+  -- losing its poles, and the project being deleted. A rename is NOT stale;
+  -- step 2 already updated its name in place.
+  UPDATE fno_atlas_project_aois a
+     SET retired_at = NOW(),
+         updated_at = NOW()
+   WHERE a.source_id = src_id
+     AND a.retired_at IS NULL
+     AND NOT EXISTS (
+       SELECT 1
+       FROM project_aois pa
+       JOIN projects pr ON pr.id = pa.project_id
+       WHERE pa.aoi_status = 'ok'
+         AND pa.project_id::text = a.site_code
+     );
+  GET DIAGNOSTICS swept = ROW_COUNT;
+
+  RAISE DEBUG 'refresh_velocity_site_aois: % written, % revived, % retired', n, revived, swept;
 
   RETURN n;
 END $$;
 
 COMMENT ON FUNCTION refresh_velocity_site_aois() IS
-  'Mirrors every ok project_aois hull into fno_atlas_project_aois under source fibreflow://project_aois, buffered 300 m, as the standing site geometry for the Fleet operational monitor. Returns the number of AOIs written. Safe to run repeatedly. Rows whose project no longer has an ok hull are deleted, or retired when an operational site references them.';
+  'Mirrors every ok project_aois hull into fno_atlas_project_aois under source fibreflow://project_aois, buffered 300 m, as the standing site geometry for the Fleet operational monitor. One live row per project, keyed on site_code = project UUID: a rename updates it in place and a return to ok revives it, so a linked operational site never loses its geometry. Returns the number of AOIs written. Safe to run repeatedly. Rows whose project no longer has an ok hull are retired, never deleted.';
 
 -- ---------------------------------------------------------------------------
 -- (c) Grants.
 -- ---------------------------------------------------------------------------
 -- The function is SECURITY INVOKER, and the nightly cron connects as
 -- fibreflow_user — so the caller's own privileges are what run the writes.
--- Production already holds all of these; re-granting is a no-op, and stating
--- them here is what makes a fresh database work.
+-- Production already holds the table grants; re-granting is a no-op, and
+-- stating them here is what makes a fresh database work.
 GRANT SELECT, INSERT, UPDATE ON fno_atlas_sources TO fibreflow_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON fno_atlas_project_aois TO fibreflow_user;
 GRANT SELECT ON project_aois, projects, fleet_project_operational_sites TO fibreflow_user;
+
+-- EXECUTE defaults to PUBLIC on a new function, which would make the grant
+-- below decorative. Revoking first is what makes it load-bearing — and what
+-- makes the SET ROLE test able to fail.
+REVOKE ALL ON FUNCTION refresh_velocity_site_aois() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION refresh_velocity_site_aois() TO fibreflow_user;
 
 -- ---------------------------------------------------------------------------
@@ -233,6 +284,31 @@ GRANT EXECUTE ON FUNCTION refresh_velocity_site_aois() TO fibreflow_user;
 --     rather than at the next 03:15 cron.
 -- ---------------------------------------------------------------------------
 SELECT refresh_velocity_site_aois();
+
+-- ---------------------------------------------------------------------------
+-- (e) Repoint existing operational sites off the OneMap ingest.
+-- ---------------------------------------------------------------------------
+-- One site exists today: Lawley, pointing at the OneMap AOI. Measured against
+-- production on 2026-08-27: the velocity Lawley AOI is 10.786 km2, the OneMap
+-- one 7.715 km2, ST_Covers is true and the OneMap area falling outside the
+-- velocity polygon is 0.000000 km2 — it is strictly contained, so nowhere
+-- that counts as on-site today stops counting.
+--
+-- The ST_Covers guard is in the statement rather than in this comment on
+-- purpose: it makes the migration verify the containment itself rather than
+-- trust a number measured once, and it is what keeps the UPDATE safe for any
+-- other site that acquires an ingest AOI before this lands.
+UPDATE fleet_project_operational_sites s
+   SET project_aoi_id = v.id,
+       updated_at = NOW()
+  FROM fno_atlas_project_aois v,
+       fno_atlas_project_aois prev
+ WHERE prev.id = s.project_aoi_id
+   AND prev.source_id IS DISTINCT FROM 'e0f1c0de-0000-4000-8000-000000000531'::uuid
+   AND v.source_id = 'e0f1c0de-0000-4000-8000-000000000531'::uuid
+   AND v.retired_at IS NULL
+   AND v.site_code = s.project_id::text
+   AND ST_Covers(v.geom, prev.geom);
 
 INSERT INTO schema_migrations (filename, applied_at)
 VALUES ('531_velocity_site_aois.sql', NOW())

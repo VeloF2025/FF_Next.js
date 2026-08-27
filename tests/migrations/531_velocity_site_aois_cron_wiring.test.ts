@@ -60,9 +60,13 @@ const PREREQUISITES = `
     clock_in_at TIMESTAMPTZ NOT NULL,
     status VARCHAR(16) NOT NULL DEFAULT 'open'
   );
+  -- Only the columns migration 531's repoint step touches; types mirror
+  -- production.
   CREATE TABLE fleet_project_operational_sites (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_aoi_id UUID
+    project_id UUID NOT NULL,
+    project_aoi_id UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
 `;
 
@@ -167,4 +171,48 @@ describe('refresh-project-aois cron', () => {
     );
     expect(rows[0]).toMatchObject({ site_code: PROJECT, area_name: 'Migration 531 Cron' });
   }, 180_000);
+
+  /**
+   * The all-distorted night. The zero-AOI guard is happy — `project_aois` is
+   * full — but the mirror consumes only `ok` rows and retires every site AOI
+   * whose project is not among them, so without its own guard this run would
+   * blank every Fleet site's geometry while reporting success.
+   *
+   * The distortion is produced the way a real one is — two poles imported far
+   * out of their site, tripping 523's absolute-area signal — rather than by
+   * setting `aoi_status` by hand. The cron re-runs `refresh_project_aois()`
+   * before the mirror, which recomputes the score from the poles, so a
+   * hand-set status is erased before the guard ever sees it.
+   */
+  it('refuses to run the mirror when no hull is scored ok', async () => {
+    await runCron();
+    expect(await siteAoiCount()).toBe(1);
+
+    await db.query(
+      `INSERT INTO poles (pole_number, project_id, latitude, longitude) VALUES
+         ('P-cron-far-1', $1, -26.10000000, 30.50000000),
+         ('P-cron-far-2', $1, -24.50000000, 28.40000000)`,
+      [PROJECT],
+    );
+
+    let stderrText = '';
+    await expect(
+      runCron().catch((err: unknown) => {
+        stderrText = String((err as { stderr?: string }).stderr ?? '');
+        throw err;
+      }),
+    ).rejects.toThrow();
+
+    // The hull really is distorted — the fixture proves itself before the
+    // guard's behaviour is trusted.
+    const { rows: status } = await db.query<{ aoi_status: string }>(
+      `SELECT aoi_status FROM project_aois WHERE project_id = $1`,
+      [PROJECT],
+    );
+    expect(status[0]?.aoi_status).toBe('distorted');
+
+    // The guard fired before the mirror, so the geometry is untouched.
+    expect(await siteAoiCount()).toBe(1);
+    expect(stderrText).toContain('no project AOI is scored ok');
+  }, 300_000);
 });
