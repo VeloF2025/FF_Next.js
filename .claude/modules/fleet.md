@@ -361,9 +361,25 @@ no driver, no coordinates, no raw telematics, the same restraint the daily group
   no such day anywhere says so. A vehicle whose `coverage_ignition` was false all week shows its
   distance and says the ignition time is not measurable — never `0.0 h`. Distance itself is not
   gated: it survives `coverage_ignition = false`.
-- **Tracker fan-out trap.** The vehicle aggregate tests tracker activity with `EXISTS`, not the
-  `JOIN fleet_vehicle_trackers` that `statsQueries.loadFleetDayOverview` uses: over a seven-day
-  LEFT JOIN that join would double the weekly distance of any vehicle with two active trackers.
+- **Tracker fan-out trap.** The vehicle aggregate tests tracker activity with `EXISTS ... AND
+  tr.is_active`, not the `JOIN fleet_vehicle_trackers` that `statsQueries.loadFleetDayOverview`
+  uses: over a seven-day LEFT JOIN that join would double the weekly distance of any vehicle with
+  two active trackers. The join to `fleet_vehicle_daily_stats` itself must stay a **LEFT** join and
+  the reporting-day count must stay `COUNT(s.work_date)` — an inner join drops silent vehicles
+  entirely and `COUNT(*)` scores an unmatched group as one reporting day, and either mutation
+  silently empties the silence list while every other assertion still passes. Both are pinned on
+  the statement text and through a behavioural double in `weeklyDigestPhase.test.ts`.
+
+**Accepted gap — a Monday-long outage skips that week silently.** The window is always computed
+relative to the tick's own date, so only a tick that lands on Monday can send that week's digest.
+If the `fleet-incident-actions` cron does not run at all that Monday (host down, scheduler
+stopped, the endpoint failing all day), the week is never sent and no later tick backfills it:
+Tuesday's ticks fail the weekday gate and Monday's claim is never taken. Nothing alerts on it,
+because a digest that was never attempted leaves no failure behind. This is accepted rather than
+fixed — a catch-up path would need its own "which weeks are outstanding" state, and the weekly
+digest is a convenience read whose underlying data stays queryable at `/fleet/daily-stats`. The
+status-monitor health check covers the outage itself. Note also that the wrapper runs at
+`2-59/5`, so in practice the first eligible tick is **08:32**, not 08:30.
 
 ### Recipients, notifications, and escalation
 
@@ -1990,7 +2006,7 @@ group gets no WhatsApp for that incident (they still get in-app and email).
 
 | Wrapper | Endpoint | Schedule | Environment | Installed? |
 |---|---|---|---|---|
-| `cron-fleet-daily-stats.sh` | `/api/cron/fleet-daily-stats` | `*/15 * * * *` | production (:3000) only | **No** — pending deployment approval |
+| `cron-fleet-daily-stats.sh` | `/api/cron/fleet-daily-stats` | `7-59/15 * * * *` | production (:3000) only | **Yes** — installed 2026-08-26. Offset from the trip build's `*/15` so the two never start together. The weekly digest reads what this job writes, so a stall here shows up as tracker silence in Monday's digest. |
 | `cron-fleet-operational-monitor.sh` | `/api/cron/fleet-operational-monitor` | `*/5 * * * *` | production | Recorded as installed; the detectors will ride this tick when PR4 lands — no new line |
 | `cron-fleet-incident-actions.sh` | `/api/cron/fleet-incident-actions` | per its own wrapper | production | The 08:15 summaries and the Monday 08:30 weekly digest ride this — no new line |
 | `cron-fleet-build-trips.sh` | `/api/cron/fleet-build-trips` | `*/15 * * * *` | production | Recorded as installed |

@@ -22,6 +22,7 @@ vi.mock('@/modules/notifications/services/whatsappDelivery', () => whatsapp);
 
 import { runWeeklyDigestPhase, weeklyDigestIsDue, weeklyDigestWindow } from '../weeklyDigestPhase';
 import { buildWeeklyDigestMessage } from '../weeklyDigestMessage';
+import { loadWeeklyVehicleTotals } from '../weeklyDigestQueries';
 import type { WeeklyVehicleTotals } from '../weeklyDigestQueries';
 import type { IncidentType } from '../types';
 
@@ -190,6 +191,33 @@ describe('the week window — previous Monday 00:00 SAST up to, but not includin
     const [sql] = vehicleCall();
     expect(sql).toContain('EXISTS (SELECT 1 FROM fleet_vehicle_trackers');
     expect(sql).not.toMatch(/JOIN\s+fleet_vehicle_trackers/);
+  });
+
+  // Without `is_active` the EXISTS matches a DECOMMISSIONED tracker, so a vehicle whose tracker
+  // was removed months ago is still expected to report and shows up in the silence list every
+  // week — noise that trains the fleet team to ignore the one section they must act on.
+  it('requires the tracker to be active, not merely to exist', async () => {
+    await runWeeklyDigestPhase(MONDAY_0830);
+    expect(vehicleCall()[0]).toContain('AND tr.is_active');
+  });
+
+  // Both of these silently EMPTY the silence list — the one line the digest exists to carry —
+  // while every other assertion in this file still passes, so they are pinned on the statement
+  // as well as through the behavioural double below.
+  it('keeps the vehicle-day join OUTER, so a vehicle with no row all week survives it', async () => {
+    await runWeeklyDigestPhase(MONDAY_0830);
+    const [sql] = vehicleCall();
+    expect(sql).toContain('LEFT JOIN fleet_vehicle_daily_stats');
+    expect(sql).not.toMatch(/(?<!LEFT )JOIN\s+fleet_vehicle_daily_stats/);
+  });
+
+  it('counts reporting days over the JOINED column, so an unmatched LEFT JOIN group counts 0', async () => {
+    await runWeeklyDigestPhase(MONDAY_0830);
+    // `COUNT(*)` counts the unmatched group's single all-NULL row and reports 1 reporting day for
+    // a vehicle that reported nothing; `COUNT(s.work_date)` skips the NULL and reports 0.
+    const [sql] = vehicleCall();
+    expect(sql).toContain('COUNT(s.work_date)');
+    expect(sql).not.toContain('COUNT(*)::int AS reporting_days');
   });
 });
 
@@ -433,5 +461,113 @@ describe('the tracker-silence list', () => {
     await runWeeklyDigestPhase(MONDAY_0830);
 
     expect(String(whatsapp.sendWhatsAppGroup.mock.calls[0][1])).toContain('• SILENT1');
+  });
+});
+
+/**
+ * A text assertion proves the statement SAYS the right thing; it cannot prove the digest BEHAVES
+ * correctly when it does not. This double answers the vehicle-totals query the way Postgres would,
+ * honouring exactly the two join semantics the silence list depends on:
+ *
+ *   - an INNER join emits no group at all for a vehicle with no matching vehicle-day, so that
+ *     vehicle disappears from the result rather than appearing with zero days;
+ *   - `COUNT(col)` skips the all-NULL row an unmatched LEFT JOIN group carries and yields 0, while
+ *     `COUNT(*)` counts that row and yields 1 — the difference between "reported nothing" and
+ *     "reported one day".
+ *
+ * It emulates Postgres, not the digest: the assertions below are about what reaches the message.
+ */
+function fakePostgresVehicleTotals(
+  sql: string,
+  vehicles: readonly { id: string; registration: string }[],
+  stats: readonly { vehicleId: string; distanceKm: number }[],
+): Record<string, unknown>[] {
+  const isOuterJoin = /LEFT JOIN\s+fleet_vehicle_daily_stats/.test(sql);
+  const countsJoinedColumn = sql.includes('COUNT(s.work_date)');
+
+  return vehicles.flatMap((vehicle) => {
+    const matched = stats.filter((stat) => stat.vehicleId === vehicle.id);
+    if (matched.length === 0 && !isOuterJoin) return [];
+    const reportingDays = matched.length > 0 ? matched.length : (countsJoinedColumn ? 0 : 1);
+    return [{
+      vehicle_id: vehicle.id, registration: vehicle.registration, reporting_days: reportingDays,
+      distance_km: String(matched.reduce((sum, stat) => sum + stat.distanceKm, 0)),
+      ignition_days: matched.length, ignition_seconds: '3600',
+      harsh_days: matched.length, harsh_events: 0,
+    }];
+  });
+}
+
+describe('the silence list survives the join — behaviour, not only statement text', () => {
+  const VEHICLES = [
+    { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', registration: 'LN40MGGP' },
+    { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', registration: 'SILENT1' },
+  ];
+  const STATS = [{ vehicleId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', distanceKm: 100 }];
+
+  beforeEach(() => {
+    db.query.mockImplementation(async (sql: string) => (
+      sql.includes('fleet-weekly-digest:vehicle-totals')
+        ? fakePostgresVehicleTotals(sql, VEHICLES, STATS)
+        : []
+    ));
+  });
+
+  it('carries a vehicle with no vehicle-day at all into the message as tracker silence', async () => {
+    await runWeeklyDigestPhase(MONDAY_0830);
+    const message = String(whatsapp.sendWhatsAppGroup.mock.calls[0][1]);
+    const silentSection = message.split('No data all week (tracker silence):')[1] ?? '';
+
+    // An INNER join drops SILENT1 from the result entirely; the section then reads "none — every
+    // tracked vehicle reported", which is the digest confidently reporting the opposite of the truth.
+    expect(silentSection).toContain('• SILENT1');
+    expect(silentSection).not.toContain('every tracked vehicle reported');
+    expect(message).toContain('1 of 2 tracked vehicles reporting');
+  });
+
+  it('gives the unmatched vehicle zero reporting days, not the one COUNT(*) would count', async () => {
+    const rows = await loadWeeklyVehicleTotals('2026-08-17', '2026-08-24');
+    const silent = rows.find((row) => row.registration === 'SILENT1');
+
+    expect(silent).toBeDefined();
+    expect(silent?.reportingDays).toBe(0);
+    expect(rows.find((row) => row.registration === 'LN40MGGP')?.reportingDays).toBe(1);
+  });
+});
+
+// A vehicle can measure ignition on some of its reporting days and not the rest. Reporting the
+// measured hours unqualified beside a full week's distance understates the running time silently.
+describe('honesty — partial ignition coverage names its denominator', () => {
+  function messageFor(vehicles: WeeklyVehicleTotals[]): string {
+    return buildWeeklyDigestMessage({
+      weekStart: '2026-08-17', weekEnd: '2026-08-23', vehicles, incidentCounts: new Map(),
+    });
+  }
+
+  it('qualifies the hours when only some reporting days could measure ignition', () => {
+    const line = messageFor([totals({ reportingDays: 7, ignitionDays: 4, ignitionSeconds: 77_400 })])
+      .split('\n').find((row) => row.includes('LN40MGGP'));
+
+    expect(line).toContain('21.5 h ignition over 4 of 7 measured days');
+    // The mutation this pins: dropping the qualifier and presenting four days of hours as if they
+    // covered the whole week. Asserted as the ABSENCE of the unqualified ending, not merely as the
+    // presence of the qualifier — a line carrying both would otherwise pass.
+    expect(line).not.toMatch(/ignition$/);
+  });
+
+  it('leaves the hours unqualified when every reporting day could measure ignition', () => {
+    const line = messageFor([totals({ reportingDays: 7, ignitionDays: 7, ignitionSeconds: 77_400 })])
+      .split('\n').find((row) => row.includes('LN40MGGP'));
+
+    expect(line).toMatch(/21\.5 h ignition$/);
+    expect(line).not.toContain('measured days');
+  });
+
+  it('still says nothing is measurable when no reporting day could measure ignition', () => {
+    const line = messageFor([totals({ reportingDays: 7, ignitionDays: 0, ignitionSeconds: 0 })])
+      .split('\n').find((row) => row.includes('LN40MGGP'));
+
+    expect(line).toContain('ignition time not measurable this week');
+    expect(line).not.toMatch(/\d+\.\d+ h/);
   });
 });

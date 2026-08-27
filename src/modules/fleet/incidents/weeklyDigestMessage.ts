@@ -15,6 +15,8 @@
  *
  *   - a vehicle with no ignition-measurable day shows its distance and says the ignition time is
  *     not measurable, rather than showing `0.0 h`;
+ *   - a vehicle that measured ignition on SOME of its reporting days names that denominator, so
+ *     four days of hours are never read as a seven-day total;
  *   - a vehicle with no harsh-measurable day is not eligible for the harsh list at all, and when
  *     no vehicle in the fleet had one the section says so instead of listing zeros.
  *
@@ -53,6 +55,21 @@ function digestUrl(): string {
   return `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app'}/fleet/daily-stats`;
 }
 
+/**
+ * Coverage is not all-or-nothing across a week: a vehicle can measure ignition on four days and
+ * not on the other three, and reporting the four days' hours unqualified beside a seven-day
+ * distance silently understates the running time. Three states, therefore, not two — no
+ * measurable day (say so), some (name the denominator, as the harsh line does), all (plain).
+ */
+function distanceLine(vehicle: WeeklyVehicleTotals): string {
+  const head = `• ${vehicle.registration}: ${km(vehicle.distanceKm)}`;
+  if (vehicle.ignitionDays === 0) return `${head} (ignition time not measurable this week)`;
+  if (vehicle.ignitionDays < vehicle.reportingDays) {
+    return `${head}, ${hours(vehicle.ignitionSeconds)} ignition over ${vehicle.ignitionDays} of ${vehicle.reportingDays} measured days`;
+  }
+  return `${head}, ${hours(vehicle.ignitionSeconds)} ignition`;
+}
+
 /** Distance survives `coverage_ignition = false`, so it is ranked over every reporting vehicle; ignition time is only shown for the ones that could measure it. */
 function topByDistance(vehicles: readonly WeeklyVehicleTotals[]): string[] {
   const ranked = vehicles
@@ -60,9 +77,7 @@ function topByDistance(vehicles: readonly WeeklyVehicleTotals[]): string[] {
     .sort((a, b) => b.distanceKm - a.distanceKm || a.registration.localeCompare(b.registration))
     .slice(0, TOP_N);
   if (ranked.length === 0) return ['• no distance recorded this week'];
-  return ranked.map((vehicle) => (vehicle.ignitionDays > 0
-    ? `• ${vehicle.registration}: ${km(vehicle.distanceKm)}, ${hours(vehicle.ignitionSeconds)} ignition`
-    : `• ${vehicle.registration}: ${km(vehicle.distanceKm)} (ignition time not measurable this week)`));
+  return ranked.map(distanceLine);
 }
 
 /**
