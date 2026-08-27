@@ -349,6 +349,50 @@ PROJECTS = {
         "table_name": "civil_audit__civil_audit__civil_audit",
         "label_col": "NAME",
     },
+    # ---- Registered 2026-08-27 from a QFC-vs-Works-QA sweep. All five FF projects are
+    # still status=planning (works-qa-sync only excludes 'archived', so they sync) and
+    # none has SOW poles yet, so poles ingest unzoned. table_name / label_col were read
+    # off the live GPKG version noted per entry, not inferred from the filename.
+    "Malmesbury": {
+        "qf_project_id": "d055742d-c5a0-439a-b270-70c63a9e0359",
+        "ff_project_id": "1fb9b999-c668-4b94-8e6d-2c760049440b",
+        "gpkg_path": "Civil Audit.gpkg",
+        "table_name": "civil_audit__civil_audit",
+        "label_col": "Name",
+    },
+    "Mohadin Ph 2": {
+        "qf_project_id": "e867b23b-b44a-4655-a645-5040d3a0076c",
+        "ff_project_id": "97426558-82d3-44f4-a071-d3b840bc90ed",
+        "gpkg_path": "Civil Audit.gpkg",
+        "table_name": "civil_audit__civil_audit__civil_audit",
+        "label_col": "Label",
+    },
+    "Chloorkop": {
+        "qf_project_id": "3e0bf63f-b7c1-4f43-90b4-53d18dba3e6e",
+        "ff_project_id": "589dbd71-a12b-4cdf-ac87-507bee751703",
+        "gpkg_path": "Civil Audit.gpkg",
+        "table_name": "civil_audit__civil_audit",
+        "label_col": "label",
+    },
+    "Protea South": {
+        "qf_project_id": "f8f51027-4b29-4c76-b4d4-ba8765e930ad",
+        "ff_project_id": "89e59593-e6c2-46c4-8b8c-874e4cc72e92",
+        "gpkg_path": "civil_audit.gpkg",
+        "table_name": "civil_audit",
+        "label_col": "Name",
+    },
+    # STOPGAP (Hein, 2026-08-27): FF_Kingsway's audit layer has NO label column — uuid,
+    # PON No, Zone no, comments, source_nam are NULL in all 827 rows. `pk` is the only
+    # populated identifier, so poles file under their numeric pk (e.g. "270489") until
+    # a real label column is added to the layer, at which point change label_col and
+    # re-run with --force; the pk-labelled pole_qa_photos rows will need a relabel.
+    "Kingsway": {
+        "qf_project_id": "f8e4e754-fbc0-4485-89ce-c72ea9614c98",
+        "ff_project_id": "3981acb5-dbd3-4bca-9bed-a1edba1ff973",
+        "gpkg_path": "Civil Audit.gpkg",
+        "table_name": "civil_audit__civil_audit",
+        "label_col": "pk",
+    },
 }
 
 # Also check these alternate GPKGs per project (civil audit vs poles audit)
