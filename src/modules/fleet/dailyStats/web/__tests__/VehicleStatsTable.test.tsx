@@ -154,3 +154,17 @@ describe('day selection', () => {
     expect(onSelectDate).toHaveBeenCalledWith('2026-08-20');
   });
 });
+
+describe('the "Moving 0m" oddity — kilometres beside zero moving time', () => {
+  it('shows an em dash with the attribution title, never a visible "Moving 0m"', () => {
+    renderTable([cartrackDay({ workDate: '2026-08-20', movingSeconds: 0, distanceKm: 12.4 })]);
+    const row = screen.getByTestId('stats-row-2026-08-20');
+    expect(within(row).getByText('12.4 km')).toBeVisible();
+    const dash = within(row).getByTitle(
+      /distance was recorded, but none of the day could be attributed to moving/,
+    );
+    expect(dash).toBeVisible();
+    expect(dash.textContent).toBe(UNMEASURABLE_TEXT);
+    expect(within(row).queryByText('0m')).toBeNull();
+  });
+});

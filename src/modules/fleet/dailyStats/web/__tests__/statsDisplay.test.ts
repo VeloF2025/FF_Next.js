@@ -5,9 +5,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  MISSING_TEXT, NO_IGNITION_OBSERVED, UNMEASURABLE_TEXT, coverageState, datesInWindow,
-  distanceValue, harshValue, ignitionTimeValue, ignitionWindowValue, maxSpeedValue,
-  speedingSecondsValue, sumOverMeasurableDays, trackerSilenceValue,
+  MISSING_TEXT, MOVING_UNATTRIBUTED_TITLE, NO_IGNITION_OBSERVED, UNMEASURABLE_TEXT, coverageState,
+  datesInWindow, distanceValue, formatDuration, harshValue, ignitionTimeValue, ignitionWindowValue,
+  maxSpeedValue, speedingSecondsValue, sumOverMeasurableDays, trackerSilenceValue,
 } from '../statsDisplay';
 import { cartrackDay, netstarDay } from './fixtures';
 
@@ -34,6 +34,44 @@ describe('ignition-derived time', () => {
     // still read as zero, or the em dash stops meaning anything.
     const parked = cartrackDay({ ignitionSeconds: 0, movingSeconds: 0, idleSeconds: 0 });
     expect(ignitionTimeValue(parked, 'ignitionSeconds')).toEqual({ kind: 'value', text: '0m' });
+  });
+});
+
+describe('moving time beside real kilometres — the "Moving 0m" oddity', () => {
+  it('never renders "0m" moving on a day that measurably covered distance', () => {
+    // dayFold accrues distance across unattributable gaps and unlabeled intervals, while an
+    // interval is booked as moving only when its gap is attributable, ignition was asserted and a
+    // speed was reported. A covered day can therefore hold distanceKm > 0 with movingSeconds = 0.
+    const day = cartrackDay({ movingSeconds: 0, distanceKm: 12.4 });
+    const value = ignitionTimeValue(day, 'movingSeconds');
+    expect(value.kind).toBe('unmeasurable');
+    expect(value.text).toBe(UNMEASURABLE_TEXT);
+    expect(value.text).not.toBe('0m');
+    expect(value.title).toBe(MOVING_UNATTRIBUTED_TITLE);
+  });
+
+  it('still renders a genuine 0 for a day that stood still — zero distance, zero moving', () => {
+    const still = cartrackDay({ movingSeconds: 0, distanceKm: 0 });
+    expect(ignitionTimeValue(still, 'movingSeconds')).toEqual({ kind: 'value', text: '0m' });
+  });
+
+  it('leaves idle and ignition untouched by the moving-specific guard', () => {
+    const day = cartrackDay({ idleSeconds: 0, ignitionSeconds: 0, distanceKm: 12.4 });
+    expect(ignitionTimeValue(day, 'idleSeconds')).toEqual({ kind: 'value', text: '0m' });
+    expect(ignitionTimeValue(day, 'ignitionSeconds')).toEqual({ kind: 'value', text: '0m' });
+  });
+});
+
+describe('formatDuration under a minute', () => {
+  it('renders 1–59 seconds as "<1m", never floored to "0m"', () => {
+    expect(formatDuration(1)).toBe('<1m');
+    expect(formatDuration(59)).toBe('<1m');
+    expect(formatDuration(45)).not.toBe('0m');
+  });
+
+  it('keeps exact zero as "0m" and a full minute as "1m"', () => {
+    expect(formatDuration(0)).toBe('0m');
+    expect(formatDuration(60)).toBe('1m');
   });
 });
 

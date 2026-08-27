@@ -39,6 +39,8 @@ const missing: StatValue = { kind: 'missing', text: MISSING_TEXT, title: MISSING
 
 export function formatDuration(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));
+  // A sub-minute duration floored to "0m" claims nothing happened when something measurably did.
+  if (total > 0 && total < 60) return '<1m';
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   if (hours === 0) return `${minutes}m`;
@@ -49,6 +51,11 @@ export function formatKm(km: number): string {
   return `${km.toFixed(1)} km`;
 }
 
+export const MOVING_UNATTRIBUTED_TITLE =
+  'distance was recorded, but none of the day could be attributed to moving — the fold books an '
+  + 'interval as moving only when its gap is attributable, ignition was asserted and a speed was '
+  + 'reported, while kilometres accrue regardless; the split was not measurable, not zero';
+
 /** Ignition, moving and idle seconds all stand or fall on the same flag. */
 export function ignitionTimeValue(
   row: VehicleDayStatsRow | null,
@@ -56,6 +63,12 @@ export function ignitionTimeValue(
 ): StatValue {
   if (row === null) return missing;
   if (!row.coverageIgnition) return unmeasurable;
+  // "Moving 0m" beside real kilometres claims the vehicle covered them without ever moving. The
+  // day earned coverage (usually through a built trip), but no interval met all three conditions
+  // for the moving bucket — that is an attribution failure, not a still day.
+  if (field === 'movingSeconds' && row.movingSeconds === 0 && row.distanceKm > 0) {
+    return { kind: 'unmeasurable', text: UNMEASURABLE_TEXT, title: MOVING_UNATTRIBUTED_TITLE };
+  }
   return { kind: 'value', text: formatDuration(row[field]) };
 }
 
