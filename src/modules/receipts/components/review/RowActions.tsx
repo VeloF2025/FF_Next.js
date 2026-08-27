@@ -1,9 +1,12 @@
 import { CheckCircle2, XCircle, Banknote, Eye, Loader2 } from 'lucide-react';
+import { ACTIONS_BY_STATUS, actionLabel } from './bulkActions';
 import type { ReviewAction, ReviewListItem } from './types';
 
 /**
  * Per-row action buttons — shared between the desktop table and the
- * mobile card list so the transition rules only live in one place.
+ * mobile card list, and driven by the same ACTIONS_BY_STATUS map the
+ * bulk-action bar uses, so which actions/labels a status offers can't
+ * drift between the two surfaces.
  */
 export function RowActions({
   item,
@@ -26,33 +29,25 @@ export function RowActions({
         <Eye className="w-3.5 h-3.5" />
         Image
       </a>
-      {item.status === 'submitted' && (
-        <>
-          <ActionButton kind="approve" disabled={isPending} onClick={() => onAction(item, 'approve')} />
-          <ActionButton kind="reject" disabled={isPending} onClick={() => onAction(item, 'reject')} />
-        </>
-      )}
-      {item.status === 'approved' && (
-        <>
-          <ActionButton kind="reconcile" disabled={isPending} onClick={() => onAction(item, 'reconcile')} />
-          <ActionButton kind="reject" disabled={isPending} onClick={() => onAction(item, 'reject')} />
-        </>
-      )}
-      {item.status === 'rejected' && (
-        <ActionButton kind="approve" disabled={isPending} onClick={() => onAction(item, 'approve')} />
-      )}
-      {item.status === 'reconciled' && (
+      {ACTIONS_BY_STATUS[item.status].map((action) => (
         <ActionButton
-          kind="approve"
+          key={action}
+          kind={action}
           disabled={isPending}
-          onClick={() => onAction(item, 'approve')}
-          label="Undo reconcile"
+          onClick={() => onAction(item, action)}
+          label={actionLabel(item.status, action, DEFAULT_LABEL[action])}
         />
-      )}
+      ))}
       {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--ff-text-tertiary)' }} />}
     </div>
   );
 }
+
+const DEFAULT_LABEL: Record<ReviewAction, string> = {
+  approve: 'Approve',
+  reject: 'Reject',
+  reconcile: 'Reconcile',
+};
 
 function ActionButton({
   kind,

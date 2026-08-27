@@ -1,22 +1,22 @@
 import { CheckCircle2, XCircle, Banknote, X, Loader2 } from 'lucide-react';
 import type { ReviewAction } from './types';
-import { commonBulkActions } from './bulkActions';
+import { commonBulkActions, commonBulkStatus, actionLabel } from './bulkActions';
 import type { ReviewListItem } from './types';
 
-const ACTION_CFG: Record<ReviewAction, { icon: React.ReactNode; label: string; cls: string }> = {
+const ACTION_CFG: Record<ReviewAction, { icon: React.ReactNode; defaultLabel: string; cls: string }> = {
   approve: {
     icon: <CheckCircle2 className="w-4 h-4" />,
-    label: 'Approve',
+    defaultLabel: 'Approve',
     cls: 'bg-emerald-700 hover:bg-emerald-600 text-white',
   },
   reject: {
     icon: <XCircle className="w-4 h-4" />,
-    label: 'Reject',
+    defaultLabel: 'Reject',
     cls: 'bg-red-700 hover:bg-red-600 text-white',
   },
   reconcile: {
     icon: <Banknote className="w-4 h-4" />,
-    label: 'Reconcile',
+    defaultLabel: 'Reconcile',
     cls: 'bg-blue-700 hover:bg-blue-600 text-white',
   },
 };
@@ -40,6 +40,7 @@ export function BulkActionBar({
 }) {
   if (selected.length === 0) return null;
   const actions = commonBulkActions(selected);
+  const status = commonBulkStatus(selected);
 
   return (
     <div
@@ -65,7 +66,7 @@ export function BulkActionBar({
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${ACTION_CFG[action].cls}`}
           >
             {ACTION_CFG[action].icon}
-            {ACTION_CFG[action].label}
+            {status ? actionLabel(status, action, ACTION_CFG[action].defaultLabel) : ACTION_CFG[action].defaultLabel}
           </button>
         ))
       ) : (

@@ -32,6 +32,16 @@ export function FilterBar({
   const advancedActive = ADVANCED_KEYS.some((k) => filters[k]);
   const [showMore, setShowMore] = React.useState(advancedActive);
 
+  // filters hydrates from the URL asynchronously (router.isReady effect in
+  // the page), after this component's first render — so a deep-link like
+  // ?staffId=<uuid> mounts with advancedActive=false and the useState
+  // initial value above never re-evaluates. Expand once the deep-linked
+  // filter actually arrives; never auto-collapse a panel the reviewer
+  // opened manually.
+  React.useEffect(() => {
+    if (advancedActive) setShowMore(true);
+  }, [advancedActive]);
+
   const update = <K extends keyof Filters>(k: K, v: Filters[K]) => {
     onChange({ ...filters, [k]: v });
   };

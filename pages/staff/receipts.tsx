@@ -189,7 +189,7 @@ export default function ReceiptsReviewPage() {
       }
       if (json.data.skippedIds?.length > 0) {
         setErrorMsg(
-          `${json.data.updatedIds.length} updated, ${json.data.skippedIds.length} skipped (already changed by someone else).`
+          `${json.data.updatedIds.length} updated, ${json.data.skippedIds.length} skipped (not eligible for this action — check their current status).`
         );
       }
       setDrawer(null);

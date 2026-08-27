@@ -83,10 +83,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     if (body.action === 'approve') {
-      // Best-effort accounting notification per receipt. SMTP failures must not fail the API.
-      for (const receipt of updated) {
-        void sendReceiptApprovedEmail(receipt);
-      }
+      // Best-effort accounting notification per receipt. Sequenced (not
+      // Promise.all) so a 100-item batch doesn't open 100 concurrent VF
+      // Storage downloads + SMTP sessions at once; not awaited by the
+      // response either way. SMTP failures must not fail the API.
+      void (async () => {
+        for (const receipt of updated) {
+          await sendReceiptApprovedEmail(receipt);
+        }
+      })();
     }
 
     return apiResponse.success(res, {
