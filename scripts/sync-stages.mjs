@@ -1,15 +1,22 @@
 /**
  * Standalone 1Map → pon_stage_tracking sync.
- * Dynamically discovers projects with metadata.onemap_prefix set.
+ * Dynamically discovers projects with metadata.onemap_prefix or
+ * metadata.stage_tracking = 'sow' set.
  * Runs outside Next.js — directly hits 1Map API + Neon DB.
  *
  * Usage:
- *   node scripts/sync-stages.mjs          # Sync all projects with onemap_prefix
+ *   node scripts/sync-stages.mjs          # Sync every opted-in project
  *   node scripts/sync-stages.mjs MAM      # Sync single site prefix
  *   node scripts/sync-stages.mjs LAW MOA  # Sync specific prefixes
+ *   node scripts/sync-stages.mjs SOW      # Sync only the SOW-tracked projects
  *
- * New projects: Set metadata.onemap_prefix on the project to include it.
- *   UPDATE projects SET metadata = metadata || '{"onemap_prefix": "TEM"}' WHERE id = '...';
+ * Opting a project in — either of:
+ *   1Map-backed (a prefix may be shared by several projects; each is synced from
+ *   the same sweep, attributing records through its own drops lookup):
+ *     UPDATE projects SET metadata = metadata || '{"onemap_prefix": "TEM"}' WHERE id = '...';
+ *   SOW-only (no 1Map presence — totals plus the DB-derived stages; permissions
+ *   stays at zero):
+ *     UPDATE projects SET metadata = metadata || '{"stage_tracking": "sow"}' WHERE id = '...';
  *
  * Cron (every 4 hours): see crontab on Velocity (velo user)
  */
@@ -18,6 +25,7 @@ import { config } from 'dotenv';
 import pg from 'pg';
 import { authenticate, fetchAllRecords, summariseSites } from './lib/onemap-client.mjs';
 import { upsertProperties } from './lib/onemap-property-sync.mjs';
+import { discoverProjects, SOW_SITE_CODE } from './lib/sync-stages-discovery.mjs';
 // Load both: prod keeps DATABASE_URL in .env and ONEMAP_PASSWORD in .env.local
 // (.env.local wins for overlapping keys). On the workstation .env.local has both.
 config({ path: ['.env.local', '.env'] });
@@ -27,9 +35,9 @@ const { Pool } = pg;
 const DB_URL = process.env.DATABASE_URL;
 if (!DB_URL) throw new Error('DATABASE_URL not set');
 
-// 1Map site codes swept into onemap_properties (flat, property-keyed). TEM is shared
-// by Thembisa POP1 + POP3, so it is property-only here (no unique project to
-// attribute).
+// 1Map site codes swept into onemap_properties (flat, property-keyed). A code
+// shared by several projects (TEM = Thembisa POP 1 + POP 3) drives stage tracking
+// for every one of them off the same sweep.
 //
 // These are free-text `q=` searches, NOT a site filter — a code only reaches its
 // properties while 1Map's own site string still starts with it. Mohadin was `MOH`
@@ -39,8 +47,8 @@ if (!DB_URL) throw new Error('DATABASE_URL not set');
 // contact number for three days. Hence the site histogram logged per sweep below.
 //
 // A code here only drives pon_stage_tracking when some project carries it in
-// `metadata.onemap_prefix` (see discoverProjects); otherwise the sweep refreshes
-// onemap_properties and skips stage tracking. So renaming a code here without
+// `metadata.onemap_prefix` (see scripts/lib/sync-stages-discovery.mjs); otherwise
+// the sweep refreshes onemap_properties and skips stage tracking. So renaming a code here without
 // repointing that column does not corrupt anything — it stops stage tracking for
 // that project until the column follows. Mohadin's `projects.metadata.onemap_prefix`
 // row was repointed to `MOA` in the database on 2026-07-30, so the pair is in step.
@@ -431,34 +439,6 @@ async function syncSite(site, projectId, pool, projectName, records) {
 // MAIN — discovers projects dynamically from DB
 // ============================================================================
 
-async function discoverProjects(pool, filterPrefixes) {
-  const client = await pool.connect();
-  try {
-    const result = await client.query(`
-      SELECT id, project_name, metadata->>'onemap_prefix' as prefix
-      FROM projects
-      WHERE status = 'active'
-        AND metadata->>'onemap_prefix' IS NOT NULL
-      ORDER BY project_name
-    `);
-
-    let projects = result.rows.map(r => ({
-      uuid: r.id,
-      name: r.project_name,
-      prefix: r.prefix,
-    }));
-
-    // Filter to specific prefixes if provided via CLI args
-    if (filterPrefixes.length > 0) {
-      projects = projects.filter(p => filterPrefixes.includes(p.prefix.toUpperCase()));
-    }
-
-    return projects;
-  } finally {
-    client.release();
-  }
-}
-
 async function main() {
   const args = process.argv.slice(2).map(s => s.toUpperCase());
   const sites = args.length > 0 ? ALL_SITE_CODES.filter(s => args.includes(s)) : ALL_SITE_CODES;
@@ -467,14 +447,9 @@ async function main() {
   const pool = new Pool({ connectionString: DB_URL });
 
   try {
-    // 1:1 prefix → project map (for pon_stage_tracking). A prefix shared by >1
-    // project (TEM = Thembisa POP1+POP3) is marked ambiguous → property-only.
-    const projects = await discoverProjects(pool, []);
-    const projectByPrefix = new Map();
-    for (const p of projects) {
-      const k = p.prefix.toUpperCase();
-      projectByPrefix.set(k, projectByPrefix.has(k) ? null : p);
-    }
+    // prefix → every project carrying it (for pon_stage_tracking), plus the
+    // projects tracked from the SOW alone.
+    const { byPrefix, sowOnly } = await discoverProjects(pool, args);
 
     log(`=== 1Map Sync Starting: ${sites.join(', ')} ===`);
     log('Authenticating with 1Map...');
@@ -514,15 +489,29 @@ async function main() {
           propClient.release();
         }
 
-        // 1:1 project → also refresh pon_stage_tracking from the same records.
-        const project = projectByPrefix.get(site);
-        if (project) {
-          if (await syncSite(site, project.uuid, pool, project.name, records)) stagedProjects++;
+        // Every project on this prefix → refresh pon_stage_tracking from the
+        // same records; each attributes them through its own drops lookup.
+        const staged = byPrefix.get(site) ?? [];
+        if (staged.length === 0) {
+          log(`  ${site}: no project carries this prefix — onemap_properties only (no stage tracking)`);
         } else {
-          log(`  ${site}: no unique project — onemap_properties only (no stage tracking)`);
+          log(`  ${site}: stage tracking for ${staged.length} project(s)`);
+          for (const project of staged) {
+            if (await syncSite(site, project.uuid, pool, project.name, records)) stagedProjects++;
+          }
         }
       } catch (err) {
         log(`  ${site}: ERROR — ${err.message}`);
+      }
+    }
+
+    // SOW-only projects: no 1Map records at all, so totals and the DB-derived
+    // stages carry the tracking and permissions stays at zero.
+    for (const project of sowOnly) {
+      try {
+        if (await syncSite(SOW_SITE_CODE, project.uuid, pool, project.name, [])) stagedProjects++;
+      } catch (err) {
+        log(`  ${SOW_SITE_CODE}: ${project.name}: ERROR — ${err.message}`);
       }
     }
 
