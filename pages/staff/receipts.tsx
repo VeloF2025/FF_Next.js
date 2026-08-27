@@ -222,7 +222,7 @@ export default function ReceiptsReviewPage() {
           onAction={requestAction}
         />
 
-        {items && (
+        {items && !loading && (
           <LoadMoreButton
             loadedCount={items.length}
             total={totalForFilters}

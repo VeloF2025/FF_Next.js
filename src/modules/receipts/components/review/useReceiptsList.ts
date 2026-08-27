@@ -68,7 +68,11 @@ export function useReceiptsList(
   }, [filters, refreshTick]);
 
   const loadMore = async () => {
-    if (!items || loadingMore) return;
+    // Guard against a page-1 refetch (filters/refreshTick changed) still
+    // in flight: `items.length` would be the stale pre-change count, so
+    // an offset computed from it could return rows for the WRONG filter
+    // — a fetch racing the page-1 request rather than following it.
+    if (!items || loading || loadingMore) return;
     setLoadingMore(true);
     setErrorMsg(null);
     try {
