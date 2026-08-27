@@ -17,6 +17,18 @@
 export const SOW_SITE_CODE = 'SOW';
 
 /**
+ * Provenance stamped on pon_stage_tracking.sync_source (migration 179 documents
+ * the column as provenance). SOW rows carry no 1Map evidence at all, so calling
+ * them '1map' would misattribute them.
+ *
+ * @param {string} site Site code the sync ran under.
+ * @returns {'sow' | '1map'}
+ */
+export function syncSourceFor(site) {
+  return site === SOW_SITE_CODE ? 'sow' : '1map';
+}
+
+/**
  * @typedef {object} DiscoveredProject
  * @property {string} uuid
  * @property {string} name

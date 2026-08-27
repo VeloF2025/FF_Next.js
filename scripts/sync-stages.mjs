@@ -25,7 +25,7 @@ import { config } from 'dotenv';
 import pg from 'pg';
 import { authenticate, fetchAllRecords, summariseSites } from './lib/onemap-client.mjs';
 import { upsertProperties } from './lib/onemap-property-sync.mjs';
-import { discoverProjects, SOW_SITE_CODE } from './lib/sync-stages-discovery.mjs';
+import { discoverProjects, SOW_SITE_CODE, syncSourceFor } from './lib/sync-stages-discovery.mjs';
 // Load both: prod keeps DATABASE_URL in .env and ONEMAP_PASSWORD in .env.local
 // (.env.local wins for overlapping keys). On the workstation .env.local has both.
 config({ path: ['.env.local', '.env'] });
@@ -195,6 +195,8 @@ async function ensureLiveImport(client) {
 async function syncSite(site, projectId, pool, projectName, records) {
   const startTime = Date.now();
   log(`  ${site}: stage tracking (${projectName})`);
+
+  const syncSource = syncSourceFor(site);
 
   const parsed = records.map(parseRecord);
 
@@ -381,7 +383,7 @@ async function syncSite(site, projectId, pool, projectName, records) {
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
           $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
-          $24, $25, $26, $27, $28, NOW(), '1map'
+          $24, $25, $26, $27, $28, NOW(), $29
         )
         ON CONFLICT (project_id, zone_no, pon_no) DO UPDATE SET
           permissions_total = EXCLUDED.permissions_total,
@@ -410,7 +412,7 @@ async function syncSite(site, projectId, pool, projectName, records) {
           activation_last_date = EXCLUDED.activation_last_date,
           overall_stage = EXCLUDED.overall_stage,
           last_synced_at = NOW(),
-          sync_source = '1map'`,
+          sync_source = EXCLUDED.sync_source`,
         [
           projectId, agg.zone_no, agg.pon_no,
           agg.permissions.total, agg.permissions.complete, agg.permissions.firstDate, agg.permissions.lastDate,
@@ -419,7 +421,7 @@ async function syncSite(site, projectId, pool, projectName, records) {
           agg.optical.total, agg.optical.complete, agg.optical.firstDate, agg.optical.lastDate,
           agg.atp.total, agg.atp.complete, agg.atp.firstDate, agg.atp.lastDate,
           agg.activation.total, agg.activation.complete, agg.activation.firstDate, agg.activation.lastDate,
-          overallStage,
+          overallStage, syncSource,
         ]
       );
       upsertCount++;

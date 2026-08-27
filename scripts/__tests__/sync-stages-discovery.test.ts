@@ -4,6 +4,7 @@ import {
   discoverProjects,
   groupProjects,
   SOW_SITE_CODE,
+  syncSourceFor,
 } from '../lib/sync-stages-discovery.mjs';
 
 type ProjectRow = {
@@ -99,6 +100,12 @@ describe('sync-stages project discovery', () => {
     const sowRun = groupProjects(rows, [SOW_SITE_CODE]);
     expect(sowRun.byPrefix.size).toBe(0);
     expect(sowRun.sowOnly.map(p => p.name)).toEqual(["Themb'elihle"]);
+  });
+
+  it('stamps SOW rows with their own provenance, not 1map', () => {
+    expect(syncSourceFor(SOW_SITE_CODE)).toBe('sow');
+    expect(syncSourceFor('TEM')).toBe('1map');
+    expect(syncSourceFor('LAW')).toBe('1map');
   });
 
   it('selects both opt-in markers from the database and releases the client', async () => {
