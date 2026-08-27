@@ -11,6 +11,13 @@ CREATE TABLE pon_stage_tracking (
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   zone_no INTEGER NOT NULL,
   pon_no INTEGER NOT NULL,
+  -- Build counts the QA Centre delivery tree reads. Types and defaults copied
+  -- from migration 179 (INTEGER DEFAULT 0) so the fixture cannot pass on a
+  -- shape production does not have.
+  poles_total INTEGER DEFAULT 0,
+  poles_planted INTEGER DEFAULT 0,
+  activation_total INTEGER DEFAULT 0,
+  activation_complete INTEGER DEFAULT 0,
   -- Prod defaults these to '1map'/NOW() because the 1Map sync is its only
   -- writer. ensureCanonicalPons stamps 'works-qa' and leaves last_synced_at
   -- NULL, so both columns must exist here or the insert fails at runtime.
