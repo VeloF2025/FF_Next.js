@@ -26,6 +26,7 @@ import pg from 'pg';
 import { authenticate, fetchAllRecords, summariseSites } from './lib/onemap-client.mjs';
 import { upsertProperties } from './lib/onemap-property-sync.mjs';
 import { discoverProjects, SOW_SITE_CODE, syncSourceFor } from './lib/sync-stages-discovery.mjs';
+import { applyPoleFallback, shouldUsePolesTable } from './lib/sync-stages-poles.mjs';
 // Load both: prod keeps DATABASE_URL in .env and ONEMAP_PASSWORD in .env.local
 // (.env.local wins for overlapping keys). On the workstation .env.local has both.
 config({ path: ['.env.local', '.env'] });
@@ -261,10 +262,37 @@ async function syncSite(site, projectId, pool, projectName, records) {
       return null;
     }
 
+    // Pole scope/progress from `poles` when not one drop carries a pole link
+    // (Thembisa POP 1 + POP 3, Themb'elihle). Per project, never per PON — see
+    // scripts/lib/sync-stages-poles.mjs for why blending the sources over-counts.
+    // "Planted" here is QField only: OES activation implies a planted pole, but
+    // without the drop→pole link that inference is unavailable for these projects.
+    let poleFallback = { pons: 0, planted: 0, cwc: 0 };
+    const usePolesTable = shouldUsePolesTable(polesTotalResult.rows);
+    if (usePolesTable) {
+      const polesTableResult = await client.query(
+        `SELECT zone_no, pon_no,
+           COUNT(DISTINCT pole_number)::int as poles,
+           COUNT(DISTINCT CASE WHEN pole_planted = 'Pole Planted' THEN pole_number END)::int as planted,
+           COUNT(DISTINCT CASE WHEN audit_complete IS NOT NULL THEN pole_number END)::int as cwc,
+           MIN(audit_complete)::text as cwc_first,
+           MAX(audit_complete)::text as cwc_last
+         FROM poles
+         WHERE project_id = $1 AND zone_no IS NOT NULL AND pon_no IS NOT NULL
+         GROUP BY zone_no, pon_no`,
+        [projectId]
+      );
+      poleFallback = applyPoleFallback(ponMap, polesTableResult.rows);
+      log(`  ${site}: pole counts from poles table (drops carry no pole link) — ${poleFallback.pons} PONs; OES-implied planted not counted`);
+    }
+
     // Count 1Map stages (permissions only — poles/cwc/activation come from DB below)
     // Collect permitted DRs to convert to pole count after loop
     let unmapped = 0;
-    const stageCounts = { permissions: 0, poles: 0, cwc: 0, optical: 0, atp: 0, activation: 0 };
+    const stageCounts = {
+      permissions: 0, poles: poleFallback.planted, cwc: poleFallback.cwc,
+      optical: 0, atp: 0, activation: 0,
+    };
     const permittedDRs = new Set(); // all DRs with permission approved
     const counted = new Map(); // key -> { permissions: Set }
 
@@ -341,14 +369,17 @@ async function syncSite(site, projectId, pool, projectName, records) {
       if (!agg) continue;
 
       // Poles planted (QField + OES activation implies planted)
-      const planted = Number(row.poles_planted);
+      // Skipped entirely when shouldUsePolesTable() picked the poles table as the
+      // source: one source per project, so a future partial drops.pole_number
+      // backfill cannot start blending the two per PON.
+      const planted = usePolesTable ? 0 : Number(row.poles_planted);
       if (planted > 0) {
         agg.poles.complete = planted;
         stageCounts.poles += planted;
       }
 
       // CWC (QField audit_complete)
-      const cwc = Number(row.cwc_complete);
+      const cwc = usePolesTable ? 0 : Number(row.cwc_complete);
       if (cwc > 0) {
         agg.cwc.complete = cwc;
         agg.cwc.firstDate = row.cwc_first_date;
