@@ -45,6 +45,9 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 | POST | `/api/my/fleet/incidents/[incidentId]/evidence` | Driver evidence upload |
 | POST | `/api/my/fleet/incidents/[incidentId]/attendance-correction-link` | Link an existing Attendance correction |
 | POST | `/api/fleet/incidents/[incidentId]/request-driver-input` | Manager requests optional driver input |
+| GET | `/api/fleet/incidents/[incidentId]/timeline` | Scoped incident chronology, keyset-paged on a µs `sort_at` (`cursor`, `limit`≤200) |
+| GET | `/api/fleet/analytics/operations` | Operations analytics cards + monthly series (PR 8 task 7) |
+| GET | `/api/fleet/analytics/operations/drill-down` | The incident ids behind a number, cursor-paged |
 
 ## Database Tables
 - `fleet_vehicles` — vehicle registry
@@ -82,6 +85,29 @@ Full vehicle lifecycle: driver check-in with VLM-validated photos, odometer/fuel
 - A driver's explanation is stored twice on purpose: `fleet_incident_driver_submissions.explanation` (driver-scoped) and verbatim in the `driver_response_received` action's `note` (manager-visible audit timeline) — do not deduplicate
 - New evidence MIME types need a registered byte signature in `MIME_SIGNATURES` (`src/lib/vfStorageUpload.ts`) BEFORE they can be enabled in driver-input settings — `versionDriverInputSettings` fails closed otherwise
 - Manager queue does NOT filter by `driverInputState`/`attendanceCorrectionState` — dead client plumbing for this was deliberately removed; land server + client together if built
+- Operations analytics (`src/modules/fleet/incidents/analytics/`, PR 8 task 7) reads a month from ONE source: live facts if its first day is at or after the purge cutoff, released aggregates otherwise — never both, and never the base aggregate table (use the `_published` view)
+- The live half has NO k-anonymity on purpose; it is safe only because `fleet.incidents:view` already confines the viewer to their own projects. Widening the audience (export, dashboard, broader permission) invalidates that reasoning — see `.claude/modules/fleet-analytics-disclosure.md`
+- `op_driver`/`op_vehicle`/`op_type`/`op_severity`/`op_outcome`/`op_evidence` AND `op_site` are refused (400) over any purged month, never silently dropped — dropping a filter WIDENS the answer. `op_site` is refused because migration 527's view publishes organisation and project rows only
+- A TOTAL_ONLY aggregate publishes a component's root total with a NULL denominator and none of its members; a NONE component publishes nothing at all (incidents are all-or-nothing — `incident.total` is no metric key). Omit the missing keys, notice them per month + component, and never render them as 0. A purged month has no histogram at all (no bucket columns in the view)
+- Every card/series value carries `coverage: { months, of }` — months of the range that reported the key. A card summing fewer months than the range is a partial total and must say so; project-coverage notices are counted PER MONTH, never over the union
+- Vehicle telematics detectors (`src/modules/fleet/vehicleDetectors/`, PR 4) ride the EXISTING `*/5` `fleet-operational-monitor` tick as a second phase under the same lock — no new cron entry, and a detector fault must never fail the roster monitor
+- A detector's `sourceEventId` is the only thing between one condition and 288 incidents a day: deterministic, bucketed, never `Date.now()`. Theft buckets on the CALENDAR after-hours night, severe_driving on `provider_event_id`, the stop on its SAST calendar DAY (its start instant SLIDES with the window — that bug shipped four ids in four ticks), lost contact on the last-fix instant
+- The detector phase SENDS the opened notification itself (same call as `monitorService`) — without it a new telematics incident is silent until the action runner escalates it, and for a critical type the first thing anyone hears is an escalation WhatsApp
+- Source-event dedup is free from the producer; RECURRENCE is not — `condition_last_seen_at` is never advanced for a source event, so a still-true condition looks like a one-off in the queue (known limitation)
+- A telematics incident is attributed to the driver `vehicle_assignments` names for that vehicle at the EVENT instant (SAST calendar date, both ends inclusive, newest start wins; null when none) — source-event path ONLY, and that `staff_id` puts the incident on the driver's `/my` surface and enables driver-input requests, while notifications still go to PM + oversight only
+- Attribution reads CLOSED assignment rows too — `is_active` is never consulted. Every close path sets the flag and the end date together, so an `is_active` filter makes the date bounds unreachable and drops all historical attribution; a handover day covers two rows and goes to the incoming driver
+- Most telematics incidents are PROJECTLESS (a road is not inside an AOI), and `isProjectOwnedByScope` refuses a null project to any restricted scope — so they are admin/oversight-only. Fleet managers who must work that queue need oversight membership, not a widened attribution rule
+- Detectors read `fleet_vehicle_positions` DIRECTLY, never `fleet_vehicle_daily_stats` — an unbuilt day and an empty day look identical, so that dependency would fail silent
+- `prolonged_unauthorized_stop` and `lost_contact_moving` are seven-vehicle detectors by construction (the other eleven feeds sample every 10–35 min). That is a property of the feeds; do not "fix" it by widening the cadence gate or by restricting to `granularity='history'` (`cartrack/urent` is history and is one of the eleven)
+- `accident_sos` is a documented stub — NO feed carries an SOS/panic/impact field. Never synthesise one from g-force or harsh braking: it is `critical`, so a derived guess is a false emergency on WhatsApp
+- `dangerous_area_entry` is DEFERRED, not stubbed: no dangerous-area geofence table exists, and no code path references it
+- Vehicle-day stats (`src/modules/fleet/dailyStats/`, PR6) render through `web/statsDisplay.ts` ONLY — `coverage_ignition = false` makes ignition/moving/idle AND the speeding duration an em dash at any value, `coverage_complete = false` is a third "Partial" state, a missing row is "No data": never a 0 for any of the three
+- `GET /api/fleet/vehicles/[id]/day-route?includePositions=1` returns a full SAST day of raw fixes to any holder of `fleet.vehicle-stats:view` — deliberate (Hein's call, the route map needs it), opt-in, one vehicle and one day, capped at 5,000 rows. Widening that permission inherits this disclosure; see `.claude/modules/fleet.md`
+- Vehicle-day stats build (`dailyStats/`, mig 528): a row is a FULL REPLACEMENT, so a build window may only open at a SAST midnight — a part-day window overwrites a complete row with a plausible smaller one
+- `coverage_gforce` is per vehicle-day (`linear_g <> 0 OR lateral_g <> 0`), never per provider: 6 of 7 `cartrack/velocity` vehicles report constant ZERO, not null
+- The build never refolds a fix older than `min(watermark - 6h, yesterday 00:00 SAST)`; the repair is `scripts/fleet-daily-stats-backfill.ts --vehicle <id> --refold-day <YYYY-MM-DD>`, never a widened lookback
+- The backfill must stay the SAME code path as the cron — a test fails if `backfillRunner.ts` imports anything outside its allowlist or grows SQL of its own
+- Severity, not `whatsapp_enabled`, is what keeps a telematics type off WhatsApp: `requiresMandatoryIncidentWhatsApp` is `critical && source_event` and ignores the flag entirely
 - Migration 511 and its number are unapplied; migration numbering churned (490→496→499→503→506→507→510→511) as master advanced — always re-check the free number before adding a new Fleet migration
 
 ## Common Issues

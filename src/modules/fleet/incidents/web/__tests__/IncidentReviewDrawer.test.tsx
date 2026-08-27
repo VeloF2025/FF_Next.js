@@ -33,7 +33,24 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 async function flush(): Promise<void> { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); }
 
 const fetchMock = vi.fn<typeof fetch>();
-beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal('fetch', fetchMock); });
+/**
+ * The drawer loads its chronology on a second request (stage 8, task 6). These
+ * tests are about the drawer, so that request is answered with an empty page
+ * here rather than being left to consume each test's own `mockResolvedValue` —
+ * `IncidentTimeline.test.tsx` is where the chronology itself is tested.
+ */
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubGlobal('fetch', (url: RequestInfo | URL, init?: RequestInit) => {
+    // Same reasoning as the chronology above: the drawer now also mounts the
+    // retention-hold panel, which loads on its own request. Answered with an
+    // unheld incident here so it never consumes a test's own
+    // `mockResolvedValue`; `RetentionHoldPanel.test.tsx` tests the panel.
+    if (String(url).includes('/timeline')) return Promise.resolve(ok({ entries: [], nextCursor: null }));
+    if (String(url).includes('/retention-holds')) return Promise.resolve(ok({ holds: [], actions: [], canManage: false, canCreate: false }));
+    return fetchMock(url as RequestInfo, init);
+  });
+});
 
 describe('IncidentReviewDrawer', () => {
   it('presents snapshot identity/schedule, reasons/freshness, history, delivery, attachments, and the linked H&S reference', async () => {
@@ -309,5 +326,17 @@ describe('IncidentReviewDrawer', () => {
     await flush();
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds the chronology beside the existing sections rather than in place of them', async () => {
+    fetchMock.mockResolvedValue(ok(detail({ lifecycleStatus: 'open' })));
+    render(<IncidentReviewDrawer incidentId="incident-1" canEdit returnFocus={null} onClose={vi.fn()} onChanged={vi.fn()} />);
+    await flush();
+    expect(screen.getByRole('region', { name: 'Incident chronology' })).toBeInTheDocument();
+    // The sections the chronology deliberately does not duplicate — it carries no
+    // bodies, so these remain the only place a manager reads one.
+    expect(screen.getByRole('region', { name: 'Activity history' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Attachments' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'acknowledged' })).toBeInTheDocument();
   });
 });

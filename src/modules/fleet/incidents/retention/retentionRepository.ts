@@ -191,15 +191,25 @@ export async function listIncidentStorageObjects(incidentId: string): Promise<In
 }
 
 /**
- * The coverage gate. Identifiable detail may only be deleted once the
- * anonymous monthly aggregate that replaces it exists and is active for the
- * metric version in force.
+ * The coverage gate. Identifiable detail may only be deleted once the month has
+ * been aggregated under the metric version in force.
+ *
+ * Reads the RECORDED fact (migration 530) rather than counting published rows.
+ * Those are not the same question, and the difference has one direction: a
+ * month can be aggregated fully and correctly and publish nothing at all,
+ * because the release rule withholds a metric with empty support rather than
+ * storing a roster-sized zero. Counting rows read that as "never aggregated"
+ * and stranded exactly the quietest months — permanently, since re-running the
+ * job produces the same empty result every night.
+ *
+ * A missing row still means no, and a failed query still throws. This
+ * authorises deletion, so the unknown case has to be the refusing one.
  */
 export async function hasCompleteAggregateCoverage(monthStart: string, metricVersion: number): Promise<boolean> {
   const row = await queryOne<CountRow>(
     `/* fleet-retention:coverage */
-     SELECT COUNT(*) AS total FROM fleet_operational_monthly_aggregates
-      WHERE month_start = $1::date AND metric_version = $2::int AND is_active = true`,
+     SELECT COUNT(*) AS total FROM fleet_operational_aggregate_month_coverage
+      WHERE month_start = $1::date AND metric_version = $2::int`,
     [monthStart, metricVersion],
   );
   return Number(row?.total ?? 0) > 0;

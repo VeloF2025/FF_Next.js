@@ -7,7 +7,8 @@ import type { IncidentListItem } from '../../types';
 function incident(overrides: Partial<IncidentListItem> = {}): IncidentListItem {
   return {
     id: 'incident-1', incidentReference: 'FL-0001', incidentType: 'late', severity: 'high', lifecycleStatus: 'open',
-    staffId: 'staff-1', staffName: 'Jane Driver', projectId: 'project-1', projectName: 'Lawley',
+    staffId: 'staff-1', staffName: 'Jane Driver', vehicleRegistration: 'ABC 123 GP',
+    projectId: 'project-1', projectName: 'Lawley',
     operationalSiteName: 'Zone A', openedAt: '2026-08-18T07:00:00.000Z', conditionLastSeenAt: '2026-08-18T07:55:00.000Z',
     conditionClearedAt: null, escalationLevel: 0, nextEscalationAt: '2026-08-18T08:15:00.000Z', evidenceCount: 0,
     driverInput: { state: 'not_requested', respondBy: null, deliveryFailed: false },
@@ -46,5 +47,35 @@ describe('IncidentTable driver-input column', () => {
     render(<IncidentTable incidents={[incident()]} canEdit={false} selected={new Set()} onToggleSelect={vi.fn()} onOpen={vi.fn()} />);
     expect(screen.queryByRole('combobox', { name: /driver input/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/driver input/i)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Vehicle-first incidents. Telematics detectors open incidents about a VEHICLE;
+ * until driver attribution landed they carried no staff member at all, and the
+ * queue's only labels were staff and project — so the row read as anonymous
+ * even though the registration was stored on it. Both halves are pinned: the
+ * new Vehicle column, and the driver name that attribution now supplies where
+ * "Unassigned" used to be.
+ */
+describe('IncidentTable vehicle column', () => {
+  it('renders the registration snapshot in a Vehicle column', () => {
+    render(<IncidentTable incidents={[incident()]} canEdit={false} selected={new Set()} onToggleSelect={vi.fn()} onOpen={vi.fn()} />);
+    expect(screen.getByRole('columnheader', { name: 'Vehicle' })).toBeInTheDocument();
+    expect(within(screen.getByTestId('incident-row-incident-1')).getByText('ABC 123 GP')).toBeInTheDocument();
+  });
+
+  it('says "No vehicle" rather than leaving the cell blank when there is no registration', () => {
+    render(<IncidentTable incidents={[incident({ vehicleRegistration: null })]} canEdit={false} selected={new Set()} onToggleSelect={vi.fn()} onOpen={vi.fn()} />);
+    expect(within(screen.getByTestId('incident-row-incident-1')).getByText('No vehicle')).toBeInTheDocument();
+  });
+
+  it('shows the attributed driver instead of "Unassigned" on a vehicle incident', () => {
+    const attributed = incident({ id: 'i-attributed', incidentType: 'severe_driving', staffName: 'Jane Driver' });
+    const unattributed = incident({ id: 'i-unattributed', incidentType: 'severe_driving', staffId: null, staffName: null });
+    render(<IncidentTable incidents={[attributed, unattributed]} canEdit={false} selected={new Set()} onToggleSelect={vi.fn()} onOpen={vi.fn()} />);
+    expect(within(screen.getByTestId('incident-row-i-attributed')).getByText('Jane Driver')).toBeInTheDocument();
+    expect(within(screen.getByTestId('incident-row-i-attributed')).queryByText('Unassigned')).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('incident-row-i-unattributed')).getByText('Unassigned')).toBeInTheDocument();
   });
 });

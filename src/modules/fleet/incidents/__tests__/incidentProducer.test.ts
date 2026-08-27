@@ -19,6 +19,7 @@ import {
   IncidentProducerConfigurationError, IncidentProducerValidationError,
   evaluateConditionClearing, produceIncident, resolveScheduledIncidentType,
 } from '../incidentProducer';
+import { buildAssignmentIdentity, computeObservationFingerprint } from '../observationFingerprint';
 import type {
   IncidentAssignmentContext, IncidentEvaluation, IncidentRule, IncidentRuleReference,
   IncidentSourceEvent, ScheduledIncidentProducerRequest,
@@ -128,6 +129,20 @@ describe('new scheduled detection', () => {
     expect(repo.recordObservation).toHaveBeenCalledTimes(1);
     expect(repo.recordObservation.mock.calls[0]![0]).toMatchObject({ incidentId: INCIDENT, observationFingerprint: 'fp-1' });
     expect(repo.touchIncidentLastSeen).not.toHaveBeenCalled();
+  });
+
+  it('records the observation against the STATUS rule, which is what observations.rule_id references', async () => {
+    // Pinned because the source-event path had to stop writing a rule id here:
+    // migration 510 points observations.rule_id at fleet_operational_status_rules,
+    // so the scheduled path's status rule is the only id that may be written.
+    repo.findActiveIncident.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord());
+
+    await produceIncident(scheduledRequest());
+
+    expect(repo.recordObservation.mock.calls[0]![0]).toMatchObject({
+      ruleId: 'status-rule-1', ruleVersion: 4, monitorRunId: null, sourceEventId: null,
+    });
   });
 
   it('permits recurrence after a prior terminal closure (no active row found for this staff/type/date)', async () => {
@@ -256,6 +271,27 @@ describe('condition clearing', () => {
   });
 });
 
+describe('the scheduled path is not touched by vehicle attribution', () => {
+  it('takes its staff identity and name from the ROSTER assignment, never from a vehicle lookup', async () => {
+    // The mutation this exists for: wiring `resolveVehicleDriver` into the
+    // scheduled branch. That path already carries a roster identity resolved
+    // from Attendance/assignment evidence; re-resolving it from
+    // `vehicle_assignments` would silently overwrite the person the roster
+    // named with whoever holds the vehicle. This request names a vehicle AND a
+    // roster driver, so the two answers are distinguishable.
+    repo.findActiveIncident.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord());
+
+    await produceIncident(scheduledRequest({
+      assignment: assignment({ vehicleId: 'vehicle-1', vehicleRegistrationSnapshot: 'ABC 123 GP', staffNameSnapshot: 'Roster Driver' }),
+    }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({
+      staffId: STAFF, staffNameSnapshot: 'Roster Driver', vehicleId: 'vehicle-1',
+    });
+  });
+});
+
 describe('source events', () => {
   beforeEach(() => { settings.loadEffectiveIncidentRule.mockResolvedValue(ruleRecord()); });
 
@@ -289,9 +325,118 @@ describe('source events', () => {
     expect(repo.recordObservation).toHaveBeenCalledTimes(1);
   });
 
+  it('writes the vehicle registration snapshot the caller supplied', async () => {
+    // The one human label a vehicle incident carries: the source-event path
+    // hardcoded null here, so a telematics WhatsApp named neither a person (it
+    // has none) nor a vehicle. Pinned at the producer layer because the
+    // detector's own test can only prove what it PASSED, not what was stored.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent({ vehicleRegistrationSnapshot: 'ABC 123 GP' }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({
+      vehicleId: 'vehicle-1', vehicleRegistrationSnapshot: 'ABC 123 GP',
+    });
+  });
+
+  it('writes the driver attribution the detector resolved — id AND name snapshot', async () => {
+    // The queue, the escalation mail and the WhatsApp body all read
+    // `staff_name_snapshot`; an incident carrying only `staff_id` still renders
+    // "Unassigned". Pinned here because the detector's own test can prove only
+    // what it PASSED, not what was stored.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent({ staffId: STAFF, staffNameSnapshot: 'Jane Driver' }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({ staffId: STAFF, staffNameSnapshot: 'Jane Driver' });
+  });
+
+  it('stores a null staff snapshot when the event resolved no driver', async () => {
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent({ staffId: null }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({ staffId: null, staffNameSnapshot: null });
+  });
+
+  it('refuses a name with no staff id — a snapshot nobody can be asked about', async () => {
+    // `staff_name_snapshot` is what the queue and every alert render, so a name
+    // stored beside a null `staff_id` would show a manager a driver they cannot
+    // request input from and whose `/my` surface the incident never reaches.
+    // The producer drops the name rather than displaying an unactionable one.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent({ staffId: null, staffNameSnapshot: 'Jane Driver' }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({ staffId: null, staffNameSnapshot: null });
+  });
+
+  it('stores null when the caller supplies no registration, never undefined', async () => {
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent());
+
+    expect(repo.createIncident.mock.calls[0]![0]).toHaveProperty('vehicleRegistrationSnapshot', null);
+  });
+
   it('throws a configuration error when no effective rule exists for the source-event type', async () => {
     settings.loadEffectiveIncidentRule.mockResolvedValueOnce(null);
 
     await expect(produceIncident(sourceEvent())).rejects.toThrow(IncidentProducerConfigurationError);
+  });
+
+  it('records the observation with no rule reference, because the incident rule is not a status rule', async () => {
+    // The production defect: observations.rule_id is an FK to
+    // fleet_operational_status_rules (migration 510), and this path wrote the
+    // INCIDENT rule's id — an id that never exists in that table — so every real
+    // source event died on
+    // fleet_operational_incident_observations_rule_id_fkey and no incident opened.
+    // The incident row still carries incidentRuleId/Version, so null here loses nothing.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent());
+
+    const observation = repo.recordObservation.mock.calls[0]![0];
+    expect(observation).toHaveProperty('ruleId', null);
+    expect(observation).toHaveProperty('ruleVersion', null);
+    expect(observation).toMatchObject({ sourceEventId: 'evt-1', monitorRunId: null });
+    // The incident itself keeps the rule identity, which is why nulling the
+    // observation columns is lossless rather than a downgrade.
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({
+      incidentRuleId: 'rule-1', incidentRuleVersion: 1, statusRuleId: null, statusRuleVersion: null,
+    });
+  });
+
+  it('keeps the observation fingerprint keyed on the incident rule, so dedup is unchanged by the null columns', async () => {
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent());
+
+    const expected = computeObservationFingerprint({
+      incidentType: 'accident_sos', ruleId: 'rule-1', ruleVersion: 1,
+      assignmentIdentity: buildAssignmentIdentity(STAFF, 'vehicle-1', ASSIGNMENT),
+      reasonCodes: [], freshnessBucket: null, siteId: 'site-1', projectId: 'project-1',
+      vehicleId: 'vehicle-1', conditionActive: true,
+    });
+    expect(repo.recordObservation.mock.calls[0]![0]).toMatchObject({ observationFingerprint: expected });
+
+    // Same context, different event id: the fingerprint is stable, and a redelivery
+    // of the SAME event short-circuits to 'unchanged' before any observation insert.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+    await produceIncident(sourceEvent({ sourceEventId: 'evt-2' }));
+    expect(repo.recordObservation.mock.calls[1]![0]).toMatchObject({ observationFingerprint: expected });
+
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos', sourceEventId: 'evt-1' }));
+    const redelivered = await produceIncident(sourceEvent());
+    expect(redelivered).toEqual({ outcome: 'unchanged', incidentId: INCIDENT, requiresInitialNotification: false });
+    expect(repo.recordObservation).toHaveBeenCalledTimes(2);
   });
 });

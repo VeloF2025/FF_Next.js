@@ -11,9 +11,14 @@
  * introduced BY the fix for an earlier one, survived both stage-local suites,
  * and was caught only by an adversarial reviewer running the two stages
  * together.
+ *
+ * Under the tier rule the histogram is doubly out of reach — a component
+ * publishes nothing unless every variable in it clears the threshold, and
+ * migration 527's view drops the histogram columns outright — but the assertion
+ * stays, because it is the one that failed.
  */
 import { describe, expect, it } from 'vitest';
-import { calculateMonthlyMetrics } from '../metricCalculator';
+import { calculateMonthly } from '../metricCalculator';
 import { releaseAnonymousGroups } from '../suppression';
 import type { OperationsFact } from '../facts';
 
@@ -52,7 +57,7 @@ function incidentAt(site: string, staff: string, overrides: Record<string, unkno
 
 /** Runs the real pipeline and returns what would be written. */
 function publish(facts: OperationsFact[], k = K) {
-  return releaseAnonymousGroups(calculateMonthlyMetrics(facts, 1), k);
+  return releaseAnonymousGroups(calculateMonthly(facts, 1), k);
 }
 
 describe('end-to-end disclosure', () => {
@@ -85,17 +90,17 @@ describe('end-to-end disclosure', () => {
     }
   });
 
-  it('leaves a residual describing at least the threshold at every parent', () => {
+  it('publishes no site row for a parent to be differenced against', () => {
+    // The old rule published site rows and then had to bound what subtracting
+    // them from their parent left behind. Two two-person sites beside a large
+    // one was the configuration that broke the first attempt at that bound. It
+    // cannot arise now: the site rows do not exist.
     const facts = [
       ...rosterAt('big', 20), ...rosterAt('tiny-1', 2), ...rosterAt('tiny-2', 2),
     ];
     const rows = publish(facts);
-
-    const project = rows.find((r) => r.dimensionLevel === 'project');
-    const sites = rows.filter((r) => r.dimensionLevel === 'site');
-    const residual = (project?.contributorCount ?? 0)
-      - sites.reduce((sum, r) => sum + r.contributorCount, 0);
-    expect(residual === 0 || residual >= K).toBe(true);
+    expect(rows.some((row) => row.dimensionLevel === 'site')).toBe(false);
+    expect(rows.some((row) => row.dimensionLevel === 'project')).toBe(true);
   });
 
   it('honours a threshold above the schema floor end to end', () => {
@@ -103,6 +108,7 @@ describe('end-to-end disclosure', () => {
     // Twelve people across two sites of six: publishable at 5, not at 20.
     expect(publish(facts, 5).length).toBeGreaterThan(0);
     expect(publish(facts, 20)).toEqual([]);
+    for (const row of publish(facts, 12)) expect(row.contributorCount).toBeGreaterThanOrEqual(12);
   });
 
   it('emits nothing at all from no facts', () => {

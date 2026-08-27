@@ -1,38 +1,92 @@
 /**
- * Turns per-site calculated groups into the rows that may actually be stored.
+ * Which aggregate rows may be stored, and therefore published.
  *
- * ## What this does and does NOT guarantee
+ * ## Why this is a tier rule and not a search
  *
- * These rows are INTERNAL. They are not a published anonymous dataset and this
- * module is not a statistical disclosure control. Read
- * `.claude/modules/fleet-analytics-disclosure.md` before exposing any of this
- * through an API, an export, or a UI - the surface is not safe to release as-is
- * and the reasons are specific and written down.
+ * Three designs preceded it. Each published what looked safe cell by cell, then
+ * searched for what a reader could recover. Every review found another channel
+ * the search had missed — across levels, across metric keys, through a
+ * denominator column, through `contributor_count`, through a histogram bucket —
+ * and every fix made the output emptier: the last withheld about four rows in
+ * five on a realistic month and still had holes.
  *
- * What it DOES close: cross-level differencing. `contributor_count >= 5` is a
- * per-row guard, and a per-row guard cannot see that subtracting a parent's
- * published children from the parent recovers the withheld ones. So siblings
- * are withheld until that residual itself describes enough people - see
- * `applyComplementarySuppression`.
+ * So the question changed. Publish only sets that are CLOSED under the
+ * arithmetic: within a set, every quantity a reader can compute is one whose
+ * support already clears the threshold. Then there is nothing to search for.
  *
- * What it does NOT close: the metric keys are not independent of one another.
- * They partition into sums whose totals are published as the denominators of
- * the surviving rows, so withholding one key while publishing its siblings and
- * their shared denominator recovers it by subtraction. Suppression here only
- * ever compares siblings WITHIN one metric key. Closing that needs
- * partition-aware suppression, which is the design work the disclosure note
- * describes.
+ * ## The rule
  *
- * It is also the last place a contributor identity exists. Groups arrive with a
- * `Set<string>` of contributor keys and leave with a count; `ReleasedAggregate`
- * has no field that can hold a person.
+ * The unit of decision is a (level, dimension, COMPONENT) — a connected piece of
+ * `metricRelations.ts`. Two variables in different components have no arithmetic
+ * between them, so each component is decided on its own. Three tiers:
+ *
+ * - **FULL** — every variable in the component clears `k` or has nobody behind
+ *   it at all: every member, every total, and every complement of every subset
+ *   and partition relation. Publish the whole component, denominators included.
+ * - **TOTAL_ONLY** — else, if the component's ROOT total clears `k`, publish
+ *   that one row and nothing else. One value per component means no difference
+ *   can be taken inside it.
+ * - **NONE** — otherwise nothing.
+ *
+ * A component rooted on an internal tally — incidents are, because
+ * `incident.total` is no metric key — has no row to publish at TOTAL_ONLY, so
+ * for those two tiers collapse into one.
+ *
+ * ## The organisation, and the cell that does not exist
+ *
+ * No site row is ever built: `decide` works at organisation and project level
+ * and nothing below. Migration 527's view restricts to those two levels anyway,
+ * as defence in depth against a future writer and against the site rows earlier
+ * versions of this code left in the table, and publishes neither
+ * `contributor_count` nor any histogram column — a whole class of channel
+ * disappears with those. A project therefore has no published children and
+ * nothing to be differenced against.
+ *
+ * The organisation does. Subtract the projects that published from the
+ * organisation and what is left is the sum of the projects that did not — so
+ * that sum has to be safe. `organisationTier` builds it: ONE VIRTUAL CELL over
+ * exactly the withheld projects, with supports UNIONED and complements taken
+ * from the calculator's own tallies, and asks it to pass the same tier check
+ * every real cell passes. The organisation publishes at the highest tier where
+ * both its own check and the virtual cell's hold.
+ *
+ * ### The proof
+ *
+ * Fix a component and a tier `T`, and let `W` be the projects not publishing at
+ * `T` or better.
+ *
+ * 1. **Within a published component at FULL**, any value a reader computes is a
+ *    linear combination of that component's variables, and every one of them
+ *    clears `k`. At TOTAL_ONLY there is a single value and so no combination to
+ *    take. Across components there is no relation at all.
+ * 2. **Across levels**, for every key the organisation publishes at `T`, each
+ *    project outside `W` publishes it too — a higher tier publishes a superset
+ *    of a lower tier's keys. So `organisation - sum(projects outside W)` is
+ *    exactly the virtual cell's value for that key, and the virtual cell passed
+ *    the tier-`T` check: at FULL every one of its variables clears `k`, at
+ *    TOTAL_ONLY its root does.
+ * 3. **The reader can recover the virtual cell's whole component**, not just one
+ *    key of it, which is why the check has to be the full tier check and not
+ *    merely "its total clears `k`". Where `W` is a single project the virtual
+ *    cell IS that project, so that project must itself pass in full,
+ *    complements included — the case a weaker relaxation would leak through.
+ * 4. **Where `W` is empty** the virtual cell has nobody behind anything, every
+ *    check passes vacuously, and the difference is zero.
+ *
+ * This replaced taking the MINIMUM tier over the projects, which is the special
+ * case of the above that refuses whenever `W` is non-empty. It was sound and
+ * needlessly lossy: one four-person project silenced the organisation entirely.
  *
  * Pure: no SQL, no clock, no configuration lookup. The threshold is passed in
  * from the effective settings row.
  */
 import type { AggregateDimensionLevel, AggregateMetricKind, OperationsMetricKey } from './aggregateSchema';
 import { metricKindFor } from './aggregateSchema';
-import type { CalculatedMetricGroup } from './facts';
+import type { CalculatedSiteMonth } from './metricCalculator';
+import type { MetricComponent } from './metricRelations';
+import { METRIC_COMPONENTS } from './metricRelations';
+import type { Accumulator, Cell, MonthScope } from './releaseCells';
+import { buildCell, monthScopes, supportSize } from './releaseCells';
 import type { DurationHistogram } from './types';
 
 export interface ReleasedAggregate {
@@ -41,7 +95,6 @@ export interface ReleasedAggregate {
   dimensionLevel: AggregateDimensionLevel;
   dimensionProjectId: string | null;
   dimensionSiteId: string | null;
-  generalizedFromLevel: AggregateDimensionLevel | null;
   metricKey: OperationsMetricKey;
   metricKind: AggregateMetricKind;
   numerator: number;
@@ -50,216 +103,191 @@ export interface ReleasedAggregate {
   contributorCount: number;
 }
 
-interface Accumulator {
-  numerator: number;
-  denominator: number | null;
-  histogram: DurationHistogram | null;
-  contributors: Set<string>;
-}
+export const RELEASE_TIERS = ['none', 'total_only', 'full'] as const;
+export type ReleaseTier = (typeof RELEASE_TIERS)[number];
 
-function emptyAccumulator(): Accumulator {
-  return { numerator: 0, denominator: null, histogram: null, contributors: new Set() };
-}
+const rank = (tier: ReleaseTier): number => RELEASE_TIERS.indexOf(tier);
 
-/** Adds `source` into `target` in place. Contributors union; they never add. */
-function accumulate(target: Accumulator, source: Accumulator): void {
-  target.numerator += source.numerator;
-  if (source.denominator !== null) {
-    target.denominator = (target.denominator ?? 0) + source.denominator;
+/**
+ * Everyone behind a partition member's complement: the other members, unioned —
+ * exact, because a partition is exhaustive. Subset complements cannot be reached
+ * this way and are tallied by `metricCalculator` instead.
+ */
+function partitionComplementSize(cell: Cell, component: MetricComponent, member: string): number {
+  const partition = component.partitions.find((candidate) => candidate.members.some((m) => m === member));
+  if (!partition) return 0;
+  const people = new Set<string>();
+  for (const other of partition.members) {
+    if (other === member) continue;
+    for (const person of cell.values.get(other)?.contributors ?? []) people.add(person);
   }
-  const incoming = source.histogram;
-  if (incoming) {
-    const base = target.histogram ?? {
-      sampleCount: 0,
-      sumSeconds: 0,
-      buckets: incoming.buckets.map(() => 0),
-    };
-    target.histogram = {
-      sampleCount: base.sampleCount + incoming.sampleCount,
-      sumSeconds: base.sumSeconds + incoming.sumSeconds,
-      buckets: base.buckets.map((n, i) => n + (incoming.buckets[i] ?? 0)),
-    };
-  }
-  for (const contributor of source.contributors) target.contributors.add(contributor);
-}
-
-function accumulatorFrom(group: CalculatedMetricGroup): Accumulator {
-  return {
-    numerator: group.numerator,
-    denominator: group.denominator,
-    histogram: group.histogram
-      ? { ...group.histogram, buckets: [...group.histogram.buckets] }
-      : null,
-    contributors: new Set(group.contributors),
-  };
-}
-
-interface Candidate {
-  id: string;
-  accumulator: Accumulator;
+  return people.size;
 }
 
 /**
- * Decides which children of one parent may be published.
- *
- * Children below the threshold are always withheld. What matters after that is
- * the RESIDUAL - what a reader recovers by subtracting the published children
- * from the parent. The residual is the union of every withheld child, and it
- * must itself describe at least `minimumContributors` people.
- *
- * Requiring merely that two or more children be withheld is NOT enough, and
- * that error is why this comment is long: two sites of two people each leave a
- * four-person residual that the parent row hands over exactly, with
- * `contributor_count` even stating the headcount. So siblings are withheld,
- * smallest first, until the residual clears the threshold or nothing is left to
- * publish. Ties break on the lower id, so two runs over the same month produce
- * the same rows and therefore the same checksum.
- *
- * When everything ends up withheld, nothing is published at this level and the
- * parent alone carries the numbers - which discloses nothing, because the
- * residual is then the parent itself.
- *
- * Contributors are UNIONED, never summed: one person working two sites is one
- * person in the residual.
+ * The tier a cell can support for one component, from its own numbers alone. A
+ * support of zero passes every check: the value is zero, it describes nobody,
+ * and a reader who derives it learns only that nothing happened.
  */
-function applyComplementarySuppression(
-  children: readonly Candidate[],
-  minimumContributors: number,
-): { published: Candidate[]; withheldCount: number } {
-  const published = children.filter((c) => c.accumulator.contributors.size >= minimumContributors);
-  const withheld = children.filter((c) => c.accumulator.contributors.size < minimumContributors);
+function ownTier(cell: Cell, component: MetricComponent, minimumContributors: number): ReleaseTier {
+  const clears = (size: number): boolean => size === 0 || size >= minimumContributors;
+  const full = component.variables.every((variable) => clears(supportSize(cell, variable)))
+    && component.partitions.every(
+      (partition) => partition.members.every(
+        (member) => clears(partitionComplementSize(cell, component, member)),
+      ),
+    );
+  if (full) return 'full';
+  return supportSize(cell, component.root) >= minimumContributors ? 'total_only' : 'none';
+}
 
-  // Smallest first, then lowest id: the order siblings are sacrificed in, and
-  // deterministic so a re-run produces byte-identical rows.
-  published.sort(
-    (a, b) => a.accumulator.contributors.size - b.accumulator.contributors.size
-      || a.id.localeCompare(b.id),
-  );
+/**
+ * The highest tier at which the organisation may publish.
+ *
+ * Three conditions, and the middle one is the one a randomised sweep had to
+ * teach me.
+ *
+ * 1. The organisation's own numbers pass the tier-`T` check.
+ * 2. **Every project is all-in or all-out**: it publishes at `T` or better, or
+ *    it publishes nothing at all. A project sitting in between — publishing its
+ *    root total while the organisation publishes members — couples the two
+ *    groups through the organisation's member values, and combinations across
+ *    that coupling can pin down a handful of people. Seed 196 of the sweep is
+ *    exactly that shape: three projects, one at TOTAL_ONLY, the organisation at
+ *    FULL, and a four-person residual falling out of the arithmetic.
+ * 3. The projects publishing nothing, aggregated into ONE VIRTUAL CELL with
+ *    supports unioned and complements taken from the calculator's own tallies,
+ *    pass the tier-`T` check themselves.
+ */
+function organisationTier(
+  scope: MonthScope, organisation: Cell, projectTiers: ReadonlyMap<string, ReleaseTier>,
+  component: MetricComponent, minimumContributors: number,
+): ReleaseTier {
+  const own = ownTier(organisation, component, minimumContributors);
+  const tierOf = (projectId: string): ReleaseTier => projectTiers.get(projectId) ?? 'none';
+  const silent = [...scope.byProject.entries()].filter(([projectId]) => tierOf(projectId) === 'none');
 
-  const residual = new Set<string>();
-  for (const child of withheld) {
-    for (const contributor of child.accumulator.contributors) residual.add(contributor);
+  for (const tier of ['full', 'total_only'] as const) {
+    if (rank(own) < rank(tier)) continue;
+    const allInOrAllOut = [...scope.byProject.keys()].every(
+      (projectId) => tierOf(projectId) === 'none' || rank(tierOf(projectId)) >= rank(tier),
+    );
+    if (!allInOrAllOut) continue;
+    const virtual = buildCell(
+      silent.flatMap(([, siteMonths]) => siteMonths), scope.monthStart, scope.metricVersion,
+      'organisation', null,
+    );
+    if (rank(ownTier(virtual, component, minimumContributors)) >= rank(tier)) return tier;
   }
-
-  // Nothing withheld means no residual to protect.
-  while (withheld.length > 0 && residual.size < minimumContributors && published.length > 0) {
-    const sacrificed = published.shift();
-    if (!sacrificed) break;
-    withheld.push(sacrificed);
-    for (const contributor of sacrificed.accumulator.contributors) residual.add(contributor);
-  }
-
-  return { published, withheldCount: withheld.length };
+  return 'none';
 }
 
 function toRow(
-  monthStart: string,
-  metricVersion: number,
-  metricKey: OperationsMetricKey,
-  level: AggregateDimensionLevel,
-  projectId: string | null,
-  siteId: string | null,
-  generalizedFrom: AggregateDimensionLevel | null,
-  accumulator: Accumulator,
+  cell: Cell, key: OperationsMetricKey, value: Accumulator, withDenominator: boolean,
 ): ReleasedAggregate {
+  const denominator = withDenominator ? value.denominator : null;
   return {
-    monthStart,
-    metricVersion,
-    dimensionLevel: level,
-    dimensionProjectId: projectId,
-    dimensionSiteId: siteId,
-    generalizedFromLevel: generalizedFrom,
-    metricKey,
-    metricKind: metricKindFor(metricKey, accumulator.denominator),
-    numerator: accumulator.numerator,
-    denominator: accumulator.denominator,
-    histogram: accumulator.histogram,
-    contributorCount: accumulator.contributors.size,
+    monthStart: cell.monthStart,
+    metricVersion: cell.metricVersion,
+    dimensionLevel: cell.level,
+    dimensionProjectId: cell.projectId,
+    dimensionSiteId: null,
+    metricKey: key,
+    metricKind: metricKindFor(key, denominator),
+    numerator: value.numerator,
+    denominator,
+    histogram: value.histogram,
+    contributorCount: value.contributors.size,
   };
 }
 
-/** One (month, metric) slice: sites -> projects -> organisation. */
-function releaseSlice(
-  monthStart: string,
-  metricVersion: number,
-  metricKey: OperationsMetricKey,
-  groups: readonly CalculatedMetricGroup[],
-  minimumContributors: number,
+/** The rows one component contributes at one cell, given its decided tier. */
+function rowsFor(
+  cell: Cell, component: MetricComponent, tier: ReleaseTier, minimumContributors: number,
 ): ReleasedAggregate[] {
-  const byProject = new Map<string, Candidate[]>();
-  for (const group of groups) {
-    const sites = byProject.get(group.projectId) ?? [];
-    sites.push({ id: group.operationalSiteId, accumulator: accumulatorFrom(group) });
-    byProject.set(group.projectId, sites);
-  }
-
-  const projects: Candidate[] = [];
-  const siteDecisions = new Map<string, { published: Candidate[]; withheldCount: number }>();
-  for (const [projectId, sites] of byProject) {
-    const accumulator = emptyAccumulator();
-    for (const site of sites) accumulate(accumulator, site.accumulator);
-    projects.push({ id: projectId, accumulator });
-    siteDecisions.set(projectId, applyComplementarySuppression(sites, minimumContributors));
-  }
-
-  const organisation = emptyAccumulator();
-  for (const project of projects) accumulate(organisation, project.accumulator);
-  // The organisation is a superset of every project, so if it cannot clear the
-  // threshold nothing beneath it can either: the whole slice is withheld.
-  if (organisation.contributors.size < minimumContributors) return [];
-
-  const projectDecision = applyComplementarySuppression(projects, minimumContributors);
-
-  const rows: ReleasedAggregate[] = [];
-  for (const project of projectDecision.published) {
-    const decision = siteDecisions.get(project.id);
-    for (const site of decision?.published ?? []) {
-      rows.push(toRow(monthStart, metricVersion, metricKey, 'site', project.id, site.id, null, site.accumulator));
-    }
-    rows.push(toRow(
-      monthStart, metricVersion, metricKey, 'project', project.id, null,
-      (decision?.withheldCount ?? 0) > 0 ? 'site' : null,
-      project.accumulator,
-    ));
-  }
-  // A withheld project publishes no site rows either: its sites would rebuild it.
-  rows.push(toRow(
-    monthStart, metricVersion, metricKey, 'organisation', null, null,
-    projectDecision.withheldCount > 0 ? 'project' : null,
-    organisation,
-  ));
-  return rows;
+  const publish = (key: OperationsMetricKey, withDenominator: boolean): ReleasedAggregate[] => {
+    const value = cell.values.get(key);
+    // A metric nobody contributed to is withheld rather than published as a
+    // zero: the table's `contributor_count >= 5` could not hold it anyway, and
+    // a reader recovers the zero from the rest of the component regardless.
+    if (!value || value.contributors.size < minimumContributors) return [];
+    return [toRow(cell, key, value, withDenominator)];
+  };
+  if (tier === 'full') return component.keys.flatMap((key) => publish(key, true));
+  if (tier === 'total_only' && component.rootKey) return publish(component.rootKey, false);
+  return [];
 }
 
 const LEVEL_ORDER: Record<AggregateDimensionLevel, number> = { site: 0, project: 1, organisation: 2 };
 
+interface Decision {
+  cell: Cell;
+  component: MetricComponent;
+  tier: ReleaseTier;
+}
+
 /**
- * Releases every group that may be published, generalizing or withholding the
- * rest. Returns rows in a stable order so a re-run is byte-identical.
+ * The tier every (cell, component) settles on. One traversal serves both the
+ * release and the usability report, so the rule the two describe cannot drift.
+ */
+function decide(siteMonths: readonly CalculatedSiteMonth[], minimumContributors: number): Decision[] {
+  const decided: Decision[] = [];
+  for (const scope of monthScopes(siteMonths)) {
+    const { monthStart, metricVersion } = scope;
+    const projects = new Map(
+      [...scope.byProject.entries()].map(
+        ([projectId, months]) => [projectId, buildCell(months, monthStart, metricVersion, 'project', projectId)],
+      ),
+    );
+    const organisation = buildCell(
+      [...scope.byProject.values()].flat(), monthStart, metricVersion, 'organisation', null,
+    );
+
+    for (const component of METRIC_COMPONENTS) {
+      const tiers = new Map(
+        [...projects.entries()].map(
+          ([projectId, cell]) => [projectId, ownTier(cell, component, minimumContributors)],
+        ),
+      );
+      for (const [projectId, cell] of projects) {
+        decided.push({ cell, component, tier: tiers.get(projectId)! });
+      }
+      decided.push({
+        cell: organisation,
+        component,
+        tier: organisationTier(scope, organisation, tiers, component, minimumContributors),
+      });
+    }
+  }
+  return decided;
+}
+
+/**
+ * Releases the rows that may be stored, in a stable order so a re-run is
+ * byte-identical and the checksum settles.
  */
 export function releaseAnonymousGroups(
-  groups: readonly CalculatedMetricGroup[],
+  siteMonths: readonly CalculatedSiteMonth[],
   minimumContributors: number,
 ): ReleasedAggregate[] {
-  const slices = new Map<string, CalculatedMetricGroup[]>();
-  for (const group of groups) {
-    const key = `${group.monthStart} ${group.metricVersion} ${group.metricKey}`;
-    const slice = slices.get(key) ?? [];
-    slice.push(group);
-    slices.set(key, slice);
-  }
-
-  const rows: ReleasedAggregate[] = [];
-  for (const [key, slice] of slices) {
-    const [monthStart, metricVersion, metricKey] = key.split(' ') as [string, string, OperationsMetricKey];
-    rows.push(...releaseSlice(monthStart, Number(metricVersion), metricKey, slice, minimumContributors));
-  }
-
+  const rows = decide(siteMonths, minimumContributors).flatMap(
+    ({ cell, component, tier }) => rowsFor(cell, component, tier, minimumContributors),
+  );
   return rows.sort(
     (a, b) => a.monthStart.localeCompare(b.monthStart)
       || a.metricKey.localeCompare(b.metricKey)
       || LEVEL_ORDER[a.dimensionLevel] - LEVEL_ORDER[b.dimensionLevel]
-      || (a.dimensionProjectId ?? '').localeCompare(b.dimensionProjectId ?? '')
-      || (a.dimensionSiteId ?? '').localeCompare(b.dimensionSiteId ?? ''),
+      || (a.dimensionProjectId ?? '').localeCompare(b.dimensionProjectId ?? ''),
   );
+}
+
+/** The tier each component reached, for the usability and disclosure tests. */
+export function releaseTiers(
+  siteMonths: readonly CalculatedSiteMonth[], minimumContributors: number,
+): Map<string, ReleaseTier> {
+  return new Map(decide(siteMonths, minimumContributors).map(
+    ({ cell, component, tier }) => [
+      `${cell.monthStart}|${cell.level}|${cell.projectId ?? ''}|${component.root}`, tier,
+    ],
+  ));
 }

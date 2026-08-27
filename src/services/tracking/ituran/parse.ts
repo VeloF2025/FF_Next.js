@@ -208,6 +208,8 @@ export function toPositions(
       // Ituran's grid reports none of these.
       linearG: null,
       lateralG: null,
+      // This feed exposes no event vocabulary of its own. Null, never a synthesised value.
+      providerEventType: null,
       bearing: num(row.LastHead),
       altitudeM: null,
       gpsFixType: null,

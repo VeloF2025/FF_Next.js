@@ -15,6 +15,12 @@
  * concern-category/evidence-MIME/channel values straight through unchanged
  * on save (versioning requires the full settings shape) rather than
  * exposing every one of them as its own control.
+ *
+ * `RetentionAnalyticsSection` (PR8 Task 9b) follows the same two conventions —
+ * its own file, and compact — for the same two reasons. It carries one rule the
+ * others do not: shortening the retention window is the only control in this
+ * dialog whose consequence is deletion, so it asks for a reviewed dry run
+ * before it will send.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
@@ -23,6 +29,7 @@ import type { IncidentOutcome, IncidentRule, IncidentSeverity, IncidentType } fr
 import { incidentApi, IncidentApiError, type DriverInputSettingsRequestBody } from './incidentApi';
 import { INCIDENT_TYPE_LABELS, OUTCOME_LABELS, SEVERITY_LABELS } from './incidentLabels';
 import { OversightSection } from './OversightSection';
+import { RetentionAnalyticsSection } from './RetentionAnalyticsSection';
 import type { DriverInputSettings } from '../driver/types';
 
 function driverInputRequestFrom(settings: DriverInputSettings, overrides: Partial<DriverInputSettingsRequestBody>): DriverInputSettingsRequestBody {
@@ -258,6 +265,7 @@ function SettingsDialogBody({ onClose, canEdit }: Omit<IncidentSettingsDialogPro
         <RulesSection canEdit={canEdit} />
         <OversightSection canEdit={canEdit} />
         <DriverInputSection canEdit={canEdit} />
+        <RetentionAnalyticsSection canEdit={canEdit} />
       </div>
     </div>
   );

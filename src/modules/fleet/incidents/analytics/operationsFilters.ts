@@ -1,0 +1,233 @@
+/**
+ * The `op_*` query parameters, parsed once.
+ *
+ * There is one parser because there will be three callers: the analytics
+ * endpoint, the drill-down endpoint, and (stage 8 task 8) the Excel export. An
+ * export whose filters are parsed by a second implementation is an export that
+ * eventually disagrees with the screen it was taken from, and a reader has no
+ * way to tell which of the two is wrong.
+ *
+ * The `op_` prefix is deliberate and is not decoration: the incident queue
+ * already puts `projectId`, `staffId` and friends on the query string, and the
+ * two filter sets are independent. Sharing bare names would make a deep link
+ * from the queue silently pre-filter the analytics screen, or the reverse.
+ *
+ * Every value is validated against a closed set or a format, never passed
+ * through, and so is every KEY: an `op_` parameter this parser does not know is
+ * refused rather than ignored. Both halves of that matter for the same reason —
+ * dropping an unrecognised filter silently WIDENS the result, and a manager
+ * reading a number that answers a different question than the one they asked
+ * has no way to notice. A typo'd `op_sevrity` that is quietly discarded returns
+ * every severity under a heading that says one.
+ */
+import { OUTCOMES, INCIDENT_TYPES, SEVERITIES } from '../reviewValidation';
+import { datesInMonth } from './sastDates';
+import type { OperationsFilters } from './types';
+
+export class OperationsFilterError extends Error {
+  constructor(message: string) { super(message); this.name = 'OperationsFilterError'; }
+}
+
+/**
+ * The widest range a single request may ask for. The retained half of a
+ * response derives its metrics from live facts month by month, so an unbounded
+ * range is an unbounded amount of work on an interactive request.
+ */
+export const MAX_RANGE_MONTHS = 12;
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export type RawOperationsQuery = Record<string, string | string[] | undefined>;
+
+/** A repeated parameter is refused, never silently reduced to its first value. */
+function single(query: RawOperationsQuery, name: string): string | undefined {
+  const value = query[name];
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) throw new OperationsFilterError(`${name} must be given at most once`);
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
+function requiredDate(query: RawOperationsQuery, name: string): string {
+  const value = single(query, name);
+  if (value === undefined) throw new OperationsFilterError(`${name} is required`);
+  if (!DATE_PATTERN.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
+    throw new OperationsFilterError(`${name} must be a calendar date as YYYY-MM-DD`);
+  }
+  return value;
+}
+
+function optionalUuid(query: RawOperationsQuery, name: string): string | undefined {
+  const value = single(query, name);
+  if (value === undefined) return undefined;
+  if (!UUID_PATTERN.test(value)) throw new OperationsFilterError(`${name} must be a UUID`);
+  return value;
+}
+
+function optionalEnum<T extends string>(
+  query: RawOperationsQuery, name: string, permitted: readonly T[],
+): T | undefined {
+  const value = single(query, name);
+  if (value === undefined) return undefined;
+  if (!permitted.includes(value as T)) {
+    throw new OperationsFilterError(`${name} must be one of: ${permitted.join(', ')}`);
+  }
+  return value as T;
+}
+
+function optionalBoolean(query: RawOperationsQuery, name: string): boolean | undefined {
+  const value = single(query, name);
+  if (value === undefined) return undefined;
+  if (value !== 'true' && value !== 'false') throw new OperationsFilterError(`${name} must be true or false`);
+  return value === 'true';
+}
+
+/** Whole months between two calendar dates, counting the month each falls in. */
+function monthSpan(start: string, end: string): number {
+  const [startYear, startMonth] = start.split('-').map(Number) as [number, number];
+  const [endYear, endMonth] = end.split('-').map(Number) as [number, number];
+  return (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+}
+
+/**
+ * The range widened to the whole months it touches.
+ *
+ * Every figure this module can produce is monthly — a released aggregate is one
+ * row per month, and the retained half derives a month at a time from facts. A
+ * mid-month bound is therefore not honoured, and echoing it back unchanged
+ * would tell a reader the first half of the month was excluded when it was
+ * counted in full. `MAX_RANGE_MONTHS` is already counted on the month span, so
+ * widening here cannot let a wider range through than the check above allowed.
+ */
+function wholeMonths(start: string, end: string): { start: string; end: string } {
+  const endMonth = `${end.slice(0, 7)}-01`;
+  const lastDay = datesInMonth(endMonth).at(-1);
+  if (lastDay === undefined) throw new OperationsFilterError(`op_end is not a usable month: ${end}`);
+  return { start: `${start.slice(0, 7)}-01`, end: lastDay };
+}
+
+/**
+ * Every `op_` key this parser reads. A key outside it is a caller asking for
+ * something this endpoint does not offer, and the honest answer is to say so.
+ */
+const KNOWN_OP_KEYS: ReadonlySet<string> = new Set([
+  'op_start', 'op_end', 'op_project', 'op_manager', 'op_site',
+  'op_driver', 'op_vehicle', 'op_type', 'op_severity', 'op_outcome', 'op_evidence',
+]);
+
+/**
+ * Only the `op_` namespace is policed. The query string legitimately carries
+ * other things — `cursor` on the drill-down, and whatever the router put there
+ * — and refusing those would break callers over parameters this parser was
+ * never responsible for.
+ */
+function assertNoUnknownOpKeys(query: RawOperationsQuery): void {
+  const unknown = Object.keys(query)
+    .filter((key) => key.startsWith('op_') && !KNOWN_OP_KEYS.has(key))
+    .sort();
+  if (unknown.length === 0) return;
+  throw new OperationsFilterError(
+    `${unknown.join(', ')} ${unknown.length === 1 ? 'is not a filter' : 'are not filters'} this endpoint accepts; `
+    + `the ones it does are: ${[...KNOWN_OP_KEYS].join(', ')}`,
+  );
+}
+
+export function parseOperationsFilters(query: RawOperationsQuery): OperationsFilters {
+  assertNoUnknownOpKeys(query);
+  const rawStart = requiredDate(query, 'op_start');
+  const rawEnd = requiredDate(query, 'op_end');
+  if (rawEnd < rawStart) throw new OperationsFilterError('op_end cannot be before op_start');
+  const span = monthSpan(rawStart, rawEnd);
+  if (span > MAX_RANGE_MONTHS) {
+    throw new OperationsFilterError(`the range may cover at most ${MAX_RANGE_MONTHS} months, and this one covers ${span}`);
+  }
+  const { start, end } = wholeMonths(rawStart, rawEnd);
+
+  const filters: OperationsFilters = { start, end };
+  const projectId = optionalUuid(query, 'op_project');
+  const managerUserId = optionalUuid(query, 'op_manager');
+  const operationalSiteId = optionalUuid(query, 'op_site');
+  const staffId = optionalUuid(query, 'op_driver');
+  const vehicleId = optionalUuid(query, 'op_vehicle');
+  const incidentType = optionalEnum(query, 'op_type', INCIDENT_TYPES);
+  const severity = optionalEnum(query, 'op_severity', SEVERITIES);
+  const outcome = optionalEnum(query, 'op_outcome', OUTCOMES);
+  const evidenceAvailable = optionalBoolean(query, 'op_evidence');
+
+  // op_manager narrows to the projects one person manages; a site sits inside
+  // exactly one project. The pair is therefore either redundant or
+  // contradictory, and honouring it would mean guessing which of the two the
+  // caller meant — which is the silent widening this parser exists to refuse.
+  if (managerUserId !== undefined && operationalSiteId !== undefined) {
+    throw new OperationsFilterError('op_manager cannot be combined with op_site; a site already names one project');
+  }
+
+  // Assigned rather than spread so an absent filter is absent, not present-and-
+  // undefined: the filters travel back out on the response, and `"op_site": null`
+  // reads as "all sites were considered" when it means "no site filter was given".
+  if (projectId !== undefined) filters.projectId = projectId;
+  if (managerUserId !== undefined) filters.managerUserId = managerUserId;
+  if (operationalSiteId !== undefined) filters.operationalSiteId = operationalSiteId;
+  if (staffId !== undefined) filters.staffId = staffId;
+  if (vehicleId !== undefined) filters.vehicleId = vehicleId;
+  if (incidentType !== undefined) filters.incidentType = incidentType;
+  if (severity !== undefined) filters.severity = severity;
+  if (outcome !== undefined) filters.outcome = outcome;
+  if (evidenceAvailable !== undefined) filters.evidenceAvailable = evidenceAvailable;
+  return filters;
+}
+
+/**
+ * The filters that describe one incident rather than a group.
+ *
+ * A presence, monitor-run or notification fact carries none of these
+ * attributes, so any one of them being set decides which live fact kinds can
+ * contribute at all — and therefore which metric keys the answer may report.
+ */
+export function incidentShapedFilterNames(filters: OperationsFilters): string[] {
+  const names: string[] = [];
+  if (filters.staffId !== undefined) names.push('op_driver');
+  if (filters.vehicleId !== undefined) names.push('op_vehicle');
+  if (filters.incidentType !== undefined) names.push('op_type');
+  if (filters.severity !== undefined) names.push('op_severity');
+  if (filters.outcome !== undefined) names.push('op_outcome');
+  if (filters.evidenceAvailable !== undefined) names.push('op_evidence');
+  return names;
+}
+
+export function hasIncidentShapedFilter(filters: OperationsFilters): boolean {
+  return incidentShapedFilterNames(filters).length > 0;
+}
+
+/**
+ * The filters a published aggregate cannot honour, by `op_` name, in a stable
+ * order. Every incident-shaped filter, plus `op_site`.
+ *
+ * `op_site` is here because migration 527's view publishes ORGANISATION and
+ * PROJECT rows only. There is no site row to read, and answering a site
+ * question from its project's row would silently widen the answer to every
+ * other site in that project — the failure this module refuses everywhere else.
+ * It remains perfectly answerable over retained months, where the facts still
+ * carry a site.
+ *
+ * The incident-shaped half is unanswerable for a different reason: an aggregate
+ * row has two dimensions and none of who, which vehicle, what type, how severe,
+ * what outcome or was-there-evidence survives into a monthly count.
+ * `op_driver` and `op_vehicle` are worse still — an aggregate exists precisely
+ * because it describes at least `k` people, so applying either would ask it a
+ * question it must not answer, and it would answer by returning the rows that
+ * survive.
+ *
+ * So a range that reaches past the retention boundary with any of them set is
+ * refused rather than answered.
+ */
+export function retainedOnlyFilterNames(filters: OperationsFilters): string[] {
+  const names = incidentShapedFilterNames(filters);
+  if (filters.operationalSiteId !== undefined) names.push('op_site');
+  return names.sort();
+}
+
+export function hasRetainedOnlyFilter(filters: OperationsFilters): boolean {
+  return retainedOnlyFilterNames(filters).length > 0;
+}

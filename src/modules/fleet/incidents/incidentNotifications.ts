@@ -22,10 +22,15 @@
  * that must always get WhatsApp regardless of that default or a muted
  * per-user preference (a critical incident on an explicit source event, see
  * `requiresMandatoryIncidentWhatsApp` in `./types`), this module places a
- * direct, best-effort `deliverWhatsApp` call to every resolved recipient IN
- * ADDITION TO the normal `notify()` call, exactly as the brief specifies ("in
- * addition to configured in-app/email delivery"). A failure there is counted
- * in the returned `NotifyResult.failed` and never thrown.
+ * direct, best-effort WhatsApp send IN ADDITION TO the normal `notify()` call,
+ * exactly as the brief specifies ("in addition to configured in-app/email
+ * delivery"). A failure there is counted in the returned `NotifyResult.failed`
+ * and never thrown.
+ *
+ * Since PR5 that send goes to the Fleet Alerts WhatsApp group first
+ * (`./incidentGroupDelivery`), with the per-user `deliverWhatsApp` fan-out
+ * below as its fallback — one post to the group the fleet team already watches
+ * beats N DMs, but an unset JID or a failed post must still reach a human.
  */
 import { log } from '@/lib/logger';
 import { notify } from '@/modules/notifications/services/notificationBus';
@@ -33,6 +38,8 @@ import { claimNotification, releaseNotificationClaim } from '@/modules/notificat
 import { deliverWhatsApp } from '@/modules/notifications/services/whatsappDelivery';
 import type { NotifyPayload, NotifyResult } from '@/modules/notifications/types';
 import { isValidUUID } from '../services/mileageUtils';
+import { buildFleetAlertsMessage, postToFleetAlertsGroup } from './incidentGroupDelivery';
+import type { FleetAlertsGroupIncident } from './incidentGroupDelivery';
 import { resolveIncidentRecipients } from './recipientService';
 import { requiresMandatoryIncidentWhatsApp, resolveIncidentOpenedNotification } from './types';
 import type {
@@ -79,12 +86,32 @@ export interface OpenedNotificationInput {
   producerKind: IncidentProducerKind; rule: IncidentRule; projectId: string | null;
   staffName: string | null; projectName: string | null; operationalSiteName: string | null;
   detectedAt: string; reasonCodes: readonly string[];
+  /** Vehicle registration snapshot for the Fleet Alerts group message (PR5). Required, not optional: an optional field lets a source-event caller forget it and silently ship "not recorded" into an accident alert. Scheduled detections pass null; PR4's detectors pass the registration they loaded, which is also what `openedBody` names when there is no staff member. */
+  vehicleRegistration: string | null;
   /** Optional: `produceIncident` (Task 3) does not return this on its result, so a caller resolving straight off that result has none to pass. Included in metadata only when known. */
   incidentReference?: string;
 }
 
+/**
+ * Who and what one alert is about.
+ *
+ * Both halves when both are known — `Jane Driver (ABC 123 GP)`. For a
+ * non-critical telematics type this line IS the whole alert (no WhatsApp leg,
+ * no vehicle field anywhere else in the body), so naming only the driver would
+ * make an incident about one of eighteen vehicles unidentifiable, and naming
+ * only the vehicle costs the reader the person they have to talk to. Driver
+ * alone and registration alone remain the fallbacks, in that order: a vehicle
+ * incident has no staff member and a roster incident has no vehicle, and
+ * falling through to "Unknown staff" naming nothing at all is indistinguishable
+ * from a bug at the receiving end.
+ */
+export function describeIncidentSubject(staffName: string | null, vehicleRegistration: string | null): string {
+  if (staffName && vehicleRegistration) return `${staffName} (${vehicleRegistration})`;
+  return staffName ?? vehicleRegistration ?? 'Unknown staff';
+}
+
 function openedBody(input: OpenedNotificationInput): string {
-  const who = input.staffName ?? 'Unknown staff';
+  const who = describeIncidentSubject(input.staffName, input.vehicleRegistration);
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
   const reason = input.reasonCodes.length > 0 ? input.reasonCodes.slice(0, 3).join(', ') : 'review required';
   return `${who} — ${where} — ${reason}`;
@@ -146,6 +173,34 @@ async function sendMandatoryWhatsApp(
   return failed;
 }
 
+interface MandatoryWhatsAppInput {
+  incidentId: string; incidentReference: string | null; incidentType: IncidentType;
+  vehicleRegistration: string | null; projectName: string | null; detectedAt: string;
+  payload: NotifyPayload; userIds: readonly string[]; idempotencyKey: string;
+}
+
+/**
+ * The mandatory-WhatsApp leg: one post to the Fleet Alerts group, with the
+ * per-user DM fan-out above as its fallback (plan §5, PR5). The DM path is
+ * injected rather than re-implemented in `incidentGroupDelivery` so the claim
+ * and release bookkeeping stays here, and so the import runs one way only.
+ * Returns the failure count to fold into `NotifyResult.failed`.
+ */
+async function deliverMandatoryWhatsApp(input: MandatoryWhatsAppInput): Promise<number> {
+  const { recipient_user_ids: _recipients, idempotency_key: _key, ...waPayload } = input.payload;
+  const logContext = { incidentId: input.incidentId };
+  const groupIncident: FleetAlertsGroupIncident = {
+    incidentId: input.incidentId, incidentReference: input.incidentReference,
+    incidentType: input.incidentType, vehicleRegistration: input.vehicleRegistration,
+    projectName: input.projectName, detectedAt: input.detectedAt,
+    eventType: input.payload.event_type, idempotencyKey: input.idempotencyKey,
+    recipientUserIds: input.userIds,
+    deliverToRecipients: () => sendMandatoryWhatsApp(
+      input.userIds, waPayload, input.payload.event_type, input.idempotencyKey, logContext),
+  };
+  return postToFleetAlertsGroup(groupIncident, buildFleetAlertsMessage(groupIncident));
+}
+
 export async function sendIncidentOpenedNotification(input: OpenedNotificationInput): Promise<NotifyResult> {
   const recipients = await resolveIncidentRecipients(input.projectId);
   if (recipients.failed) {
@@ -174,10 +229,12 @@ export async function sendIncidentOpenedNotification(input: OpenedNotificationIn
   const result = await safeNotify(payload, { incidentId: input.incidentId });
 
   if (plan.mandatoryChannels.includes('whatsapp')) {
-    const { recipient_user_ids: _drop, idempotency_key: _drop2, ...waPayload } = payload;
-    const waFailed = await sendMandatoryWhatsApp(
-      recipients.userIds, waPayload, payload.event_type, openedIdempotencyKey, { incidentId: input.incidentId });
-    result.failed += waFailed;
+    result.failed += await deliverMandatoryWhatsApp({
+      incidentId: input.incidentId, incidentReference: input.incidentReference ?? null,
+      incidentType: input.incidentType, vehicleRegistration: input.vehicleRegistration,
+      projectName: input.projectName, detectedAt: input.detectedAt,
+      payload, userIds: recipients.userIds, idempotencyKey: openedIdempotencyKey,
+    });
   }
 
   return result;
@@ -194,6 +251,8 @@ export interface EscalationNotificationInput {
   producerKind: IncidentProducerKind;
   projectId: string | null; staffName: string | null; projectName: string | null;
   operationalSiteName: string | null; escalationLevel: number;
+  /** Vehicle registration snapshot and the incident's detection instant — both carried into the Fleet Alerts group message for critical source-event incidents (PR5). */
+  vehicleRegistration: string | null; detectedAt: string;
 }
 
 export async function sendEscalationNotification(input: EscalationNotificationInput): Promise<NotifyResult> {
@@ -204,7 +263,11 @@ export async function sendEscalationNotification(input: EscalationNotificationIn
     }, MODULE);
     return { ...NO_RECIPIENT_RESULT };
   }
-  const who = input.staffName ?? 'Unknown staff';
+  // The same subject line as `openedBody`, for the same reason and then some:
+  // these are exactly the incidents that escalate, because a vehicle cannot
+  // acknowledge. An escalation naming a driver but not the vehicle sends
+  // somebody looking for the wrong van.
+  const who = describeIncidentSubject(input.staffName, input.vehicleRegistration);
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
   const escalatedIdempotencyKey = buildIncidentEscalatedIdempotencyKey(input.incidentId, input.escalationLevel);
   const payload: NotifyPayload = {
@@ -224,10 +287,12 @@ export async function sendEscalationNotification(input: EscalationNotificationIn
   const result = await safeNotify(payload, { incidentId: input.incidentId });
 
   if (requiresMandatoryIncidentWhatsApp(input.severity, input.producerKind)) {
-    const { recipient_user_ids: _drop, idempotency_key: _drop2, ...waPayload } = payload;
-    const waFailed = await sendMandatoryWhatsApp(
-      recipients.userIds, waPayload, payload.event_type, escalatedIdempotencyKey, { incidentId: input.incidentId });
-    result.failed += waFailed;
+    result.failed += await deliverMandatoryWhatsApp({
+      incidentId: input.incidentId, incidentReference: input.incidentReference,
+      incidentType: input.incidentType, vehicleRegistration: input.vehicleRegistration,
+      projectName: input.projectName, detectedAt: input.detectedAt,
+      payload, userIds: recipients.userIds, idempotencyKey: escalatedIdempotencyKey,
+    });
   }
 
   return result;
@@ -302,6 +367,53 @@ export async function sendMorningSummaryNotification(input: MorningSummaryGroupI
     recipient_user_ids: [input.recipientUserId],
     idempotency_key: buildMorningSummaryIdempotencyKey(input.recipientUserId, input.projectId, input.workDate),
   }, { recipientUserId: input.recipientUserId, projectId: input.projectId, workDate: input.workDate });
+}
+
+// -- Vehicle morning summary (PR8) ------------------------------------------
+
+/**
+ * Reuses the registered `fleet.operational_morning_summary` event — the vehicle
+ * summary is the same kind of daily digest to the same audience, and a second
+ * event would need a second channel-preference default nobody would keep in step.
+ */
+export const VEHICLE_MORNING_SUMMARY_EVENT = 'fleet.operational_morning_summary';
+
+/**
+ * Its own key namespace, and NOT `buildMorningSummaryIdempotencyKey(user, null, date)`.
+ * That builder renders a null project as the literal `unassigned`, which the roster
+ * summary already emits for its projectless bucket — so a shared namespace would make
+ * the two summaries collide on the same recipient and date, and claimNotification would
+ * silently suppress whichever ran second. See `vehicleSummaryPhase.ts`.
+ */
+export function buildVehicleMorningSummaryIdempotencyKey(recipientUserId: string, workDate: string): string {
+  return `fleet-vehicle-morning-summary:${recipientUserId}:${workDate}`;
+}
+
+export interface VehicleMorningSummaryInput {
+  recipientUserId: string;
+  workDate: string;
+  items: { incidentType: IncidentType; count: number }[];
+}
+
+/** Vehicle incidents carry no staff and no project, so this payload has neither — the vehicle registration lives in the group message only. */
+export async function sendVehicleMorningSummaryNotification(input: VehicleMorningSummaryInput): Promise<NotifyResult> {
+  const totalCount = input.items.reduce((sum, item) => sum + item.count, 0);
+  const breakdown = input.items.map((item) => `${humanizeCode(item.incidentType)}: ${item.count}`).join(', ');
+  return safeNotify({
+    event_type: VEHICLE_MORNING_SUMMARY_EVENT,
+    title: `Fleet vehicle incident summary — ${input.workDate}`,
+    body: totalCount === 0
+      ? `No vehicle incidents recorded for ${input.workDate}.`
+      : `${totalCount} vehicle incident(s) — ${breakdown}`,
+    action_url: '/fleet/incidents',
+    source_module: 'fleet-incidents',
+    metadata: {
+      summaryScope: 'vehicle', workDate: input.workDate, totalCount,
+      items: input.items.map((item) => ({ incidentType: item.incidentType, count: item.count })),
+    },
+    recipient_user_ids: [input.recipientUserId],
+    idempotency_key: buildVehicleMorningSummaryIdempotencyKey(input.recipientUserId, input.workDate),
+  }, { recipientUserId: input.recipientUserId, workDate: input.workDate });
 }
 
 // -- Monitor health -----------------------------------------------------------

@@ -363,12 +363,12 @@ export default function PurchaseOrderDetailPage() {
         {status === 'draft' && (
           <>
             <button
-              onClick={() => router.push(`/procurement/purchase-orders/${id}/edit`)}
+              onClick={() => setActiveTab('items')}
               disabled={actionLoading}
               className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               <Edit className="h-4 w-4" />
-              Edit
+              Edit Items
             </button>
             <button
               onClick={() => handleAction('submit')}

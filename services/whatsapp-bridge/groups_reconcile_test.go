@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"go.mau.fi/whatsmeow/types"
 )
@@ -282,5 +283,38 @@ func TestReconcileClientAccessorIsRaceFree(t *testing.T) {
 
 	if getReconcileClient() == nil {
 		t.Fatal("client was lost")
+	}
+}
+
+// The 5-minute reload drove GetJoinedGroups 288 times a day and WhatsApp
+// started returning 429 within hours. These pin the floor that prevents a
+// repeat.
+func TestReconcileIntervalDefaultsToSixHours(t *testing.T) {
+	t.Setenv("WA_RECONCILE_INTERVAL", "")
+	if got := reconcileInterval(); got != 6*time.Hour {
+		t.Fatalf("default = %s, want 6h", got)
+	}
+}
+
+func TestReconcileIntervalRejectsAggressiveOverride(t *testing.T) {
+	// 5m is the exact value that caused the incident.
+	t.Setenv("WA_RECONCILE_INTERVAL", "5m")
+	got := reconcileInterval()
+	if got != minReconcileInterval {
+		t.Fatalf("interval = %s, want exactly the %s floor", got, minReconcileInterval)
+	}
+}
+
+func TestReconcileIntervalAcceptsReasonableOverride(t *testing.T) {
+	t.Setenv("WA_RECONCILE_INTERVAL", "2h")
+	if got := reconcileInterval(); got != 2*time.Hour {
+		t.Fatalf("interval = %s, want 2h", got)
+	}
+}
+
+func TestReconcileIntervalFallsBackOnGarbage(t *testing.T) {
+	t.Setenv("WA_RECONCILE_INTERVAL", "not-a-duration")
+	if got := reconcileInterval(); got != defaultReconcileInterval {
+		t.Fatalf("interval = %s, want the default on unparseable input", got)
 	}
 }

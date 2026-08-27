@@ -33,6 +33,24 @@ function sastInstant(date: [number, number, number], time: [number, number, numb
   return new Date(Date.UTC(year, month - 1, day, hour - 2, minute, second));
 }
 
+/**
+ * The instant a SAST work date begins, in epoch milliseconds.
+ *
+ * Exported so `statusService` can measure its history window from the real
+ * start of the day rather than from UTC midnight. The offset belongs here:
+ * this module is where the operational timezone is defined and where every
+ * other schedule instant is built.
+ *
+ * A SAST day begins at 22:00Z the day before. Treating the work date as UTC
+ * midnight therefore places its start two hours LATE, and for the two hours
+ * after SAST midnight that puts "now" before the start of the very work date
+ * derived from it — a negative age. The monitor derives `workDate` in SAST, so
+ * this was rejecting every run between 00:00 and 02:00 SAST, every night.
+ */
+export function sastStartOfWorkDate(workDate: string): number {
+  return sastInstant(parseDate(workDate), [0, 0, 0]).getTime();
+}
+
 function addMinutes(value: Date, minutes: number): Date {
   return new Date(value.getTime() + minutes * 60_000);
 }

@@ -34,6 +34,9 @@ vi.mock('../monitorService', () => monitor);
 const producer = vi.hoisted(() => ({ resolveScheduledIncidentType: vi.fn() }));
 vi.mock('../incidentProducer', () => producer);
 
+const vehiclePhase = vi.hoisted(() => ({ runVehicleMorningSummaryPhase: vi.fn() }));
+vi.mock('../vehicleSummaryPhase', () => vehiclePhase);
+
 import { runIncidentActions } from '../actionRunner';
 import type { IncidentRule } from '../types';
 import type { OperationalStatusSummary } from '../../operations/types';
@@ -84,6 +87,7 @@ beforeEach(() => {
     query: vi.fn().mockResolvedValue([]),
   }));
   incidentRepo.insertIncidentAction.mockResolvedValue({ id: 'action-1' });
+  vehiclePhase.runVehicleMorningSummaryPhase.mockResolvedValue(null);
   notifications.sendEscalationNotification.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
   notifications.sendMorningSummaryNotification.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
   notifications.sendMonitorFailedNotification.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
@@ -422,5 +426,46 @@ describe('status-monitor health check', () => {
 
     expect(nextDayKey).toBe('missing:2026-08-19');
     expect(nextDayKey).not.toBe(firstKey);
+  });
+});
+
+// PR8. The vehicle summary has no monitor-run row and its own claim-based guard, so its
+// failure mode has to be pure isolation: nothing it does may reach the escalation or
+// roster-summary counters, or a broken vehicle query would report both as degraded.
+describe('runIncidentActions — the vehicle summary phase is isolated', () => {
+  it('leaves the escalation and roster-summary results untouched when it throws', async () => {
+    db.query.mockResolvedValue([dueRow()]);
+    vehiclePhase.runVehicleMorningSummaryPhase.mockRejectedValue(new Error('vehicle counts query exploded'));
+
+    const result = await runIncidentActions(AFTER_0815);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.escalatedCount).toBe(1);
+    expect(result.notifications.failed).toBe(0);
+    expect(result.vehicleSummary).toBeNull();
+    const finalizedEscalation = runs.finalizeMonitorRun.mock.calls.find((call) => call[0] === RUN_ID);
+    expect(finalizedEscalation?.[1]).toMatchObject({ status: 'succeeded', errorCount: 0 });
+  });
+
+  it('reports its outcome separately, never folded into the notification counters', async () => {
+    vehiclePhase.runVehicleMorningSummaryPhase.mockResolvedValue({
+      workDate: '2026-08-17', totalIncidents: 4, groupPostFailed: false, delivered: 3, failed: 0,
+    });
+
+    const result = await runIncidentActions(AFTER_0815);
+
+    expect(result.vehicleSummary).toMatchObject({ workDate: '2026-08-17', delivered: 3 });
+    expect(result.summariesSentCount).toBe(0);
+    expect(result.notifications.delivered).toBe(0);
+  });
+
+  it('runs it even on a tick where the roster summary already ran today', async () => {
+    runs.findLatestMonitorRun.mockImplementation(async (kind: string) => (kind === 'status_monitor'
+      ? runRow({ runKind: 'status_monitor', status: 'succeeded', startedAt: AFTER_0815.effectiveAt })
+      : runRow({ runKind: 'morning_summary', status: 'succeeded', effectiveAt: AFTER_0815.effectiveAt })));
+
+    await runIncidentActions(AFTER_0815);
+
+    expect(vehiclePhase.runVehicleMorningSummaryPhase).toHaveBeenCalledTimes(1);
   });
 });

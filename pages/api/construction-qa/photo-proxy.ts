@@ -14,6 +14,7 @@ import path from 'path';
 import fs from 'fs';
 import { apiResponse } from '@/lib/apiResponse';
 import { isVlmProxyAuthorized, secretsMatch } from '@/lib/vlm/photoProxyAuth';
+import { QFIELD_KEY_DENYLIST } from '@/lib/construction-qa/qfieldKeyGuard';
 import { streamMinioObject, resolveLatestVersion, PHOTO_CONTENT_TYPES } from '@/lib/construction-qa/minioPhotoStream';
 
 const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-photos';
@@ -39,8 +40,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     if (source === 'qfield') {
-      // Guard against shell injection — key is passed to docker exec
-      if (/[;`$|&\\(){}\[\]!#]/.test(key)) {
+      // See QFIELD_KEY_DENYLIST for why parentheses/spaces are allowed.
+      if (QFIELD_KEY_DENYLIST.test(key)) {
         return apiResponse.badRequest(res, 'Invalid characters in photo key');
       }
       return await proxyMinioPhoto(key, res);

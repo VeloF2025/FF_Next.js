@@ -52,7 +52,39 @@ export interface IncidentSourceEvent {
   sourceEventId: string;
   occurredAt: string;
   staffId?: string | null;
+  /**
+   * The driver's name AS IT READ when the event was detected, mirroring the
+   * scheduled path's `IncidentAssignmentContext.staffNameSnapshot`.
+   *
+   * The queue and every notification read the snapshot column, never a live
+   * join back to `staff` — so without this an attributed incident would carry
+   * a `staff_id` and still render "Unassigned". Only meaningful alongside
+   * `staffId`; a name with no id names nobody the review flow can act on.
+   */
+  staffNameSnapshot?: string | null;
   vehicleId?: string | null;
+  /**
+   * The vehicle's registration AS IT READ when the event was detected.
+   *
+   * Snapshot, like the scheduled path's `vehicleRegistrationSnapshot`: a
+   * registration can be reassigned or corrected, and a historical incident must
+   * keep saying which vehicle it was actually about. It is also the only human
+   * label a vehicle incident has — nothing else on a source event names the
+   * thing that moved.
+   *
+   * Optional here, unlike `OpenedNotificationInput.vehicleRegistration`, which
+   * PR5 made required so a caller cannot silently ship "not recorded" into an
+   * accident alert. The asymmetry is deliberate: `vehicleId` on this interface
+   * is itself optional, so requiring only the registration would be incoherent.
+   *
+   * What actually closes the hole is a TEST, not the type system — a caller can
+   * satisfy the required notification field with a literal `null` and compile
+   * perfectly well. `incidentProducer.test.ts` pins that a supplied registration
+   * reaches `CreateIncidentInput`, and `vehicleDetectorService.test.ts` pins
+   * that the detectors supply one. Do not read the required field on the
+   * notification side as a compile-time guarantee here.
+   */
+  vehicleRegistrationSnapshot?: string | null;
   projectId?: string | null;
   operationalSiteId?: string | null;
   operationalAssignmentId?: string | null;
@@ -150,9 +182,23 @@ export interface IncidentActionRunnerResult {
   escalatedCount: number;
   summariesSentCount: number;
   notifications: IncidentDeliverySummary;
+  /** PR8's vehicle summary. Null before 08:15 SAST, or when that phase threw — it has no monitor-run row, so this is its only report. Required, not optional: `runIncidentActions` always sets it, and an optional field would let a caller read `undefined` as "the phase is not wired up" when it means "it did not run today". */
+  vehicleSummary: VehicleSummaryResult | null;
 }
 
 export type IncidentDeliverySummary = NotifyResult;
+
+/** PR8's 08:15 SAST vehicle-incident summary outcome. It has no monitor-run row (migration 510's run-kind CHECK admits only three kinds), so this result is its only bookkeeping. */
+export interface VehicleSummaryResult {
+  /** The SAST calendar date summarised — the day BEFORE the tick's SAST date. */
+  workDate: string;
+  totalIncidents: number;
+  /** True only when the group post was attempted and failed. NOT the inverse of "posted": a later tick that day is claim-suppressed and reports `false`, because nothing failed. */
+  groupPostFailed: boolean;
+  /** Per-recipient notifications actually delivered — never attempts. */
+  delivered: number;
+  failed: number;
+}
 
 export interface IncidentListRequest {
   lifecycleStatuses?: IncidentLifecycleStatus[];
@@ -204,6 +250,8 @@ export interface IncidentListItem {
   lifecycleStatus: IncidentLifecycleStatus;
   staffId: string | null;
   staffName: string | null;
+  /** `vehicle_registration_snapshot` — the queue's only vehicle label. A telematics incident is about a vehicle first, and without this column a vehicle-first row reads as anonymous. */
+  vehicleRegistration: string | null;
   projectId: string | null;
   projectName: string | null;
   operationalSiteName: string | null;

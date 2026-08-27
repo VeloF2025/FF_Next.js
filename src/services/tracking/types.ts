@@ -24,6 +24,21 @@ export interface ProviderPosition {
   bearing: number | null;
   altitudeM: number | null;
   gpsFixType: number | null;
+  /**
+   * The provider's own event vocabulary for this fix, verbatim and unmapped.
+   *
+   * Cartrack's `event_description` carries a 14-value set -- IGNITION_ON/OFF, MOTION_START/END,
+   * IDLING_START/CONTINUE/END, GPS_LOCK/LOST, SPEEDING_START/END, HARSH_BRAKING, HARSH_CORNERING,
+   * PERIODIC_EVENT -- measured over 55,009 events across 8 vehicles and 7 days on 2026-08-25. It
+   * is worth keeping because the device already computes harshness itself, and it does so on the
+   * firmware family whose `linearG`/`lateralG` are constant zero: those are real events our g
+   * columns cannot see at all.
+   *
+   * Null for netstar and ituran, whose live paths expose no equivalent field. Deliberately NOT
+   * normalised into a shared enum -- a provider may add a value at any time, and silently mapping
+   * an unrecognised one to null would lose exactly the value worth noticing.
+   */
+  providerEventType: string | null;
 }
 
 /**

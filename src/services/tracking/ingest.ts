@@ -34,13 +34,14 @@ import type { ProviderKey, ProviderPosition } from './types';
 /** Reject fixes dated further ahead than this — device clock skew. */
 export const MAX_FUTURE_MS = 5 * 60 * 1000;
 
-/** Rows per INSERT: 500 * 18 columns = 9,000 params, well under Postgres's 65,535 limit. */
+/** Rows per INSERT: 500 * 19 columns = 9,500 params, well under Postgres's 65,535 limit. */
 const CHUNK_SIZE = 500;
 
 const COLUMNS = [
   'vehicle_id', 'tracker_id', 'provider', 'account_ref', 'provider_event_id', 'recorded_at',
   'lat', 'lon', 'speed_kph', 'road_speed_kph', 'is_speeding', 'ignition',
   'odometer_km', 'linear_g', 'lateral_g', 'bearing', 'altitude_m', 'gps_fix_type',
+  'provider_event_type',
 ] as const;
 
 interface TrackerRow extends Record<string, unknown> {
@@ -131,6 +132,7 @@ export async function ingestPositions(
       t.vehicle_id, t.tracker_id, provider, accountRef, eventId, p.recordedAt,
       p.lat, p.lon, p.speedKph, p.roadSpeedKph, p.isSpeeding, p.ignition,
       p.odometerKm, p.linearG, p.lateralG, p.bearing, p.altitudeM, p.gpsFixType,
+      p.providerEventType,
     ]);
   }
 

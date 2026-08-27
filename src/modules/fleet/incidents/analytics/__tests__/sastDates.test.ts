@@ -12,14 +12,27 @@ import {
   datesInMonth, endOfWorkDate, sastMonthStart, shiftMonth, toWorkDate,
 } from '../sastDates';
 
+/**
+ * A `DATE` column as node-postgres hands it back when the server is on SAST:
+ * midnight at a FIXED +02:00, whatever zone the test process happens to run in.
+ *
+ * The assertion below used the ambient zone and asserted that `toISOString()`
+ * disagreed with the local date — true in Johannesburg, false under `TZ=UTC`,
+ * and false in the other direction west of Greenwich. A test that passes only
+ * where it was written is not evidence about the code.
+ */
+const sastDateColumn = (workDate: string): Date => new Date(`${workDate}T00:00:00+02:00`);
+
 describe('toWorkDate', () => {
   it('reads a Date through its local parts, not through UTC', () => {
-    // node-postgres hands back a DATE column as LOCAL midnight. toISOString()
-    // on this value yields the 31st of the previous month in any positive
-    // offset - the exact bug this function exists to avoid.
-    const localMidnight = new Date(2026, 7, 1, 0, 0, 0); // 2026-08-01 local
-    expect(toWorkDate(localMidnight)).toBe('2026-08-01');
-    expect(localMidnight.toISOString().slice(0, 10)).not.toBe('2026-08-01');
+    // Constructed from local parts, exactly as a DATE column arrives: the
+    // answer is those parts back, in any zone.
+    expect(toWorkDate(new Date(2026, 7, 1, 0, 0, 0))).toBe('2026-08-01');
+  });
+
+  it('is why the UTC route cannot be used: SAST midnight is the day before', () => {
+    // Fixed offset, so this holds identically under TZ=UTC and TZ=Pacific/Midway.
+    expect(sastDateColumn('2026-08-01').toISOString().slice(0, 10)).toBe('2026-07-31');
   });
 
   it('pads single-digit months and days', () => {

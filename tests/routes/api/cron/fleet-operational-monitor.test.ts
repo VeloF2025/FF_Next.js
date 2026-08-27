@@ -9,6 +9,21 @@ vi.mock('@/modules/fleet/incidents/cronLock', () => lock);
 const monitor = vi.hoisted(() => ({ runOperationalMonitor: vi.fn() }));
 vi.mock('@/modules/fleet/incidents/monitorService', () => monitor);
 
+// Both exports the route uses. `vehicleDetectorPhaseFailure` is the shape the
+// route reports when the phase could not run at all — mocking only
+// `runVehicleDetectors` left it undefined, and the "a throwing detector phase
+// does not fail the tick" test then 500'd for the mock's reason rather than
+// the route's.
+const detectors = vi.hoisted(() => ({
+  runVehicleDetectors: vi.fn(),
+  vehicleDetectorPhaseFailure: vi.fn(() => ({
+    status: 'failed' as const, vehiclesEvaluated: 0, eventsDetected: 0, incidentsOpened: 0,
+    incidentsUnchanged: 0, incidentsSuppressedByRule: 0, notificationsAccepted: 0,
+    notificationsFailed: 0, detectorFailures: 0, producerFailures: 0,
+  })),
+}));
+vi.mock('@/modules/fleet/vehicleDetectors/vehicleDetectorService', () => detectors);
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMocks } from 'node-mocks-http';
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -29,10 +44,17 @@ const RUN_RESULT = {
   incidentsUpdatedCount: 0, incidentsClearedCount: 0, notifications: { delivered: 1, suppressed: 0, failed: 0 },
 };
 
+const DETECTOR_RESULT = {
+  status: 'succeeded' as const, vehiclesEvaluated: 18, eventsDetected: 2, incidentsOpened: 1,
+  incidentsUnchanged: 1, incidentsSuppressedByRule: 0, notificationsAccepted: 3,
+  notificationsFailed: 0, detectorFailures: 0, producerFailures: 0,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.CRON_SECRET = CRON_AUTH_FIXTURE;
   monitor.runOperationalMonitor.mockResolvedValue(RUN_RESULT);
+  detectors.runVehicleDetectors.mockResolvedValue(DETECTOR_RESULT);
   lock.runWithCronLock.mockImplementation(async (_lockName: string, work: () => Promise<unknown>) => ({
     ran: true, result: await work(),
   }));
@@ -89,6 +111,46 @@ describe('POST /api/cron/fleet-operational-monitor', () => {
     const res = await run(AUTH);
 
     expect(res._getStatusCode()).toBe(500);
+  });
+
+  it('runs the vehicle detectors AFTER the roster monitor, inside the same lock', async () => {
+    const order: string[] = [];
+    monitor.runOperationalMonitor.mockImplementation(async () => { order.push('monitor'); return RUN_RESULT; });
+    detectors.runVehicleDetectors.mockImplementation(async () => { order.push('detectors'); return DETECTOR_RESULT; });
+
+    const res = await run(AUTH);
+
+    expect(order).toEqual(['monitor', 'detectors']);
+    expect(lock.runWithCronLock).toHaveBeenCalledTimes(1);
+    expect(res._getJSONData().data).toMatchObject({
+      monitorRunId: 'run-1', vehicleDetectors: { status: 'succeeded', incidentsOpened: 1 },
+    });
+  });
+
+  it('does not run the detectors at all when the lock is held', async () => {
+    lock.runWithCronLock.mockResolvedValue({ ran: false });
+
+    await run(AUTH);
+
+    expect(detectors.runVehicleDetectors).not.toHaveBeenCalled();
+  });
+
+  it('a throwing detector phase does NOT fail the tick or lose the monitor result', async () => {
+    detectors.runVehicleDetectors.mockRejectedValue(new Error('positions unreadable'));
+
+    const res = await run(AUTH);
+
+    expect(res._getStatusCode()).toBe(200);
+    expect(res._getJSONData().data).toMatchObject({
+      status: 'succeeded', monitorRunId: 'run-1', vehicleDetectors: { status: 'failed' },
+    });
+  });
+
+  it('a failing roster monitor still 500s — the detector phase does not rescue it', async () => {
+    monitor.runOperationalMonitor.mockRejectedValue(new Error('db unreachable'));
+
+    expect((await run(AUTH))._getStatusCode()).toBe(500);
+    expect(detectors.runVehicleDetectors).not.toHaveBeenCalled();
   });
 
   it('accepts GET as well as POST', async () => {

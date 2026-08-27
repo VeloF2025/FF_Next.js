@@ -21,6 +21,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { incidentApi, IncidentApiError, type EvidenceUploadBody } from './incidentApi';
 import { IncidentActionPanel } from './IncidentActionPanel';
+import { IncidentTimeline } from './IncidentTimeline';
+import { RetentionHoldPanel } from './RetentionHoldPanel';
 import type { IncidentAction, IncidentDetail, IncidentVisibility } from '../types';
 import type { AttendanceCorrectionState, DriverInputState } from '../driver/types';
 
@@ -197,6 +199,10 @@ export function IncidentReviewDrawer({ incidentId, canEdit, returnFocus, onClose
   const closeButton = useRef<HTMLButtonElement>(null);
   const [detail, setDetail] = useState<IncidentDetail | null>(null);
   const [error, setError] = useState<IncidentApiError | null>(null);
+  // The chronology loads on its own request and otherwise refetches only when
+  // the incident changes, so an action or an upload made in the open drawer has
+  // to tell it to read again — `load()` below refreshes the detail, not it.
+  const [chronologyVersion, setChronologyVersion] = useState(0);
 
   const load = async (): Promise<void> => {
     try { setDetail(await incidentApi.detail(incidentId)); setError(null); }
@@ -221,7 +227,11 @@ export function IncidentReviewDrawer({ incidentId, canEdit, returnFocus, onClose
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
   }
 
-  const refreshAfterChange = (): void => { void load(); onChanged(); };
+  const refreshAfterChange = (): void => {
+    void load();
+    setChronologyVersion((version) => version + 1);
+    onChanged();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -236,6 +246,15 @@ export function IncidentReviewDrawer({ incidentId, canEdit, returnFocus, onClose
         {detail && <div className="mt-4 space-y-5">
           <DriverInputStatus driverInput={detail.driverInput} />
           <DetailSections detail={detail} />
+          {/* Added beside the existing sections, not in place of them (stage 8, task 6):
+              the chronology carries no bodies, so the activity and attachment lists above
+              remain the only place a manager reads a comment or opens evidence. */}
+          <IncidentTimeline incidentId={detail.id} refreshKey={chronologyVersion} />
+          {/* Whether this incident survives the retention window is part of
+              its state, so it sits with the rest of it. The panel decides for
+              itself what to show — a viewer without hold authority gets the
+              state and none of the controls. */}
+          <RetentionHoldPanel incidentId={detail.id} refreshKey={chronologyVersion} />
           <IncidentActionPanel incident={detail} canEdit={canEdit} onSubmitted={refreshAfterChange} />
           <EvidenceUploadForm incidentId={detail.id} canEdit={canEdit} onUploaded={refreshAfterChange} />
         </div>}

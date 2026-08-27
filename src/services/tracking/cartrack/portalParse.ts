@@ -161,6 +161,8 @@ export function toPositions(
       odometerKm: odometerM === null ? null : odometerM / 1000,
       linearG: null,
       lateralG: null,
+      // This feed exposes no event vocabulary of its own. Null, never a synthesised value.
+      providerEventType: null,
       bearing: num(v.bearing),
       altitudeM: null,
       gpsFixType: num(v.gps_fix_type),

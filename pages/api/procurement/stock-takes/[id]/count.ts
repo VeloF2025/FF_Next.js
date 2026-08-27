@@ -1,6 +1,7 @@
 /**
  * Stock Take Count API
- * POST /api/procurement/stock-takes/[id]/count - Record count for a line
+ * POST /api/procurement/stock-takes/[id]/count - Record count for a line,
+ *   or { zero_remaining: true } to record 0 for every uncounted line at once
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -15,6 +16,7 @@ const sql = neon(process.env.DATABASE_URL!);
 interface CountRequest extends StockTakeLineCountData {
   line_id: string;
   is_recount?: boolean;
+  zero_remaining?: boolean;
 }
 
 async function handler(
@@ -48,6 +50,27 @@ async function handler(
     const countedByName = authUser?.name || null;
 
     const data: CountRequest = req.body;
+
+    // Bulk path: everything still uncounted is counted as 0. The variance
+    // trigger fires per row, so variance/value/summary stay correct.
+    if (data.zero_remaining === true) {
+      const zeroed = await sql`
+        UPDATE stock_take_lines
+        SET
+          counted_quantity = 0,
+          counted_at = NOW(),
+          counted_by = ${countedBy},
+          counted_by_name = ${countedByName},
+          status = 'counted',
+          updated_at = NOW()
+        WHERE stock_take_id = ${id} AND counted_quantity IS NULL
+        RETURNING id
+      `;
+      return apiResponse.success(res, {
+        zeroed: zeroed.length,
+        message: `Recorded 0 for ${zeroed.length} uncounted item(s)`,
+      });
+    }
 
     if (!data.line_id) {
       return apiResponse.badRequest(res, 'Line ID is required');

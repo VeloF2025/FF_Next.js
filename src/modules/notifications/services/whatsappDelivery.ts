@@ -249,7 +249,14 @@ function maskPhone(phone: string): string {
 // Delivery Log
 // =============================================================================
 
-async function logDelivery(
+/**
+ * Append one row to the WhatsApp/email delivery audit trail. Exported so a
+ * caller that sends through `sendWhatsAppGroup` directly — rather than through
+ * `deliverWhatsApp` — can still record what it sent (fleet incidents' Fleet
+ * Alerts group post does this). Throws on a DB error; callers that must not
+ * fail because of bookkeeping are responsible for catching.
+ */
+export async function logDelivery(
   notificationId: string | null,
   userId: string,
   channel: string,

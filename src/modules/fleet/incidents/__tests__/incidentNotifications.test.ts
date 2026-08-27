@@ -6,7 +6,12 @@ vi.mock('@/lib/logger', () => logger);
 const bus = vi.hoisted(() => ({ notify: vi.fn() }));
 vi.mock('@/modules/notifications/services/notificationBus', () => bus);
 
-const wa = vi.hoisted(() => ({ deliverWhatsApp: vi.fn() }));
+// sendWhatsAppGroup and logDelivery are mocked even though most of this file
+// exercises the DM path: the module under test imports the group path too, and
+// a mock missing them turns a group post into a TypeError that the group
+// module's own catch swallows into the fallback — every DM assertion below
+// would then pass for the wrong reason on a machine that has the JID set.
+const wa = vi.hoisted(() => ({ deliverWhatsApp: vi.fn(), sendWhatsAppGroup: vi.fn(), logDelivery: vi.fn() }));
 vi.mock('@/modules/notifications/services/whatsappDelivery', () => wa);
 
 const idem = vi.hoisted(() => ({ claimNotification: vi.fn(), releaseNotificationClaim: vi.fn() }));
@@ -21,6 +26,8 @@ import {
   buildIncidentResolvedIdempotencyKey,
   buildMonitorFailedIdempotencyKey,
   buildMorningSummaryIdempotencyKey,
+  buildVehicleMorningSummaryIdempotencyKey,
+  sendVehicleMorningSummaryNotification,
   sendEscalationNotification,
   sendIncidentOpenedNotification,
   sendMonitorFailedNotification,
@@ -44,11 +51,18 @@ function rule(overrides: Partial<IncidentRule> = {}): IncidentRule {
   };
 }
 
+// This file pins the per-user DM leg, which only runs when no group is
+// configured. A developer or CI box with FLEET_ALERTS_WA_GROUP_JID exported
+// would otherwise silently exercise the group path instead — see the
+// both-modes tests at the end for the configured case.
 beforeEach(() => {
   vi.clearAllMocks();
+  delete process.env.FLEET_ALERTS_WA_GROUP_JID;
   recipients.resolveIncidentRecipients.mockResolvedValue({ userIds: [PM, OVERSIGHT], failed: false });
   bus.notify.mockResolvedValue({ delivered: 2, suppressed: 0, failed: 0 });
   wa.deliverWhatsApp.mockResolvedValue(undefined);
+  wa.sendWhatsAppGroup.mockResolvedValue(undefined);
+  wa.logDelivery.mockResolvedValue(undefined);
   idem.claimNotification.mockResolvedValue(true);
   idem.releaseNotificationClaim.mockResolvedValue(undefined);
 });
@@ -83,6 +97,43 @@ describe('sendIncidentOpenedNotification', () => {
     }));
   });
 
+  it('names the VEHICLE in the body when the incident has no staff member', async () => {
+    // A telematics incident never has one, and "Unknown staff — Unassigned
+    // project — review required" is indistinguishable from a bug at the
+    // receiving end. Asserted on the rendered body, not on the input.
+    await sendIncidentOpenedNotification({
+      ...baseInput, incidentType: 'theft_after_hours_movement', producerKind: 'source_event',
+      staffName: null, projectName: null, operationalSiteName: null,
+      vehicleRegistration: 'ABC 123 GP', reasonCodes: [],
+    });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'ABC 123 GP — Unassigned project — review required',
+    }));
+  });
+
+  it('names the driver AND the vehicle when both are known', async () => {
+    // Driver attribution made "both known" the normal case for a telematics
+    // incident, and for a non-critical type this body is the whole alert —
+    // there is no WhatsApp leg and no other vehicle field. Naming only the
+    // driver leaves the reader guessing which of eighteen vehicles it was.
+    await sendIncidentOpenedNotification({ ...baseInput, vehicleRegistration: 'ABC 123 GP' });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'Jane Driver (ABC 123 GP) — Site One — attendance_late',
+    }));
+  });
+
+  it('names the staff member alone when the incident has no vehicle', async () => {
+    // The roster path: no registration exists, and an empty bracket would be
+    // worse than none.
+    await sendIncidentOpenedNotification({ ...baseInput, vehicleRegistration: null });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'Jane Driver — Site One — attendance_late',
+    }));
+  });
+
   it('omits coordinates, raw GPS data, and disciplinary language from the payload', async () => {
     await sendIncidentOpenedNotification(baseInput);
 
@@ -101,7 +152,7 @@ describe('sendIncidentOpenedNotification', () => {
     expect(result).toEqual({ delivered: 0, suppressed: 0, failed: 1 });
   });
 
-  it('sends WhatsApp directly to every recipient for a critical source-event incident, in addition to notify()', async () => {
+  it('DMs every recipient for a critical source-event incident when no Fleet Alerts group is configured, in addition to notify()', async () => {
     await sendIncidentOpenedNotification({
       ...baseInput, producerKind: 'source_event', severity: 'critical',
       incidentType: 'accident_sos', rule: rule({ incidentType: 'accident_sos', severity: 'critical', channels: { inApp: true, email: true, whatsapp: true } }),
@@ -202,6 +253,7 @@ describe('sendEscalationNotification', () => {
     severity: 'high' as const, producerKind: 'scheduled_detection' as const,
     projectId: PROJECT, staffName: 'Jane Driver', projectName: 'Project One',
     operationalSiteName: 'Site One', escalationLevel: 2,
+    vehicleRegistration: 'JX 12 AB GP', detectedAt: '2026-08-18T08:00:00.000Z',
   };
 
   it('uses the incident id + escalation level idempotency key', async () => {
@@ -210,6 +262,38 @@ describe('sendEscalationNotification', () => {
     expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
       event_type: 'fleet.operational_incident_escalated',
       idempotency_key: `fleet-incident-escalated:${INCIDENT}:2`,
+    }));
+  });
+
+  it('names the VEHICLE in the escalation body when there is no staff member', async () => {
+    // These are exactly the incidents that DO escalate: a vehicle cannot
+    // acknowledge, so a telematics incident reaches level 1 by construction.
+    await sendEscalationNotification({
+      ...input, incidentType: 'theft_after_hours_movement', producerKind: 'source_event',
+      staffName: null, projectName: null, operationalSiteName: null,
+      vehicleRegistration: 'ABC 123 GP',
+    });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'ABC 123 GP — Unassigned project — still unacknowledged at escalation level 2',
+    }));
+  });
+
+  it('names the driver AND the vehicle in an escalation when both are known', async () => {
+    // An escalation naming a driver but not the vehicle sends somebody looking
+    // for the wrong van.
+    await sendEscalationNotification(input);
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'Jane Driver (JX 12 AB GP) — Site One — still unacknowledged at escalation level 2',
+    }));
+  });
+
+  it('names the staff member alone in an escalation when there is no vehicle', async () => {
+    await sendEscalationNotification({ ...input, vehicleRegistration: null });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'Jane Driver — Site One — still unacknowledged at escalation level 2',
     }));
   });
 
@@ -241,13 +325,23 @@ describe('sendEscalationNotification', () => {
     expect(wa.deliverWhatsApp).not.toHaveBeenCalled();
   });
 
-  it('sends mandatory WhatsApp directly to every recipient for a critical source-event escalation, in addition to notify()', async () => {
+  it('DMs every recipient for a critical source-event escalation when no Fleet Alerts group is configured', async () => {
     await sendEscalationNotification({ ...input, severity: 'critical', producerKind: 'source_event', incidentType: 'accident_sos' });
 
     expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({ event_type: 'fleet.operational_incident_escalated' }));
     expect(wa.deliverWhatsApp).toHaveBeenCalledTimes(2);
     expect(wa.deliverWhatsApp).toHaveBeenCalledWith(PM, expect.anything(), null);
     expect(wa.deliverWhatsApp).toHaveBeenCalledWith(OVERSIGHT, expect.anything(), null);
+  });
+
+  it('posts to the group instead of DMing when a Fleet Alerts group IS configured', async () => {
+    process.env.FLEET_ALERTS_WA_GROUP_JID = '120363000000000000@g.us';
+
+    const result = await sendEscalationNotification({ ...input, severity: 'critical', producerKind: 'source_event' });
+
+    expect(wa.sendWhatsAppGroup).toHaveBeenCalledTimes(1);
+    expect(wa.deliverWhatsApp).not.toHaveBeenCalled();
+    expect(result.failed).toBe(0);
   });
 
   it('counts a mandatory WhatsApp delivery failure on escalation without throwing', async () => {
@@ -415,5 +509,45 @@ describe('sendMonitorFailedNotification', () => {
       .toBe(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-20'));
     expect(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-20'))
       .not.toBe(buildMonitorFailedIdempotencyKey('status_monitor', 'missing:2026-08-21'));
+  });
+});
+
+// PR8. The roster summary renders a null project as the literal `unassigned`, and vehicle
+// incidents are projectless too — so if the vehicle summary reused that builder the two
+// digests would produce the SAME key for the same recipient and date, and claimNotification
+// would silently drop whichever ran second. These must never collide, for any project id.
+describe('vehicle morning-summary keys never collide with the roster summary', () => {
+  const WORK_DATE = '2026-08-30';
+
+  it('uses a distinct namespace from the roster summary, including its unassigned bucket', () => {
+    const vehicleKey = buildVehicleMorningSummaryIdempotencyKey(PM, WORK_DATE);
+    expect(vehicleKey).toBe(`fleet-vehicle-morning-summary:${PM}:${WORK_DATE}`);
+    for (const projectId of [null, PROJECT, 'unassigned', '']) {
+      expect(buildMorningSummaryIdempotencyKey(PM, projectId, WORK_DATE)).not.toBe(vehicleKey);
+    }
+  });
+
+  it('cannot be confused by prefix either way', () => {
+    const rosterKey = buildMorningSummaryIdempotencyKey(PM, null, WORK_DATE);
+    const vehicleKey = buildVehicleMorningSummaryIdempotencyKey(PM, WORK_DATE);
+    expect(vehicleKey.startsWith('fleet-morning-summary:')).toBe(false);
+    expect(rosterKey.startsWith('fleet-vehicle-morning-summary:')).toBe(false);
+  });
+
+  it('separates recipients and work dates', () => {
+    expect(buildVehicleMorningSummaryIdempotencyKey(PM, WORK_DATE))
+      .not.toBe(buildVehicleMorningSummaryIdempotencyKey(PM, '2026-08-29'));
+    expect(buildVehicleMorningSummaryIdempotencyKey(PM, WORK_DATE))
+      .not.toBe(buildVehicleMorningSummaryIdempotencyKey(INCIDENT, WORK_DATE));
+  });
+
+  it('sends a zero-incident summary rather than nothing', async () => {
+    bus.notify.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
+
+    await sendVehicleMorningSummaryNotification({ recipientUserId: PM, workDate: WORK_DATE, items: [] });
+
+    const payload = bus.notify.mock.calls[0]?.[0];
+    expect(payload?.body).toContain('No vehicle incidents');
+    expect(payload?.metadata?.summaryScope).toBe('vehicle');
   });
 });

@@ -22,7 +22,6 @@ function row(overrides: Partial<ReleasedAggregate> = {}): ReleasedAggregate {
     dimensionLevel: 'site',
     dimensionProjectId: 'p1',
     dimensionSiteId: 's1',
-    generalizedFromLevel: null,
     metricKey: 'presence.confirmed_days',
     metricKind: 'ratio',
     numerator: 1,
@@ -108,7 +107,7 @@ describe('replaceMonth', () => {
     expect(result.rowsWritten).toBe(1);
   });
 
-  it('clears the month, inserts the new rows, then retires other versions - in that order', async () => {
+  it('clears, inserts, retires other versions and their coverage, then records coverage - in that order', async () => {
     mocks.query.mockResolvedValue([]);
     const { calls } = captureTransaction();
 
@@ -117,14 +116,25 @@ describe('replaceMonth', () => {
     const kinds = calls.map((c) =>
       c.sql.includes('aggregates:clear') ? 'clear'
         : c.sql.includes('aggregates:insert') ? 'insert'
-        : c.sql.includes('retire-other-versions') ? 'retire' : 'other');
-    expect(kinds).toEqual(['clear', 'insert', 'retire']);
+        : c.sql.includes('retire-other-version-coverage') ? 'retire-coverage'
+        : c.sql.includes('retire-other-versions') ? 'retire'
+        : c.sql.includes('record-coverage') ? 'coverage' : 'other');
+    // The two retirements are adjacent and both precede the coverage write. A
+    // version's rows and the coverage that speaks for them go together: leaving
+    // the coverage behind is a gate reading TRUE for a month the published view
+    // answers with nothing. Coverage last (migration 530): it asserts the rows
+    // above exist, so anything that throws before it must leave no coverage row
+    // behind.
+    expect(kinds).toEqual(['clear', 'insert', 'retire', 'retire-coverage', 'coverage']);
     expect(calls[2]?.params).toEqual(['2026-07-01', 2]);
-    // Scoped to OTHER versions of this month. Without the exclusion the
-    // statement would deactivate the rows the INSERT above just wrote, leaving
-    // the month with no active rows at all -- which reads as "no coverage" and
+    // Both retirements are scoped to OTHER versions of this month. Without the
+    // exclusion the first would deactivate the rows the INSERT above just
+    // wrote, and the second would delete the coverage written immediately
+    // after -- either of which leaves the month reporting no coverage and
     // blocks retention from ever purging it.
     expect(calls[2]?.sql).toContain('metric_version <> $2');
+    expect(calls[3]?.params).toEqual(['2026-07-01', 2]);
+    expect(calls[3]?.sql).toContain('metric_version <> $2');
   });
 
   it('leaves this version active while retiring the previous one', async () => {

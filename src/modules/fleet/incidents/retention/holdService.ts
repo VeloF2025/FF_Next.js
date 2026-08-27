@@ -223,8 +223,16 @@ export async function releaseRetentionHold(
 export interface IncidentHoldsView {
   holds: RetentionHold[];
   actions: RetentionHoldAction[];
-  /** False for a scoped viewer without hold authority — they see the badge, not the controls. */
+  /** False for a scoped viewer without `edit` authority — they see the badge, not the review/release controls. */
   canManage: boolean;
+  /**
+   * False for a viewer without `create` authority. Kept separate from
+   * `canManage` because `createRetentionHold` checks `create` while review and
+   * release check `edit`: a grant of one and not the other is expressible, so
+   * collapsing them into a single flag offers a Place-hold button whose
+   * request the server then refuses.
+   */
+  canCreate: boolean;
 }
 
 export async function listIncidentHoldsForViewer(
@@ -233,6 +241,9 @@ export async function listIncidentHoldsForViewer(
   await assertIncidentInScope(incidentId, actor);
   const holds = await listIncidentHolds(incidentId);
   const actionLists = await Promise.all(holds.map((hold) => listHoldActions(hold.id)));
-  const canManage = await userHasPermission(actor.userId, FLEET_RETENTION_HOLDS_PERMISSION, 'edit');
-  return { holds, actions: actionLists.flat(), canManage };
+  const [canManage, canCreate] = await Promise.all([
+    userHasPermission(actor.userId, FLEET_RETENTION_HOLDS_PERMISSION, 'edit'),
+    userHasPermission(actor.userId, FLEET_RETENTION_HOLDS_PERMISSION, 'create'),
+  ]);
+  return { holds, actions: actionLists.flat(), canManage, canCreate };
 }

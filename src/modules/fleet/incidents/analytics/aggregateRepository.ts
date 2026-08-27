@@ -79,7 +79,7 @@ function insertParams(
     : DURATION_BUCKET_COLUMNS.map(() => null);
   return [
     row.metricVersion, row.monthStart, row.dimensionLevel, row.dimensionProjectId, row.dimensionSiteId,
-    row.generalizedFromLevel, row.metricKey, row.metricKind, row.numerator, row.denominator,
+    null, row.metricKey, row.metricKind, row.numerator, row.denominator,
     row.histogram?.sampleCount ?? null, row.histogram?.sumSeconds ?? null, ...buckets,
     row.contributorCount, true, runId, checksum,
   ];
@@ -133,6 +133,56 @@ export async function replaceMonth(
        UPDATE fleet_operational_monthly_aggregates SET is_active = false, updated_at = now()
        WHERE month_start = $1::date AND metric_version <> $2 AND is_active = true`,
       [monthStart, metricVersion],
+    );
+
+    // The retirement above deactivates the OTHER versions' rows; this drops the
+    // coverage that spoke for them, in the same transaction, because a coverage
+    // row that outlives the rows it attests to is a gate reading TRUE for a
+    // month the published view returns nothing for.
+    //
+    // The scenario is a version bump followed by a revert. Bumping to 2 retires
+    // version 1's rows for every month the nightly window recomputes. Reverting
+    // to 1 recomputes only the months still inside that window; an OLDER month
+    // keeps its retired version-1 rows and — without this statement — its
+    // version-1 coverage row, which then authorises purging a month whose
+    // published answer is empty. That is the one direction a deletion gate may
+    // not fail in, and no later run would ever correct it: the month is outside
+    // the recalculation window, so `replaceMonth` is never called for it again.
+    //
+    // Scoped to `metric_version <> $2` so it can never touch the coverage being
+    // written immediately below.
+    await client.query(
+      `/* fleet-analytics-aggregates:retire-other-version-coverage */
+       DELETE FROM fleet_operational_aggregate_month_coverage
+       WHERE month_start = $1::date AND metric_version <> $2`,
+      [monthStart, metricVersion],
+    );
+
+    // Coverage is recorded HERE, in the same transaction as the rows it
+    // attests to (migration 530). A separate write after the fact could commit
+    // while the rows did not, and the consequence of that particular lie is
+    // retention deleting identifiable detail against an aggregate that was
+    // never written.
+    //
+    // Written on every path, exactly like the retirement above: a month that
+    // publishes NOTHING is still a month that was aggregated. That is the whole
+    // defect this closes — the old gate counted published rows, so a month
+    // whose every group fell below the anonymity threshold, or in which nothing
+    // qualifying happened, reported no coverage forever and was never purged.
+    //
+    // Upserted because the nightly job re-aggregates the whole recalculation
+    // window, so this key is rewritten every night; the run and timestamp name
+    // the LATEST run to have covered the month, not the first.
+    await client.query(
+      `/* fleet-analytics-aggregates:record-coverage */
+       INSERT INTO fleet_operational_aggregate_month_coverage
+         (metric_version, month_start, aggregation_run_id, row_count, completed_at)
+       VALUES ($1, $2::date, $3, $4, now())
+       ON CONFLICT (metric_version, month_start) DO UPDATE
+         SET aggregation_run_id = EXCLUDED.aggregation_run_id,
+             row_count = EXCLUDED.row_count,
+             completed_at = EXCLUDED.completed_at`,
+      [metricVersion, monthStart, runId, rows.length],
     );
   });
 

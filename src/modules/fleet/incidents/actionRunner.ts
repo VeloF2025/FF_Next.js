@@ -13,17 +13,20 @@
  * returned counters instead of aborting the tick.
  */
 import { query, transaction, type TxnClient } from '@/lib/db-pool';
+import { log } from '@/lib/logger';
 import { insertIncidentAction } from './incidentRepository';
 import { sendEscalationNotification, sendMonitorFailedNotification } from './incidentNotifications';
 import {
   findLatestMonitorRun, findStaleRunningRuns, finalizeMonitorRun, startMonitorRun,
 } from './runRepository';
 import { sastDateString } from '../parking/sastDate';
-import { addMinutesIso, applyDelivery, boundedErrorSummary, recordPhaseError } from './incidentActionShared';
+import { addMinutesIso, applyDelivery, boundedErrorSummary, MODULE, recordPhaseError } from './incidentActionShared';
 import type { EscalationTotals, SummaryTotals } from './incidentActionShared';
 import { runMorningSummaryPhase } from './incidentSummaryPhase';
+import { runVehicleMorningSummaryPhase } from './vehicleSummaryPhase';
 import type {
-  IncidentActionRunnerRequest, IncidentActionRunnerResult, IncidentProducerKind, IncidentSeverity, IncidentType,
+  IncidentActionRunnerRequest, IncidentActionRunnerResult, IncidentProducerKind, IncidentSeverity,
+  IncidentType, VehicleSummaryResult,
 } from './types';
 
 const STALE_STATUS_MONITOR_MINUTES = 15; // 3x the 5-min cadence: absorbs one missed tick, still catches a real outage promptly
@@ -32,7 +35,7 @@ const STALE_STATUS_MONITOR_MINUTES = 15; // 3x the 5-min cadence: absorbs one mi
 interface DueEscalationRow extends Record<string, unknown> {
   id: string; incident_reference: string; incident_type: IncidentType; severity: IncidentSeverity;
   project_id: string | null; staff_name_snapshot: string | null; project_name_snapshot: string | null;
-  operational_site_name_snapshot: string | null; escalation_level: number;
+  operational_site_name_snapshot: string | null; vehicle_registration_snapshot: string | null; escalation_level: number;
   opened_at: string; next_escalation_at: string | null; source_event_id: string | null;
   acknowledgement_target_minutes: number; reminder_interval_minutes: number; maximum_escalation_level: number;
 }
@@ -51,6 +54,7 @@ async function findDueEscalations(effectiveAt: string): Promise<DueEscalationRow
     `/* fleet-incident-actions:due-escalations */
      SELECT i.id, i.incident_reference, i.incident_type, i.severity, i.project_id,
        i.staff_name_snapshot, i.project_name_snapshot, i.operational_site_name_snapshot,
+       i.vehicle_registration_snapshot,
        i.escalation_level, i.opened_at, i.next_escalation_at, i.source_event_id,
        r.acknowledgement_target_minutes, r.reminder_interval_minutes, r.maximum_escalation_level
      FROM fleet_operational_incidents i
@@ -111,7 +115,8 @@ async function runEscalationPhase(request: IncidentActionRunnerRequest, runId: s
         incidentId: row.id, incidentReference: row.incident_reference, incidentType: row.incident_type,
         severity: row.severity, producerKind: producerKindOf(row), projectId: row.project_id, staffName: row.staff_name_snapshot,
         projectName: row.project_name_snapshot, operationalSiteName: row.operational_site_name_snapshot,
-        escalationLevel: outcome.newLevel,
+        escalationLevel: outcome.newLevel, vehicleRegistration: row.vehicle_registration_snapshot ?? null,
+        detectedAt: row.opened_at,
       }));
     } catch (error) {
       recordPhaseError(totals, '[fleet-incident-actions] escalation failed for one incident', { incidentId: row.id }, error);
@@ -176,6 +181,18 @@ export async function runIncidentActions(request: IncidentActionRunnerRequest): 
 
   await runEscalationPhase(request, run.id, totals);
   await runMorningSummaryPhase(request, summaryTotals);
+  // A fourth, fully isolated phase (PR8). It keeps its own totals and its own guard —
+  // a throw here must not reach the escalation or roster-summary counters, and must not
+  // change this run's finalized status, or one broken vehicle query would report the
+  // roster summary as degraded too.
+  let vehicleSummary: VehicleSummaryResult | null = null;
+  try {
+    vehicleSummary = await runVehicleMorningSummaryPhase(request);
+  } catch (vehicleError) {
+    log.error('[fleet-incident-actions] vehicle morning-summary phase failed', {
+      error: vehicleError instanceof Error ? vehicleError.message : String(vehicleError),
+    }, MODULE);
+  }
   await runStatusMonitorHealthCheck(request.effectiveAt, totals);
 
   const status = (totals.errorCount + summaryTotals.errorCount) > 0 || (totals.notifFailed + summaryTotals.notifFailed) > 0
@@ -192,5 +209,9 @@ export async function runIncidentActions(request: IncidentActionRunnerRequest): 
       delivered: totals.notifAccepted + summaryTotals.notifAccepted, suppressed: 0,
       failed: totals.notifFailed + summaryTotals.notifFailed,
     },
+    // Reported separately, never folded into the counters above: the vehicle summary has no
+    // monitor-run row of its own (see vehicleSummaryPhase.ts), so this is where its outcome
+    // becomes visible in the cron response.
+    vehicleSummary,
   };
 }
