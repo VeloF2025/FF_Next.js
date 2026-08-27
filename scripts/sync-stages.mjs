@@ -454,57 +454,68 @@ async function main() {
     const { byPrefix, sowOnly } = await discoverProjects(pool, args);
 
     log(`=== 1Map Sync Starting: ${sites.join(', ')} ===`);
-    log('Authenticating with 1Map...');
-    const cookieStr = await authenticate();
-    log('Authenticated OK');
-
-    const client = await pool.connect();
-    let liveImportId;
-    try {
-      liveImportId = await ensureLiveImport(client);
-    } finally {
-      client.release();
-    }
 
     let totalProps = 0;
     let stagedProjects = 0;
+    let onemapError = null;
 
-    for (const site of sites) {
+    // The 1Map half — auth, the live-import row, and the per-site sweep — is
+    // isolated from the SOW pass below, which needs no 1Map at all. An auth
+    // failure used to abort the whole run and silently skip the SOW projects.
+    // The failure still reaches cron via the non-zero exit at the end.
+    try {
+      log('Authenticating with 1Map...');
+      const cookieStr = await authenticate();
+      log('Authenticated OK');
+
+      const client = await pool.connect();
+      let liveImportId;
       try {
-        const records = await fetchAllRecords(cookieStr, site, (q, page, total, n) =>
-          log(`  ${q}: page ${page}/${Math.ceil(total)} (${n} records)`));
-        log(`  ${site}: fetched ${records.length} records from 1Map`);
-        // Which sites did this free-text query actually reach? A code whose own
-        // site has drifted still returns incidental matches from elsewhere, so
-        // the record count alone looks merely low rather than wrong. Printing
-        // the histogram makes that visible in the log the next time it happens.
-        log(`  ${site}: sites returned — ${summariseSites(records)}`);
-        if (records.length === 0) continue;
-
-        // Always: refresh the flat onemap_properties snapshot.
-        const propClient = await pool.connect();
-        try {
-          const n = await upsertProperties(propClient, records, liveImportId);
-          totalProps += n;
-          log(`  ${site}: upserted ${n} onemap_properties rows`);
-        } finally {
-          propClient.release();
-        }
-
-        // Every project on this prefix → refresh pon_stage_tracking from the
-        // same records; each attributes them through its own drops lookup.
-        const staged = byPrefix.get(site) ?? [];
-        if (staged.length === 0) {
-          log(`  ${site}: no project carries this prefix — onemap_properties only (no stage tracking)`);
-        } else {
-          log(`  ${site}: stage tracking for ${staged.length} project(s)`);
-          for (const project of staged) {
-            if (await syncSite(site, project.uuid, pool, project.name, records)) stagedProjects++;
-          }
-        }
-      } catch (err) {
-        log(`  ${site}: ERROR — ${err.message}`);
+        liveImportId = await ensureLiveImport(client);
+      } finally {
+        client.release();
       }
+
+      for (const site of sites) {
+        try {
+          const records = await fetchAllRecords(cookieStr, site, (q, page, total, n) =>
+            log(`  ${q}: page ${page}/${Math.ceil(total)} (${n} records)`));
+          log(`  ${site}: fetched ${records.length} records from 1Map`);
+          // Which sites did this free-text query actually reach? A code whose own
+          // site has drifted still returns incidental matches from elsewhere, so
+          // the record count alone looks merely low rather than wrong. Printing
+          // the histogram makes that visible in the log the next time it happens.
+          log(`  ${site}: sites returned — ${summariseSites(records)}`);
+          if (records.length === 0) continue;
+
+          // Always: refresh the flat onemap_properties snapshot.
+          const propClient = await pool.connect();
+          try {
+            const n = await upsertProperties(propClient, records, liveImportId);
+            totalProps += n;
+            log(`  ${site}: upserted ${n} onemap_properties rows`);
+          } finally {
+            propClient.release();
+          }
+
+          // Every project on this prefix → refresh pon_stage_tracking from the
+          // same records; each attributes them through its own drops lookup.
+          const staged = byPrefix.get(site) ?? [];
+          if (staged.length === 0) {
+            log(`  ${site}: no project carries this prefix — onemap_properties only (no stage tracking)`);
+          } else {
+            log(`  ${site}: stage tracking for ${staged.length} project(s)`);
+            for (const project of staged) {
+              if (await syncSite(site, project.uuid, pool, project.name, records)) stagedProjects++;
+            }
+          }
+        } catch (err) {
+          log(`  ${site}: ERROR — ${err.message}`);
+        }
+      }
+    } catch (err) {
+      onemapError = err;
+      log(`1Map sweep FAILED — ${err.message} (continuing with SOW-only projects)`);
     }
 
     // SOW-only projects: no 1Map records at all, so totals and the DB-derived
@@ -519,6 +530,13 @@ async function main() {
 
     const totalDuration = ((Date.now() - totalStart) / 1000).toFixed(1);
     log(`=== 1Map Sync Complete: ${totalProps} properties upserted, ${stagedProjects} projects staged, ${totalDuration}s total ===`);
+
+    // Rethrow after the SOW pass so the run still exits non-zero for cron; the
+    // finally below closes the pool and main()'s own catch logs FATAL.
+    if (onemapError) {
+      log('=== 1Map half failed — exiting non-zero ===');
+      throw onemapError;
+    }
   } finally {
     await pool.end();
   }
