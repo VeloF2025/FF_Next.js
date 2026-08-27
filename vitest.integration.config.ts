@@ -24,6 +24,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@/lib/chunkReload': path.resolve(__dirname, './src/lib/chunkReload'),
       '@/lib': path.resolve(__dirname, './lib'),
       '@/components': path.resolve(__dirname, './src/components'),
       '@/hooks': path.resolve(__dirname, './src/hooks'),
