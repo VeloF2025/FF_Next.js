@@ -7,6 +7,13 @@
  * nearest AOI at write time, so a stalled refresh means new sites go
  * unrecognised and workers on them read as "far" forever.
  *
+ * It then calls `refresh_velocity_site_aois()` (migration 531), which mirrors
+ * every `ok` hull into `fno_atlas_project_aois` buffered 300 m — the standing
+ * site geometry the Fleet operational monitor covers vehicle and attendance
+ * fixes against. The two are one chain on purpose: the mirror derives from
+ * `project_aois`, so refreshing the hulls without it publishes yesterday's
+ * shapes to Fleet for a day.
+ *
  * Usage:
  *   npx tsx scripts/cron/refresh-project-aois.ts
  *   npx tsx scripts/cron/refresh-project-aois.ts --dry-run
@@ -214,6 +221,24 @@ async function main(): Promise<void> {
   if (after.length === 0) {
     throw new Error('refresh produced zero AOIs — every clock-in would record no project');
   }
+
+  // Mirror the freshly rebuilt hulls into the Fleet monitor's site geometry.
+  //
+  // AFTER the zero-AOI guard, not before: the mirror's stale sweep removes any
+  // site AOI whose project no longer has an `ok` hull, so an empty refresh
+  // would propagate straight through and strip every Fleet site's geometry
+  // before anything noticed. The guard has to fire first.
+  //
+  // Deliberately NOT best-effort like the distortion alerter below. A failure
+  // here leaves the Fleet operational monitor judging drivers against stale
+  // polygons, which is a wrong answer rather than a missing one — so it throws
+  // and the cron goes red.
+  const siteResult = await sql.query<{ refresh_velocity_site_aois: number }>(
+    'SELECT refresh_velocity_site_aois()',
+    [],
+  );
+  const siteAois = Number(siteResult[0]?.refresh_velocity_site_aois ?? 0);
+  stderr(`[project-aoi-refresh] velocity site AOIs refreshed: ${siteAois}`);
 
   // After the zero-AOI guard on purpose: with no AOIs at all there is nothing
   // to score, and the thrown error above is the louder signal.

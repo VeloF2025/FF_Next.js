@@ -44,6 +44,67 @@ src/modules/fleet/
 | `fleet_gps_jobs` | GPS investigation jobs |
 | `fleet_gps_trips` | Analyzed GPS trips |
 
+## Site geometry: where an operational site's polygon comes from (migration 531)
+
+`fleet_project_operational_sites` takes exactly one geometry source per site — an
+`fno_atlas_project_aois` polygon or a `fleet_authorized_locations` circle
+(`num_nonnulls(project_aoi_id, authorized_location_id) = 1`). **For a Velocity project, use the
+polygon.** Circles were measured and rejected: the minimum bounding circle over Thembisa POP 1's
+own on-site clock-ins is 971 km² against a 1.88 km² polygon, which would call a driver on site
+anywhere in Ekurhuleni; tightening the circles produces the opposite failure on the same sites.
+
+### The velocity source and the refresh chain
+
+Migration 531 adds a source row of its own — `fno_atlas_sources.source_url =
+'fibreflow://project_aois'`, name *Velocity project site AOIs* — and everything under it is owned
+by `refresh_velocity_site_aois()`. **Do not hand-edit rows under that source**; the next refresh
+overwrites them. The active-uniqueness index is `(source_id, site_code, area_name) WHERE
+retired_at IS NULL`, so the separate source is what keeps these rows from colliding with the
+OneMap ingest under `fibreflow://onemap_properties`.
+
+The chain runs nightly, in this order, inside `scripts/cron/refresh-project-aois.ts` (03:15 SAST):
+
+```
+poles  --refresh_project_aois()-->  project_aois.aoi (convex hull, scored ok/suspect/distorted)
+       --refresh_velocity_site_aois()-->  fno_atlas_project_aois  (hull buffered 300 m)
+```
+
+- Only `aoi_status = 'ok'` hulls are mirrored. 523's scoring exists because one pole 145 km out
+  inflated a geofence 63x for months.
+- `site_code` is the **project UUID**, not `project_code` — the only identifier that cannot be
+  edited out from under a live operational site. `area_name` is the project name, so a rename
+  writes a new row and the sweep removes the old one.
+- The 300 m buffer is a measured value, not a knob. Of the trimmed on-site clock-ins the raw pole
+  hull covers 301 of 325 and the buffer covers 324; Themb'elihle goes from 6 of 17 to 17 of 17.
+  Re-measure before changing it.
+- The mirror runs **after** the cron's zero-AOI guard. An empty pole refresh would otherwise sweep
+  every site's geometry away before anything noticed.
+- A stale row (project lost `ok`, lost its poles, was deleted or renamed) is deleted — **unless an
+  operational site references it**, in which case it is retired instead. The FK is NO ACTION, so
+  deleting a referenced row raises 23503 and aborts the whole refresh. Every Fleet consumer
+  already filters `retired_at IS NULL`, so a retired row leaves the evidence path exactly as a
+  deleted one would.
+
+### Linking a new project's operational site
+
+Create the site with `project_aoi_id` pointing at that project's row under the velocity source:
+
+```sql
+SELECT a.id, a.area_name FROM fno_atlas_project_aois a
+  JOIN fno_atlas_sources s ON s.id = a.source_id
+ WHERE s.source_url = 'fibreflow://project_aois'
+   AND a.site_code = '<project uuid>' AND a.retired_at IS NULL;
+```
+
+There is no UI to create or edit these polygons — that gap is why the refresh function exists
+rather than a one-off seed. The Assignments page (`ProjectSiteManager`) can *select* them.
+
+**Expect the monitor to start flagging.** With correct geometry, roughly 35–60% of current
+clock-ins at the newly seeded sites read as off-site, because they are: every off-site cluster
+beyond 500 m is 1–5 staff at one fixed spot at a near-constant distance, i.e. homes. Lawley
+(98.1% on site) is the outlier, which is why it was safe to seed first. Tonga has one clock-in in
+30 days, 210 km out, and Grabouw is `on_hold` — neither gets a site.
+
 ## Operational Status Engine (migration 498, PR 4)
 
 Operational status is an explainable, read-time classification of a roster member's assignment,
