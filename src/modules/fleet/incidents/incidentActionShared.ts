@@ -5,6 +5,7 @@
  * minute-of-day helpers used by more than one phase.
  */
 import { log } from '@/lib/logger';
+import { sastDateString } from '../parking/sastDate';
 import type { NotifyResult } from '@/modules/notifications/types';
 
 export const MODULE = 'FleetIncidentActionRunner';
@@ -33,6 +34,32 @@ export function sastMinutesOfDay(iso: string): number {
   }).formatToParts(new Date(iso));
   return Number(parts.find((p) => p.type === 'hour')?.value ?? '0') * 60 + Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
 }
+/**
+ * SAST is UTC+2 year-round, so a SAST calendar day is exactly `[D 00:00+02:00, D+1 00:00+02:00)`.
+ * The offset is written out explicitly so no server or session timezone can shift a window.
+ */
+export function sastMidnightIso(date: string): string {
+  return `${date}T00:00:00+02:00`;
+}
+
+/** Calendar arithmetic on SAST dates, done through that date's own midnight so it never passes through the host's local calendar. */
+export function shiftSastDate(date: string, days: number): string {
+  const at = new Date(sastMidnightIso(date));
+  at.setUTCDate(at.getUTCDate() + days);
+  return sastDateString(at);
+}
+
+/**
+ * Day of the week of a SAST calendar date, `0` = Sunday through `6` = Saturday.
+ *
+ * The date string is parsed as UTC on purpose: it is already a SAST calendar date, so the only
+ * job left is to name its weekday, and re-interpreting it in the host's zone could move it a day
+ * on any negative-offset host.
+ */
+export function sastWeekday(date: string): number {
+  return new Date(`${date}T00:00:00Z`).getUTCDay();
+}
+
 /** Shared per-phase failure bookkeeping: count it, keep a bounded message, and log with context — never throws, never aborts the phase's loop. */
 export function recordPhaseError(totals: Totals, logLabel: string, context: { incidentId?: string; runId?: string; projectId?: string | null }, error: unknown): void {
   const message = sanitizedMessage(error);

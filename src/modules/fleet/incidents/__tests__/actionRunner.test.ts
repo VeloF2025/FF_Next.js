@@ -37,6 +37,9 @@ vi.mock('../incidentProducer', () => producer);
 const vehiclePhase = vi.hoisted(() => ({ runVehicleMorningSummaryPhase: vi.fn() }));
 vi.mock('../vehicleSummaryPhase', () => vehiclePhase);
 
+const digestPhase = vi.hoisted(() => ({ runWeeklyDigestPhase: vi.fn() }));
+vi.mock('../weeklyDigestPhase', () => digestPhase);
+
 import { runIncidentActions } from '../actionRunner';
 import type { IncidentRule } from '../types';
 import type { OperationalStatusSummary } from '../../operations/types';
@@ -88,6 +91,7 @@ beforeEach(() => {
   }));
   incidentRepo.insertIncidentAction.mockResolvedValue({ id: 'action-1' });
   vehiclePhase.runVehicleMorningSummaryPhase.mockResolvedValue(null);
+  digestPhase.runWeeklyDigestPhase.mockResolvedValue(null);
   notifications.sendEscalationNotification.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
   notifications.sendMorningSummaryNotification.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
   notifications.sendMonitorFailedNotification.mockResolvedValue({ delivered: 1, suppressed: 0, failed: 0 });
@@ -467,5 +471,71 @@ describe('runIncidentActions — the vehicle summary phase is isolated', () => {
     await runIncidentActions(AFTER_0815);
 
     expect(vehiclePhase.runVehicleMorningSummaryPhase).toHaveBeenCalledTimes(1);
+  });
+});
+
+// PR9. The weekly digest has no monitor-run row and its own claim-based guard, so like the
+// vehicle summary its failure mode has to be pure isolation — and it must not be able to take
+// the vehicle summary down with it either.
+describe('runIncidentActions — the weekly digest phase is isolated', () => {
+  it('leaves every other phase untouched when it throws', async () => {
+    db.query.mockResolvedValue([dueRow()]);
+    vehiclePhase.runVehicleMorningSummaryPhase.mockResolvedValue({
+      workDate: '2026-08-17', totalIncidents: 0, groupPostFailed: false, delivered: 2, failed: 0,
+    });
+    digestPhase.runWeeklyDigestPhase.mockRejectedValue(new Error('weekly aggregate exploded'));
+
+    const result = await runIncidentActions(AFTER_0815);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.escalatedCount).toBe(1);
+    expect(result.notifications.failed).toBe(0);
+    expect(result.weeklyDigest).toBeNull();
+    expect(result.vehicleSummary).toMatchObject({ delivered: 2 });
+    const finalizedEscalation = runs.finalizeMonitorRun.mock.calls.find((call) => call[0] === RUN_ID);
+    expect(finalizedEscalation?.[1]).toMatchObject({ status: 'succeeded', errorCount: 0 });
+  });
+
+  // The reverse direction: the digest must still run when an EARLIER phase blew up.
+  it('still runs when the vehicle summary phase throws before it', async () => {
+    vehiclePhase.runVehicleMorningSummaryPhase.mockRejectedValue(new Error('vehicle counts exploded'));
+    digestPhase.runWeeklyDigestPhase.mockResolvedValue({
+      weekStart: '2026-08-10', weekEnd: '2026-08-16', weekEndExclusive: '2026-08-17',
+      delivered: 1, failed: 0, groupPostFailed: false, skippedNoGroupJid: false,
+    });
+
+    const result = await runIncidentActions(AFTER_0815);
+
+    expect(result.vehicleSummary).toBeNull();
+    expect(result.weeklyDigest).toMatchObject({ weekStart: '2026-08-10', delivered: 1 });
+  });
+
+  // The status-monitor health check runs AFTER the digest, so a throw that escaped the digest's
+  // try/catch would take the tick's health alerting with it.
+  it('does not stop the status-monitor health check that follows it', async () => {
+    runs.findLatestMonitorRun.mockResolvedValue(null);
+    digestPhase.runWeeklyDigestPhase.mockRejectedValue(new Error('weekly aggregate exploded'));
+
+    await runIncidentActions(AFTER_0815);
+
+    expect(notifications.sendMonitorFailedNotification).toHaveBeenCalled();
+  });
+
+  it('reports its outcome separately, never folded into the notification counters', async () => {
+    digestPhase.runWeeklyDigestPhase.mockResolvedValue({
+      weekStart: '2026-08-10', weekEnd: '2026-08-16', weekEndExclusive: '2026-08-17',
+      delivered: 1, failed: 0, groupPostFailed: false, skippedNoGroupJid: false,
+    });
+
+    const result = await runIncidentActions(AFTER_0815);
+
+    expect(result.weeklyDigest).toMatchObject({ delivered: 1 });
+    expect(result.notifications.delivered).toBe(0);
+    expect(result.summariesSentCount).toBe(0);
+  });
+
+  it('runs on every tick, leaving the Monday-08:30 gate to the phase itself', async () => {
+    await runIncidentActions(BEFORE_0815);
+    expect(digestPhase.runWeeklyDigestPhase).toHaveBeenCalledWith(BEFORE_0815);
   });
 });

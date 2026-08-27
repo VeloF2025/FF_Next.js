@@ -25,7 +25,7 @@
 import { query } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { sastDateString } from '../parking/sastDate';
-import { sastMinutesOfDay } from './incidentActionShared';
+import { sastMidnightIso, sastMinutesOfDay, shiftSastDate } from './incidentActionShared';
 import { postToFleetAlertsGroup } from './incidentGroupDelivery';
 import { sendVehicleMorningSummaryNotification, VEHICLE_MORNING_SUMMARY_EVENT } from './incidentNotifications';
 import { resolveIncidentRecipients } from './recipientService';
@@ -68,17 +68,6 @@ export interface VehicleIncidentCount {
 interface CountRow extends Record<string, unknown> {
   incident_type: IncidentType; severity: IncidentSeverity;
   vehicle_registration: string; incident_count: number;
-}
-
-/** SAST is UTC+2 year-round, so a SAST calendar day is exactly `[D 00:00+02:00, D+1 00:00+02:00)` — expressed as explicit offsets so no server or session timezone can shift the window. */
-function sastMidnightIso(date: string): string {
-  return `${date}T00:00:00+02:00`;
-}
-
-function shiftSastDate(date: string, days: number): string {
-  const at = new Date(sastMidnightIso(date));
-  at.setUTCDate(at.getUTCDate() + days);
-  return sastDateString(at);
 }
 
 async function loadVehicleIncidentCounts(workDate: string): Promise<VehicleIncidentCount[]> {
