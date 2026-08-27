@@ -20,6 +20,7 @@ import React from 'react';
 import { useRouter } from 'next/router';
 import { Download, AlertCircle } from 'lucide-react';
 
+import { log } from '@/lib/logger';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SummaryBar } from '@/modules/receipts/components/review/SummaryBar';
 import { FilterBar } from '@/modules/receipts/components/review/FilterBar';
@@ -164,6 +165,7 @@ export default function ReceiptsReviewPage() {
         setDrawer(null);
         setRefreshTick((t) => t + 1);
       } catch (err) {
+        log.error('[receipts-review] single action failed', err instanceof Error ? { message: err.message } : { err });
         setErrorMsg(err instanceof Error ? err.message : 'Action failed');
       } finally {
         setPendingId(null);
@@ -196,6 +198,7 @@ export default function ReceiptsReviewPage() {
       setSelectedIds(new Set());
       setRefreshTick((t) => t + 1);
     } catch (err) {
+      log.error('[receipts-review] bulk action failed', err instanceof Error ? { message: err.message } : { err });
       setErrorMsg(err instanceof Error ? err.message : 'Bulk action failed');
     } finally {
       setBulkPending(false);
