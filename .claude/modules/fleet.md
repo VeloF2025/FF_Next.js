@@ -2007,7 +2007,7 @@ entry. `accident_sos` is the exception and remains a documented stub with no sou
 | `theft_after_hours_movement` | `critical` + WhatsApp | ≥500 m displacement, ≥2 fixes, inside the after-hours window, `after_hours_exempt = false` | Live (PR4) |
 | `severe_driving` | `high`, no WhatsApp, in the 08:15 summary | `harsh_linear_g` 0.350, `harsh_lateral_g` 0.350, **`harsh_min_speed_kph` 20**, `speed_over_limit_kph` 15 | Live (PR4) |
 | `prolonged_unauthorized_stop` | `high` | `unauthorized_stop_minutes` 45, `known_site_radius_meters` 500 | Live (PR4) |
-| `lost_contact_moving` | `high` | `lost_contact_minutes` 30, used as a FLOOR: `max(rule, 3 × observed p90 gap)` | Live (PR4) — in practice a **7-vehicle** detector |
+| `lost_contact_moving` | `high` | `lost_contact_minutes` 30, used as a FLOOR: `max(rule, 3 × observed p90 gap)`; **at most one incident per vehicle per SAST day** (source id bucketed by `calendarDayKey` — a flappy unit that reconnects mints a new last-fix instant per drop; MW63YBGP opened 4 in 48 h) | Live (PR4) — in practice a **7-vehicle** detector |
 | `dangerous_area_entry` | `high` | `known_site_radius_meters` | **Deferred — no dangerous-area table exists** |
 
 Three numbers that are decisions, not defaults:
