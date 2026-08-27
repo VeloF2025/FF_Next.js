@@ -63,6 +63,19 @@ export function takeRawString(v: string | string[] | undefined): string | null {
   return takeString(v);
 }
 
+/**
+ * Total row count matching the active filters — used to decide whether
+ * "Load more" has anything left to fetch. The summary API scopes its
+ * per-status buckets by the same status filter the list uses (see
+ * pages/api/staff/receipts.ts), so with a single status selected only
+ * that bucket is populated; with no status filter ("All"), every bucket
+ * is populated and the total is their sum.
+ */
+export function totalMatchingStatus(summary: SummaryShape, status: ReceiptStatus | ''): number {
+  if (status) return summary[status].count;
+  return STATUSES.reduce((sum, s) => sum + summary[s].count, 0);
+}
+
 export function coerceSummary(raw: unknown): SummaryShape {
   if (!raw || typeof raw !== 'object') return emptySummary();
   const empty: SummaryBucket = { count: 0, totalCents: 0 };

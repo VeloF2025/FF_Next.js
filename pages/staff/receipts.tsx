@@ -27,9 +27,10 @@ import { FilterBar } from '@/modules/receipts/components/review/FilterBar';
 import { ReceiptsTable } from '@/modules/receipts/components/review/ReceiptsTable';
 import { RejectDrawer } from '@/modules/receipts/components/review/RejectDrawer';
 import { BulkActionBar } from '@/modules/receipts/components/review/BulkActionBar';
+import { LoadMoreButton } from '@/modules/receipts/components/review/LoadMoreButton';
+import { useReceiptsList } from '@/modules/receipts/components/review/useReceiptsList';
 import {
   buildQueryString,
-  coerceSummary,
   takeCategory,
   takeMonth,
   takeRawString,
@@ -37,11 +38,9 @@ import {
 } from '@/modules/receipts/components/review/filters';
 import {
   DEFAULT_FILTERS,
-  emptySummary,
   type Filters,
   type ReviewAction,
   type ReviewListItem,
-  type SummaryShape,
 } from '@/modules/receipts/components/review/types';
 
 type Drawer =
@@ -51,15 +50,14 @@ type Drawer =
 export default function ReceiptsReviewPage() {
   const router = useRouter();
   const [filters, setFilters] = React.useState<Filters>(DEFAULT_FILTERS);
-  const [items, setItems] = React.useState<ReviewListItem[] | null>(null);
-  const [summary, setSummary] = React.useState<SummaryShape | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [pendingId, setPendingId] = React.useState<string | null>(null);
   const [bulkPending, setBulkPending] = React.useState(false);
   const [refreshTick, setRefreshTick] = React.useState(0);
   const [drawer, setDrawer] = React.useState<Drawer | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+
+  const { items, summary, loading, loadingMore, errorMsg, setErrorMsg, loadMore, totalForFilters } =
+    useReceiptsList(filters, refreshTick, () => setSelectedIds(new Set()));
 
   // Hydrate filters from URL on first mount + when route query changes.
   React.useEffect(() => {
@@ -73,45 +71,6 @@ export default function ReceiptsReviewPage() {
       month: takeMonth(q.month) ?? prev.month,
     }));
   }, [router.isReady, router.query]);
-
-  // Re-fetch whenever filters or refreshTick change; selection doesn't
-  // survive a re-fetch (the underlying rows may have changed).
-  React.useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      setLoading(true);
-      setErrorMsg(null);
-      try {
-        const qs = buildQueryString(filters, { summary: '1' });
-        const res = await fetch(`/api/staff/receipts${qs}`, { credentials: 'include' });
-        const json = await res.json();
-        if (cancelled) return;
-        if (!res.ok || !json.success) {
-          setErrorMsg(
-            res.status === 403
-              ? 'You do not have permission to review receipts.'
-              : json?.error?.message ?? `Server returned HTTP ${res.status}`
-          );
-          setItems([]);
-          setSummary(emptySummary());
-          return;
-        }
-        setItems(json.data.items as ReviewListItem[]);
-        setSummary(coerceSummary(json.data.summary));
-        setSelectedIds(new Set());
-      } catch (err) {
-        if (!cancelled) {
-          setErrorMsg(err instanceof Error ? err.message : 'Failed to load receipts');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [filters, refreshTick]);
 
   const onResetFilters = () => {
     setFilters(DEFAULT_FILTERS);
@@ -262,6 +221,15 @@ export default function ReceiptsReviewPage() {
           onToggleSelectAll={toggleSelectAll}
           onAction={requestAction}
         />
+
+        {items && !loading && (
+          <LoadMoreButton
+            loadedCount={items.length}
+            total={totalForFilters}
+            loading={loadingMore}
+            onClick={loadMore}
+          />
+        )}
 
         {drawer && (
           <RejectDrawer

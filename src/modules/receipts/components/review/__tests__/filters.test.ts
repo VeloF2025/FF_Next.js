@@ -12,8 +12,9 @@ import {
   takeMonth,
   takeRawString,
   takeStatus,
+  totalMatchingStatus,
 } from '../filters';
-import { DEFAULT_FILTERS, type Filters } from '../types';
+import { DEFAULT_FILTERS, emptySummary, type Filters, type SummaryShape } from '../types';
 
 describe('takeStatus', () => {
   it('returns null for undefined', () => {
@@ -132,9 +133,47 @@ describe('buildQueryString', () => {
     expect(qs).toContain('summary=1');
   });
 
+  it('appends an offset of "0" — a falsy-looking string, not the same as empty', () => {
+    // Regression guard: buildQueryString's extras loop skips falsy VALUES
+    // ("" is skipped), but '0' is a non-empty string and must survive —
+    // Load More's very first page request depends on offset=0 reaching
+    // the API, not being silently dropped like an empty extra would be.
+    const qs = buildQueryString(DEFAULT_FILTERS, { offset: '0', limit: '200' });
+    expect(qs).toContain('offset=0');
+    expect(qs).toContain('limit=200');
+  });
+
   it('skips extra params with an empty value', () => {
     const qs = buildQueryString(DEFAULT_FILTERS, { summary: '' });
     expect(qs).not.toContain('summary=');
+  });
+});
+
+describe('totalMatchingStatus', () => {
+  function summaryWith(counts: Partial<Record<keyof SummaryShape, number>>): SummaryShape {
+    const s = emptySummary();
+    for (const [k, count] of Object.entries(counts) as [keyof SummaryShape, number][]) {
+      s[k] = { count, totalCents: 0 };
+    }
+    return s;
+  }
+
+  it('returns just that bucket when a single status is active', () => {
+    // Mirrors the API: with a status filter active, only that bucket is
+    // populated (pages/api/staff/receipts.ts scopes the summary query by
+    // the same status filter as the list).
+    const summary = summaryWith({ submitted: 379 });
+    expect(totalMatchingStatus(summary, 'submitted')).toBe(379);
+  });
+
+  it('sums every bucket when status is "" (All)', () => {
+    const summary = summaryWith({ submitted: 379, approved: 12, rejected: 3, reconciled: 40 });
+    expect(totalMatchingStatus(summary, '')).toBe(434);
+  });
+
+  it('returns 0 for an empty summary', () => {
+    expect(totalMatchingStatus(emptySummary(), 'submitted')).toBe(0);
+    expect(totalMatchingStatus(emptySummary(), '')).toBe(0);
   });
 });
 
