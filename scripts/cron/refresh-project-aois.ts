@@ -7,6 +7,13 @@
  * nearest AOI at write time, so a stalled refresh means new sites go
  * unrecognised and workers on them read as "far" forever.
  *
+ * It then calls `refresh_velocity_site_aois()` (migration 531), which mirrors
+ * every `ok` hull into `fno_atlas_project_aois` buffered 300 m — the standing
+ * site geometry the Fleet operational monitor covers vehicle and attendance
+ * fixes against. The two are one chain on purpose: the mirror derives from
+ * `project_aois`, so refreshing the hulls without it publishes yesterday's
+ * shapes to Fleet for a day.
+ *
  * Usage:
  *   npx tsx scripts/cron/refresh-project-aois.ts
  *   npx tsx scripts/cron/refresh-project-aois.ts --dry-run
@@ -214,6 +221,43 @@ async function main(): Promise<void> {
   if (after.length === 0) {
     throw new Error('refresh produced zero AOIs — every clock-in would record no project');
   }
+
+  // The mirror's OWN guard, and it is not the same as the one above.
+  //
+  // The zero-AOI guard counts rows in `project_aois`. The mirror consumes only
+  // rows scored `ok`, and its sweep retires every site AOI whose project is
+  // not in that set — so a night on which every hull is scored `distorted`
+  // (one bad pole import is enough; see 523) leaves the guard above perfectly
+  // happy with a full table and still strips every Fleet site's geometry.
+  //
+  // Guarding on the `ok` count rather than on a percentage of the previous
+  // run: it needs no prior state, it is the exact input the mirror reads, and
+  // "nothing is ok tonight" is never a legitimate reason to blank the Fleet
+  // monitor. A partial collapse is a real signal too, but it is also a real
+  // shape — projects do get imported and re-scored — so it belongs in the
+  // distortion alerter below, which already reports it.
+  const okAois = await sql.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM project_aois WHERE aoi_status = 'ok'`,
+    [],
+  );
+  if (Number(okAois[0]?.n ?? 0) === 0) {
+    throw new Error(
+      'no project AOI is scored ok — refusing to refresh Velocity site AOIs, which would retire every Fleet site geometry',
+    );
+  }
+
+  // Mirror the freshly rebuilt hulls into the Fleet monitor's site geometry.
+  //
+  // Deliberately NOT best-effort like the distortion alerter below. A failure
+  // here leaves the Fleet operational monitor judging drivers against stale
+  // polygons, which is a wrong answer rather than a missing one — so it throws
+  // and the cron goes red.
+  const siteResult = await sql.query<{ refresh_velocity_site_aois: number }>(
+    'SELECT refresh_velocity_site_aois()',
+    [],
+  );
+  const siteAois = Number(siteResult[0]?.refresh_velocity_site_aois ?? 0);
+  stderr(`[project-aoi-refresh] velocity site AOIs refreshed: ${siteAois}`);
 
   // After the zero-AOI guard on purpose: with no AOIs at all there is nothing
   // to score, and the thrown error above is the louder signal.
