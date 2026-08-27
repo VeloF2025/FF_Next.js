@@ -1,17 +1,17 @@
 /**
- * Inline modal for entering a reject (or reconcile) note.
+ * Inline modal for entering a reject (or reconcile) note. Used for both
+ * a single receipt and a bulk selection — the caller supplies the
+ * subtitle line, everything else (validation, keyboard trap) is shared.
  *
  * Replaces the prior `window.prompt` usage so the reject flow:
  *   - is keyboard-trappable and ARIA-labelled
  *   - survives accidental browser-dialog dismissal
- *   - shows the staff-context the note will be attached to
- *
- * Pattern matches the inline reject drawer used in attendance-corrections.
+ *   - shows the context the note will be attached to
  */
 
 import React from 'react';
 import { CheckCircle2, XCircle, Banknote, X } from 'lucide-react';
-import type { ReviewAction, ReviewListItem } from './types';
+import type { ReviewAction } from './types';
 
 const COPY: Record<ReviewAction, {
   title: string;
@@ -56,18 +56,18 @@ const COPY: Record<ReviewAction, {
 };
 
 interface Props {
-  item: ReviewListItem;
   action: ReviewAction;
+  /** e.g. "Sasol Sunnyside · Aron Kotlolo" (single) or "3 receipts selected" (bulk). */
+  subtitle: string;
   pending: boolean;
   onConfirm: (note: string | null) => void;
   onCancel: () => void;
 }
 
-export function RejectDrawer({ item, action, pending, onConfirm, onCancel }: Props) {
+export function RejectDrawer({ action, subtitle, pending, onConfirm, onCancel }: Props) {
   const cfg = COPY[action];
   const [note, setNote] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
-  const dialogRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   React.useEffect(() => {
@@ -101,24 +101,28 @@ export function RejectDrawer({ item, action, pending, onConfirm, onCancel }: Pro
       role="dialog"
       aria-modal="true"
       aria-labelledby="reject-drawer-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'var(--ff-bg-overlay)' }}
       onClick={(e) => {
         if (e.target === e.currentTarget && !pending) onCancel();
       }}
     >
       <div
-        ref={dialogRef}
-        className="w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900 shadow-xl"
+        className="w-full max-w-md rounded-2xl border shadow-xl"
+        style={{ background: 'var(--ff-bg-card)', borderColor: 'var(--ff-border-medium)' }}
       >
-        <header className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-neutral-800">
+        <header
+          className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b"
+          style={{ borderColor: 'var(--ff-border-light)' }}
+        >
           <div className="flex items-start gap-2">
             {cfg.icon}
             <div>
-              <h2 id="reject-drawer-title" className="text-base font-semibold text-neutral-100">
+              <h2 id="reject-drawer-title" className="text-base font-semibold" style={{ color: 'var(--ff-text-primary)' }}>
                 {cfg.title}
               </h2>
-              <p className="mt-0.5 text-xs text-neutral-400">
-                {item.vendor ?? 'Unknown vendor'} · {item.staff_name ?? 'Unknown staff'}
+              <p className="mt-0.5 text-xs" style={{ color: 'var(--ff-text-secondary)' }}>
+                {subtitle}
               </p>
             </div>
           </div>
@@ -127,14 +131,17 @@ export function RejectDrawer({ item, action, pending, onConfirm, onCancel }: Pro
             onClick={onCancel}
             disabled={pending}
             aria-label="Close"
-            className="text-neutral-500 hover:text-neutral-200 disabled:opacity-40"
+            className="disabled:opacity-40"
+            style={{ color: 'var(--ff-text-tertiary)' }}
           >
             <X className="w-4 h-4" />
           </button>
         </header>
 
         <div className="px-5 py-4 space-y-3">
-          <p className="text-sm text-neutral-300">{cfg.intro}</p>
+          <p className="text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
+            {cfg.intro}
+          </p>
           <label className="block">
             <span className="sr-only">Note</span>
             <textarea
@@ -145,27 +152,30 @@ export function RejectDrawer({ item, action, pending, onConfirm, onCancel }: Pro
               rows={4}
               maxLength={500}
               disabled={pending}
-              className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-800 text-sm text-neutral-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="ff-input resize-none text-sm focus:outline-none focus:ring-2"
+              style={{ ['--tw-ring-color' as string]: 'var(--ff-primary-400)' }}
             />
           </label>
-          <div className="flex justify-between text-[11px] text-neutral-500">
+          <div className="flex justify-between text-[11px]" style={{ color: 'var(--ff-text-tertiary)' }}>
             <span>{note.length} / 500</span>
             {cfg.noteRequired && <span>Reason is required</span>}
           </div>
           {error && (
-            <div role="alert" className="text-xs text-red-300 bg-red-950/40 border border-red-800 rounded-md px-2 py-1.5">
+            <div
+              role="alert"
+              className="text-xs rounded-md px-2 py-1.5"
+              style={{ color: 'var(--ff-error)', background: 'var(--ff-error-light)' }}
+            >
               {error}
             </div>
           )}
         </div>
 
-        <footer className="flex items-center justify-end gap-2 px-5 pb-5 pt-2 border-t border-neutral-800">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={pending}
-            className="rounded-lg bg-neutral-800 hover:bg-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-100 disabled:opacity-50"
-          >
+        <footer
+          className="flex items-center justify-end gap-2 px-5 pb-5 pt-2 border-t"
+          style={{ borderColor: 'var(--ff-border-light)' }}
+        >
+          <button type="button" onClick={onCancel} disabled={pending} className="ff-button ff-button--secondary">
             Cancel
           </button>
           <button

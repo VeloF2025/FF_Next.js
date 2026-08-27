@@ -1,16 +1,9 @@
-import {
-  Receipt,
-  CheckCircle2,
-  XCircle,
-  Banknote,
-  Eye,
-  Loader2,
-} from 'lucide-react';
-import {
-  RECEIPT_CATEGORY_LABELS,
-} from '@/modules/receipts/categories';
+import { Receipt } from 'lucide-react';
+import { RECEIPT_CATEGORY_LABELS } from '@/modules/receipts/categories';
 
 import { StatusPill } from './StatusPill';
+import { RowActions } from './RowActions';
+import { ReceiptCard } from './ReceiptCard';
 import { formatRand, formatDate, formatRelative } from './format';
 import type { ReviewAction, ReviewListItem } from './types';
 
@@ -18,226 +11,209 @@ export function ReceiptsTable({
   items,
   loading,
   pendingId,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
   onAction,
 }: {
   items: ReviewListItem[] | null;
   loading: boolean;
   pendingId: string | null;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: () => void;
   onAction: (item: ReviewListItem, action: ReviewAction) => void;
 }) {
   if (loading && items === null) {
     return (
-      <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 space-y-3">
+      <div className="ff-card space-y-3">
         {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-10 rounded-lg bg-neutral-800/40 animate-pulse" />
+          <div
+            key={i}
+            className="h-10 rounded-lg animate-pulse"
+            style={{ background: 'var(--ff-bg-tertiary)' }}
+          />
         ))}
       </div>
     );
   }
   if (!items || items.length === 0) {
     return (
-      <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-8 text-center">
-        <Receipt className="w-8 h-8 mx-auto text-neutral-600" />
-        <div className="mt-2 text-sm text-neutral-300">No receipts match these filters.</div>
+      <div className="ff-card p-8 text-center">
+        <Receipt className="w-8 h-8 mx-auto" style={{ color: 'var(--ff-text-tertiary)' }} />
+        <div className="mt-2 text-sm" style={{ color: 'var(--ff-text-secondary)' }}>
+          No receipts match these filters.
+        </div>
       </div>
     );
   }
+
+  const allSelected = items.every((i) => selectedIds.has(i.id));
+
   return (
-    <div className="rounded-2xl border border-neutral-800 bg-neutral-900 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-950/40 text-left text-xs uppercase tracking-wide text-neutral-400">
-            <tr>
-              <th className="px-4 py-2">Date</th>
-              <th className="px-4 py-2">Staff</th>
-              <th className="px-4 py-2">Vendor</th>
-              <th className="px-4 py-2">Category</th>
-              <th className="px-4 py-2">Project / Vehicle</th>
-              <th className="px-4 py-2 text-right">Total</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-800">
-            {items.map((r) => (
-              <Row key={r.id} item={r} pendingId={pendingId} onAction={onAction} />
-            ))}
-          </tbody>
-        </table>
+    <>
+      {/* Mobile: stacked cards, no horizontal scroll */}
+      <div className="sm:hidden space-y-3">
+        {items.map((r) => (
+          <ReceiptCard
+            key={r.id}
+            item={r}
+            selected={selectedIds.has(r.id)}
+            pendingId={pendingId}
+            onToggleSelect={onToggleSelect}
+            onAction={onAction}
+          />
+        ))}
       </div>
-    </div>
+
+      {/* Desktop: table */}
+      <div className="hidden sm:block ff-card overflow-hidden p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead
+              className="text-left text-xs uppercase tracking-wide"
+              style={{ background: 'var(--ff-bg-tertiary)', color: 'var(--ff-text-secondary)' }}
+            >
+              <tr>
+                <th className="w-10 px-4 py-2">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={onToggleSelectAll}
+                    aria-label="Select all visible receipts"
+                    className="w-4 h-4"
+                  />
+                </th>
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Staff</th>
+                <th className="px-3 py-2">Vendor</th>
+                <th className="px-3 py-2">Category</th>
+                <th className="px-3 py-2">Project / Vehicle</th>
+                <th className="px-3 py-2 text-right">Total</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y" style={{ borderColor: 'var(--ff-border-light)' }}>
+              {items.map((r) => (
+                <Row
+                  key={r.id}
+                  item={r}
+                  selected={selectedIds.has(r.id)}
+                  pendingId={pendingId}
+                  onToggleSelect={onToggleSelect}
+                  onAction={onAction}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }
 
 function Row({
   item,
+  selected,
   pendingId,
+  onToggleSelect,
   onAction,
 }: {
   item: ReviewListItem;
+  selected: boolean;
   pendingId: string | null;
+  onToggleSelect: (id: string) => void;
   onAction: (item: ReviewListItem, action: ReviewAction) => void;
 }) {
   const isPending = pendingId === item.id;
   const totalCents = Number(item.total_cents);
 
   return (
-    <tr className="text-neutral-200 align-top">
-      <td className="px-4 py-3 whitespace-nowrap">
+    <tr style={{ color: 'var(--ff-text-primary)' }} className="align-top">
+      <td className="px-4 py-2.5">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(item.id)}
+          aria-label={`Select receipt from ${item.vendor ?? 'unknown vendor'}`}
+          className="w-4 h-4"
+        />
+      </td>
+      <td className="px-3 py-2.5 whitespace-nowrap">
         {formatDate(item.receipt_date)}
-        <div className="text-xs text-neutral-500 mt-0.5">
+        <div className="text-xs mt-0.5" style={{ color: 'var(--ff-text-tertiary)' }}>
           captured {formatRelative(item.captured_at)}
         </div>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2.5">
         <div className="font-medium">{item.staff_name ?? '—'}</div>
         {item.staff_email && (
-          <div className="text-xs text-neutral-500">{item.staff_email}</div>
+          <div className="text-xs" style={{ color: 'var(--ff-text-tertiary)' }}>
+            {item.staff_email}
+          </div>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2.5">
         <div className="font-medium truncate max-w-xs" title={item.vendor ?? ''}>
-          {item.vendor ?? <span className="text-neutral-500">No vendor</span>}
+          {item.vendor ?? <span style={{ color: 'var(--ff-text-tertiary)' }}>No vendor</span>}
         </div>
         {item.description && (
-          <div className="text-xs text-neutral-500 truncate max-w-xs" title={item.description}>
+          <div
+            className="text-xs truncate max-w-xs"
+            title={item.description}
+            style={{ color: 'var(--ff-text-tertiary)' }}
+          >
             {item.description}
           </div>
         )}
       </td>
-      <td className="px-4 py-3 whitespace-nowrap">
-        <span className="text-xs uppercase tracking-wide text-neutral-300">
+      <td className="px-3 py-2.5 whitespace-nowrap">
+        <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--ff-text-secondary)' }}>
           {RECEIPT_CATEGORY_LABELS[item.category] ?? item.category}
         </span>
         {item.payment_method === 'company_card' && (
-          <div className="text-[10px] text-neutral-500 mt-0.5">Company card</div>
+          <div className="text-[10px] mt-0.5" style={{ color: 'var(--ff-text-tertiary)' }}>
+            Company card
+          </div>
         )}
       </td>
-      <td className="px-4 py-3 text-xs text-neutral-400">
+      <td className="px-3 py-2.5 text-xs" style={{ color: 'var(--ff-text-secondary)' }}>
         {item.project_name ? (
-          <div className="text-neutral-200">{item.project_name}</div>
+          <div style={{ color: 'var(--ff-text-primary)' }}>{item.project_name}</div>
         ) : (
-          <div className="text-neutral-600">—</div>
+          <div style={{ color: 'var(--ff-text-tertiary)' }}>—</div>
         )}
-        {item.vehicle_registration && (
-          <div className="mt-0.5">{item.vehicle_registration}</div>
-        )}
+        {item.vehicle_registration && <div className="mt-0.5">{item.vehicle_registration}</div>}
       </td>
-      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap font-semibold">
+      <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap font-semibold">
         {formatRand(totalCents)}
         {item.vat_cents !== null && (
-          <div className="text-xs text-neutral-500 font-normal">
+          <div className="text-xs font-normal" style={{ color: 'var(--ff-text-tertiary)' }}>
             VAT {formatRand(Number(item.vat_cents))}
           </div>
         )}
       </td>
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-3 py-2.5 whitespace-nowrap">
         <StatusPill status={item.status} />
         {item.reviewed_by_name && (
-          <div className="text-[10px] text-neutral-500 mt-1">
+          <div className="text-[10px] mt-1" style={{ color: 'var(--ff-text-tertiary)' }}>
             by {item.reviewed_by_name}
           </div>
         )}
         {item.review_note && (
-          <div className="text-[10px] text-neutral-400 mt-0.5 max-w-[12rem] truncate" title={item.review_note}>
+          <div
+            className="text-[10px] mt-0.5 max-w-[12rem] truncate"
+            title={item.review_note}
+            style={{ color: 'var(--ff-text-secondary)' }}
+          >
             “{item.review_note}”
           </div>
         )}
       </td>
-      <td className="px-4 py-3">
-        <RowActions item={item} pendingId={pendingId} isPending={isPending} onAction={onAction} />
+      <td className="px-3 py-2.5">
+        <RowActions item={item} isPending={isPending} onAction={onAction} />
       </td>
     </tr>
-  );
-}
-
-function RowActions({
-  item,
-  isPending,
-  onAction,
-}: {
-  item: ReviewListItem;
-  pendingId: string | null;
-  isPending: boolean;
-  onAction: (item: ReviewListItem, action: ReviewAction) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <a
-        href={`/api/staff/receipts-image?id=${encodeURIComponent(item.id)}`}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 px-2 py-1.5 text-xs text-neutral-200"
-        title="Open the captured image"
-      >
-        <Eye className="w-3.5 h-3.5" />
-        Image
-      </a>
-      {item.status === 'submitted' && (
-        <>
-          <ActionButton kind="approve" disabled={isPending} onClick={() => onAction(item, 'approve')} />
-          <ActionButton kind="reject" disabled={isPending} onClick={() => onAction(item, 'reject')} />
-        </>
-      )}
-      {item.status === 'approved' && (
-        <>
-          <ActionButton kind="reconcile" disabled={isPending} onClick={() => onAction(item, 'reconcile')} />
-          <ActionButton kind="reject" disabled={isPending} onClick={() => onAction(item, 'reject')} />
-        </>
-      )}
-      {item.status === 'rejected' && (
-        <ActionButton kind="approve" disabled={isPending} onClick={() => onAction(item, 'approve')} />
-      )}
-      {item.status === 'reconciled' && (
-        <ActionButton
-          kind="approve"
-          disabled={isPending}
-          onClick={() => onAction(item, 'approve')}
-          label="Undo reconcile"
-        />
-      )}
-      {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-400" />}
-    </div>
-  );
-}
-
-function ActionButton({
-  kind,
-  disabled,
-  onClick,
-  label,
-}: {
-  kind: ReviewAction;
-  disabled: boolean;
-  onClick: () => void;
-  label?: string;
-}) {
-  const cfg = {
-    approve: {
-      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-      text: label ?? 'Approve',
-      cls: 'bg-emerald-700 hover:bg-emerald-600 text-white border-emerald-600',
-    },
-    reject: {
-      icon: <XCircle className="w-3.5 h-3.5" />,
-      text: label ?? 'Reject',
-      cls: 'bg-red-800 hover:bg-red-700 text-white border-red-700',
-    },
-    reconcile: {
-      icon: <Banknote className="w-3.5 h-3.5" />,
-      text: label ?? 'Reconcile',
-      cls: 'bg-blue-700 hover:bg-blue-600 text-white border-blue-600',
-    },
-  }[kind];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${cfg.cls}`}
-    >
-      {cfg.icon}
-      {cfg.text}
-    </button>
   );
 }

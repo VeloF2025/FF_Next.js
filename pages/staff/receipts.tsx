@@ -3,17 +3,17 @@
  *
  * Lists every staff-submitted receipt across the org with filters
  * (status, staff, project, category, month). Reviewers can approve /
- * reject / reconcile, view the captured image (server-proxied via
- * /api/staff/receipts-image), and export the filtered slice as CSV
- * for accounting.
+ * reject / reconcile — one row at a time or in bulk — view the captured
+ * image (server-proxied via /api/staff/receipts-image), and export the
+ * filtered slice as CSV for accounting.
  *
  * RBAC: receipts.review (gated server-side; UI degrades to 403 panel).
  *
  * Default view: submitted (oldest first) — that's the active backlog.
  *
  * This file is intentionally thin — it owns the state machine that
- * coordinates fetch/filter/action. Each visual piece lives under
- * src/modules/receipts/components/review/ (CLAUDE.md: ≤300 lines/file).
+ * coordinates fetch/filter/selection/action. Each visual piece lives
+ * under src/modules/receipts/components/review/ (CLAUDE.md: <=300 lines/file).
  */
 
 import React from 'react';
@@ -25,6 +25,7 @@ import { SummaryBar } from '@/modules/receipts/components/review/SummaryBar';
 import { FilterBar } from '@/modules/receipts/components/review/FilterBar';
 import { ReceiptsTable } from '@/modules/receipts/components/review/ReceiptsTable';
 import { RejectDrawer } from '@/modules/receipts/components/review/RejectDrawer';
+import { BulkActionBar } from '@/modules/receipts/components/review/BulkActionBar';
 import {
   buildQueryString,
   coerceSummary,
@@ -42,6 +43,10 @@ import {
   type SummaryShape,
 } from '@/modules/receipts/components/review/types';
 
+type Drawer =
+  | { kind: 'single'; item: ReviewListItem; action: ReviewAction }
+  | { kind: 'bulk'; items: ReviewListItem[]; action: ReviewAction };
+
 export default function ReceiptsReviewPage() {
   const router = useRouter();
   const [filters, setFilters] = React.useState<Filters>(DEFAULT_FILTERS);
@@ -50,8 +55,10 @@ export default function ReceiptsReviewPage() {
   const [loading, setLoading] = React.useState(true);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [pendingId, setPendingId] = React.useState<string | null>(null);
+  const [bulkPending, setBulkPending] = React.useState(false);
   const [refreshTick, setRefreshTick] = React.useState(0);
-  const [drawer, setDrawer] = React.useState<{ item: ReviewListItem; action: ReviewAction } | null>(null);
+  const [drawer, setDrawer] = React.useState<Drawer | null>(null);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
 
   // Hydrate filters from URL on first mount + when route query changes.
   React.useEffect(() => {
@@ -66,7 +73,8 @@ export default function ReceiptsReviewPage() {
     }));
   }, [router.isReady, router.query]);
 
-  // Re-fetch whenever filters or refreshTick change.
+  // Re-fetch whenever filters or refreshTick change; selection doesn't
+  // survive a re-fetch (the underlying rows may have changed).
   React.useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -89,6 +97,7 @@ export default function ReceiptsReviewPage() {
         }
         setItems(json.data.items as ReviewListItem[]);
         setSummary(coerceSummary(json.data.summary));
+        setSelectedIds(new Set());
       } catch (err) {
         if (!cancelled) {
           setErrorMsg(err instanceof Error ? err.message : 'Failed to load receipts');
@@ -109,83 +118,161 @@ export default function ReceiptsReviewPage() {
   };
 
   const requestAction = (item: ReviewListItem, action: ReviewAction) => {
-    setDrawer({ item, action });
+    setDrawer({ kind: 'single', item, action });
+  };
+
+  const requestBulkAction = (action: ReviewAction) => {
+    const selected = (items ?? []).filter((i) => selectedIds.has(i.id));
+    if (selected.length === 0) return;
+    setDrawer({ kind: 'bulk', items: selected, action });
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const allSelected = (items ?? []).every((i) => prev.has(i.id));
+      return allSelected ? new Set() : new Set((items ?? []).map((i) => i.id));
+    });
   };
 
   const submitAction = async (note: string | null) => {
     if (!drawer) return;
-    const { item, action } = drawer;
-    setPendingId(item.id);
+    if (drawer.kind === 'single') {
+      const { item, action } = drawer;
+      setPendingId(item.id);
+      setErrorMsg(null);
+      try {
+        const res = await fetch('/api/staff/receipts-review', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id, action, note }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          setErrorMsg(json?.error?.message ?? `Server returned HTTP ${res.status}`);
+          return;
+        }
+        setDrawer(null);
+        setRefreshTick((t) => t + 1);
+      } catch (err) {
+        setErrorMsg(err instanceof Error ? err.message : 'Action failed');
+      } finally {
+        setPendingId(null);
+      }
+      return;
+    }
+
+    // Bulk
+    const { items: selected, action } = drawer;
+    setBulkPending(true);
     setErrorMsg(null);
     try {
-      const res = await fetch('/api/staff/receipts-review', {
+      const res = await fetch('/api/staff/receipts-review-bulk', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, action, note }),
+        body: JSON.stringify({ ids: selected.map((i) => i.id), action, note }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
         setErrorMsg(json?.error?.message ?? `Server returned HTTP ${res.status}`);
         return;
       }
+      if (json.data.skippedIds?.length > 0) {
+        setErrorMsg(
+          `${json.data.updatedIds.length} updated, ${json.data.skippedIds.length} skipped (already changed by someone else).`
+        );
+      }
       setDrawer(null);
+      setSelectedIds(new Set());
       setRefreshTick((t) => t + 1);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Action failed');
+      setErrorMsg(err instanceof Error ? err.message : 'Bulk action failed');
     } finally {
-      setPendingId(null);
+      setBulkPending(false);
     }
   };
 
   const exportHref = `/api/staff/receipts-export${buildQueryString(filters)}`;
+  const selectedItems = (items ?? []).filter((i) => selectedIds.has(i.id));
 
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
         <header className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Review receipts</h1>
-            <p className="text-sm text-neutral-400 mt-1">
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--ff-text-primary)' }}>
+              Review receipts
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--ff-text-secondary)' }}>
               Approve, reject, or reconcile staff-submitted slips.
             </p>
           </div>
-          <a
-            href={exportHref}
-            className="inline-flex items-center gap-2 min-h-[48px] rounded-lg bg-neutral-800 hover:bg-neutral-700 px-4 text-sm font-semibold text-neutral-100"
-            data-testid="export-csv"
-          >
+          <a href={exportHref} className="ff-button ff-button--secondary min-h-[48px]" data-testid="export-csv">
             <Download className="w-4 h-4" />
             Export CSV
           </a>
         </header>
 
-        <SummaryBar summary={summary} loading={loading && summary === null} />
+        <SummaryBar
+          summary={summary}
+          loading={loading && summary === null}
+          activeStatus={filters.status}
+          onSelect={(status) => setFilters((f) => ({ ...f, status }))}
+        />
 
         <FilterBar filters={filters} onChange={setFilters} onReset={onResetFilters} />
 
         {errorMsg && (
-          <div role="alert" className="flex items-start gap-2 rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200">
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
+            style={{ background: 'var(--ff-error-light)', color: 'var(--ff-error)' }}
+          >
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
+        <BulkActionBar
+          selected={selectedItems}
+          pending={bulkPending}
+          onAction={requestBulkAction}
+          onClear={() => setSelectedIds(new Set())}
+        />
+
         <ReceiptsTable
           items={items}
           loading={loading}
           pendingId={pendingId}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
           onAction={requestAction}
         />
 
         {drawer && (
           <RejectDrawer
-            item={drawer.item}
             action={drawer.action}
-            pending={pendingId === drawer.item.id}
+            subtitle={
+              drawer.kind === 'single'
+                ? `${drawer.item.vendor ?? 'Unknown vendor'} · ${drawer.item.staff_name ?? 'Unknown staff'}`
+                : `${drawer.items.length} receipts selected`
+            }
+            pending={drawer.kind === 'single' ? pendingId === drawer.item.id : bulkPending}
             onConfirm={submitAction}
             onCancel={() => {
-              if (pendingId === null) setDrawer(null);
+              const isPending = drawer.kind === 'single' ? pendingId !== null : bulkPending;
+              if (!isPending) setDrawer(null);
             }}
           />
         )}

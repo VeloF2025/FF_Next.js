@@ -152,8 +152,13 @@ export function EntitySearch({
   if (selectedId) {
     return (
       <label className="block">
-        <span className="block text-xs uppercase tracking-wide text-neutral-400 mb-1">{label}</span>
-        <div className="flex items-center gap-2 rounded-lg bg-neutral-800 border border-neutral-700 text-sm text-neutral-100 px-3 py-2">
+        <span
+          className="block text-xs uppercase tracking-wide mb-1"
+          style={{ color: 'var(--ff-text-secondary)' }}
+        >
+          {label}
+        </span>
+        <div className="ff-input flex items-center gap-2 text-sm">
           <span className="flex-1 truncate" title={selectedLabel ?? selectedId}>
             {selectedLabel ?? selectedId}
           </span>
@@ -161,7 +166,8 @@ export function EntitySearch({
             type="button"
             onClick={clear}
             aria-label={`Clear ${label}`}
-            className="text-neutral-400 hover:text-neutral-100 shrink-0"
+            className="shrink-0"
+            style={{ color: 'var(--ff-text-tertiary)' }}
           >
             <X className="w-4 h-4" />
           </button>
@@ -188,9 +194,17 @@ export function EntitySearch({
 
   return (
     <label className="block relative" ref={containerRef}>
-      <span className="block text-xs uppercase tracking-wide text-neutral-400 mb-1">{label}</span>
+      <span
+        className="block text-xs uppercase tracking-wide mb-1"
+        style={{ color: 'var(--ff-text-secondary)' }}
+      >
+        {label}
+      </span>
       <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" />
+        <Search
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+          style={{ color: 'var(--ff-text-tertiary)' }}
+        />
         <input
           type="text"
           role="combobox"
@@ -207,11 +221,14 @@ export function EntitySearch({
           onBlur={onBlur}
           onKeyDown={onKey}
           placeholder={placeholder}
-          className="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-sm text-neutral-100 pl-8 pr-8 py-2"
+          className="ff-input text-sm pl-8 pr-8"
           autoComplete="off"
         />
         {loading && (
-          <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 animate-spin" />
+          <Loader2
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin"
+            style={{ color: 'var(--ff-text-tertiary)' }}
+          />
         )}
       </div>
 
@@ -219,7 +236,8 @@ export function EntitySearch({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-30 mt-1 w-full max-h-72 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-800 shadow-xl"
+          className="absolute z-30 mt-1 w-full max-h-72 overflow-y-auto rounded-lg border shadow-xl"
+          style={{ background: 'var(--ff-bg-card)', borderColor: 'var(--ff-border-medium)' }}
         >
           {hits.map((hit, i) => (
             <li
@@ -232,13 +250,18 @@ export function EntitySearch({
                 select(hit);
               }}
               onMouseEnter={() => setActiveIdx(i)}
-              className={`px-3 py-2 cursor-pointer text-sm ${
-                i === activeIdx ? 'bg-blue-600/30 text-blue-100' : 'text-neutral-200 hover:bg-neutral-700'
-              }`}
+              className="px-3 py-2 cursor-pointer text-sm"
+              style={
+                i === activeIdx
+                  ? { background: 'var(--ff-primary-100)', color: 'var(--ff-primary-700)' }
+                  : { color: 'var(--ff-text-primary)' }
+              }
             >
               <div className="font-medium truncate">{hit.primary}</div>
               {hit.secondary && (
-                <div className="text-xs text-neutral-400 truncate">{hit.secondary}</div>
+                <div className="text-xs truncate" style={{ color: 'var(--ff-text-secondary)' }}>
+                  {hit.secondary}
+                </div>
               )}
             </li>
           ))}
@@ -249,7 +272,12 @@ export function EntitySearch({
         <div
           role="status"
           aria-live="polite"
-          className="absolute z-30 mt-1 w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-xs text-neutral-400 shadow-xl"
+          className="absolute z-30 mt-1 w-full rounded-lg border px-3 py-2 text-xs shadow-xl"
+          style={{
+            background: 'var(--ff-bg-card)',
+            borderColor: 'var(--ff-border-medium)',
+            color: 'var(--ff-text-secondary)',
+          }}
         >
           No matches.
         </div>
