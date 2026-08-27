@@ -362,6 +362,19 @@ describe('source events', () => {
     expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({ staffId: null, staffNameSnapshot: null });
   });
 
+  it('refuses a name with no staff id — a snapshot nobody can be asked about', async () => {
+    // `staff_name_snapshot` is what the queue and every alert render, so a name
+    // stored beside a null `staff_id` would show a manager a driver they cannot
+    // request input from and whose `/my` surface the incident never reaches.
+    // The producer drops the name rather than displaying an unactionable one.
+    repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
+    repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));
+
+    await produceIncident(sourceEvent({ staffId: null, staffNameSnapshot: 'Jane Driver' }));
+
+    expect(repo.createIncident.mock.calls[0]![0]).toMatchObject({ staffId: null, staffNameSnapshot: null });
+  });
+
   it('stores null when the caller supplies no registration, never undefined', async () => {
     repo.findIncidentBySourceEvent.mockResolvedValueOnce(null);
     repo.createIncident.mockResolvedValueOnce(incidentRecord({ incidentType: 'accident_sos' }));

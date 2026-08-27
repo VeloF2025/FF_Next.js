@@ -92,11 +92,26 @@ export interface OpenedNotificationInput {
   incidentReference?: string;
 }
 
+/**
+ * Who and what one alert is about.
+ *
+ * Both halves when both are known — `Jane Driver (ABC 123 GP)`. For a
+ * non-critical telematics type this line IS the whole alert (no WhatsApp leg,
+ * no vehicle field anywhere else in the body), so naming only the driver would
+ * make an incident about one of eighteen vehicles unidentifiable, and naming
+ * only the vehicle costs the reader the person they have to talk to. Driver
+ * alone and registration alone remain the fallbacks, in that order: a vehicle
+ * incident has no staff member and a roster incident has no vehicle, and
+ * falling through to "Unknown staff" naming nothing at all is indistinguishable
+ * from a bug at the receiving end.
+ */
+export function describeIncidentSubject(staffName: string | null, vehicleRegistration: string | null): string {
+  if (staffName && vehicleRegistration) return `${staffName} (${vehicleRegistration})`;
+  return staffName ?? vehicleRegistration ?? 'Unknown staff';
+}
+
 function openedBody(input: OpenedNotificationInput): string {
-  // A vehicle incident has no staff member. Falling through to "Unknown staff"
-  // would send a WhatsApp naming nobody and nothing, which is indistinguishable
-  // from a bug at the receiving end.
-  const who = input.staffName ?? input.vehicleRegistration ?? 'Unknown staff';
+  const who = describeIncidentSubject(input.staffName, input.vehicleRegistration);
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
   const reason = input.reasonCodes.length > 0 ? input.reasonCodes.slice(0, 3).join(', ') : 'review required';
   return `${who} — ${where} — ${reason}`;
@@ -248,11 +263,11 @@ export async function sendEscalationNotification(input: EscalationNotificationIn
     }, MODULE);
     return { ...NO_RECIPIENT_RESULT };
   }
-  // Same fallback as `openedBody`, and for the same reason: a telematics
-  // incident has no staff member, so an escalation about one would otherwise
-  // read "Unknown staff — Unassigned project" and name nothing at all. These are
-  // exactly the incidents that escalate, because a vehicle cannot acknowledge.
-  const who = input.staffName ?? input.vehicleRegistration ?? 'Unknown staff';
+  // The same subject line as `openedBody`, for the same reason and then some:
+  // these are exactly the incidents that escalate, because a vehicle cannot
+  // acknowledge. An escalation naming a driver but not the vehicle sends
+  // somebody looking for the wrong van.
+  const who = describeIncidentSubject(input.staffName, input.vehicleRegistration);
   const where = input.operationalSiteName ?? input.projectName ?? 'Unassigned project';
   const escalatedIdempotencyKey = buildIncidentEscalatedIdempotencyKey(input.incidentId, input.escalationLevel);
   const payload: NotifyPayload = {

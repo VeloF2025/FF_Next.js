@@ -168,6 +168,12 @@ export interface DetectorVehicle {
 /**
  * One `vehicle_assignments` row, as driver attribution reads it.
  *
+ * `is_active` is deliberately absent. Every close path sets the flag and the
+ * end date together, so a row is either `{active, open-ended}` or
+ * `{inactive, ended}`; reading the flag would make the date bounds unreachable
+ * and discard every closed row — which is precisely the history attribution
+ * needs. The dates are the rule (`vehicleDriverResolver`).
+ *
  * `assignmentStart`/`assignmentEnd` are `YYYY-MM-DD` STRINGS, not Dates:
  * the columns are DATE, node-postgres parses OID 1082 into a Date in the
  * server's local zone, and a Date round-tripped through UTC renders a day
@@ -180,7 +186,6 @@ export interface VehicleDriverAssignment {
   staffId: string;
   /** `first_name last_name` at read time; null only when the staff row is gone. */
   staffName: string | null;
-  isActive: boolean;
   assignmentStart: string;
   assignmentEnd: string | null;
 }

@@ -20,7 +20,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/logger', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 
-import { runVehicleDetectors, type VehicleDetectorDeps } from '../vehicleDetectorService';
+import { DEFAULT_DEPS, runVehicleDetectors, type VehicleDetectorDeps } from '../vehicleDetectorService';
+import { resolveVehicleDriver } from '../vehicleDriverResolver';
+import { resolveVehicleProjectId } from '../vehicleProjectResolver';
 import { sanitizeMetadata } from '../detectedEventEmitter';
 import { INCIDENT_RULE, RULE, VEHICLE, VEHICLE_ID, latOffset, position } from './detectorFixtures';
 
@@ -296,5 +298,18 @@ describe('sanitizeMetadata', () => {
     });
 
     expect(clean).toEqual({ registration: 'ABC 123 GP', meters: 600, exempt: false, place: null });
+  });
+});
+
+/**
+ * Everything above runs on injected fakes, so the suite cannot tell a correctly
+ * wired production default from a stub that always answers null. In production
+ * that difference is the whole feature: attribution and project scoping simply
+ * stop happening, silently, with every test still green.
+ */
+describe('runVehicleDetectors — the production wiring', () => {
+  it('defaults to the real driver and project resolvers', () => {
+    expect(DEFAULT_DEPS.resolveDriver).toBe(resolveVehicleDriver);
+    expect(DEFAULT_DEPS.resolveProjectId).toBe(resolveVehicleProjectId);
   });
 });

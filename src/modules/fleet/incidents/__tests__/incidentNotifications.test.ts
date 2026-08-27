@@ -112,8 +112,22 @@ describe('sendIncidentOpenedNotification', () => {
     }));
   });
 
-  it('keeps naming the staff member when both are known', async () => {
+  it('names the driver AND the vehicle when both are known', async () => {
+    // Driver attribution made "both known" the normal case for a telematics
+    // incident, and for a non-critical type this body is the whole alert —
+    // there is no WhatsApp leg and no other vehicle field. Naming only the
+    // driver leaves the reader guessing which of eighteen vehicles it was.
     await sendIncidentOpenedNotification({ ...baseInput, vehicleRegistration: 'ABC 123 GP' });
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'Jane Driver (ABC 123 GP) — Site One — attendance_late',
+    }));
+  });
+
+  it('names the staff member alone when the incident has no vehicle', async () => {
+    // The roster path: no registration exists, and an empty bracket would be
+    // worse than none.
+    await sendIncidentOpenedNotification({ ...baseInput, vehicleRegistration: null });
 
     expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
       body: 'Jane Driver — Site One — attendance_late',
@@ -265,8 +279,18 @@ describe('sendEscalationNotification', () => {
     }));
   });
 
-  it('keeps naming the staff member in an escalation when both are known', async () => {
+  it('names the driver AND the vehicle in an escalation when both are known', async () => {
+    // An escalation naming a driver but not the vehicle sends somebody looking
+    // for the wrong van.
     await sendEscalationNotification(input);
+
+    expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
+      body: 'Jane Driver (JX 12 AB GP) — Site One — still unacknowledged at escalation level 2',
+    }));
+  });
+
+  it('names the staff member alone in an escalation when there is no vehicle', async () => {
+    await sendEscalationNotification({ ...input, vehicleRegistration: null });
 
     expect(bus.notify).toHaveBeenCalledWith(expect.objectContaining({
       body: 'Jane Driver — Site One — still unacknowledged at escalation level 2',

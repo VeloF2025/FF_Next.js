@@ -134,19 +134,38 @@ describe('loadVehicleDriverAssignments', () => {
     // keeps the value a calendar date all the way through.
     db.query.mockResolvedValue([{
       id: 'assignment-1', staff_id: 'staff-1', staff_name: 'Jane Driver',
-      is_active: true, assignment_start: '2026-08-01', assignment_end: null,
+      assignment_start: '2026-08-01', assignment_end: null,
     }]);
 
     const assignments = await loadVehicleDriverAssignments('vehicle-1');
 
     expect(assignments).toEqual([{
       assignmentId: 'assignment-1', staffId: 'staff-1', staffName: 'Jane Driver',
-      isActive: true, assignmentStart: '2026-08-01', assignmentEnd: null,
+      assignmentStart: '2026-08-01', assignmentEnd: null,
     }]);
     const [text, params] = db.query.mock.calls[0]!;
     expect(text).toContain("to_char(va.assignment_start, 'YYYY-MM-DD')");
     expect(text).toContain("to_char(va.assignment_end, 'YYYY-MM-DD')");
     expect(params).toEqual(['vehicle-1']);
+  });
+
+  it('returns CLOSED rows too — history is the point, and `is_active` is not consulted', async () => {
+    // The bug this pins: every close path writes `is_active = false` and the end
+    // date in one statement, so an `is_active` predicate makes the date bounds
+    // unreachable and drops all 41 closed rows — i.e. every past driver, for
+    // every incident older than the current assignment.
+    db.query.mockResolvedValue([{
+      id: 'assignment-closed', staff_id: 'staff-0', staff_name: 'Past Driver',
+      assignment_start: '2026-03-03', assignment_end: '2026-04-30',
+    }]);
+
+    const assignments = await loadVehicleDriverAssignments('vehicle-1');
+
+    expect(assignments).toEqual([{
+      assignmentId: 'assignment-closed', staffId: 'staff-0', staffName: 'Past Driver',
+      assignmentStart: '2026-03-03', assignmentEnd: '2026-04-30',
+    }]);
+    expect(db.query.mock.calls[0]![0]).not.toContain('is_active');
   });
 
   it('leaves the covering-instant decision to the resolver — no date predicate in SQL', async () => {
@@ -155,15 +174,14 @@ describe('loadVehicleDriverAssignments', () => {
     const [text] = db.query.mock.calls[0]!;
     expect(text).toContain('WHERE va.fleet_vehicle_id = $1::uuid');
     expect(text).not.toContain('assignment_start <=');
-    expect(text).not.toContain('is_active AND');
   });
 
-  it('treats a NULL is_active as inactive rather than as truthy', async () => {
+  it('keeps a missing staff name null rather than an empty string', async () => {
     db.query.mockResolvedValue([{
       id: 'assignment-1', staff_id: 'staff-1', staff_name: null,
-      is_active: null, assignment_start: '2026-08-01', assignment_end: '2026-08-20',
+      assignment_start: '2026-08-01', assignment_end: '2026-08-20',
     }]);
     const assignments = await loadVehicleDriverAssignments('vehicle-1');
-    expect(assignments[0]).toMatchObject({ isActive: false, staffName: null, assignmentEnd: '2026-08-20' });
+    expect(assignments[0]).toMatchObject({ staffName: null, assignmentEnd: '2026-08-20' });
   });
 });

@@ -22,8 +22,24 @@
  *
  * Both ends are INCLUSIVE: an assignment that starts today covers today, and
  * one that ended today still covers today. That matches how a handover is
- * captured — the leaving driver's row is ended on the day they hand the keys
- * over.
+ * captured — the leaving driver's row is ended on the SAME date the incoming
+ * driver's row starts (e.g. `2026-03-03 → 2026-04-30` closed, `2026-04-30`
+ * open). On that one shared date both rows cover the event and the newest start
+ * wins, so a handover day is attributed to the INCOMING driver. That is the
+ * price of a day-granular table: it cannot say who held the keys at 09:00. Say
+ * so rather than inventing a tie-break the data does not support.
+ *
+ * ## `is_active` is NOT part of the rule — the dates are
+ *
+ * Every close path sets the flag and the end date in one statement, so all 63
+ * production rows are one of exactly two shapes: `{is_active, end IS NULL}` (22
+ * rows) or `{NOT is_active, end IS NOT NULL}` (41 rows). Filtering on the flag
+ * would therefore make the date bounds unreachable and throw away ALL history:
+ * an event that predates the current driver's start would resolve to nobody
+ * even though a closed row names exactly who was driving. Closed rows are the
+ * history this resolver exists to read. A hypothetical `{NOT is_active, end IS
+ * NULL}` row — none exists — would attribute indefinitely under this rule;
+ * fix the row, not the resolver, if one ever appears.
  *
  * ## What this changes, deliberately
  *
@@ -59,18 +75,19 @@ export type VehicleAssignmentLoader = (vehicleId: string) => Promise<VehicleDriv
 /**
  * The assignment covering `eventDate`, or null.
  *
- * Pure and exported so the boundary is testable without a database. When more
- * than one assignment covers the date — overlapping rows are possible, nothing
- * in the schema forbids them — the NEWEST `assignmentStart` wins: that is the
- * most recent statement anybody made about who drives this vehicle. Ties keep
- * the first row the loader returned, which orders deterministically.
+ * Pure and exported so the boundary is testable without a database. Closed
+ * rows count: they are how the table records who was driving in the past, and
+ * the flag is not consulted at all (see this module's header). When more than
+ * one assignment covers the date — a handover day always produces two — the
+ * NEWEST `assignmentStart` wins: that is the most recent statement anybody made
+ * about who drives this vehicle. Ties keep the first row the loader returned,
+ * which orders deterministically.
  */
 export function selectDriverAssignmentAt(
   assignments: readonly VehicleDriverAssignment[], eventDate: string,
 ): VehicleDriverAssignment | null {
   let best: VehicleDriverAssignment | null = null;
   for (const assignment of assignments) {
-    if (!assignment.isActive) continue;
     if (assignment.assignmentStart > eventDate) continue;
     if (assignment.assignmentEnd !== null && assignment.assignmentEnd < eventDate) continue;
     if (best === null || assignment.assignmentStart > best.assignmentStart) best = assignment;

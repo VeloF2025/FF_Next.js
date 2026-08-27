@@ -156,13 +156,19 @@ interface AssignmentRow extends Record<string, unknown> {
   id: string;
   staff_id: string;
   staff_name: string | null;
-  is_active: boolean | null;
   assignment_start: string;
   assignment_end: string | null;
 }
 
 /**
- * Every `vehicle_assignments` row for one vehicle, newest start first.
+ * Every `vehicle_assignments` row for one vehicle, newest start first —
+ * CLOSED rows included, and `is_active` neither selected nor filtered on.
+ *
+ * A closed row is the history: it names who was driving between two dates, and
+ * an incident is attributed by when it HAPPENED. Every close path writes the
+ * flag and the end date in one statement (all 63 production rows are
+ * `{active, open-ended}` or `{inactive, ended}`), so filtering on the flag
+ * would leave the date bounds unreachable and silently drop every past driver.
  *
  * The instant-covering predicate is deliberately NOT in this query. Filtering
  * here would put the boundary rule (`start <= t`, inclusive end, newest wins)
@@ -180,7 +186,6 @@ export async function loadVehicleDriverAssignments(vehicleId: string): Promise<V
     `/* fleet-detectors:vehicle-driver */
      SELECT va.id, va.staff_id,
             NULLIF(CONCAT_WS(' ', s.first_name, s.last_name), '') AS staff_name,
-            va.is_active,
             to_char(va.assignment_start, 'YYYY-MM-DD') AS assignment_start,
             to_char(va.assignment_end, 'YYYY-MM-DD') AS assignment_end
      FROM vehicle_assignments va
@@ -193,7 +198,6 @@ export async function loadVehicleDriverAssignments(vehicleId: string): Promise<V
     assignmentId: row.id,
     staffId: row.staff_id,
     staffName: row.staff_name,
-    isActive: row.is_active === true,
     assignmentStart: row.assignment_start,
     assignmentEnd: row.assignment_end,
   }));

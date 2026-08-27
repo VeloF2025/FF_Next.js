@@ -165,15 +165,24 @@ export interface VehicleDetectorDeps extends EmitterDeps {
   detectors: readonly RegisteredDetector[];
 }
 
-const DEFAULT_DEPS: VehicleDetectorDeps = {
+/**
+ * The production wiring. Exported ONLY so a test can assert these are the real
+ * resolvers and not a stub: every seam below is overridable, so a wrong default
+ * here silently disables attribution or project scoping in production while the
+ * whole suite stays green on its own fakes.
+ *
+ * The resolvers are passed by reference rather than wrapped in an arrow for the
+ * same reason — an arrow makes that identity untestable.
+ */
+export const DEFAULT_DEPS: VehicleDetectorDeps = {
   loadVehicles: loadDetectorVehicles,
   loadWindow: loadPositionWindow,
   loadLast: loadLastPosition,
   loadGapP90: loadGapP90Seconds,
   loadRule: loadEffectiveVehicleRule,
   loadHolidayDates: loadHolidays,
-  resolveProjectId: (lat, lon) => resolveVehicleProjectId(lat, lon),
-  resolveDriver: (vehicleId, occurredAt) => resolveVehicleDriver(vehicleId, occurredAt),
+  resolveProjectId: resolveVehicleProjectId,
+  resolveDriver: resolveVehicleDriver,
   loadIncidentRule: loadEffectiveIncidentRule,
   produce: produceIncident,
   notifyOpened: sendIncidentOpenedNotification,
