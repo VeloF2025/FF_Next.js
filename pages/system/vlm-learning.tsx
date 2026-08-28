@@ -41,6 +41,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { log } from '@/lib/logger';
+import { ANALYSIS_TYPES_BY_MODULE } from '@/types/vlm-learning';
 import type {
   VlmModule,
   VlmAnalysisType,
@@ -67,8 +68,19 @@ const MODULE_LABELS: Record<VlmModule, string> = {
   staff: 'Staff',
   qfield: 'QField',
   construction_qa: 'Construction QA',
+  works_qa: 'Works QA',
   'data-sync': 'Data Sync',
 };
+
+const ANALYSIS_TYPE_LABELS: Partial<Record<VlmAnalysisType, string>> = {
+  works_qa_civil: 'Civil',
+  works_qa_optical: 'Optical',
+};
+
+function analysisTypeLabel(type: VlmAnalysisType): string {
+  return ANALYSIS_TYPE_LABELS[type]
+    ?? type.replaceAll('_', ' ').replace(/\b\w/g, character => character.toUpperCase());
+}
 
 export default function VlmLearningPage() {
   const router = useRouter();
@@ -541,7 +553,11 @@ function CorrectionsTab({ isCanonicalOnly }: { isCanonicalOnly: boolean }) {
         <select
           value={filters.module}
           onChange={(e) => {
-            setFilters({ ...filters, module: e.target.value as VlmModule | '' });
+            setFilters({
+              ...filters,
+              module: e.target.value as VlmModule | '',
+              analysisType: '',
+            });
             setPage(0);
           }}
           className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-purple-500 focus:border-purple-500"
@@ -553,6 +569,23 @@ function CorrectionsTab({ isCanonicalOnly }: { isCanonicalOnly: boolean }) {
             </option>
           ))}
         </select>
+
+        {filters.module && ANALYSIS_TYPES_BY_MODULE[filters.module].length > 0 && (
+          <select
+            value={filters.analysisType}
+            onChange={(e) => {
+              setFilters({ ...filters, analysisType: e.target.value as VlmAnalysisType | '' });
+              setPage(0);
+            }}
+            aria-label="Analysis type"
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-purple-500 focus:border-purple-500"
+          >
+            <option value="">All {MODULE_LABELS[filters.module]} Types</option>
+            {ANALYSIS_TYPES_BY_MODULE[filters.module].map(type => (
+              <option key={type} value={type}>{analysisTypeLabel(type)}</option>
+            ))}
+          </select>
+        )}
 
         <select
           value={filters.errorPattern}

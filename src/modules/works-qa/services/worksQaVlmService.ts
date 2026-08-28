@@ -7,6 +7,11 @@ import {
   stripThinkTags,
 } from '@/lib/vlm';
 import { log } from '@/lib/logger';
+import {
+  buildVlmFewShotPrompt,
+  getVlmFewShotExamples,
+} from '@/services/vlmLearningService';
+import type { VlmAnalysisType } from '@/types/vlm-learning';
 import type { VlmSlotResult } from '../types/works-qa.types';
 import { SLOT_META } from '../utils/slot-keys';
 
@@ -53,15 +58,49 @@ export function redactVlmKey(text: string): string {
   return text.replace(/(vlmkey(?:=|%3D))[^&'"\s]+/gi, '$1[REDACTED]');
 }
 
+export function worksQaAnalysisTypeForSlot(slotKey: string): VlmAnalysisType | null {
+  const discipline = SLOT_META.find(slot => slot.key === slotKey)?.discipline;
+  if (discipline === 'civil') return 'works_qa_civil';
+  if (discipline === 'dome' || discipline === 'main_joint') return 'works_qa_optical';
+  return null;
+}
+
+async function getWorksQaLearningSection(slotKey?: string): Promise<string> {
+  const analysisTypes: VlmAnalysisType[] = slotKey
+    ? [worksQaAnalysisTypeForSlot(slotKey)].filter(
+        (value): value is VlmAnalysisType => value !== null
+      )
+    : ['works_qa_civil', 'works_qa_optical'];
+
+  if (analysisTypes.length === 0) return '';
+
+  const examples = (
+    await Promise.all(
+      analysisTypes.map(analysisType =>
+        getVlmFewShotExamples({
+          module: 'works_qa',
+          analysisType,
+          context: slotKey ? { slotKey } : undefined,
+          maxExamples: slotKey ? 4 : 2,
+        })
+      )
+    )
+  ).flat();
+
+  return buildVlmFewShotPrompt(examples);
+}
+
 export async function validatePhotoWithVlm(
   params: VlmValidateParams,
 ): Promise<VlmSlotResult> {
   const { photoUrl, slotKey, stepLabel, vlmCheck } = params;
+  const learningSection = await getWorksQaLearningSection(slotKey);
 
   const prompt = `You are a fibre network construction QA inspector.
 Evaluate whether this photo correctly shows: ${stepLabel}.
 
 What to check: ${vlmCheck}
+${learningSection ? `\n${learningSection}\n` : ''}
 
 Respond with ONLY valid JSON (no markdown):
 {"valid": true/false, "confidence": 0.0-1.0, "feedback": "brief reason"}`;
@@ -135,7 +174,14 @@ Respond with ONLY valid JSON (no markdown):
       feedback?: unknown;
     };
 
-    const valid = Boolean(parsed.valid);
+    if (typeof parsed.valid !== 'boolean') {
+      log.error('worksQaVlmService: invalid valid field type', {
+        slotKey,
+        validType: typeof parsed.valid,
+      });
+      return FALLBACK_RESULT;
+    }
+    const valid = parsed.valid;
     const confidence =
       typeof parsed.confidence === 'number'
         ? Math.min(1, Math.max(0, parsed.confidence))
@@ -191,7 +237,8 @@ Respond with ONLY valid JSON (no markdown):
 }
 
 export async function classifyPhotoToSlot(photoUrl: string): Promise<VlmClassifyResult> {
-  const prompt = buildClassifyPrompt();
+  const learningSection = await getWorksQaLearningSection();
+  const prompt = `${buildClassifyPrompt()}${learningSection ? `\n\n${learningSection}` : ''}`;
 
   const body = {
     model: VLM_QA_MODEL,

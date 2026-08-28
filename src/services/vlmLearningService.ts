@@ -118,11 +118,25 @@ export async function markAsCanonical(
   priority?: number
 ): Promise<void> {
   try {
-    await sql`
+    const updated = await sql`
       UPDATE vlm_corrections
       SET is_canonical = ${isCanonical}, priority = COALESCE(${priority}, priority)
       WHERE id = ${correctionId}
+      RETURNING source_table, source_id
     `;
+
+    const source = updated[0];
+    if (source?.source_table === 'qa_correction_examples' && source.source_id) {
+      // Keep Works-QA's workflow-level source in sync. Its database trigger then
+      // refreshes the universal mirror, so prompt retrieval and dashboard curation
+      // cannot disagree about which examples are canonical.
+      await sql`
+        UPDATE qa_correction_examples
+        SET is_canonical = ${isCanonical}
+        WHERE id = ${source.source_id}
+          AND workflow_type = 'works_qa'
+      `;
+    }
     log.info(`Updated correction ${correctionId} canonical=${isCanonical}`);
   } catch (error) {
     log.error(`Failed to update canonical status: ${error}`);
@@ -746,6 +760,7 @@ export async function getModuleAccuracySummaries(): Promise<ModuleAccuracySummar
       staff: 'Staff/HR',
       qfield: 'QField QA',
       construction_qa: 'Construction QA',
+      works_qa: 'Works QA',
       'data-sync': 'Data Sync',
     };
 
